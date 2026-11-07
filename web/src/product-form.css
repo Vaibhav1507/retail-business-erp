@@ -1,0 +1,49 @@
+/* Add / edit product form and stock import assistant.
+   Selectors are prefixed with .stock-page / form.product-form so they beat the global form rules in styles.css. */
+form.product-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; align-items: start; max-width: none; width: 100%; padding: 4px 0 0; margin: 0; }
+form.product-form > h3 { grid-column: 1 / -1; margin: 0; font-size: 18px; }
+form.product-form > fieldset, form.product-form > .form-actions, form.product-form > p, form.product-form > .check { grid-column: 1 / -1; }
+form.product-form label { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: none; margin: 0; font-size: 14px; font-weight: 600; }
+form.product-form label input, form.product-form label select { width: 100%; min-height: 46px; margin: 0; box-sizing: border-box; }
+form.product-form label.check { flex-direction: row; align-items: center; gap: 10px; align-self: end; min-height: 46px; }
+form.product-form label.check input { width: 22px; min-height: 0; flex: none; }
+form.product-form select { appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer; background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'><path fill='%235b6770' d='M5 7l5 6 5-6z'/></svg>") no-repeat right 14px center; }
+form.product-form fieldset { border: 1px solid var(--line, #e3e7e5); border-radius: 12px; margin: 0; padding: 20px 20px 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; background: #f9fbfa; min-width: 0; }
+@media (max-width: 800px) { form.product-form, form.product-form fieldset { grid-template-columns: 1fr; } }
+form.product-form legend { padding: 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--brand, #107c52); }
+form.product-form .form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+form.product-form .form-actions button { margin: 0; min-width: 120px; }
+form.product-form button.secondary { background: #fff; color: var(--brand-dark, #0b5a3a); }
+form.product-form button.secondary:hover:not(:disabled) { background: var(--brand-soft, #e8f5ee); }
+
+.stock-page > section > p:first-child { margin: 0 0 16px; }
+.stock-page .import-heading { margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid var(--line, #e3e7e5); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--brand, #107c52); }
+.stock-page section section { border: 0; padding: 0; box-shadow: none; background: transparent; display: grid; gap: 16px; }
+.stock-page section section > * { margin: 0; }
+.stock-page section section > h2 { font-size: 17px; }
+.stock-page section section ol { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0; }
+.stock-page section section ol li { padding: 6px 14px; border: 1px solid var(--line, #e3e7e5); border-radius: 999px; font-size: 13px; background: #fff; }
+.stock-page section section ol li[aria-current="true"] { background: #e8f5ee; border-color: var(--brand, #107c52); font-weight: 700; }
+.stock-page section section label { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.stock-page section section input[type="file"] { padding: 10px 12px; background: #f9fbfa; border-style: dashed; min-height: 52px; }
+.stock-page section section div { display: grid; gap: 16px; justify-items: start; }
+.stock-page section section p button, .stock-page section section div > button { margin: 0 8px 0 0; }
+.stock-page section section button.secondary { background: #fff; color: var(--brand-dark, #0b5a3a); }
+.catalogue-screen { display: block; }
+.catalogue-screen > .tabs { display: flex; flex-wrap: wrap; gap: 8px; overflow: visible; margin: 0 0 16px; padding: 0; }
+.catalogue-screen .stock-actions { margin-bottom: 16px; }
+.catalogue-screen div[role='search'] { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; margin-bottom: 16px; }
+.catalogue-screen div[role='search'] label:has(input[type='checkbox']) { flex-direction: row; align-items: center; gap: 8px; min-height: 46px; white-space: nowrap; }
+.catalogue-screen div[role='search'] input[type='checkbox'] { flex: none; }
+.catalogue-screen th { font-size: 14px; }
+.catalogue-screen .import-block { margin: 0 0 28px; padding-bottom: 28px; border-bottom: 1px solid var(--line, #e3e7e5); }
+.catalogue-screen h3 { margin: 0 0 16px; font-size: 18px; }
+.catalogue-screen .invoice-upload { display: grid; gap: 14px; }
+.catalogue-screen .invoice-upload-pick { display: flex; flex-direction: column; gap: 8px; font-weight: 600; }
+.catalogue-screen .invoice-upload-pick input[type="file"] { padding: 14px; border: 2px dashed var(--line, #e3e7e5); border-radius: 12px; background: #fff; min-height: 52px; }
+.catalogue-screen .invoice-upload-meta { margin: 0; font-weight: 600; }
+.catalogue-screen .invoice-upload-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.catalogue-screen .invoice-upload td input, .catalogue-screen .invoice-upload td select { width: 100%; min-width: 110px; min-height: 40px; }
+.catalogue-screen .invoice-upload p { margin: 0; }
+.catalogue-screen form[aria-label='Rename category'] { margin-top: 16px; }
+@media (max-width: 800px) { .catalogue-screen div[role='search'] { grid-template-columns: 1fr; } }

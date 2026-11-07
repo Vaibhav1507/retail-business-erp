@@ -1,0 +1,176 @@
+import './invoice-upload.css'
+import { useState } from 'react'
+import { api } from './api'
+
+type Opt = { id: string; name: string }
+type DraftLine = { description: string; quantity: number | null; unitCost: number | null; amount: number | null; productId: string | null; productName: string | null; category?: string | null; brand?: string | null }
+export type InvoiceDraft = { fileId: string; supplierName: string | null; supplierId: string | null; invoiceNumber: string | null; date: string | null; total: number | null; lines: DraftLine[]; warnings: string[] }
+type Row = { description: string; productId: string; qty: string; cost: string; category?: string; brand?: string }
+type Picked = { productId: string; quantity: number; unitCost: number }
+
+const MAX_BYTES = 8 * 1024 * 1024
+
+export const toBase64 = (b: Blob) => new Promise<string>((resolve, reject) => {
+  const r = new FileReader()
+  r.onload = () => resolve(String(r.result).split(',')[1] ?? '')
+  r.onerror = () => reject(r.error)
+  r.readAsDataURL(b)
+})
+
+export async function prepare(file: File): Promise<{ contentType: string; data: string }> {
+  if (file.type === 'application/pdf') {
+    if (file.size > MAX_BYTES) throw new Error('PDF is larger than 8 MB.')
+    return { contentType: file.type, data: await toBase64(file) }
+  }
+  if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
+  const bmp = await createImageBitmap(file)
+  const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bmp.width * scale)
+  canvas.height = Math.round(bmp.height * scale)
+  canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+  if (!blob) throw new Error('Could not prepare the photo.')
+  return { contentType: 'image/jpeg', data: await toBase64(blob) }
+}
+
+const NEW = '__new__'
+
+export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSupplierAdded }: { products: Opt[]; suppliers: Opt[]; onUse: (d: InvoiceDraft, lines: Picked[]) => void; onProductAdded?: () => void; onSupplierAdded?: () => void }) {
+  const [supplierId, setSupplierId] = useState('')
+  const [extraSup, setExtraSup] = useState<Opt[]>([])
+  const supOptions = [...suppliers, ...extraSup.filter(x => !suppliers.some(s => s.id === x.id))]
+  const [extra, setExtra] = useState<Opt[]>([])
+  const options = [...products, ...extra.filter(x => !products.some(p => p.id === x.id))]
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [draft, setDraft] = useState<InvoiceDraft | null>(null)
+  const [rows, setRows] = useState<Row[]>([])
+
+  const pick = async (files: File[]) => {
+    if (files.length === 0) return
+    if (files.length > 6) { setError('Choose at most 6 pages of one invoice.'); return }
+    setBusy(true); setError(''); setDraft(null)
+    try {
+      const pages = await Promise.all(files.map(prepare))
+      const d = await api<InvoiceDraft>('POST', '/purchases/extract', { pages })
+      setDraft(d); setSupplierId(d.supplierId ?? '')
+      setRows(d.lines.map(l => ({ description: l.description, productId: l.productId ?? '', qty: l.quantity?.toString() ?? '', cost: l.unitCost?.toString() ?? '', category: l.category ?? undefined, brand: l.brand ?? undefined })))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read the invoice.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const edit = (i: number, patch: Partial<Row>) => setRows(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)))
+
+  const create = async (items: Row[]) => {
+    setError('')
+    const made = new Map<string, string>()
+    try {
+      for (const it of items) {
+        const name = it.description
+        if (made.has(name)) continue
+        const p = await api<{ id: string }>('POST', '/products', { name: name.trim().slice(0, 120), categoryName: it.category?.trim() || 'Uncategorised', isGeneric: !it.brand?.trim(), brand: it.brand?.trim() || null, baseUnit: 'pcs' })
+        made.set(name, p.id)
+        setExtra(x => [...x, { id: p.id, name: name.trim() }])
+      }
+      onProductAdded?.()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add the product.')
+    }
+    return made
+  }
+  const choose = async (i: number, value: string) => {
+    if (value !== NEW) { edit(i, { productId: value }); return }
+    const made = await create([rows[i]])
+    const id = made.get(rows[i].description)
+    if (id) setRows(rs => rs.map((r, n) => (n === i ? { ...r, productId: id } : r)))
+  }
+  const chooseSupplier = async (value: string) => {
+    if (value !== NEW || !draft?.supplierName) { setSupplierId(value); return }
+    setError('')
+    const name = draft.supplierName.trim().slice(0, 120)
+    try {
+      const s = await api<{ id: string }>('POST', '/suppliers', { name })
+      setExtraSup(x => [...x, { id: s.id, name }]); setSupplierId(s.id); onSupplierAdded?.()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add the supplier.')
+    }
+  }
+  const unmatched = rows.filter(r => !r.productId)
+  const addAll = async () => {
+    const made = await create(unmatched)
+    setRows(rs => rs.map(r => (!r.productId && made.has(r.description) ? { ...r, productId: made.get(r.description)! } : r)))
+  }
+  const valid = rows.filter(r => r.productId && Number(r.qty) > 0 && Number(r.cost) > 0)
+
+  const apply = () => {
+    if (!draft) return
+    const byProduct = new Map<string, Picked>()
+    for (const r of valid) {
+      const q = Number(r.qty); const c = Number(r.cost)
+      const prev = byProduct.get(r.productId)
+      if (!prev) byProduct.set(r.productId, { productId: r.productId, quantity: q, unitCost: c })
+      else { const qty = prev.quantity + q; byProduct.set(r.productId, { productId: r.productId, quantity: qty, unitCost: Math.round(((prev.quantity * prev.unitCost + q * c) / qty) * 10000) / 10000 }) }
+    }
+    onUse({ ...draft, supplierId: supplierId || null }, [...byProduct.values()])
+    setDraft(null); setRows([])
+  }
+
+  return (
+    <div role="region" aria-label="Read invoice" className="invoice-upload">
+      <label className="invoice-upload-pick">
+        Upload invoice photo or PDF (optional). Select all pages of one invoice together.
+        <input type="file" accept="image/*,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+      </label>
+      {busy && <p role="status">Reading invoice...</p>}
+      {error && <p role="alert">{error}</p>}
+      {draft && (
+        <div className="invoice-upload-review">
+          <p className="invoice-upload-meta">
+            {draft.supplierName ? `Supplier: ${draft.supplierName}` : 'Supplier not found'}
+            {draft.invoiceNumber ? ` | Invoice ${draft.invoiceNumber}` : ''}
+            {draft.date ? ` | ${draft.date}` : ''}
+            {draft.total != null ? ` | Total ${draft.total.toFixed(2)}` : ''}
+          </p>
+          <label>Supplier
+            <select aria-label="Supplier for this invoice" value={supplierId} onChange={e => { void chooseSupplier(e.target.value) }}>
+              <option value="">{draft.supplierName ? 'Choose supplier' : 'No supplier'}</option>
+              {draft.supplierName && <option value={NEW}>+ Add "{draft.supplierName}" as new supplier</option>}
+              {supOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          {draft.warnings.length > 0 && <ul className="invoice-upload-warn">{draft.warnings.map(w => <li key={w}>{w}</li>)}</ul>}
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>On invoice</th><th>Product</th><th>Qty</th><th>Unit cost</th></tr></thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i}>
+                    <td>{r.description}</td>
+                    <td>
+                      <select aria-label={`Product for ${r.description}`} value={r.productId} onChange={e => { void choose(i, e.target.value) }}>
+                        <option value="">Skip this line</option>
+                        <option value={NEW}>+ Add "{r.description}" as new product</option>
+                        {options.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </td>
+                    <td><input aria-label="Quantity" inputMode="decimal" value={r.qty} onChange={e => edit(i, { qty: e.target.value })} /></td>
+                    <td><input aria-label="Unit cost" inputMode="decimal" value={r.cost} onChange={e => edit(i, { cost: e.target.value })} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="invoice-upload-actions">
+            {unmatched.length > 0 && <button type="button" className="secondary" onClick={() => { void addAll() }}>Add {unmatched.length} unmatched as new products</button>}
+            <button type="button" onClick={apply} disabled={valid.length === 0}>Use {valid.length} line{valid.length === 1 ? '' : 's'}</button>
+            <button type="button" className="secondary" onClick={() => { setDraft(null); setRows([]) }}>Discard</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

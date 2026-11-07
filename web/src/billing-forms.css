@@ -1,0 +1,63 @@
+.billing-page { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+.billing-page h2 { margin: 0; }
+.billing-card { background: #fff; border: 1px solid var(--line, #e3e7e5); border-radius: 16px; padding: 18px 20px; box-shadow: 0 6px 18px rgba(30, 60, 90, .06); }
+.billing-card h3 { margin: 0 0 12px; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--brand, #107c52); }
+.billing-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px 14px; }
+.billing-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; }
+.billing-field label { font-size: 13px; font-weight: 600; color: var(--muted, #5b6770); flex: none; }
+.billing-field input, .billing-field select { width: 100%; min-height: 44px; }
+.billing-col-3 { grid-column: span 3; } .billing-col-4 { grid-column: span 4; } .billing-col-5 { grid-column: span 5; }
+.billing-col-6 { grid-column: span 6; } .billing-col-8 { grid-column: span 8; } .billing-col-2 { grid-column: span 2; } .billing-col-12 { grid-column: span 12; }
+.billing-row { flex-direction: row; align-items: center; gap: 14px; }
+.billing-hint { margin: 10px 0 0; font-size: 13px; color: var(--muted, #5b6770); }
+.billing-row .billing-hint { margin: 0; }
+.billing-err { color: #b3261e; margin: 0; }
+.billing-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line, #e3e7e5); border-radius: 12px; box-shadow: 0 12px 28px rgba(30, 60, 90, .18); max-height: 260px; overflow: auto; }
+.billing-menu li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.billing-menu li:hover { background: #eef6f2; }
+.billing-menu li span { color: var(--muted, #5b6770); }
+.billing-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+.billing-table th, .billing-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line, #e3e7e5); }
+.billing-table th:nth-child(n+2), .billing-table td:nth-child(n+2) { text-align: right; }
+.billing-foot { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.billing-gst { display: flex; align-items: center; gap: 12px; }
+.billing-gst select { width: 90px; min-height: 40px; }
+.billing-check { display: flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 600; flex: none; }
+.billing-check input { width: 20px; min-height: 0; }
+.billing-total { font-size: 16px; margin-left: auto; }
+.billing-total strong { font-size: 22px; margin-left: 6px; }
+.billing-total small { color: var(--muted, #5b6770); }
+
+.billing-screen { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 16px; align-items: end; background: #fff; border: 1px solid var(--line, #e3e7e5); border-radius: 16px; padding: 20px; box-shadow: 0 6px 18px rgba(30, 60, 90, .06); }
+.billing-screen > h2, .billing-screen > h3, .billing-screen > h4, .billing-screen > table, .billing-screen > p, .billing-screen > ul, .billing-screen > div[role="region"] { grid-column: 1 / -1; margin: 0; }
+.billing-screen > h3 { font-size: 18px; color: var(--brand, #107c52); padding-top: 12px; border-top: 1px solid var(--line, #e3e7e5); }
+.billing-screen label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted, #5b6770); }
+.billing-screen label input, .billing-screen label select { width: 100%; min-height: 44px; }
+.billing-screen button { justify-self: start; }
+.billing-screen table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.billing-screen th, .billing-screen td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line, #e3e7e5); }
+.billing-screen th { font-size: 14px; color: var(--muted, #5b6770); }
+.billing-screen tbody tr:hover { background: #f3f8f5; }
+.billing-screen div[role="region"] { background: #f7faf8; border: 1px solid var(--line, #e3e7e5); border-radius: 12px; padding: 16px; }
+@media print { .billing-screen { box-shadow: none; border: 0; padding: 0; display: block; } }
+@media (max-width: 700px) { .billing-col-3, .billing-col-4, .billing-col-5, .billing-col-6, .billing-col-8 { grid-column: span 12; } .billing-col-2 { grid-column: span 4; } .billing-foot { flex-direction: column; align-items: stretch; } .billing-total { margin-left: 0; } }
+
+.billing-screen > div[role="search"], .billing-screen > .table-scroll, .billing-screen > .paged { grid-column: 1 / -1; }
+.billing-screen > div[role="search"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 16px; align-items: end; }
+.billing-screen > .hint-line, .billing-screen > .empty { grid-column: 1 / -1; margin: 0; }
+.billing-screen .paged .table-scroll { overflow-x: auto; }
+
+.stock-page .billing-screen, .stock-page > section { max-width: none; margin: 0; }
+.billing-screen > div:not([role]):not(.paged):not(.table-scroll) { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 16px; align-items: end; }
+.billing-screen .table-scroll { overflow-x: auto; width: 100%; }
+.billing-screen > a, .stock-page > p > a { justify-self: start; }
+
+.billing-screen > ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+.billing-screen > ul:empty { display: none; }
+.billing-screen > ul > li { padding: 10px 14px; background: #f7faf8; border: 1px solid var(--line, #e3e7e5); border-radius: 10px; font-size: 14px; }
+.billing-screen > p[role="alert"], .billing-screen > p[role="status"] { padding: 10px 14px; border-radius: 10px; font-weight: 600; }
+.billing-screen > p[role="alert"] { background: #fdecea; color: #a12622; }
+.billing-screen > p[role="status"] { background: #e8f5ee; color: #0b6b43; }
+.billing-screen > h2 + h3, .stock-page > .billing-screen > h3:first-child { border-top: 0; padding-top: 0; }
+.billing-screen > div:not([role]):not(.paged):not(.table-scroll) > button { align-self: end; }
+@media (max-width: 700px) { .billing-screen { padding: 14px; } .billing-screen button { width: 100%; justify-self: stretch; } }

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Rbos.Api/Rbos.Api.csproj" />
+    <Project Path="src/Rbos.Domain/Rbos.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Rbos.IntegrationTests/Rbos.IntegrationTests.csproj" />
+    <Project Path="tests/Rbos.UnitTests/Rbos.UnitTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,10 @@
+.billing-screen .invoice-upload { display: grid; gap: 14px; }
+.invoice-upload-pick { display: flex; flex-direction: column; gap: 8px; font-weight: 600; }
+.invoice-upload-pick input[type="file"] { padding: 14px; border: 2px dashed var(--line, #e3e7e5); border-radius: 12px; background: #fff; min-height: 52px; }
+.invoice-upload-meta { margin: 0; font-weight: 600; }
+.invoice-upload-warn { margin: 0; padding: 10px 14px 10px 30px; background: #fff6e5; color: #8a5a00; border-radius: 10px; font-size: 14px; }
+.invoice-upload-review { display: grid; gap: 12px; }
+.invoice-upload-review td input, .invoice-upload-review td select { width: 100%; min-width: 90px; min-height: 40px; }
+.invoice-upload-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.billing-screen .invoice-upload [role="alert"] { margin: 0; padding: 10px 14px; border-radius: 10px; background: #fdecea; color: #a12622; font-weight: 600; }
+.billing-screen .invoice-upload [role="status"] { margin: 0; font-weight: 600; color: #0b6b43; }

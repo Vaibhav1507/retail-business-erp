@@ -1,0 +1,4 @@
+name,category,unit,brand,model,generic,colour,capacity,connector_type,compatible_with
+USB-C Cable 1m,Cables,pcs,Acme,UC-100,no,black,,USB-C,
+Generic HDMI Cable,Cables,pcs,,,yes,black,,HDMI,
+Phone Charger 20W,Chargers,pcs,Acme,CH-20,no,white,,USB-C,Android phones

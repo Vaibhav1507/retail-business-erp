@@ -1,0 +1,94 @@
+﻿using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+namespace Rbos.IntegrationTests;
+
+public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
+{
+    static string Today => DateTime.UtcNow.ToString("yyyy-MM-dd");
+    static string K() => Guid.NewGuid().ToString();
+    static async Task<(Client c, Guid loc, Guid p)> Stocked(ApiFactory f, decimal qty = 10, decimal cost = 20m)
+    {
+        var c = new Client(f); await c.SignUpAndBootstrap(); var loc = await c.Location(); var p = await c.AddProduct("Cable");
+        var s = await c.Send(HttpMethod.Post, "/suppliers", new { name = "Acme" });
+        var sup = (await s.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var r = await c.Send(HttpMethod.Post, "/purchases", new { supplierId = sup, locationId = loc, receiptDate = Today, lines = new[] { new { productId = p, quantity = qty, unitCost = cost } } }, K());
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        return (c, loc, p);
+    }
+    static async Task<Guid> Customer(Client c, string name = "Ravi")
+        => (await (await c.Send(HttpMethod.Post, "/customers", new { name, phone = "9990001111" })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+    static object Sale(Guid? cust, Guid loc, Guid p, decimal qty, decimal price, string type, decimal? paid = null, decimal discount = 0m)
+        => new { customerId = cust, locationId = loc, saleDate = Today, saleType = type, amountPaid = paid, payMethod = type == "Credit" ? "Cash" : (string?)null, lines = new[] { new { productId = p, quantity = qty, unitPrice = price, discount } } };
+    static async Task<JsonElement> Stock(Client c) => (await c.GetJson("/stock")).EnumerateArray().Single();
+    static async Task<decimal> Owed(Client c, Guid cust) => (await c.GetJson("/customers")).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == cust).GetProperty("owed").GetDecimal();
+
+    [Fact] public async Task Walk_in_cash_sale_deducts_stock_at_wac()
+    {
+        var (c, loc, p) = await Stocked(f);
+        var r = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 3, 50m, "Cash", discount: 10m), K());
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(140m, (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("total").GetDecimal());
+        var s = await Stock(c);
+        Assert.Equal(7m, s.GetProperty("quantity").GetDecimal());
+        Assert.Equal(20m, s.GetProperty("wac").GetDecimal());
+        Assert.Equal(140m, s.GetProperty("value").GetDecimal());
+    }
+    [Fact] public async Task Credit_sale_with_part_payment_updates_customer_balance()
+    {
+        var (c, loc, p) = await Stocked(f); var cust = await Customer(c);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 2, 100m, "Credit", 60m), K())).StatusCode);
+        Assert.Equal(140m, await Owed(c, cust));
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 50m, "Credit"), K())).StatusCode);
+        Assert.Equal(190m, await Owed(c, cust));
+        Assert.Equal(7m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+    }
+    [Fact] public async Task Credit_sale_requires_customer_and_overpay_rejected()
+    {
+        var (c, loc, p) = await Stocked(f); var cust = await Customer(c);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 1, 50m, "Credit"), K())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 50m, "Credit", 60m), K())).StatusCode);
+        Assert.Equal(10m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+    }
+    [Fact] public async Task Sale_cannot_make_stock_negative()
+    {
+        var (c, loc, p) = await Stocked(f, 5);
+        var r = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "UPI"), K());
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        Assert.Equal(5m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 5, 50m, "UPI"), K())).StatusCode);
+        var s = await Stock(c); Assert.Equal(0m, s.GetProperty("quantity").GetDecimal()); Assert.Equal(0m, s.GetProperty("value").GetDecimal());
+    }
+    [Fact] public async Task Duplicate_submission_is_safe_and_key_reuse_conflicts()
+    {
+        var (c, loc, p) = await Stocked(f); var key = K();
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 2, 50m, "Cash"), key)).StatusCode);
+        var again = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 2, 50m, "Cash"), key);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.True((await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("replayed").GetBoolean());
+        Assert.Equal(HttpStatusCode.Conflict, (await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 3, 50m, "Cash"), key)).StatusCode);
+        Assert.Equal(8m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+        Assert.Single((await c.GetJson("/sales")).EnumerateArray());
+    }
+    [Fact] public async Task Sale_detail_and_search_work()
+    {
+        var (c, loc, p) = await Stocked(f); var cust = await Customer(c, "Meera Stores");
+        var id = (await (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 80m, "Credit", 30m), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var d = await c.GetJson("/sales/" + id);
+        Assert.Equal(50m, d.GetProperty("sale").GetProperty("balance").GetDecimal());
+        Assert.Single(d.GetProperty("lines").EnumerateArray());
+        Assert.Single((await c.GetJson("/sales?q=meera")).EnumerateArray());
+        Assert.Empty((await c.GetJson("/sales?q=nobody")).EnumerateArray());
+        Assert.Single((await c.GetJson("/customers?q=meera")).EnumerateArray());
+    }
+    [Fact] public async Task Other_business_cannot_see_or_sell_against_data()
+    {
+        var (a, loc, p) = await Stocked(f); var cust = await Customer(a);
+        await a.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 50m, "Credit"), K());
+        var b = new Client(f); await b.SignUpAndBootstrap();
+        Assert.Empty((await b.GetJson("/customers")).EnumerateArray());
+        Assert.Empty((await b.GetJson("/sales")).EnumerateArray());
+        Assert.Equal(HttpStatusCode.BadRequest, (await b.Send(HttpMethod.Post, "/sales", Sale(cust, await b.Location(), p, 1, 50m, "Credit"), K())).StatusCode);
+    }
+}

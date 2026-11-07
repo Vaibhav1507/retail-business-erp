@@ -1,0 +1,229 @@
+﻿[
+    {
+        "file":  "Media (1).jpg",
+        "ok":  true,
+        "seconds":  9.3,
+        "supplier":  "Maa Vaishno Agencies(26-27)",
+        "supplierMatched":  false,
+        "invoiceNumber":  "196",
+        "date":  "2026-05-31",
+        "total":  73600,
+        "lineCount":  2,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"Raj Rhombus 125 Ltr\".",
+                         "Choose a product for \"DAIKIN FTKC48XV16VLA AC\"."
+                     ],
+        "lines":  [
+                      "Raj Rhombus 125 Ltr | qty 4 | rate 8389.83 | amt 33559.32",
+                      "DAIKIN FTKC48XV16VLA AC | qty 1 | rate 28813.56 | amt 28813.56"
+                  ]
+    },
+    {
+        "file":  "Media (2).jpg",
+        "ok":  true,
+        "seconds":  13.4,
+        "supplier":  "FRIENDS ELECTRONICS",
+        "supplierMatched":  false,
+        "invoiceNumber":  "FE-8050",
+        "date":  "2026-10-07",
+        "total":  null,
+        "lineCount":  9,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"BPL MIXER GRINDER BMGJ481100 4J 1000W KHARAKPUR\".",
+                         "Choose a product for \"JMG 3345 KHARAKPUR\".",
+                         "Choose a product for \"GLT2216WYPZ.DPZZEBN KHARAKPUR\".",
+                         "Choose a product for \"GLT2216WYRG.ARGZEBN KHARAKPUR\".",
+                         "Choose a product for \"GLT2216WYRO.AROZEBN KHARAKPUR\".",
+                         "Choose a product for \"PX650D3SK2Z.ABMQEIL KHARAKPUR\".",
+                         "Choose a product for \"PX100B3SK2Z.ABMQEIL KHARAKPUR\".",
+                         "Choose a product for \"PX900H3SK4Z.ABMQEIL KHARAKPUR\".",
+                         "Choose a product for \"GLD 2356ZARS DR SZEBN KHARAKPUR\"."
+                     ],
+        "lines":  [
+                      "BPL MIXER GRINDER BMGJ481100 4J 1000W KHARAKPUR | qty 2.0 | rate 3881.36 | amt 7762.72",
+                      "JMG 3345 KHARAKPUR | qty 4.0 | rate 2415.25 | amt 9661.0",
+                      "GLT2216WYPZ.DPZZEBN KHARAKPUR | qty 1.0 | rate 18728.81 | amt 17796.61",
+                      "GLT2216WYRG.ARGZEBN KHARAKPUR | qty 1.0 | rate 18728.81 | amt 18644.07",
+                      "GLT2216WYRO.AROZEBN KHARAKPUR | qty 1.0 | rate 19152.54 | amt 18220.34",
+                      "PX650D3SK2Z.ABMQEIL KHARAKPUR | qty 2.0 | rate 11610.17 | amt 22542.38",
+                      "PX100B3SK2Z.ABMQEIL KHARAKPUR | qty 1.0 | rate 18728.81 | amt 13389.83",
+                      "PX900H3SK4Z.ABMQEIL KHARAKPUR | qty 1.0 | rate 12288.14 | amt 12118.64",
+                      "GLD 2356ZARS DR SZEBN KHARAKPUR | qty 1.0 | rate 17542.37 | amt 17542.37"
+                  ]
+    },
+    {
+        "file":  "Media (3).jpg",
+        "ok":  true,
+        "seconds":  18.5,
+        "supplier":  "FRIENDS ELECTRONICS",
+        "supplierMatched":  false,
+        "invoiceNumber":  "FE-5132",
+        "date":  "2020-08-06",
+        "total":  178600.0,
+        "lineCount":  0,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Lines add up to 0.00 but the invoice total reads 178600.00. Please check.",
+                         "No product lines were found."
+                     ],
+        "lines":  [
+
+                  ]
+    },
+    {
+        "file":  "Media (4).jpg",
+        "ok":  true,
+        "seconds":  7.1,
+        "supplier":  "FRIENDS ELECTRONICS",
+        "supplierMatched":  false,
+        "invoiceNumber":  "FE-5884",
+        "date":  "2026-08-14",
+        "total":  103400.0,
+        "lineCount":  4,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"SSDAZ.ABGQEIL\".",
+                         "Choose a product for \"SSGAZ.ADGQEIL\".",
+                         "Choose a product for \"DH7SK4Z.AB MWEIL\".",
+                         "Choose a product for \"ASRAZ.ABGQEIL\"."
+                     ],
+        "lines":  [
+                      "SSDAZ.ABGQEIL | qty 2 | rate 12288.14 | amt 24576.28",
+                      "SSGAZ.ADGQEIL | qty 3 | rate 11694.92 | amt 35084.76",
+                      "DH7SK4Z.AB MWEIL | qty 1 | rate 13983.05 | amt 13983.05",
+                      "ASRAZ.ABGQEIL | qty 1 | rate 13983.05 | amt 13983.05"
+                  ]
+    },
+    {
+        "file":  "Media (5).jpg",
+        "ok":  true,
+        "seconds":  40.3,
+        "supplier":  "FRIENDS ELECTRONICS",
+        "supplierMatched":  false,
+        "invoiceNumber":  "FE-5132",
+        "date":  "2024-08-06",
+        "total":  null,
+        "lineCount":  10,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"GLT2516WXRO.AROZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD2136ZHEG.AEGZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD1936ZARG.ARGZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD 1946 ZAEL AE LZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD1925XOBK.ABKZEEN HARAKPUR\".",
+                         "Choose a product for \"B036SRAZA.ABGQEIL HARAKPUR\".",
+                         "Choose a product for \"GLD1936ZABW.ABWZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD1936YARG.ARGZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD1936YAWG.AWGZEBN HARAKPUR\".",
+                         "Choose a product for \"GLD1925XORK.ARKZEBN HARAKPUR\"."
+                     ],
+        "lines":  [
+                      "GLT2516WXRO.AROZEBN HARAKPUR | qty 1 | rate 21779.66 | amt 21779.66",
+                      "GLD2136ZHEG.AEGZEBN HARAKPUR | qty 1 | rate 15254.24 | amt 15254.24",
+                      "GLD1936ZARG.ARGZEBN HARAKPUR | qty 1 | rate 13644.07 | amt 13644.07",
+                      "GLD 1946 ZAEL AE LZEBN HARAKPUR | qty 1 | rate 13983.05 | amt 13983.05",
+                      "GLD1925XOBK.ABKZEEN HARAKPUR | qty 1 | rate 12118.64 | amt 12118.64",
+                      "B036SRAZA.ABGQEIL HARAKPUR | qty 2 | rate 11610.17 | amt 23220.34",
+                      "GLD1936ZABW.ABWZEBN HARAKPUR | qty 1 | rate 13644.07 | amt 13644.07",
+                      "GLD1936YARG.ARGZEBN HARAKPUR | qty 1 | rate 12796.61 | amt 12796.61",
+                      "GLD1936YAWG.AWGZEBN HARAKPUR | qty 1 | rate 12796.61 | amt 12796.61",
+                      "GLD1925XORK.ARKZEBN HARAKPUR | qty 1 | rate 12118.64 | amt 12118.64"
+                  ]
+    },
+    {
+        "file":  "Media (6).jpg",
+        "ok":  true,
+        "seconds":  15,
+        "supplier":  "FRIENDS MARKETING",
+        "supplierMatched":  false,
+        "invoiceNumber":  "FM-9332",
+        "date":  "2026-10-13",
+        "total":  66000,
+        "lineCount":  2,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"CS-RU 18CKY 1.5TON 3STAR INV COPPER (I/D)\".",
+                         "Choose a product for \"CU-RU 18CKY 1.5TON 3STAR INV COPPER (O/D)\"."
+                     ],
+        "lines":  [
+                      "CS-RU 18CKY 1.5TON 3STAR INV COPPER (I/D) | qty 2 | rate 27966.1 | amt 55932.2",
+                      "CU-RU 18CKY 1.5TON 3STAR INV COPPER (O/D) | qty 2 | rate 0.01 | amt 0.02"
+                  ]
+    },
+    {
+        "file":  "Media (7).jpg",
+        "ok":  true,
+        "seconds":  51.9,
+        "supplier":  "FRIENDS ENTERPRISES",
+        "supplierMatched":  false,
+        "invoiceNumber":  "ENT-5507",
+        "date":  "2026-11-02",
+        "total":  null,
+        "lineCount":  6,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"RDC220B /3SOBAE0M0000GD 3 Star RAILWAY\".",
+                         "Choose a product for \"RDC220B/ 3SOBTEOMOOOGD 3 Star RAILWAY\".",
+                         "Choose a product for \"WTT80UHA / BRSSWH5PODE RAILWAY\".",
+                         "Choose a product for \"WTT80DBLG / BLSSWH5GBDE RAILWAY\".",
+                         "Choose a product for \"WTT90UDX/BKGR4KGTD RAILWAY\".",
+                         "Choose a product for \"WTT140UPA/BKSSDG5GTDA RAILWAY\"."
+                     ],
+        "lines":  [
+                      "RDC220B /3SOBAE0M0000GD 3 Star RAILWAY | qty 1 | rate 12118.64 | amt 11694.91",
+                      "RDC220B/ 3SOBTEOMOOOGD 3 Star RAILWAY | qty 1 | rate 12118.64 | amt 11694.92",
+                      "WTT80UHA / BRSSWH5PODE RAILWAY | qty 2 | rate 8898.31 | amt 16949.16",
+                      "WTT80DBLG / BLSSWH5GBDE RAILWAY | qty 2 | rate 9745.76 | amt 18135.6",
+                      "WTT90UDX/BKGR4KGTD RAILWAY | qty 1 | rate 11016.95 | amt 10593.22",
+                      "WTT140UPA/BKSSDG5GTDA RAILWAY | qty 1 | rate 13135.59 | amt 12711.86"
+                  ]
+    },
+    {
+        "file":  "Media (8).jpg",
+        "ok":  true,
+        "seconds":  19.7,
+        "supplier":  "FRIENDS ELECTRONICS",
+        "supplierMatched":  false,
+        "invoiceNumber":  "FE-9263",
+        "date":  "2026-11-02",
+        "total":  73890.0,
+        "lineCount":  4,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"PX100B3SK2Z.ABMQEIL KHARAKPUR\".",
+                         "Choose a product for \"GLD1925XOBK.ABKZEEN KHARAKPUR\".",
+                         "Choose a product for \"GLD1936YAPZ.APZZEBN KHARAKPUR\".",
+                         "Choose a product for \"43NU875BPLA.ATR KHARAKPUR\"."
+                     ],
+        "lines":  [
+                      "PX100B3SK2Z.ABMQEIL KHARAKPUR | qty 1 | rate 14406.78 | amt 13389.83",
+                      "GLD1925XOBK.ABKZEEN KHARAKPUR | qty 1 | rate 12118.64 | amt 12033.89",
+                      "GLD1936YAPZ.APZZEBN KHARAKPUR | qty 1 | rate 12203.39 | amt 12203.39",
+                      "43NU875BPLA.ATR KHARAKPUR | qty 1 | rate 26686.44 | amt 24991.52"
+                  ]
+    },
+    {
+        "file":  "Media.jpg",
+        "ok":  true,
+        "seconds":  8.4,
+        "supplier":  "Sonal Electronics",
+        "supplierMatched":  false,
+        "invoiceNumber":  "2026-27/436",
+        "date":  "2026-07-18",
+        "total":  53475.0,
+        "lineCount":  3,
+        "matchedLines":  0,
+        "warnings":  [
+                         "Choose a product for \"TT 160AH MICROTEK BAT\".",
+                         "Choose a product for \"TT 180AH MICROTEK BATTE\".",
+                         "Choose a product for \"Ups 1100 DG NEW\"."
+                     ],
+        "lines":  [
+                      "TT 160AH MICROTEK BAT | qty 2.0 | rate 10338.98 | amt 24400.0",
+                      "TT 180AH MICROTEK BATTE | qty 1.0 | rate 11673.72 | amt 13775.0",
+                      "Ups 1100 DG NEW | qty 3.0 | rate 4322.03 | amt 15300.0"
+                  ]
+    }
+]
