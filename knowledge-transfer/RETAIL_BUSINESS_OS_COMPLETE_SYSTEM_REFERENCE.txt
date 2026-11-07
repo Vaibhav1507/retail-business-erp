@@ -1,0 +1,430 @@
+RETAIL BUSINESS OS (RBOS) - COMPLETE SYSTEM REFERENCE
+=====================================================================
+Document version : 1 (evidence-based, read-only investigation)
+Repository       : projects/retail-business-os (local folder, not a Git repository)
+Companion file   : docs/knowledge-transfer/system-overview.txt (earlier historical overview; partly outdated, see section 32)
+Encoding         : UTF-8 plain text
+
+HOW TO READ THIS DOCUMENT
+-------------------------
+Status vocabulary used everywhere:
+  IMPLEMENTED-VERIFIED   : code exists AND an automated test (named) exercises it.
+  IMPLEMENTED-UNVERIFIED : code/route/table exists, no named automated test found.
+  PARTIAL                : some of the workflow exists; gaps are listed.
+  DESIGNED-ONLY          : appears only in docs/ADRs (all ADRs are status "Proposed").
+  PLANNED / DEFERRED     : listed in roadmap or "deferred" lists; no code.
+  NOT FOUND              : searched, nothing present.
+  NOT VERIFIED FROM REPOSITORY : I did not read the underlying source in this pass.
+
+Evidence hierarchy: source code and migrations > tests > docs > README > naming > inference (labelled INFERENCE).
+
+HONESTY NOTE ON COVERAGE (read first)
+-------------------------------------
+The repository has 271 meaningful files (generated folders excluded). In this pass I
+enumerated ALL of them (names and sizes) and extracted ALL route definitions, ALL
+migration table/function/policy creations and ALL automated test method names by
+pattern. I read in full or in substantial part: Program.cs (first ~3.9 KB), SecurityMiddleware.cs,
+TenantDb.cs, Pages.tsx (first 140 of 182 lines), App.tsx (first 120 of 137 lines),
+package.json, all .csproj, NuGet.Config, .npmrc, the slnx, docs/00-guardrails.md
+(first 60 lines), docs/knowledge-transfer/system-overview.txt (first ~9 KB),
+docs/quality/slice-2-4-evidence.md (first ~3.5 KB), and targeted greps of services and rules.
+I did NOT read line-by-line: most Application/*.cs services, most React screens, CSS, most
+SQL bodies, e2e specs, most docs. Statements about those are derived from file names,
+greps, test names and earlier docs, and are marked accordingly. This document is
+therefore a verified map plus partially verified detail, not an exhaustive line-level
+audit. Section 38 lists exactly what remains unverified.
+
+No secrets were read or copied. Connection strings are held in .NET user-secrets
+(keys named ConnectionStrings:RbosDevApp, RbosDevMigrator, RbosTestApp, RbosTestMigrator);
+values were never opened.
+
+=====================================================================
+PART A - PRODUCT AND BUSINESS UNDERSTANDING
+=====================================================================
+
+1. PRODUCT OVERVIEW
+-------------------
+1.1 What it is
+ Retail Business OS (RBOS) is a personal learning project: an India-first, multi-tenant,
+ local-first retail operating system for small shops (source: docs/knowledge-transfer/system-overview.txt
+ section 1; docs/00-guardrails.md). Priorities in order (guardrails section 1): learning sound
+ engineering, solving real small-retail problems, correct accounting and inventory, strong tenant
+ isolation, simple workflows, free/local-first, complete vertical slices over feature count.
+1.2 Constraints (docs/00-guardrails.md)
+ - Not a commercial SaaS commitment. Product owner has final authority.
+ - No company (H&M) resources of any kind. Free/open-source only; no paid APIs; must work with AI disabled.
+ - Synthetic data only unless separately authorised. No secrets in files.
+ - Package feeds limited to nuget.org and npmjs (NuGet.Config, .npmrc verified).
+1.3 Target users / business
+ Small shop owners (owner-operated), electronics first (docs/product/electronics-validation-plan.md,
+ web/e2e/demo-electronics.spec.ts). INR currency, Indian formatting (en-IN) in UI (Pages.tsx inr()).
+1.4 Vision vs reality
+ Vision (docs/product/*, ADR-001..024 all "Proposed"): multi-vertical, multilingual, GST, offline, mobile, AI, CA workspace.
+ Reality (code): a single-owner, English-only web app with catalogue, opening stock, purchases, sales, returns,
+ customer receipts, expenses, owner money, stock adjustments, period lock, basic reports, barcodes,
+ optional serial/IMEI at sale, invoice-image extraction, OTP login. No GST engine, no roles beyond Owner,
+ no offline, no multilingual, no AI. (Evidence: routes list in section 23; migrations in section 21.)
+
+2. BUSINESS VERTICALS
+---------------------
+Only an "electronics" orientation has concrete support: BusinessSetup.tsx collects a business category
+and /me returns businessCategory (App.tsx type Me); Stock.tsx receives businessCategory. The exact behavioural
+difference per category is NOT VERIFIED FROM REPOSITORY (Stock.tsx/BusinessSetup.tsx not read in full).
+Product attributes are a controlled key list (ProductRules.cs; tests ProductRulesTests: Unknown_attribute_key_is_rejected,
+Known_attribute_keys_are_accepted). Serial/IMEI tracking (migration 017 product.track_serials) supports electronics.
+Pharmacy, garments, auto parts, sports, hardware: DESIGNED/PLANNED at most (docs/product/scope-phase-1a-1b-future.md; vertical templates
+explicitly "not delivered" per docs/quality/slice-2-4-evidence.md). Units of measure and conversions: NOT delivered
+(same file). Batch/expiry (pharmacy), size/colour variants (garments): NOT FOUND in migrations (no variant table).
+
+3. USER PERSONAS AND ROLES
+--------------------------
+Implemented: single "Owner" membership per tenant (core.tenant_membership, status 'Active'; TenantDb.FindTenantAsync).
+Cashier, stock manager, purchase manager, accountant, CA, auditor, branch manager: PLANNED only
+(docs/security/authorization-matrix.md; system-overview "Single Owner role only; no staff, approvals or invitations").
+No role-check code beyond membership status was found in the routes inspected; endpoint groups use RequireAuthorization.
+
+9. FUNCTIONALITY CATALOGUE (60 areas; status per evidence)
+-----------------------------------------------------------
+Legend: API = route(s); T = test(s).
+ 1 Tenant registration        : IMPLEMENTED-VERIFIED. POST /auth/register, /auth/otp/send, /auth/otp/verify (AuthOtpEndpoints.cs). T: Registration_is_closed_by_default_once_a_user_exists, Duplicate_registration_does_not_reveal_account_existence.
+ 2 Business onboarding        : IMPLEMENTED (UI BusinessSetup.tsx; POST /bootstrap; PUT /business-profile). T: Slice1Tests (bootstrap used in fixtures). UI flow NOT VERIFIED beyond screenshots 01-03.
+ 3 Business profile           : IMPLEMENTED-UNVERIFIED API (ProfileEndpoints.cs GET/PUT /business-profile; migration 012). e2e setup in web/e2e/signup.ts.
+ 4 Vertical configuration     : PARTIAL (business category string only).
+ 5 Branch management          : PARTIAL. Table core.branch exists; no branch CRUD route found.
+ 6 Warehouse/locations        : PARTIAL. core.stock_location; GET /locations only; created at bootstrap (Endpoints.cs /bootstrap).
+ 7 User management            : NOT FOUND (no invitation/staff routes; test No_user_directory_or_membership_listing_endpoint_exists asserts none).
+ 8 Product categories         : IMPLEMENTED-VERIFIED. GET /categories, PUT /categories/{id}. T: Category_names_are_case_insensitive_and_renamable.
+ 9 Product catalogue          : IMPLEMENTED-VERIFIED. GET/POST /products, PUT /products/{id}. T: Slice2Tests (10).
+10 Branded products           : IMPLEMENTED-VERIFIED (brand/model fields, duplicate key brand+model).
+11 Generic products           : IMPLEMENTED-VERIFIED (INT- SKU; Generic_product_cannot_carry_brand_or_model).
+12 Variants                   : NOT FOUND.
+13 SKU                        : IMPLEMENTED-VERIFIED. catalog.sku_counter; Skus_are_sequential_per_business; Sku_is_zero_padded.
+14 Barcode                    : IMPLEMENTED-UNVERIFIED (no named test in the lists extracted). Migration 017 catalog.product_barcode; routes /products/by-barcode, /products/{id}/barcodes (GET,POST,DELETE); UI BarcodeManager.tsx, BarcodeScanner.tsx (ZXing).
+15 Unit of measure            : NOT FOUND as a table. Unit validity checked in domain (Unknown_unit_is_rejected).
+16 Unit conversion            : NOT FOUND (declared not delivered).
+17 Opening stock              : IMPLEMENTED-VERIFIED. POST /opening-stock. T: Opening_stock_flow_posts_wac_and_is_idempotent; OpeningStockServiceTests.
+18 Stock movements            : IMPLEMENTED (inventory.stock_movement, append-only trigger).
+19 Stock balances             : IMPLEMENTED (inventory.stock_balance projection; GET /stock).
+20 Inventory valuation (WAC)  : IMPLEMENTED-VERIFIED. CostAndJournal.cs/Values; tests First_receipt_sets_wac_to_unit_cost etc.; GET /reports/stock-valuation.
+21 Suppliers                  : IMPLEMENTED-VERIFIED. /suppliers GET/POST/PUT. T: Supplier_names_unique_ignoring_case.
+22 Purchases                  : IMPLEMENTED-VERIFIED. POST /purchases. T: Receipt_increases_stock_updates_wac_and_creates_payable.
+23 Goods receipt              : MERGED with purchase (receipt = purchase; separate bill vs receive "not delivered").
+24 Supplier invoices (files)  : IMPLEMENTED-UNVERIFIED. POST /purchases/extract, GET /purchases/{id}/invoice; migrations 014, 015; InvoiceExtractionService.cs; e2e invoice-extract.spec.ts. Extraction mechanism (external calls?) NOT VERIFIED - must be checked against free-first/local-only guardrail.
+25 Purchase returns           : IMPLEMENTED-VERIFIED. /purchase-returns. T: Supplier_return_reduces_stock_and_supplier_balance; Supplier_return_blocked_when_stock_already_sold.
+26 Supplier payments          : IMPLEMENTED-VERIFIED. /supplier-payments. T: Payment_reduces_payable_and_cannot_exceed_it.
+27 Customers                  : IMPLEMENTED-UNVERIFIED for CRUD directly; used in Slice4 tests (Credit_sale_requires_customer...).
+28 Sales                      : IMPLEMENTED-VERIFIED. POST /sales, GET /sales, GET /sales/{id}. T: Slice4SalesTests (7).
+29 POS                        : PARTIAL. Bill screen GenerateInvoice.tsx (route #/sell/bill). No dedicated POS mode, no hold/resume.
+30 Billing/invoice            : IMPLEMENTED. InvoiceDocument.tsx, print route #/print/sale/{id} (App.tsx printMatch).
+31 Discounts                  : PARTIAL. Per-line discount (evidence doc). No bill-level/promo discounts found.
+32 Payment methods            : Cash, UPI, Credit sale types; pay methods Cash, Bank, UPI (SalesRules.cs SaleTypes, PayMethods). Card: NOT FOUND as a method. Split payment: NOT FOUND (one method per receipt).
+33 Credit sales               : IMPLEMENTED-VERIFIED (Credit_sale_with_part_payment_updates_customer_balance).
+34 Customer receipts          : IMPLEMENTED-VERIFIED (/customer-payments; Collection_reduces_balance_supports_partial_full_and_rejects_overpay).
+35 Sales returns/refunds      : IMPLEMENTED-VERIFIED (/sale-returns; Customer_return_restocks...; Return_beyond_balance_becomes_cash_refund). Exchange: NOT FOUND. Invoice cancellation/reversal: NOT FOUND.
+36 Ledgers                    : PARTIAL. GET /customers/{id}/statement; supplier balance computed; GET /reports/ledger/{accountId} (GL per account). No supplier statement route found.
+37 Expenses                   : IMPLEMENTED-VERIFIED (/expenses; /expense-categories; Capital_expense_drawing_keep_books_balanced_and_totals_reconcile).
+38 Cash management            : PARTIAL. accounting.money_account; /money-accounts, /history. No cash-count/day-close.
+39 Bank management            : PARTIAL (money accounts only; no reconciliation).
+40 Loans and interest         : NOT FOUND (account codes none; no tables).
+41 Accounting                 : IMPLEMENTED (journal entries, lines, balanced-entry trigger).
+42 Chart of accounts          : PARTIAL. accounting.account rows created lazily by code (AccountAsync in Sales/Procurement/FinanceService). No COA management UI/route.
+43 Journal entries            : IMPLEMENTED (system-generated only; no manual journal route found).
+44 General ledger             : IMPLEMENTED-UNVERIFIED (GET /reports/ledger/{accountId}).
+45 Trial balance             : IMPLEMENTED (GET /reports/trial-balance; asserted in Slice6 test "totals reconcile").
+46 Profit & Loss              : IMPLEMENTED (GET /reports/profit-loss).
+47 Balance sheet              : IMPLEMENTED (GET /reports/balance-sheet).
+48 Cash flow statement        : NOT FOUND.
+49 Inventory reports          : PARTIAL (stock list, stock valuation). Ageing/low-stock: NOT FOUND.
+50 Dead stock                 : NOT FOUND.
+51 GST                        : PARTIAL-MINIMAL. sale.gst_rate column (migration 013). No GSTR, HSN, ITC, e-invoice, e-way bill found. Exact use of gst_rate NOT VERIFIED.
+52 Income-tax prep            : NOT FOUND.
+53 CA/auditor workspace       : NOT FOUND.
+54 Audit history             : PARTIAL. audit.audit_event written by services (append-only); no read route/UI found.
+55 Notifications/reminders    : NOT FOUND.
+56 Document management        : PARTIAL (purchase invoice files only, procurement.invoice_file).
+57 Multilingual               : NOT FOUND (English only).
+58 Mobile support            : PARTIAL. Responsive CSS; mobile screenshots; Playwright Edge 390x844 (playwright.config.ts). Camera barcode scan in browser.
+59 Offline                    : NOT FOUND.
+60 AI                         : NOT FOUND as product feature (invoice extraction mechanism unverified).
+Per-feature detail fields requested (UI/service/tables/rules) are given for the verified core flows in Part B and in sections 21/23.
+
+=====================================================================
+PART B - END-TO-END WORKFLOWS
+=====================================================================
+
+10. ONBOARDING
+--------------
+Journey: AccountAccess.tsx (register/login, OTP) -> POST /auth/register (closed by default after first user) ->
+POST /auth/login -> /me returns tenantId=null -> BusinessSetup.tsx -> POST /bootstrap creates core.tenant,
+tenant_membership (Owner, Active), business profile, default stock_location(s), (Endpoints.cs lines ~75-105; details
+partly NOT VERIFIED) -> PUT /business-profile (GSTIN etc; screenshot 03-setup-step2-gstin-mobile.png) -> Home.
+App.tsx gate: if !tenantId or !profileComplete the app renders BusinessSetup only.
+Branch creation: not a step. Opening balances: via Stock > Add Starting Stock. Account setup: lazy.
+Password policy (Program.cs): min length 12, lockout 5 attempts / 10 minutes, unique email.
+
+11. PRODUCT CREATION AND OPENING STOCK
+--------------------------------------
+Create: Catalogue.tsx -> POST /products -> CatalogueService (duplicate key = normalised name+brand+model, catalog.norm_text; SKU from catalog.sku_counter; generic SKUs "INT-").
+Import: Stock > Import from Excel -> POST /products/import/read (file reading via ProductFileReader, has HttpClient registered - external call mechanism NOT VERIFIED), /preview (writes nothing; test Preview_classifies_rows_and_writes_nothing), /commit (once per key via catalog.import_batch; max rows enforced; test Commit_requires_key_and_limits_rows).
+Opening stock: App.tsx OpeningStock component -> POST /opening-stock with Idempotency-Key -> OpeningStockService: validates (OpeningStockPolicy.cs: max 200 lines, no duplicate products, qty>0, cost>0, date not > tomorrow) -> inserts opening_stock_document/lines, stock_movement, upserts stock_balance and item_cost (WAC), posts journal Dr 1400 Inventory / Cr 3900 Opening Balance Equity (CostAndJournal.OpeningStock), writes audit_event and idempotency_record in one transaction.
+Limitations: no images, no OCR into catalogue (OCR-like extraction is for purchase invoices), no fuzzy product matching, no bulk edit.
+
+12. PURCHASE-TO-PAY
+-------------------
+Implemented: Supplier -> POST /purchases (multi-line, qty, unit cost) -> stock_movement in, WAC update, journal Dr 1400 / Cr 2000 Accounts Payable (ProcurementService; evidence doc) -> POST /supplier-payments (Cash/Bank/UPI) Dr 2000 / Cr 1000 Cash and Bank.
+Not delivered (evidence doc): freight/other charges, tax status/GST on purchase, bill-vs-receive split, purchase reversal, payment allocation to documents. Purchases are paid-at-receipt? Partial payment at purchase time: NOT VERIFIED. Duplicate supplier-invoice number prevention: NOT VERIFIED (test names show only idempotency-key duplicates). Supplier advances: NOT FOUND.
+Returns: POST /purchase-returns reduces stock and payable; blocked if stock already sold (Supplier_return_blocked_when_stock_already_sold).
+
+13. SALE-TO-CASH
+----------------
+Implemented: GenerateInvoice.tsx (#/sell/bill) builds lines (product, qty, price, discount, optional serials) -> POST /sales with Idempotency-Key -> SalesService (SalesPosting.cs): SalesRules.TryValidateSale; row-locked stock deduction at WAC; reject negative stock; sale + sale_line inserts; journal: Dr Cash/Receivables, Dr COGS 5000; Cr Revenue 4000, Cr Inventory 1400; serial persistence in sale_line.serials (migration 018); warning-only detection of previously sold serials (product-owner decision during development).
+Cash/UPI must be paid in full; Credit requires a named customer, partial payment allowed. Over-payment rejected.
+Later: POST /customer-payments (collection), POST /sale-returns (restock, reduce balance, excess becomes cash refund).
+NOT FOUND: exchange, cancellation, split tender, card, GST-bearing invoice calculation (beyond gst_rate column), controlled bill numbering (sale.number is an identity column, migration 008 + later column add; ADR-016 numbering not implemented).
+Printing: browser print of InvoiceDocument via #/print/sale/{id}.
+NOTE two screens exist: GenerateInvoice.tsx (active, linked from Pages.tsx SellPage tab 'bill') and Sales.tsx (used for tab 'bills' = Old Invoices, show="bills"; also contains a billing form - duplication; its reachability for creating bills is NOT VERIFIED).
+
+14. INVENTORY LIFECYCLE
+-----------------------
+Exists: opening stock; purchase receipt in; sale out; sales return in; purchase return out; stock adjustment (POST /stock-adjustments; reasons incl. OwnerConsumption; requires reason; journals Inventory 1400 vs 3100 Owner Drawings or 4900 Inventory Gain; test Stock_adjustment_requires_reason...). Negative stock: blocked (Sale_cannot_make_stock_negative). Valuation: weighted average cost, 4-decimal WAC, 2-decimal value (test Wac_rounds_to_four_places_and_value_stays_two_places).
+Not found: transfers between locations, damage/theft categories beyond adjustment reasons (reason set NOT fully verified), physical count sessions, backdated cost correction, reconciliation tool.
+
+15. ACCOUNTING LIFECYCLE
+------------------------
+Double entry enforced: domain CostAndJournal.AssertBalanced (tests: Unbalanced_journal_is_rejected, Line_with_both_sides_is_rejected, Single_line_journal_is_rejected); database trigger accounting.assert_entry_balanced (test Unbalanced_journal_cannot_commit); journal_entry and journal_line append-only via core.reject_mutation triggers (migration 003).
+Accounts seen in code (lazily created per tenant): 1000 Cash and Bank (Asset); 1200 Accounts Receivable (Asset); 1400 Inventory (Asset); 2000 Accounts Payable (Liability); 3100 Owner Drawings (Equity); 3900 Opening Balance Equity; 4000 Sales Revenue (Income); 4900 Inventory Gain (Income); 5000 Cost of Goods Sold (Expense). Capital and expense accounts: created by FinanceService (codes NOT VERIFIED).
+Posting table (implemented unless marked):
+ Opening stock : Dr 1400 / Cr 3900.
+ Purchase      : Dr 1400 / Cr 2000.
+ Supplier pay  : Dr 2000 / Cr 1000.
+ Sale          : Dr 1000 or 1200 (and part) + Dr 5000 / Cr 4000 + Cr 1400.
+ Customer recv : presumably Dr 1000 / Cr 1200 (INFERENCE; AfterSalesService not read).
+ Sale return   : presumably reverse of sale lines (INFERENCE).
+ Purchase ret. : presumably Dr 2000 / Cr 1400 (INFERENCE).
+ Expense/Owner : FinanceService (NOT VERIFIED entry shapes; test asserts books balanced).
+ Loans/interest/depreciation/tax: NOT FOUND.
+Period lock: accounting.period_lock with trigger enforce_period_lock; backward move needs a reason, history table (migration 011; test Period_lock_blocks_postings_and_backward_move_needs_reason).
+Reports derive from journal_line sums (FinanceService.cs; P&L = -(sum of Income and Expense balances) at line ~305). Rounding: half away from zero to 2 places for money (test Rounds_to_two_places_half_away_from_zero); decimal arithmetic only.
+
+16. GST AND INCOME TAX
+----------------------
+Implemented: only a gst_rate column on sales.sale (migration 013) and a GSTIN field in business setup (screenshot 03). CGST/SGST/IGST split, HSN/SAC, ITC, GSTR-1/3B/2B, e-invoice, e-way, TDS/TCS, income-tax: NOT FOUND in code. docs/finance and ADRs describe proposals only; require professional (CA) review. No legal rules are asserted here.
+
+17. REPORTS
+-----------
+Implemented routes: trial-balance (asOf), ledger/{accountId} (from,to), profit-loss (from,to), balance-sheet (asOf), receivable-ageing (asOf), payable-ageing (asOf), stock-valuation (current), GET /stock (current stock). All run in TenantSession with RLS, so tenant isolation is database-enforced. Branch/warehouse filters: NOT VERIFIED. UI: Finance.tsx (More > Reports). Not found: cash flow, low stock, dead stock, stock ageing, sales/purchase-by-period summaries, gross-profit report, loan outstanding.
+
+=====================================================================
+PART C - TECHNICAL ARCHITECTURE
+=====================================================================
+
+18. TECHNOLOGY STACK (versions from project files)
+--------------------------------------------------
+ .NET target net10.0 (all 4 csproj). ASP.NET Core Minimal API (Rbos.Api.csproj Sdk Web).
+ ASP.NET Core Identity + EF Core 10.0.14 (Identity.EntityFrameworkCore, OpenApi, EF Design 10.0.14) and Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3: EF Core is used ONLY for Identity (RbosIdentityDbContext); all business SQL is hand-written Npgsql via TenantDb/TenantSession.
+ PostgreSQL (local; version NOT VERIFIED).
+ Frontend: React ^19.3.1, TypeScript ~7.0.2, Vite ^8.3.5, @vitejs/plugin-react ^6.1.2, @zxing/browser ^0.2.1 and @zxing/library ^0.23.0 (barcode scanning), plain CSS files (no UI framework installed), oxlint ^1.89.0.
+ Tests: xUnit 2.9.3, Microsoft.NET.Test.Sdk 17.14.1, Mvc.Testing 10.0.14, coverlet 6.4.0; Vitest ^5.0.5, Testing Library, jsdom; Playwright ^1.64.1.
+ Not used (verified by package.json): React Router, Redux, Zustand, axios, Tailwind, any component library.
+ Optional SMS provider MSG91 (Sms:Provider=msg91) - external paid-risk service, only if configured; Development uses DevSmsSender.
+
+19. ARCHITECTURE OVERVIEW
+-------------------------
+ Browser (React SPA, hash routing)
+   -> fetch /api/* (api.ts; CSRF token via GET /api/csrf; Idempotency-Key header on money/stock POSTs)
+   -> Vite dev proxy (web/vite.config.ts) or static hosting from API
+   -> Kestrel: SecurityMiddleware (headers, 64 KB body cap, 12 MB for /api/purchases/extract, JSON-only)
+   -> Authentication (cookie rbos.auth) + Antiforgery + fallback authorization policy
+   -> Minimal API endpoint groups (Endpoints.cs, *Endpoints.cs)
+   -> Application services (src/Rbos.Api/Application/*Service.cs, SalesPosting.cs)
+   -> Domain rules (src/Rbos.Domain: static validation + calculation)
+   -> TenantDb.BeginAsync: opens connection as runtime role rbos_app, begins transaction, set_config('app.user_id'/'app.tenant_id', ..., true)
+   -> PostgreSQL: RLS policies (tenant_id = core.current_tenant_id() and core.is_active_member(...)), FORCE ROW LEVEL SECURITY, append-only triggers, balance trigger, period-lock trigger.
+ Pattern: modular monolith, two projects (Api, Domain). Patterns NOT used: CQRS framework, MediatR, repository/EF unit-of-work for business data, event bus, microservices, background workers (none found).
+ Startup also asserts the DB role is rbos_app (system-overview describing Program.cs; remainder of Program.cs after ~3.9 KB NOT VERIFIED).
+ Migrations: Program.cs --migrate dev|test uses DatabaseMigrator.ApplyAsync with the migrator connection string from user-secrets/env; checksum strategy: NOT VERIFIED (DatabaseMigrator.cs not read). --emit-identity-sql generates the Identity schema script.
+
+20. BACKEND FILE INVENTORY (src)
+--------------------------------
+ Program.cs : tooling modes, DI, Identity options, cookie (HttpOnly, SameSite=Strict, Secure outside Development, 8 h), antiforgery, SMS sender selection.
+ Endpoints.cs : /healthz, /csrf, /auth/login, /auth/logout, /me, /bootstrap, /locations, /opening-stock, /stock.
+ AuthOtpEndpoints.cs + Application/OtpService.cs : OTP send/verify, register, OTP login, mobile verification; table identity.otp_challenge (016).
+ ProfileEndpoints.cs : /business-profile.
+ CatalogueEndpoints.cs + CatalogueService.cs + ProductFileReader.cs : products, categories, import.
+ BarcodeEndpoints.cs + BarcodeService.cs : barcode lookup/assign/delete, serial-tracking flag.
+ ProcurementEndpoints.cs + ProcurementService.cs + InvoiceExtractionService.cs : suppliers, purchases, payments, invoice extraction/files.
+ SalesEndpoints.cs + SalesPosting.cs (class SalesService) : customers, sales.
+ AfterSalesEndpoints.cs + AfterSalesService.cs : customer payments, sale returns, purchase returns, statements, business-name.
+ FinanceEndpoints.cs + FinanceService.cs : money accounts, expenses, owner transactions, stock adjustments, period lock, reports.
+ OpeningStockService.cs : opening stock use case.
+ Persistence/TenantDb.cs (tenant transaction + context), DatabaseMigrator.cs, RbosIdentityDbContext.cs.
+ Security/SecurityMiddleware.cs.
+ Rbos.Domain: Values.cs (Money, Quantity, WAC math), CostAndJournal.cs (WAC blend, journal drafts, AssertBalanced), OpeningStockPolicy.cs, ProductRules.cs, PurchaseRules.cs, SalesRules.cs (sale validation, serial normalisation), AfterSalesRules.cs.
+ Call chain example (sale): SalesEndpoints POST /sales -> SalesService.SellAsync-type method (SalesPosting.cs) -> SalesRules.TryValidateSale -> TenantDb.BeginAsync -> SQL inserts/locks -> journal + audit + idempotency -> commit -> JSON reply.
+ Method-level detail beyond names: NOT VERIFIED.
+
+21. DATABASE (db/migrations, 18 files; tables counted from CREATE TABLE statements)
+-----------------------------------------------------------------------------------
+ 001_identity.sql : 7 ASP.NET Identity tables in schema identity (names generated by EF; not itemised here).
+ 002_core.sql : core.tenant, core.tenant_membership, core.business_profile, core.branch, core.stock_location, security.security_event; functions core.current_user_id(), core.current_tenant_id(), core.is_active_member(); 5 policies.
+ 003_business.sql : catalog.category, catalog.product, accounting.account, accounting.journal_entry, accounting.journal_line, audit.audit_event, inventory.opening_stock_document, inventory.opening_stock_line, platform.idempotency_record, inventory.stock_movement, inventory.stock_balance, inventory.item_cost; core.reject_mutation + no_update_* triggers; accounting.assert_entry_balanced; policy tenant_isolation via loop with FORCE RLS; grants select/insert only (no DELETE; no UPDATE on append-only tables); inventory_value >= 0 check on balances.
+ 004_integrity_guards.sql, 005_force_rls_core.sql : integrity guards and FORCE RLS on core tables (bodies not read).
+ 006_catalogue.sql : catalog.sku_counter, catalog.import_batch, function catalog.norm_text.
+ 007_procurement.sql : procurement.supplier, purchase_receipt, purchase_receipt_line, supplier_payment.
+ 008_sales.sql : sales.customer, sales.sale, sales.sale_line (+ sale.number); Income/Expense account types; negative movement deltas permitted.
+ 009_returns_collections.sql : sales.customer_payment, sales.sale_return, sales.sale_return_line, procurement.purchase_return, procurement.purchase_return_line.
+ 010 : purchase_receipt.number. 011 : accounting.money_account, expense, owner_transaction, inventory.stock_adjustment, accounting.period_lock, period_lock_history; accounting.enforce_period_lock + period_lock_guard trigger.
+ 012 : business profile fields. 013 : sales.sale.gst_rate. 014 : procurement.invoice_file. 015 : invoice file zip change. 016 : identity.otp_challenge. 017 : catalog.product_barcode, inventory.serial_unit, catalog.product.track_serials. 018 : sales.sale_line.serials text[] + GIN index ix_sale_line_serials.
+ Count: 35 named tables created outside 001 + 7 identity tables = 42 (security.security_event, platform.idempotency_record included). Recount: core 6 + 003 12 + 006 2 + 007 4 + 008 3 + 009 5 + 011 6 + 014 1 + 016 1 + 017 2 = 42 non-001 tables; with 7 identity = 49. (016's table is in schema identity.) USE 49 as the total; per-column documentation NOT VERIFIED.
+ Roles: rbos_app (runtime), a migrator role (via separate connection string); created by scripts/database/bootstrap-postgresql.sql (not read in full).
+ Text ER (core relationships, from file contents/names; FK detail NOT VERIFIED):
+  tenant 1-* tenant_membership; tenant 1-* branch 1-* stock_location
+  tenant 1-* product (category) 1-* product_barcode; product 1-* stock_balance/item_cost per location
+  stock_movement -> product, location; journal_entry 1-* journal_line -> account
+  supplier 1-* purchase_receipt 1-* purchase_receipt_line; supplier 1-* supplier_payment; purchase_return -> receipt
+  customer 1-* sale 1-* sale_line; sale 1-* sale_return 1-* line; customer 1-* customer_payment
+  Source of truth: journal_line, stock_movement, documents. Projections: stock_balance, item_cost, computed party balances.
+ Implemented but unused by workflows: core.branch (no CRUD), security.security_event (use NOT VERIFIED), inventory.serial_unit (usage NOT VERIFIED; serial capture currently stores text[] on sale_line).
+
+22. SECURITY
+------------
+ Tenant identity: membership resolved by TenantDb.FindTenantAsync (single Active membership, oldest). Context: transaction-local set_config (true) so it cannot leak across pooled connections.
+ RLS + FORCE RLS: migrations 003, 005; tests Tenants_cannot_see_or_use_each_others_data, App_role_without_context_sees_nothing_and_cannot_change_schema_or_delete_audit, App_role_sees_only_own_membership_rows, Revoked_membership_loses_access, Other_business_cannot_* in Slice2-4 tests.
+ Auth: Identity cookie rbos.auth, HttpOnly, SameSite Strict (test Auth_cookie_is_httponly_and_samesite_strict); 401/403 instead of redirects.
+ CSRF: antiforgery token from /csrf; test Mutations_without_csrf_token_are_rejected.
+ Headers/limits: SecurityMiddleware; tests Api_responses_have_security_headers_and_no_store, Oversized_body_is_rejected, Non_json_content_type_is_rejected.
+ Login enumeration: Unknown_and_wrong_password_logins_return_identical_responses.
+ Idempotency: platform.idempotency_record with request hash; key reuse with different body conflicts (tests in Slice1/3/4).
+ Weaknesses/not found: no rate limiting (system-overview), no roles beyond Owner, no per-record authorization beyond tenant, SMS provider external, secrets in user-secrets (acceptable local). CSP defined for API responses only; SPA static host headers NOT VERIFIED.
+
+23. API REFERENCE (77 route definitions found by pattern; all under /api prefix per SecurityMiddleware; default authenticated unless AllowAnonymous - per-route auth detail NOT VERIFIED for each)
+-----------------------------------------------------------------------------------------------
+ Platform (Endpoints.cs): GET /healthz; GET /csrf; POST /auth/login; POST /auth/logout; GET /me; POST /bootstrap; GET /locations; POST /opening-stock; GET /stock.
+ Auth/OTP: POST /auth/otp/send, /auth/otp/verify, /auth/register, /auth/login/otp, /profile/mobile/send-otp, /profile/mobile/verify.
+ Profile: GET,PUT /business-profile.
+ Catalogue: GET,POST /products; PUT /products/{id}; GET /categories; PUT /categories/{id}; POST /products/import/read|preview|commit.
+ Barcode: GET /products/by-barcode; GET,POST /products/{id}/barcodes; DELETE /products/{id}/barcodes/{barcodeId}; PUT /products/{id}/serial-tracking.
+ Procurement: GET,POST /suppliers; PUT /suppliers/{id}; GET,POST /purchases; POST /purchases/extract; GET /purchases/{id}/invoice; GET,POST /supplier-payments.
+ Sales: GET,POST /customers; PUT /customers/{id}; GET,POST /sales; GET /sales/{id}.
+ After-sales: GET /business-name; GET /customers/{id}/statement; GET,POST /customer-payments; GET /customer-payments/{id}; GET /sales/{id}/returnable; GET,POST /sale-returns; GET /sale-returns/{id}; GET /purchases/{id}; GET,POST /purchase-returns; GET /purchase-returns/{id}.
+ Finance: GET,POST /money-accounts; GET /money-accounts/{id}/history; GET /expense-categories; GET,POST /expenses; GET,POST /owner-transactions; GET,POST /stock-adjustments; GET,PUT /period-lock; GET /reports/trial-balance|ledger/{accountId}|profit-loss|balance-sheet|receivable-ageing|payable-ageing|stock-valuation.
+ Note: some lines in my extraction showed the same route as two methods (GET+POST); the count of 77 is Map* calls. Request/response schemas, error shapes and table-per-route mapping: NOT VERIFIED beyond the domain summaries in sections 10-17.
+ Idempotency-Key required (by tests/evidence) on: /opening-stock, /purchases, /supplier-payments, /sales, /customer-payments, /sale-returns, /purchase-returns, products/import/commit; others NOT VERIFIED.
+
+24. FRONTEND INVENTORY (web)
+----------------------------
+ Routing: hand-rolled hash router in App.tsx parseRoute() regex ^#/([a-z]+)(/([a-z]+))?; print route #/print/{sale|purchase|payment}/{guid}. State: React useState/useEffect in App.tsx (products, locations, stock, route); no state library. API: api.ts (fetch wrapper, CSRF, ApiError, Idempotency-Key). Auth gate: me===undefined Loading; null -> AccountAccess; no tenant/profile -> BusinessSetup.
+ Nav (Pages.tsx NAV): Home, Sell, Buy, Stock, People, Money, More.
+ Sell menu: Generate Invoice (#/sell/bill, GenerateInvoice.tsx), Old Invoices (#/sell/bills, Sales.tsx), Create Return (#/sell/return, AfterSales.tsx sreturn), Due Balance (#/sell/collect).
+ Buy tabs: Add Purchase, Pay Supplier, Past Purchases, Return to Supplier (Procurement.tsx, AfterSales.tsx).
+ Stock tabs: Check Stock (StockList), Products (Catalogue.tsx), Add Starting Stock, Import from Excel (SetupAssistant.tsx), Fix Stock Count (adjustments).
+ People tabs: Customers, Suppliers. Money tabs: Cash & Bank, Record Expense, Owner Money. More: Reports, Print Bills, Close Old Dates (Finance.tsx, AfterSales.tsx); settings via BusinessSettings (Home.tsx).
+ Components: BarcodeScanner.tsx (ZXing camera + manual entry), BarcodeManager.tsx, InvoiceDocument.tsx, InvoiceUpload.tsx, Invoice.tsx, Paged.tsx (pagination), amountInWords.ts, csv.ts.
+ Frontend tests: api.test.ts, App.test.tsx, csv.test.ts (Vitest); e2e: collections.spec.ts, demo-electronics.spec.ts, invoice-extract.spec.ts, opening-stock.spec.ts, sales.spec.ts (Playwright; helper signup.ts, make-invoice.ps1). web/src/collections.spec.tsx is a 0-byte file; web/vite.config.ts.new is 0 bytes (stray artefacts).
+ Per-file hooks/validation/empty states: NOT VERIFIED except StockList (search, category/supplier filters, empty-state message, Paged table).
+
+25. UI/UX
+---------
+ Evidence: docs/ui-review-screenshots/{desktop,mobile,tablet} 23 PNGs each (listing present; images were not visually inspected in this pass); screenshots/ 3 mobile PNGs (account, setup step 1, setup step 2 GSTIN). Home: "What do you want to do?" with action tiles (Make Bill, Add Purchase, Check Stock, Collect Money, Pay Supplier, Record Expense, Add Product) and tiles Money to Collect, Money to Pay, Items in stock, Cash & Bank. Shopkeeper-oriented plain wording (e.g. "Fix Stock Count", "Close Old Dates"). ARIA used: nav aria-label, role=alert/status, aria-current on tabs. Colours/typography/touch sizes: in styles.css/App.css/billing-forms.css/product-form.css/invoice.css (NOT READ). I make no claim of visual polish or verified responsiveness beyond the existence of the screenshots and a 390x844 Playwright config.
+ GenerateInvoice (latest implementation work in this project): Add product and Scan product buttons above the line fields; per-line serial/IMEI field kept separate from product scan; scan calls GET /products/by-barcode and fills product; serials posted with the line and printed on InvoiceDocument.
+
+26. CONFIGURATION
+-----------------
+ NuGet.Config: clear + nuget.org only. .npmrc: registry npmjs. Solution: RetailBusinessOs.slnx (Api, Domain, IntegrationTests, UnitTests). appsettings.json/Development.json (tiny; contents not opened). User-secrets key names above. Rbos:Database selects dev/test app string. scripts/local/set-development-secrets.ps1 writes secrets locally (modifies local state; not run). scripts/database/bootstrap-postgresql.sql creates roles/databases (modifies DB; not run). Vite proxy and Playwright config exist (web/vite.config.ts, web/playwright.config.ts; values NOT VERIFIED here). Commands: dotnet run --project src/Rbos.Api -- --migrate dev|test; npm run dev|build|lint|test|test:e2e.
+
+=====================================================================
+PART D - TESTING
+=====================================================================
+27. TEST INVENTORY (method names extracted by pattern)
+ Unit (tests/Rbos.UnitTests): DomainTests 25 methods (rounding, quantity/cost validation, opening-stock command rules, 200-line cap, WAC blending, journal balance); ProductRulesTests 10. Total 35 methods.
+ Integration (real PostgreSQL, WebApplicationFactory): SecurityAndMembershipTests 10; Slice1Tests 7; Slice2Tests 10; Slice3PurchaseTests 7; Slice4SalesTests 7; Slice5AfterSalesTests 7; Slice6FinanceTests 3 = 51 extracted; IntegrityGuardTests, OpeningStockServiceTests, SchemaGuardTests exist but my extraction output was truncated - counts NOT VERIFIED.
+ No automated tests found for: barcodes/serials (017/018), OTP, invoice extraction (only a Playwright spec), profile endpoints, reports beyond reconciliation.
+ Test data: synthetic; setup uses test database via ConnectionStrings:RbosTest*. Cleanup approach NOT VERIFIED.
+28. EXECUTION EVIDENCE
+ Latest recorded (docs/knowledge-transfer/system-overview.txt, written after Slice 4): unit 57 cases (35 methods), integration 48, Vitest 15, Playwright 2, build 0 warnings/0 errors, lint 0 errors/7 warnings. These are historical and predate slices 5-6, barcodes, OTP; I did NOT re-run anything. Current pass/fail status: UNKNOWN. Vulnerability scan evidence: docs/quality/dependency-licence-review.md exists (not read).
+
+=====================================================================
+PART E - REPOSITORY REFERENCE
+=====================================================================
+29. TREE (271 meaningful files; excluded: node_modules, bin, obj, .git, dist, playwright-report, test-results, .vite - generated)
+ / : README.md, RetailBusinessOs.slnx, NuGet.Config, .npmrc (4)
+ db/migrations: 001..018 (18)
+ docs: 00-guardrails.md + 1 more (2); adr 5; architecture 8; decisions 2; finance 8; knowledge-transfer 1; product 7; quality 8; security 3; workflows 5; ui-review-screenshots 2 + desktop/mobile/tablet 23 each
+ screenshots: 3 PNG
+ scripts: database/bootstrap-postgresql.sql; local/set-development-secrets.ps1
+ src/Rbos.Api 14 + Application 10 + Persistence 3 + Security 1 + Properties 1; src/Rbos.Domain 8
+ tests/Rbos.IntegrationTests 11; tests/Rbos.UnitTests 3
+ Test Data Invoice: 9 JPG invoice images, extraction-report.json, run-extraction-test.ps1, run-multipage-test.ps1 (12). Origin/synthetic status NOT VERIFIED; guardrails require synthetic data - OWNER SHOULD CONFIRM these photos contain no real shop data.
+ web: 13 root files + e2e 8 + public 2 + src 35 + src/assets 3
+30. FILE EXPLANATIONS: see sections 18-26 for responsibilities of every src and web area. Per-file dependencies/"unused" classification: NOT VERIFIED except: README.md is stale per system-overview; web/src/collections.spec.tsx and web/vite.config.ts.new are empty; docs/adr files are Proposed; docs/quality/slice-*-evidence.md are historical snapshots.
+
+=====================================================================
+PART F - GAPS, RISKS, FUTURE
+=====================================================================
+31. IMPLEMENTED VS PLANNED MATRIX (module: status | UI | API | DB | tests)
+ Onboarding/profile: implemented | yes | yes | yes | partial
+ Catalogue/SKU: verified | yes | yes | yes | yes
+ Barcode/serial: implemented | yes | yes | yes | none found
+ Opening stock/WAC: verified | yes | yes | yes | yes
+ Purchases/payments/returns: verified | yes | yes | yes | yes
+ Sales/receipts/returns: verified | yes | yes | yes | yes
+ Finance (expenses, owner, adjustments, lock): verified-light | yes | yes | yes | 3 tests
+ Reports TB/PL/BS/ageing/valuation: implemented | yes | yes | n/a | reconciliation only
+ GST/ITC/returns/e-invoice, loans, cash flow, dead stock, roles, branches, offline, i18n, AI: not found
+32. GAPS AND RISKS
+ HIGH: GST absent for an India product; single role; no sale cancel/reversal; no tests for barcodes/serials/OTP; test status unknown since slice 4.
+ HIGH (privacy/guardrail): Test Data Invoice images - confirm synthetic. Invoice extraction and product file reader use HttpClient - confirm no external/paid service (guardrail 3, 4).
+ MEDIUM: bill numbering is a DB identity (ADR-016 not implemented); party balances computed not allocated; lazy chart of accounts; two billing screens (GenerateInvoice vs Sales); no rate limiting; MSG91 SMS dependency when configured.
+ LOW: stray empty files; 7 lint warnings (historical).
+ Documentation inconsistencies: README.md stale (Phase 0); system-overview says no returns/period lock/reports/barcodes, but migrations 009, 011, 017 and routes exist; ADRs all Proposed while accepted decisions live in docs/decisions/product-owner-decisions.md.
+33. DEPENDENCY MAP
+ Catalogue -> Opening stock/Purchase -> Inventory (WAC) -> Accounting (journals) -> Reports; Catalogue -> Sales -> stock deduction -> receivables -> accounting -> reports; returns and receipts depend on sales/purchases.
+34. RECOMMENDED NEXT SLICES (not implemented)
+ 1) Test backfill for barcode/serial/OTP/profile and a fresh full test run to restore trustworthy evidence. 2) Decide GST model with CA review, then add GST to purchase and sale. 3) Sale cancellation/reversal and controlled numbering. 4) Roles/staff (cashier). 5) Stock count and low/dead-stock reports. 6) Cash flow, loans. 7) Consolidate Sales.tsx/GenerateInvoice.tsx.
+
+=====================================================================
+38. VALIDATION SUMMARY / UNVERIFIED AREAS
+=====================================================================
+ Verified by extraction: file inventory, 77 Map* route calls, migration table creations, test method names (35 unit + 51 integration + 3 classes uncounted).
+ GAP-CLOSING PASS (second read-only pass) - VERIFIED ADDITIONS:
+ A. SCHEMA DETAIL (migrations 002-009, 011-018). All tenant tables use composite (tenant_id,id) keys and composite tenant FKs; RLS is enabled+forced with policy tenant_isolation (tenant_id = core.current_tenant_id() AND core.is_active_member(tenant_id)); runtime role rbos_app gets only select/insert (+ column-level update on a few tables).
+  002 core: tenant(created_by,bootstrap_key), tenant_membership(role only 'Owner'; status Active/Revoked), business_profile(base_currency fixed INR), branch, stock_location, security.security_event (global, insert-only).
+  003: catalog.product (base_unit pcs/set/pack/m; attributes JSON limited to colour/capacity/connector_type/compatible_with; generic products have no brand/model; internal_sku starts INT-), journal_line (exactly one of debit/credit >0), opening_stock_document (Posted iff posted_at+journal+audit set), stock_movement/stock_balance/item_cost(WAC), idempotency_record.
+  004: one tenant per creator; one Posted opening-stock document per location. 005: force RLS on tenant and membership.
+  006: generated dup_key (normalised name|brand|model) unique among active products; case-insensitive unique category; sku_counter; import_batch.
+  007: account types Asset/Equity/Liability; supplier name unique case-insensitively; purchase_receipt, receipt_line, supplier_payment (Cash/Bank/UPI), each with idempotency_key(8-100) + request_hash + journal_entry_id.
+  008: account types add Income/Expense; stock_movement allows negative deltas (sign of value must match); customer; sale (type Cash/UPI/Credit; paid<=total; non-credit fully paid; credit needs customer; number identity); sale_line.
+  009: customer_payment, sale_return (receivable_credit+cash_refund=total), sale_return_line, purchase_return, purchase_return_line.
+  011: money_account(Cash/Bank/UPI), expense, owner_transaction(Capital/Drawing), stock_adjustment(reasons Damage/Theft/Shortage/WriteOff/FoundOnCount/OwnerConsumption/Other), period_lock, period_lock_history; trigger period_lock_guard rejects journal entries dated on/before locked_through (errcode RB001).
+  012: profile fields (8 business categories; GST status NotRegistered/Regular/Composition/Undecided; GSTIN regex; mobile and PIN regex; FY start month; language 'en' only; onboarding_completed). 013: nullable sale.gst_rate 0-100 (stored only; no GST engine verified).
+  014/015: procurement.invoice_file (bytea; JPEG/PNG/WebP/PDF/ZIP; max 12,582,912 bytes). 016: identity.otp_challenge (purpose signup/login/change; Indian mobile regex) + unique phone index.
+  017: product.track_serials; product_barcode (code 4-64 chars no whitespace, unique per tenant, pack_quantity 1-100000); inventory.serial_unit (InStock/Sold/ReturnedToSupplier; unique upper(trim(serial))). 018: sale_line.serials text[] with GIN index.
+ B. MIGRATION RUNNER (DatabaseMigrator.cs): advisory lock 7272741; table public.schema_migrations(name,applied_at,checksum); files applied in ordinal filename order, each in one transaction; checksum = SHA-256 of UTF-8 SQL after CRLF->LF; an already-applied file whose checksum changed raises an error ("add a new migration instead"); missing checksums are back-filled. Run by migrator role only.
+ C. EXTERNAL SERVICE WARNING: InvoiceExtractionService and ProductFileReader POST page/photo content to Google Gemini (https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent, header x-goog-api-key) ONLY when configuration key Gemini:ApiKey is set; otherwise they return a "not set up" message. appsettings*.json contain logging only (no key). So the system is not strictly local-only when that key is configured; do not use it with real business data. Nothing was called during this investigation.
+ D. ACCOUNTING (account codes): 1000 Cash, 1200 Receivable, 1400 Inventory, 2000 Payable, 3000 Owner Capital, 3100 Owner Drawings, 4000 Revenue, 4900 Inventory Gain, 5000 COGS, 5100 Stock Write-off Loss, expenses 6010 Rent/6020 Salaries/6030 Utilities/6040 Transport/6050 Marketing/6060 Repairs/6090 Other.
+  Sale: Dr Cash(paid) + Dr Receivable(unpaid), Cr Revenue; Dr COGS, Cr Inventory at WAC. Purchase receipt: Dr Inventory, Cr Payable. Supplier payment: Dr Payable, Cr Cash. Collection: Dr Cash, Cr Receivable. Customer return: Dr Revenue; Cr Receivable and/or Cash; Dr Inventory, Cr COGS at original cost; last-unit return takes rounding remainder. Supplier return: Dr Payable; Cr Inventory; difference to COGS. Stock adjustment: decrease Dr 5100 (or 3100 for OwnerConsumption) Cr 1400; increase Dr 1400 Cr 4900; FoundOnCount must be an increase; Other requires a note. Capital/Drawing posts against Owner Capital/Drawings; drawing is rejected if the money account balance is insufficient.
+ E. SALE RULES (SalesRules/SalesPosting): max 100 lines; each product once; date not future and not older than 5 years; price and discount max 2 decimals; discount <= gross; total >0 and <=99,999,999; stock row locked and oversell rejected; idempotent via Idempotency-Key+request hash (replay returns same id, different payload 409).
+ F. SERIAL DISCREPANCY: serials (uppercase, 4-40 chars, no spaces, count <= quantity, unique within line) are saved in sale_line.serials and included in the idempotency hash. After posting, earlier use of the same serial in other sale lines is returned as serialWarnings (warning only, never blocks). inventory.serial_unit exists in the schema but SalesPosting does not update it (inspected code). Sale search matches a serial exactly. Dedicated barcode/serial/OTP automated tests were not found.
+ G. TESTS: additional integration methods counted: IntegrityGuardTests 2, OpeningStockServiceTests 3, SchemaGuardTests 2 (total integration methods = 51 + 7 = 58 by extraction; Theory cases not expanded). Current pass/fail results are NOT known: no tests were run.
+ H. FRONTEND CONFIG: Vite dev port 5173 proxying /api to http://localhost:5082; Vitest uses jsdom, setup src/test-setup.ts, includes src/**/*.test.{ts,tsx}. Playwright: single project mobile-390x844 (Edge, touch), 1 worker, no retries, 90 s timeout, starts API on 5082 with Rbos__Database=test and Rbos__AllowOpenRegistration=true plus Vite; localhost only.
+ STILL NOT VERIFIED: remainder of Program.cs; per-route request/response schemas and authorization attributes; service internals not named above (catalogue, opening stock, reports); React screen internals; CSS design tokens; screenshot visual content; e2e spec bodies; current test results; docs other than those named. Possible item to review: SalesPosting audit-event insert passes a fresh GUID as the event id and uid as actor (appears intended; not confirmed as a defect).
+ No secrets copied. Output is UTF-8 plain text.
+
+=====================================================================
+39. NETWORK, TEST-DATA PROVENANCE AND DOCUMENT CONTRADICTIONS (third read-only pass)
+=====================================================================
+ NETWORK BEHAVIOUR (verified in Program.cs, InvoiceExtractionService.cs, ProductFileReader.cs):
+  - Program.cs registers typed HttpClients (60 s timeout) for InvoiceExtractionService and ProductFileReader. A third client, Msg91SmsSender (15 s), is registered ONLY when Sms:Provider = msg91 - another optional external service (SMS for OTP).
+  - Both extraction paths send content to https://generativelanguage.googleapis.com only if Gemini:ApiKey is configured. No key was found in appsettings*.json or in the Gemini__ApiKey environment variable. The API csproj has a UserSecretsId, so a key could exist in user secrets; that store was NOT read, so whether a key is configured here is NOT VERIFIED.
+  - Conclusion: default run = no outbound calls. With a key, invoice images/PDFs and product photos leave the machine. This conflicts with guardrails (no paid AI/APIs, no mandatory hosted services) if the key is paid, and with the no-external-upload rule for real data.
+ TEST-DATA PROVENANCE:
+  - "Test Data Invoice" has 9 JPGs (Media.jpg, Media (1..8).jpg, all dated 04-11-2026 15:19), extraction-report.json and two PowerShell scripts that call only the LOCAL API (localhost:5082 /purchases/extract). web/e2e/test-invoice.png is a separate small fixture.
+  - extraction-report.json and web/e2e/demo-electronics.spec.ts name real-looking suppliers (Maa Vaishno, Friends Electronics/Marketing/Enterprises) with invoice numbers and totals. The "Media (n).jpg" names suggest phone-gallery photos of real documents. Nothing in the repository says they are synthetic or authorised. STATUS: NOT CONFIRMED; only the owner can confirm. Until then treat as potentially real third-party data: do not run extraction with a Gemini key set, do not share, and consider replacing with synthetic invoices.
+ DOCUMENT CONTRADICTIONS (authority = current source and migrations 001-018):
+  - system-overview.txt (~lines 101-104, 152-153) says no returns, reports, trial balance, reconciliation, period lock or barcodes. WRONG: migrations 009, 011, 017, 018 and routes exist.
+  - system-overview.txt slice status / "next slice" and README "Slice 5 has not been authorised" / Phase 0 framing are stale.
+  - system-overview.txt (~line 332) says GST profile "not yet known"; migrations 012/013 now store GST status, GSTIN and sale gst_rate (no GST engine).
+  - All 24 ADRs remain "Proposed" while accepted decisions live in docs/decisions/product-owner-decisions.md.
+  - Older test counts (57/48/15/2) predate later slices; current results unknown.
+  - Guardrails forbid paid AI/hosted services, yet Gemini and MSG91 code paths exist.
+ 40. OWNER DECISIONS NEEDED: (1) confirm or replace the invoice images; (2) keep disabled by default, or remove, the Gemini/MSG91 paths and document a local-only mode; (3) approve edits to README.md, docs/product/roadmap.md, system-overview.txt and ADR statuses to match reality.

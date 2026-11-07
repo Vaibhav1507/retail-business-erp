@@ -1,0 +1,6 @@
+-- A2: a sale is cancelled by a separate, append-only record plus a mirror journal. The sale row itself is never changed.
+create table sales.sale_cancellation (tenant_id uuid not null references core.tenant(id), id uuid not null, sale_id uuid not null, cancel_date date not null, reason text null check (reason is null or length(reason) <= 200), idempotency_key text not null check (length(idempotency_key) between 8 and 100), request_hash text not null, journal_entry_id uuid not null, created_by uuid not null, created_at timestamptz not null default now(), primary key (tenant_id, id), unique (tenant_id, idempotency_key), unique (tenant_id, sale_id), foreign key (tenant_id, sale_id) references sales.sale(tenant_id, id), foreign key (tenant_id, journal_entry_id) references accounting.journal_entry(tenant_id, id));
+alter table sales.sale_cancellation enable row level security;
+alter table sales.sale_cancellation force row level security;
+create policy tenant_isolation on sales.sale_cancellation for all to rbos_app using (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id)) with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id));
+grant select, insert on sales.sale_cancellation to rbos_app;
