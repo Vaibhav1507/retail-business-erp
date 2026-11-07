@@ -1,0 +1,227 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using Npgsql;
+using Rbos.Api.Persistence;
+using static Rbos.Api.Application.SqlHelpers;
+using Rbos.Domain;
+
+namespace Rbos.Api.Application;
+
+public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true);
+public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null);
+
+/// <summary>Customers and sales (stock deduction at WAC, balanced journal, customer receivable). All amounts are recomputed server-side.</summary>
+public sealed class SalesService(TenantDb db)
+{
+    public async Task<ServiceResult<object>> CustomersAsync(Guid uid, string? q, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        await using var c = s.Command(@"select c.id, c.name, c.phone, c.notes, c.is_active,
+            coalesce((select sum(total - amount_paid) from sales.sale x where x.customer_id=c.id and not exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id)),0)
+                      - coalesce((select sum(amount) from sales.customer_payment p where p.customer_id=c.id),0)
+                      - coalesce((select sum(receivable_credit) from sales.sale_return r where r.customer_id=c.id),0) as owed
+            from sales.customer c
+            where (@q::text is null or lower(c.name) like '%' || lower(@q) || '%' or coalesce(c.phone,'') like '%' || @q || '%')
+            order by c.is_active desc, lower(c.name) limit 200");
+        c.Parameters.AddWithValue("q", (object?)Blank(q) ?? DBNull.Value);
+        var list = new List<object>();
+        await using var r = await c.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new { id = r.GetGuid(0), name = r.GetString(1), phone = r.IsDBNull(2) ? null : r.GetString(2), notes = r.IsDBNull(3) ? null : r.GetString(3), isActive = r.GetBoolean(4), owed = r.GetDecimal(5) });
+        return ServiceResult<object>.Ok(list);
+    }
+
+    public async Task<ServiceResult<object>> CreateCustomerAsync(Guid uid, CustomerCommand m, CancellationToken ct)
+    {
+        if (!SalesRules.TryValidateCustomer(m.Name, m.Phone, m.Notes, out var err)) return ServiceResult<object>.Fail(err!);
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        var id = Guid.NewGuid();
+        await Exec(s, ct, "insert into sales.customer(tenant_id,id,name,phone,notes) values (@t,@i,@n,@p,@o)",
+            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)));
+        await s.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { id });
+    }
+
+    public async Task<ServiceResult<object>> UpdateCustomerAsync(Guid uid, Guid id, CustomerCommand m, CancellationToken ct)
+    {
+        if (!SalesRules.TryValidateCustomer(m.Name, m.Phone, m.Notes, out var err)) return ServiceResult<object>.Fail(err!);
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a where id=@i");
+        c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("p", (object?)Blank(m.Phone) ?? DBNull.Value);
+        c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("i", id);
+        if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Customer not found.", 404);
+        await s.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { id });
+    }
+
+    public async Task<ServiceResult<object>> SalesAsync(Guid uid, string? q, Guid? customerId, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, c.name, x.number, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id)
+            from sales.sale x left join sales.customer c on c.id=x.customer_id
+            where (@c::uuid is null or x.customer_id=@c)
+              and (@q::text is null or lower(coalesce(c.name,'walk-in')) like '%' || lower(@q) || '%'
+              or x.number::text = @q or lower(x.sale_type)=lower(@q) or coalesce(c.phone,'') like '%' || @q || '%'
+              or exists (select 1 from sales.sale_line sl where sl.sale_id=x.id and upper(btrim(@q)) = any(sl.serials)))
+            order by x.sale_date desc, x.created_at desc limit 100");
+        c.Parameters.AddWithValue("c", (object?)customerId ?? DBNull.Value);
+        c.Parameters.AddWithValue("q", (object?)Blank(q) ?? DBNull.Value);
+        var list = new List<object>();
+        await using var r = await c.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            number = r.GetInt64(6), cancelled = r.GetBoolean(7) });
+        return ServiceResult<object>.Ok(list);
+    }
+
+    public async Task<ServiceResult<object>> SaleAsync(Guid uid, Guid id, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        object? head = null;
+        c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id)
+            from sales.sale x left join sales.customer c on c.id=x.customer_id join core.stock_location l on l.id=x.location_id where x.id=@i"))
+        {
+            c.Parameters.AddWithValue("i", id);
+            await using var r = await c.ExecuteReaderAsync(ct);
+            if (await r.ReadAsync(ct))
+                head = new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), payMethod = r.IsDBNull(5) ? null : r.GetString(5), customer = r.IsDBNull(6) ? "Walk-in" : r.GetString(6), location = r.GetString(7),
+                customerNotes = r.IsDBNull(10) ? null : r.GetString(10), gstRate = r.IsDBNull(11) ? (decimal?)null : r.GetDecimal(11), cancelled = r.GetBoolean(12) };
+        }
+        if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
+        var lines = new List<object>();
+        await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials
+            from sales.sale_line l join catalog.product p on p.id=l.product_id where l.sale_id=@i order by p.name"))
+        {
+            c.Parameters.AddWithValue("i", id);
+            await using var r = await c.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+                lines.Add(new { product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2), unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5), serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6) });
+        }
+        return ServiceResult<object>.Ok(new { sale = head, lines });
+    }
+
+    public async Task<ServiceResult<object>> SellAsync(Guid uid, string? key, SaleCommand m, string correlationId, CancellationToken ct)
+    {
+        key ??= "";
+        if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
+        if (!SalesRules.TryValidateSale(m.Lines, m.SaleType, m.AmountPaid, m.PayMethod, m.CustomerId is not null, m.SaleDate, DateOnly.FromDateTime(DateTime.UtcNow),
+                out var lines, out var total, out var paid, out var method, out var err))
+            return ServiceResult<object>.Fail(err!);
+        var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
+            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}"))));
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        var tenantId = tid.Value;
+
+        try
+        {
+            await using var s = await db.BeginAsync(uid, tenantId, ct);
+            await using (var q = s.Command("select id, request_hash from sales.sale where idempotency_key=@k"))
+            {
+                q.Parameters.AddWithValue("k", key);
+                await using var r = await q.ExecuteReaderAsync(ct);
+                if (await r.ReadAsync(ct))
+                    return r.GetString(1) == hash ? ServiceResult<object>.Ok(new { id = r.GetGuid(0), replayed = true }) : ServiceResult<object>.Fail("Idempotency-Key reused with a different request.", 409);
+            }
+            if (m.CustomerId is not null && await Scalar<Guid?>(s, "select id from sales.customer where id=@i and is_active", ct, ("i", m.CustomerId)) is null) return ServiceResult<object>.Fail("Unknown or inactive customer.");
+            if (await Scalar<Guid?>(s, "select id from core.stock_location where id=@i", ct, ("i", m.LocationId)) is null) return ServiceResult<object>.Fail("Unknown location.");
+            var ids = lines.Select(l => l.ProductId).ToArray();
+            await using (var q = s.Command("select count(*) from catalog.product where id = any(@i) and is_active"))
+            {
+                q.Parameters.AddWithValue("i", ids);
+                if ((long)(await q.ExecuteScalarAsync(ct))! != ids.Length) return ServiceResult<object>.Fail("Unknown or inactive product.");
+            }
+
+            var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next)>();
+            foreach (var l in lines.OrderBy(x => x.ProductId))
+            {
+                var onHand = await Scalar<decimal?>(s, "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update", ct, ("p", l.ProductId), ("l", m.LocationId)) ?? 0m;
+                if (onHand < l.Quantity.Value)
+                {
+                    var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", l.ProductId));
+                    return ServiceResult<object>.Fail($"Not enough stock for {name}: {onHand:0.###} available.");
+                }
+                var cur = await ReadCostAsync(s, l.ProductId, ct);
+                var remaining = cur.TotalQuantity - l.Quantity.Value;
+                var cost = remaining <= 0 ? cur.InventoryValue : Math.Min(cur.InventoryValue, Money.Of(l.Quantity.Value * cur.Wac).Amount);
+                costed.Add((l, cur.Wac, cost, new CostState(remaining, cur.InventoryValue - cost, cur.Wac)));
+            }
+
+            var costTotal = Money.Of(costed.Sum(x => x.Cost));
+            var journal = SalesRules.SaleJournal(total, paid, costTotal);
+            var accounts = new List<Guid>();
+            foreach (var j in journal) accounts.Add(await AccountAsync(s, tenantId, j.AccountCode, ct));
+
+            var id = Guid.NewGuid(); var entry = Guid.NewGuid();
+            await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'SalePosted','Sale',@d,@s,@c)",
+                ("t", tenantId), ("a", Guid.NewGuid()), ("u", uid), ("d", id), ("s", string.Create(CultureInfo.InvariantCulture, $"{m.SaleType} sale, {lines.Count} lines, total {total.Amount:0.00} INR")), ("c", correlationId));
+            await Exec(s, ct, "insert into accounting.journal_entry(tenant_id,id,effective_date,source_type,source_id) values (@t,@e,@d,'Sale',@s)", ("t", tenantId), ("e", entry), ("d", m.SaleDate), ("s", id));
+            for (var i = 0; i < journal.Count; i++)
+                await Exec(s, ct, "insert into accounting.journal_line(tenant_id,id,entry_id,account_id,debit,credit) values (@t,@i,@e,@a,@d,@c)",
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("e", entry), ("a", accounts[i]), ("d", journal[i].Debit), ("c", journal[i].Credit));
+            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@k,@h,@j,@u,@g)",
+                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value));
+
+            foreach (var (l, unitCost, cost, next) in costed)
+            {
+                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr)",
+                    ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials));
+                await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'Sale',@d)",
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
+                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", l.ProductId), ("l", m.LocationId));
+                await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac), ("p", l.ProductId));
+            }
+            var allSerials = lines.Where(l => l.Serials is not null).SelectMany(l => l.Serials!).ToArray();
+            var soldBefore = new List<string>();
+            if (allSerials.Length > 0)
+            {
+                await using var q = s.Command("select distinct u from sales.sale_line l, unnest(l.serials) u where u = any(@s)");
+                q.Parameters.AddWithValue("s", allSerials);
+                await using var r = await q.ExecuteReaderAsync(ct);
+                while (await r.ReadAsync(ct)) soldBefore.Add(r.GetString(0));
+            }
+            await s.CommitAsync(ct);
+            return ServiceResult<object>.Ok(new { id, total = total.Amount, balance = total.Amount - paid.Amount, serialWarnings = soldBefore });
+        }
+        catch (PostgresException e) when (e.SqlState == "23505")
+        {
+            await using var s2 = await db.BeginAsync(uid, tenantId, ct);
+            await using var q = s2.Command("select id, request_hash from sales.sale where idempotency_key=@k");
+            q.Parameters.AddWithValue("k", key);
+            await using var r = await q.ExecuteReaderAsync(ct);
+            if (await r.ReadAsync(ct) && r.GetString(1) == hash) return ServiceResult<object>.Ok(new { id = r.GetGuid(0), replayed = true });
+            return ServiceResult<object>.Fail("Idempotency-Key reused with a different request.", 409);
+        }
+    }
+
+    static async Task<Guid> AccountAsync(TenantSession s, Guid tenantId, string code, CancellationToken ct)
+    {
+        var (name, type) = code switch
+        {
+            "1000" => ("Cash and Bank", "Asset"), "1200" => ("Accounts Receivable", "Asset"), "1400" => ("Inventory", "Asset"),
+            "4000" => ("Sales Revenue", "Income"), "5000" => ("Cost of Goods Sold", "Expense"), _ => (code, "Asset")
+        };
+        await Exec(s, ct, "insert into accounting.account(tenant_id,id,code,name,type) values (@t,@i,@c,@n,@y) on conflict (tenant_id,code) do nothing",
+            ("t", tenantId), ("i", Guid.NewGuid()), ("c", code), ("n", name), ("y", type));
+        return (await Scalar<Guid?>(s, "select id from accounting.account where code=@c", ct, ("c", code)))!.Value;
+    }
+
+    static async Task<CostState> ReadCostAsync(TenantSession s, Guid productId, CancellationToken ct)
+    {
+        await using var q = s.Command("select total_quantity,inventory_value,wac from inventory.item_cost where product_id=@p for update");
+        q.Parameters.AddWithValue("p", productId);
+        await using var r = await q.ExecuteReaderAsync(ct);
+        return await r.ReadAsync(ct) ? new CostState(r.GetDecimal(0), r.GetDecimal(1), r.GetDecimal(2)) : CostState.Empty;
+    }
+
+    }

@@ -1,0 +1,6 @@
+@Rbos.Api_HostAddress = http://localhost:5082
+
+GET {{Rbos.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
