@@ -1,0 +1,21 @@
+name: Migrate production database
+
+# Manual only. Needs the repository secret NEON_MIGRATOR_CONNECTION (Npgsql format, SSL Mode=Require).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Apply pending migrations
+        env:
+          ConnectionStrings__RbosProdMigrator: ${{ secrets.NEON_MIGRATOR_CONNECTION }}
+        run: dotnet run --project src/Rbos.Api -c Release -- --migrate prod
