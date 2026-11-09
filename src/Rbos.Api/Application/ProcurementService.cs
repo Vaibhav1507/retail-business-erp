@@ -145,7 +145,7 @@ public sealed class ProcurementService(TenantDb db)
             return ServiceResult<object>.Fail(err!);
         if ((m.SupplierRef?.Trim().Length ?? 0) > 60) return ServiceResult<object>.Fail("Supplier reference is too long.");
         var hash = Hash(string.Join('|', m.SupplierId, m.LocationId, m.ReceiptDate.ToString("O"), m.SupplierRef?.Trim(),
-            string.Join(';', lines.OrderBy(l => l.ProductId).Select(l => $"{l.ProductId}:{l.Quantity.Value.ToString(CultureInfo.InvariantCulture)}:{l.UnitCost.Value.ToString(CultureInfo.InvariantCulture)}"))));
+            string.Join(';', lines.OrderBy(l => l.ProductId).Select(l => string.Join(':', l.ProductId, l.Quantity.Value.ToString(CultureInfo.InvariantCulture), l.UnitCost.Value.ToString(CultureInfo.InvariantCulture), l.Gst.Amount.ToString(CultureInfo.InvariantCulture))))));
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -165,8 +165,10 @@ public sealed class ProcurementService(TenantDb db)
                 if ((long)(await q.ExecuteScalarAsync(ct))! != ids.Length) return ServiceResult<object>.Fail("Unknown or inactive product.");
             }
 
-            var total = PurchaseRules.Total(lines);
-            var journal = PurchaseRules.ReceiptJournal(total);
+            var gstClaimed = PurchaseRules.CanClaimGst(await Scalar<string>(s, "select gst_status from core.business_profile limit 1", ct));
+            var total = PurchaseRules.GrandTotal(lines);
+            var gstTotal = PurchaseRules.GstTotal(lines);
+            var journal = PurchaseRules.ReceiptJournal(lines, gstClaimed);
             var accounts = new List<Guid>();
             foreach (var j in journal) accounts.Add(await AccountAsync(s, tenantId, j.AccountCode, ct));
 
@@ -177,19 +179,21 @@ public sealed class ProcurementService(TenantDb db)
             for (var i = 0; i < journal.Count; i++)
                 await Exec(s, ct, "insert into accounting.journal_line(tenant_id,id,entry_id,account_id,debit,credit) values (@t,@i,@e,@a,@d,@c)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("e", entry), ("a", accounts[i]), ("d", journal[i].Debit), ("c", journal[i].Credit));
-            await Exec(s, ct, "insert into procurement.purchase_receipt(tenant_id,id,supplier_id,location_id,receipt_date,supplier_ref,total,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@l,@d,@r,@v,@k,@h,@j,@u)",
-                ("t", tenantId), ("i", id), ("s", m.SupplierId), ("l", m.LocationId), ("d", m.ReceiptDate), ("r", Blank(m.SupplierRef)), ("v", total.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid));
+            await Exec(s, ct, "insert into procurement.purchase_receipt(tenant_id,id,supplier_id,location_id,receipt_date,supplier_ref,total,gst_total,gst_claimed,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@l,@d,@r,@v,@g,@gc,@k,@h,@j,@u)",
+                ("t", tenantId), ("i", id), ("s", m.SupplierId), ("l", m.LocationId), ("d", m.ReceiptDate), ("r", Blank(m.SupplierRef)), ("v", total.Amount), ("g", gstTotal.Amount), ("gc", gstClaimed), ("k", key), ("h", hash), ("j", entry), ("u", uid));
 
-            foreach (var l in lines)
-            {
-                await Exec(s, ct, "insert into procurement.purchase_receipt_line(tenant_id,receipt_id,product_id,quantity,unit_cost) values (@t,@r,@p,@q,@c)",
-                    ("t", tenantId), ("r", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("c", l.UnitCost.Value));
+                            foreach (var l in lines)
+                            {
+                                var landed = l.LandedUnitCost(gstClaimed);
+                                var landedCost = UnitCost.TryCreate(landed, out var lc, out _) ? lc : l.UnitCost;
+                                await Exec(s, ct, "insert into procurement.purchase_receipt_line(tenant_id,receipt_id,product_id,quantity,unit_cost,gst_amount,landed_unit_cost) values (@t,@r,@p,@q,@c,@g,@lc)",
+                                    ("t", tenantId), ("r", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("c", l.UnitCost.Value), ("g", l.Gst.Amount), ("lc", landedCost.Value));
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'PurchaseReceipt',@d)",
-                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", l.Quantity.Value), ("c", l.UnitCost.Value), ("v", l.Value.Amount), ("e", m.ReceiptDate), ("d", id));
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", l.Quantity.Value), ("c", landedCost.Value), ("v", l.StockValue(gstClaimed).Amount), ("e", m.ReceiptDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
                     ("t", tenantId), ("p", l.ProductId), ("l", m.LocationId), ("q", l.Quantity.Value));
                 var current = await ReadCostAsync(s, l.ProductId, ct);
-                var next = WeightedAverageCostCalculator.ApplyReceipt(current, l.Quantity, l.UnitCost);
+                var next = WeightedAverageCostCalculator.ApplyReceipt(current, l.Quantity, landedCost);
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
                     ("t", tenantId), ("p", l.ProductId), ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac));
             }
@@ -259,7 +263,7 @@ public sealed class ProcurementService(TenantDb db)
 
     static async Task<Guid> AccountAsync(TenantSession s, Guid tenantId, string code, CancellationToken ct)
     {
-        var (name, type) = code switch { "2000" => ("Accounts Payable", "Liability"), "1000" => ("Cash and Bank", "Asset"), "1400" => ("Inventory", "Asset"), _ => (code, "Asset") };
+        var (name, type) = code switch { "2000" => ("Accounts Payable", "Liability"), "1000" => ("Cash and Bank", "Asset"), "1400" => ("Inventory", "Asset"), "1500" => ("GST Input", "Asset"), _ => (code, "Asset") };
         await Exec(s, ct, "insert into accounting.account(tenant_id,id,code,name,type) values (@t,@i,@c,@n,@y) on conflict (tenant_id,code) do nothing",
             ("t", tenantId), ("i", Guid.NewGuid()), ("c", code), ("n", name), ("y", type));
         return (await Scalar<Guid?>(s, "select id from accounting.account where code=@c", ct, ("c", code)))!.Value;

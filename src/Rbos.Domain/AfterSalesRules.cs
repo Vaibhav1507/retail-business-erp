@@ -68,12 +68,13 @@ public static class AfterSalesRules
     }
 
     /// <summary>Dr Accounts Payable at the purchase cost; Cr Inventory at the cost removed; any difference goes to COGS.</summary>
-    public static IReadOnlyList<JournalLineDraft> SupplierReturnJournal(Money credit, Money inventoryRemoved)
+    public static IReadOnlyList<JournalLineDraft> SupplierReturnJournal(Money credit, Money inventoryRemoved, Money gstReversed = default)
     {
         if (credit.Amount <= 0) throw new ArgumentOutOfRangeException(nameof(credit));
         var j = new List<JournalLineDraft> { new(PayableAccount, credit.Amount, 0m) };
         if (inventoryRemoved.Amount > 0) j.Add(new(InventoryAccount, 0m, inventoryRemoved.Amount));
-        var diff = credit.Amount - inventoryRemoved.Amount;
+        if (gstReversed.Amount > 0) j.Add(new(PurchaseRules.GstInputAccount, 0m, gstReversed.Amount));
+        var diff = credit.Amount - inventoryRemoved.Amount - gstReversed.Amount;
         if (diff > 0) j.Add(new(CogsAccount, 0m, diff));
         else if (diff < 0) j.Add(new(CogsAccount, -diff, 0m));
         BalancedJournalPolicy.AssertBalanced(j);

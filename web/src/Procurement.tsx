@@ -11,7 +11,7 @@ type Supplier = { id: string; name: string; phone: string | null; notes: string 
 type Receipt = { id: string; date: string; supplier: string; supplierRef: string | null; total: number; hasInvoice?: boolean }
 type Payment = { id: string; date: string; supplier: string; amount: number; method: string; reference: string | null }
 type Opt = { id: string; name: string }
-type Line = { productId: string; quantity: number; unitCost: number }
+type Line = { productId: string; quantity: number; unitCost: number; gstAmount?: number }
 
 const newKey = () => crypto.randomUUID()
 const today = () => new Date().toISOString().slice(0, 10)
@@ -35,6 +35,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const [productId, setProductId] = useState('')
   const [qty, setQty] = useState('')
   const [cost, setCost] = useState('')
+  const [gst, setGst] = useState('')
   const [lines, setLines] = useState<Line[]>([])
   const [rkey, setRkey] = useState(newKey)
   const [invoiceFileId, setInvoiceFileId] = useState<string | null>(null)
@@ -79,9 +80,10 @@ export function Procurement({ products, locations, reload, show }: { products: (
     try { await api('POST', `/products/${productId}/barcodes`, { code: unknownCode.code, symbology: unknownCode.symbology, packQuantity: Number(qty) || 1 }); setUnknownCode(null); setDone('Barcode linked to the selected product.') } catch (e) { setError(msg(e)) }
   }
   const addLine = () => {
-    const quantity = Number(qty); const unitCost = Number(cost)
+    const quantity = Number(qty); const unitCost = Number(cost); const gstAmount = Number(gst) || 0
     if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError('Choose a product and enter a positive quantity and unit cost.'); return }
-    setError(''); setLines([...lines.filter(l => l.productId !== productId), { productId, quantity, unitCost }]); setQty(''); setCost('')
+    if (gstAmount < 0 || gstAmount > quantity * unitCost) { setError('GST amount must be between 0 and the line value before tax.'); return }
+    setError(''); setLines([...lines.filter(l => l.productId !== productId), { productId, quantity, unitCost, gstAmount }]); setQty(''); setCost(''); setGst('')
   }
   const receive = () => run(async () => {
     const r = await api<{ total: number; replayed?: boolean }>('POST', '/purchases', { supplierId: sup, locationId: loc, receiptDate: date, supplierRef: ref || null, lines, invoiceFileId }, rkey)
@@ -126,13 +128,14 @@ export function Procurement({ products, locations, reload, show }: { products: (
       <div>
         <label>Product <select value={productId} onChange={e => setProductId(e.target.value)}><option value="">Select</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
         <label>Quantity <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
-        <label>Unit cost (INR) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
+        <label>Unit cost (INR, before GST) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
+                <label>GST on this line (INR, optional) <input inputMode="decimal" value={gst} onChange={e => setGst(e.target.value)} /></label>
         <button type="button" className="secondary" onClick={() => setScanning(true)}>Scan barcode</button>
         <button type="button" onClick={addLine}>Add line</button>
       </div>
       {scanning && <BarcodeScanner title="Scan product barcode" onScan={onScan} onClose={() => setScanning(false)} />}
       {unknownCode && <p role="status">Barcode <strong>{unknownCode.code}</strong> is not in your products. Pick the matching product above and <button type="button" className="secondary" onClick={linkUnknown}>Link barcode to selected product</button>, or add it as a new product under Manage Products and scan it there.</p>}
-      <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}</li>)}</ul>
+      <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}{l.gstAmount ? ` + GST ${l.gstAmount}` : ''}</li>)}</ul>
       <button type="button" onClick={receive} disabled={lines.length === 0 || !sup}>Post receipt</button>
       </>}
       {v('pay') && <>

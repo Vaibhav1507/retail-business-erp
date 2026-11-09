@@ -3,10 +3,10 @@ import { useState } from 'react'
 import { api } from './api'
 
 type Opt = { id: string; name: string }
-type DraftLine = { description: string; quantity: number | null; unitCost: number | null; amount: number | null; productId: string | null; productName: string | null; category?: string | null; brand?: string | null }
-export type InvoiceDraft = { fileId: string; supplierName: string | null; supplierId: string | null; invoiceNumber: string | null; date: string | null; total: number | null; lines: DraftLine[]; warnings: string[] }
-type Row = { description: string; productId: string; qty: string; cost: string; category?: string; brand?: string }
-type Picked = { productId: string; quantity: number; unitCost: number }
+type DraftLine = { description: string; quantity: number | null; unitCost: number | null; amount: number | null; productId: string | null; productName: string | null; category?: string | null; brand?: string | null; gst?: number | null }
+export type InvoiceDraft = { fileId: string; supplierName: string | null; supplierId: string | null; invoiceNumber: string | null; date: string | null; total: number | null; lines: DraftLine[]; warnings: string[]; subtotal?: number | null; taxAmount?: number | null }
+type Row = { description: string; productId: string; qty: string; cost: string; gst: string; category?: string; brand?: string }
+export type Picked = { productId: string; quantity: number; unitCost: number; gstAmount: number }
 
 const MAX_BYTES = 8 * 1024 * 1024
 
@@ -36,6 +36,23 @@ export async function prepare(file: File): Promise<{ contentType: string; data: 
 
 const NEW = '__new__'
 
+const round2 = (n: number) => Math.round(n * 100) / 100
+const lineNet = (r: Row) => Number(r.qty) * Number(r.cost)
+
+function withSpreadTax(rows: Row[], tax: number): Row[] {
+  const base = rows.filter(r => lineNet(r) > 0)
+  const total = base.reduce((a, r) => a + lineNet(r), 0)
+  if (!(tax > 0) || total <= 0 || rows.some(r => Number(r.gst) > 0)) return rows
+  const last = base[base.length - 1]
+  let left = round2(tax)
+  return rows.map(r => {
+    if (lineNet(r) <= 0) return r
+    const g = r === last ? left : round2((tax * lineNet(r)) / total)
+    left = round2(left - g)
+    return { ...r, gst: g.toFixed(2) }
+  })
+}
+
 export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSupplierAdded }: { products: Opt[]; suppliers: Opt[]; onUse: (d: InvoiceDraft, lines: Picked[]) => void; onProductAdded?: () => void; onSupplierAdded?: () => void }) {
   const [supplierId, setSupplierId] = useState('')
   const [extraSup, setExtraSup] = useState<Opt[]>([])
@@ -55,7 +72,8 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
       const pages = await Promise.all(files.map(prepare))
       const d = await api<InvoiceDraft>('POST', '/purchases/extract', { pages })
       setDraft(d); setSupplierId(d.supplierId ?? '')
-      setRows(d.lines.map(l => ({ description: l.description, productId: l.productId ?? '', qty: l.quantity?.toString() ?? '', cost: l.unitCost?.toString() ?? '', category: l.category ?? undefined, brand: l.brand ?? undefined })))
+      setRows(withSpreadTax(d.lines.map(l => ({ description: l.description, productId: l.productId ?? '', qty: l.quantity?.toString() ?? '',
+        cost: l.unitCost?.toString() ?? '', gst: l.gst?.toString() ?? '', category: l.category ?? undefined, brand: l.brand ?? undefined })), d.taxAmount ?? 0))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not read the invoice.')
     } finally {
@@ -105,16 +123,19 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     setRows(rs => rs.map(r => (!r.productId && made.has(r.description) ? { ...r, productId: made.get(r.description)! } : r)))
   }
   const valid = rows.filter(r => r.productId && Number(r.qty) > 0 && Number(r.cost) > 0)
+  const skipped = rows.filter(r => !valid.includes(r) && lineNet(r) > 0)
+  const skippedGst = round2(skipped.reduce((s, r) => s + (Number(r.gst) || 0), 0))
+  const skippedNet = round2(skipped.reduce((s, r) => s + lineNet(r), 0))
 
   const apply = () => {
     if (!draft) return
     const byProduct = new Map<string, Picked>()
-    for (const r of valid) {
-      const q = Number(r.qty); const c = Number(r.cost)
+    valid.forEach(r => {
+      const q = Number(r.qty); const c = Number(r.cost); const g = round2(Number(r.gst) || 0)
       const prev = byProduct.get(r.productId)
-      if (!prev) byProduct.set(r.productId, { productId: r.productId, quantity: q, unitCost: c })
-      else { const qty = prev.quantity + q; byProduct.set(r.productId, { productId: r.productId, quantity: qty, unitCost: Math.round(((prev.quantity * prev.unitCost + q * c) / qty) * 10000) / 10000 }) }
-    }
+      if (!prev) byProduct.set(r.productId, { productId: r.productId, quantity: q, unitCost: c, gstAmount: g })
+      else { const qty = prev.quantity + q; byProduct.set(r.productId, { productId: r.productId, quantity: qty, unitCost: Math.round(((prev.quantity * prev.unitCost + q * c) / qty) * 10000) / 10000, gstAmount: Math.round((prev.gstAmount + g) * 100) / 100 }) }
+    })
     onUse({ ...draft, supplierId: supplierId || null }, [...byProduct.values()])
     setDraft(null); setRows([])
   }
@@ -133,6 +154,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
             {draft.supplierName ? `Supplier: ${draft.supplierName}` : 'Supplier not found'}
             {draft.invoiceNumber ? ` | Invoice ${draft.invoiceNumber}` : ''}
             {draft.date ? ` | ${draft.date}` : ''}
+            {draft.taxAmount != null ? ` | GST ${draft.taxAmount.toFixed(2)}` : ''}
             {draft.total != null ? ` | Total ${draft.total.toFixed(2)}` : ''}
           </p>
           <label>Supplier
@@ -143,9 +165,10 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
             </select>
           </label>
           {draft.warnings.length > 0 && <ul className="invoice-upload-warn">{draft.warnings.map(w => <li key={w}>{w}</li>)}</ul>}
+          {skipped.length > 0 && <p role="status" className="invoice-upload-warn">{skipped.length} line(s) are skipped: cost {skippedNet.toFixed(2)} and GST {skippedGst.toFixed(2)} will NOT be recorded. Choose a product for each line to record the full invoice.</p>}
           <div className="table-scroll">
             <table>
-              <thead><tr><th>On invoice</th><th>Product</th><th>Qty</th><th>Unit cost</th></tr></thead>
+              <thead><tr><th>On invoice</th><th>Product</th><th>Quantity</th><th>Unit cost</th><th>GST amount</th></tr></thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={i}>
@@ -159,6 +182,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
                     </td>
                     <td><input aria-label="Quantity" inputMode="decimal" value={r.qty} onChange={e => edit(i, { qty: e.target.value })} /></td>
                     <td><input aria-label="Unit cost" inputMode="decimal" value={r.cost} onChange={e => edit(i, { cost: e.target.value })} /></td>
+                    <td><input aria-label="GST amount" inputMode="decimal" value={r.gst} onChange={e => edit(i, { gst: e.target.value })} /></td>
                   </tr>
                 ))}
               </tbody>

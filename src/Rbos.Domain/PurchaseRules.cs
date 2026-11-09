@@ -1,10 +1,20 @@
 namespace Rbos.Domain;
 
-public sealed record PurchaseLineInput(Guid ProductId, decimal Quantity, decimal UnitCost);
+public sealed record PurchaseLineInput(Guid ProductId, decimal Quantity, decimal UnitCost, decimal GstAmount = 0m);
 
-public sealed record PurchaseLine(Guid ProductId, Quantity Quantity, UnitCost UnitCost)
+public sealed record PurchaseLine(Guid ProductId, Quantity Quantity, UnitCost UnitCost, Money Gst = default)
 {
+    /// <summary>Taxable value: quantity x pre-GST rate.</summary>
     public Money Value => Money.Of(Quantity.Value * UnitCost.Value);
+
+    /// <summary>What the supplier bills for this line (taxable value + GST).</summary>
+    public Money Billed => Value + Gst;
+
+    /// <summary>Value that goes into stock: GST is part of the cost unless the business claims it back.</summary>
+    public Money StockValue(bool gstClaimed) => gstClaimed ? Value : Billed;
+
+    /// <summary>Actual cost of one unit; includes GST unless the business claims it back.</summary>
+    public decimal LandedUnitCost(bool gstClaimed) => gstClaimed ? UnitCost.Value : decimal.Round(StockValue(false).Amount / Quantity.Value, 4, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>Pure rules for purchase receipts and supplier payments (Slice 3).</summary>
@@ -13,6 +23,7 @@ public static class PurchaseRules
     public const int MaxLines = 100;
     public const string PayableAccount = "2000";
     public const string CashAccount = "1000";
+    public const string GstInputAccount = "1500";
     public static readonly string[] PaymentMethods = ["Cash", "Bank", "UPI"];
 
     public static bool TryValidateReceipt(IReadOnlyList<PurchaseLineInput>? input, DateOnly date, DateOnly today, out IReadOnlyList<PurchaseLine> lines, out string? error)
@@ -29,13 +40,40 @@ public static class PurchaseRules
             if (!Quantity.TryCreate(l.Quantity, out var q, out var qe)) { error = qe; return false; }
             if (!UnitCost.TryCreate(l.UnitCost, out var c, out var ce)) { error = ce; return false; }
             if (list.Any(x => x.ProductId == l.ProductId)) { error = "A product can appear only once per receipt."; return false; }
-            list.Add(new PurchaseLine(l.ProductId, q, c));
+            if (l.GstAmount < 0 || Money.Round(l.GstAmount) != l.GstAmount) { error = "GST must be zero or positive with at most 2 decimal places."; return false; }
+            var gst = Money.Of(l.GstAmount);
+            if (gst.Amount > Money.Of(q.Value * c.Value).Amount) { error = "GST on a line cannot be more than the line value."; return false; }
+            list.Add(new PurchaseLine(l.ProductId, q, c, gst));
         }
         lines = list;
         return true;
     }
 
     public static Money Total(IReadOnlyList<PurchaseLine> lines) => lines.Aggregate(Money.Zero, (a, l) => a + l.Value);
+
+    public static Money GstTotal(IReadOnlyList<PurchaseLine> lines) => lines.Aggregate(Money.Zero, (a, l) => a + l.Gst);
+
+    /// <summary>Amount owed to the supplier: taxable value + GST.</summary>
+    public static Money GrandTotal(IReadOnlyList<PurchaseLine> lines) => lines.Aggregate(Money.Zero, (a, l) => a + l.Billed);
+
+    public static Money StockTotal(IReadOnlyList<PurchaseLine> lines, bool gstClaimed) => lines.Aggregate(Money.Zero, (a, l) => a + l.StockValue(gstClaimed));
+
+    /// <summary>Only a Regular (registered) business can claim supplier GST back; every other status keeps it as cost.</summary>
+    public static bool CanClaimGst(string? gstStatus) => string.Equals(gstStatus, "Regular", StringComparison.Ordinal);
+
+    /// <summary>Dr Inventory (and Dr GST Input when claimable), Cr Accounts Payable for the full bill.</summary>
+    public static IReadOnlyList<JournalLineDraft> ReceiptJournal(IReadOnlyList<PurchaseLine> lines, bool gstClaimed)
+    {
+        var stock = StockTotal(lines, gstClaimed);
+        var gst = gstClaimed ? GstTotal(lines) : Money.Zero;
+        var grand = GrandTotal(lines);
+        if (grand.Amount <= 0) throw new ArgumentOutOfRangeException(nameof(lines));
+        var j = new List<JournalLineDraft> { new(BalancedJournalPolicy.InventoryAccount, stock.Amount, 0m) };
+        if (gst.Amount > 0) j.Add(new(GstInputAccount, gst.Amount, 0m));
+        j.Add(new(PayableAccount, 0m, grand.Amount));
+        BalancedJournalPolicy.AssertBalanced(j);
+        return j;
+    }
 
     /// <summary>Dr Inventory, Cr Accounts Payable.</summary>
     public static IReadOnlyList<JournalLineDraft> ReceiptJournal(Money total)

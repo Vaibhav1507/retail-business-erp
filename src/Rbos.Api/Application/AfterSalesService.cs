@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Npgsql;
@@ -329,28 +329,28 @@ public sealed class AfterSalesService(TenantDb db)
             var prior = await Prior(s, "procurement.purchase_return", key, hash, ct);
             if (prior is not null) return prior;
 
-            Guid supplierId = Guid.Empty, locationId = Guid.Empty; DateOnly receiptDate = default; var found = false;
-            await using (var q = s.Command("select supplier_id, location_id, receipt_date from procurement.purchase_receipt where id=@i"))
+            Guid supplierId = Guid.Empty, locationId = Guid.Empty; DateOnly receiptDate = default; var found = false; var gstClaimed = false;
+            await using (var q = s.Command("select supplier_id, location_id, receipt_date, gst_claimed from procurement.purchase_receipt where id=@i"))
             {
                 q.Parameters.AddWithValue("i", m.ReceiptId);
                 await using var r = await q.ExecuteReaderAsync(ct);
-                if (await r.ReadAsync(ct)) { found = true; supplierId = r.GetGuid(0); locationId = r.GetGuid(1); receiptDate = r.GetFieldValue<DateOnly>(2); }
+                if (await r.ReadAsync(ct)) { found = true; supplierId = r.GetGuid(0); locationId = r.GetGuid(1); receiptDate = r.GetFieldValue<DateOnly>(2); gstClaimed = r.GetBoolean(3); }
             }
             if (!found) return ServiceResult<object>.Fail("Purchase receipt not found.", 404);
             if (m.ReturnDate < receiptDate) return ServiceResult<object>.Fail("Return date cannot be before the receipt date.");
 
-            var costed = new List<(Guid ProductId, decimal Qty, Money Amount, decimal UnitCost, Money Removed)>();
+            var costed = new List<(Guid ProductId, decimal Qty, Money Amount, decimal UnitCost, Money Removed, Money Gst)>();
             foreach (var (productId, qty) in lines.OrderBy(x => x.ProductId))
             {
-                decimal bought = 0, unitCost = 0, retQty = 0, retAmt = 0; var has = false;
-                await using (var q = s.Command(@"select l.quantity, l.unit_cost,
+                decimal bought = 0, unitCost = 0, retQty = 0, retAmt = 0, lineGst = 0; var has = false;
+                await using (var q = s.Command(@"select l.quantity, l.unit_cost, l.gst_amount,
                       coalesce((select sum(quantity) from procurement.purchase_return_line x where x.receipt_id=l.receipt_id and x.product_id=l.product_id),0),
                       coalesce((select sum(amount) from procurement.purchase_return_line x where x.receipt_id=l.receipt_id and x.product_id=l.product_id),0)
                     from procurement.purchase_receipt_line l where l.receipt_id=@s and l.product_id=@p"))
                 {
                     q.Parameters.AddWithValue("s", m.ReceiptId); q.Parameters.AddWithValue("p", productId);
                     await using var r = await q.ExecuteReaderAsync(ct);
-                    if (await r.ReadAsync(ct)) { has = true; bought = r.GetDecimal(0); unitCost = r.GetDecimal(1); retQty = r.GetDecimal(2); retAmt = r.GetDecimal(3); }
+                    if (await r.ReadAsync(ct)) { has = true; bought = r.GetDecimal(0); unitCost = r.GetDecimal(1); lineGst = r.GetDecimal(2); retQty = r.GetDecimal(3); retAmt = r.GetDecimal(4); }
                 }
                 if (!has) return ServiceResult<object>.Fail("A returned product was not on this receipt.");
                 if (qty.Value > bought - retQty) return ServiceResult<object>.Fail($"Cannot return {qty.Value:0.###}: only {bought - retQty:0.###} left to return for this product.");
@@ -363,13 +363,13 @@ public sealed class AfterSalesService(TenantDb db)
                 var cur = await ReadCostAsync(s, productId, ct);
                 var remaining = cur.TotalQuantity - qty.Value;
                 var removed = remaining <= 0 ? cur.InventoryValue : Math.Min(cur.InventoryValue, Money.Of(qty.Value * cur.Wac).Amount);
-                var amount = AfterSalesRules.ReturnedValue(Money.Of(bought * unitCost).Amount, bought, retQty, retAmt, qty.Value);
-                costed.Add((productId, qty.Value, amount, unitCost, Money.Of(removed)));
+                var billed = Money.Of(bought * unitCost + lineGst).Amount; var amount = AfterSalesRules.ReturnedValue(billed, bought, retQty, retAmt, qty.Value); var gstPart = gstClaimed && billed > 0 ? Money.Of(Math.Min(amount.Amount, Math.Round(lineGst * amount.Amount / billed, 2))) : Money.Of(0m);
+                costed.Add((productId, qty.Value, amount, unitCost, Money.Of(removed), gstPart));
             }
             var total = Money.Of(costed.Sum(x => x.Amount.Amount));
             var removedTotal = Money.Of(costed.Sum(x => x.Removed.Amount));
             if (total.Amount <= 0) return ServiceResult<object>.Fail("Returned value is zero.");
-            var journal = AfterSalesRules.SupplierReturnJournal(total, removedTotal);
+            var gstReversed = Money.Of(costed.Sum(x => x.Gst.Amount)); var journal = AfterSalesRules.SupplierReturnJournal(total, removedTotal, gstReversed);
 
             var id = Guid.NewGuid(); var entry = Guid.NewGuid();
             await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'PurchaseReturned','PurchaseReturn',@d,@s,@c)",
