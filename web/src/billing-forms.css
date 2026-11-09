@@ -8,7 +8,7 @@
 .billing-field input, .billing-field select { width: 100%; min-height: 44px; }
 .billing-col-3 { grid-column: span 3; } .billing-col-4 { grid-column: span 4; } .billing-col-5 { grid-column: span 5; }
 .billing-col-6 { grid-column: span 6; } .billing-col-8 { grid-column: span 8; } .billing-col-2 { grid-column: span 2; } .billing-col-12 { grid-column: span 12; }
-.billing-row { flex-direction: row; align-items: center; gap: 14px; }
+.billing-row { display: flex; flex-wrap: wrap; flex-direction: row; align-items: center; gap: 12px; margin-bottom: 14px; }
 .billing-hint { margin: 10px 0 0; font-size: 13px; color: var(--muted, #5b6770); }
 .billing-row .billing-hint { margin: 0; }
 .billing-err { color: #b3261e; margin: 0; }

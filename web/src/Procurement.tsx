@@ -152,13 +152,13 @@ export function Procurement({ products, locations, reload, show }: { products: (
       {v('history') && <>
       <h3>Past purchases</h3>
       <Paged rows={receipts}>{page => (
-      <table><thead><tr><th>Date</th><th>Supplier</th><th>Invoice no.</th><th>Total</th><th>Bill copy</th></tr></thead><tbody>{page.map(r => <tr key={r.id}><td>{r.date}</td><td>{r.supplier}</td><td>{r.supplierRef}</td><td>{r.total.toFixed(2)}</td><td>{r.hasInvoice ? <a href={`/api/purchases/${r.id}/invoice`} target="_blank" rel="noreferrer">View</a> : "-"}</td></tr>)}</tbody></table>
+      <table><thead><tr><th>Date</th><th>Supplier</th><th>Invoice no.</th><th>Total</th><th>Bill copy</th></tr></thead><tbody>{page.map(r => <tr key={r.id}><td data-label="Date">{r.date}</td><td data-label="Supplier">{r.supplier}</td><td data-label="Invoice no.">{r.supplierRef}</td><td data-label="Total">{r.total.toFixed(2)}</td><td data-label="Bill copy">{r.hasInvoice ? <a href={`/api/purchases/${r.id}/invoice`} target="_blank" rel="noreferrer">View</a> : "-"}</td></tr>)}</tbody></table>
       )}</Paged>
       {sup && <button type="button" onClick={showStatement}>Show supplier statement</button>}
       {statement && <div role="region" aria-label="Supplier statement"><h4>Statement: {statement.supplier} (we owe {statement.outstanding.toFixed(2)} INR)</h4><Paged rows={statement.entries}>{page => (<table><thead><tr><th>Date</th><th>Type</th><th>Bill</th><th>Paid/Returned</th><th>Balance</th></tr></thead><tbody>{page.map(e => <tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit ? e.debit.toFixed(2) : ""}</td><td>{e.credit ? e.credit.toFixed(2) : ""}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>)}</Paged><button type="button" onClick={() => setStatement(null)}>Close statement</button></div>}
       <h3>Payments made to suppliers</h3>
       <Paged rows={payments}>{page => (
-      <table><thead><tr><th>Date</th><th>Supplier</th><th>Method</th><th>Amount paid</th></tr></thead><tbody>{page.map(p => <tr key={p.id}><td>{p.date}</td><td>{p.supplier}</td><td>{p.method}</td><td>{p.amount.toFixed(2)}</td></tr>)}</tbody></table>
+      <table><thead><tr><th>Date</th><th>Supplier</th><th>Method</th><th>Amount paid</th></tr></thead><tbody>{page.map(p => <tr key={p.id}><td data-label="Date">{p.date}</td><td data-label="Supplier">{p.supplier}</td><td data-label="Method">{p.method}</td><td data-label="Amount paid">{p.amount.toFixed(2)}</td></tr>)}</tbody></table>
       )}</Paged>
             </>}
           </section>

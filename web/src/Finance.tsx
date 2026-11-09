@@ -166,10 +166,12 @@ function LockTab({ lock, submit }: { lock: { lockedThrough: string | null; histo
 function Reports({ setError }: { setError: (s: string) => void }) {
   const [rep, setRep] = useState<Report>('tb')
   const [from, setFrom] = useState(yearStart()); const [to, setTo] = useState(today())
-  const [data, setData] = useState<any>(null)
+  const [raw, setRaw] = useState<{ rep: Report; d: any } | null>(null)
+  const data = raw && raw.rep === rep ? raw.d : null
   const [account, setAccount] = useState('')
   const [accounts, setAccounts] = useState<any[]>([])
   const run = useCallback(async () => {
+    const setData = (d: any) => setRaw({ rep, d })
     setError(''); setData(null)
     try {
       if (rep === 'tb') setData(await api('GET', `/reports/trial-balance?asOf=${to}`))

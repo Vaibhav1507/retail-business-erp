@@ -1,4 +1,4 @@
-namespace Rbos.Api.Security;
+﻿namespace Rbos.Api.Security;
 
 /// <summary>Basic security headers, request-size limit, JSON content-type enforcement and no-store for API responses.</summary>
 public sealed class SecurityMiddleware(RequestDelegate next)
@@ -12,7 +12,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
         h["X-Content-Type-Options"] = "nosniff";
         h["X-Frame-Options"] = "DENY";
         h["Referrer-Policy"] = "no-referrer";
-        h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+        h["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()";
         h["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
         if (ctx.Request.Path.StartsWithSegments("/api"))
