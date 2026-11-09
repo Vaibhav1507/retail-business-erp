@@ -1,0 +1,57 @@
+name: rbos-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-superuser-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: ci-superuser-only
+      ConnectionStrings__RbosTestMigrator: Host=localhost;Database=rbos_test;Username=rbos_migrator;Password=ci-migrator-pass
+      ConnectionStrings__RbosTestApp: Host=localhost;Database=rbos_test;Username=rbos_app;Password=ci-app-pass
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Create roles and databases (throwaway CI database, synthetic passwords)
+        run: |
+          psql -h localhost -U postgres -d postgres -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -U postgres -d postgres -c "ALTER ROLE rbos_migrator PASSWORD 'ci-migrator-pass'" -c "ALTER ROLE rbos_app PASSWORD 'ci-app-pass'"
+      - run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+      - run: dotnet run --project src/Rbos.Api -c Release --no-build -- --migrate test
+      - run: dotnet test RetailBusinessOs.slnx --nologo -c Release --no-build
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+      - name: Dependency audit (report only)
+        run: npm audit --audit-level=high
+        continue-on-error: true
