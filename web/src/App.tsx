@@ -88,6 +88,8 @@ export default function App() {
   const [route, setRoute] = useState(parseRoute)
   const [businessName, setBusinessName] = useState<string | undefined>()
   const [lang, setLang] = useState<Lang>('en')
+  const [dark, setDark] = useState(() => localStorage.getItem('rbos.theme') === 'dark')
+  useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('rbos.theme', dark ? 'dark' : 'light') }, [dark])
 
   const loadMe = useCallback(async () => {
 	try { setMe(await api<Me>('GET', '/me')) } catch { setMe(null) }
@@ -136,7 +138,7 @@ export default function App() {
   const active = NAV.some(n => n.key === page) ? page : 'home'
   return (
 	<div className="shell">
-	  <header className="topbar"><h1>{t('app.title')}</h1><span className="who">{me.email}</span><button type="button" onClick={logout}>{t('app.signOut')}</button></header>
+	  <header className="topbar"><h1>{t('app.title')}</h1><span className="who">{me.email}</span><button type="button" onClick={() => setDark(d => !d)}>{dark ? t('theme.light') : t('theme.dark')}</button><button type="button" onClick={logout}>{t('app.signOut')}</button></header>
 	  <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>

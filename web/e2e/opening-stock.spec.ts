@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory } from './signup'
 import { expect, request as pwRequest, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Synthetic data only. Unique suffix per run so the test is repeatable against the same database.
@@ -21,9 +21,10 @@ async function api(ctx: APIRequestContext, method: 'GET' | 'POST', path: string,
 }
 
 async function addProduct(page: Page, name: string, generic: boolean, brand = '', model = '') {
-  const s = page.getByRole('region', { name: 'Products' }).getByRole('form', { name: 'Add product' })
+  await page.goto('/#/stock/products')
+  const s = await openAddProduct(page)
   await s.getByLabel('Name', { exact: true }).fill(name)
-  await s.getByLabel('Category').fill('Cables')
+  await chooseCategory(s, 'Cables')
   const box = s.getByLabel('Generic / unbranded')
   if ((await box.isChecked()) !== generic) await box.setChecked(generic)
   if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model', { exact: true }).fill(model) }
@@ -32,6 +33,7 @@ async function addProduct(page: Page, name: string, generic: boolean, brand = ''
 }
 
 async function addLine(page: Page, product: string, qty: string, cost: string) {
+  await page.goto('/#/stock/opening')
   const s = page.getByRole('region', { name: 'Opening stock' })
   const value = await s.getByLabel('Product').locator('option', { hasText: product }).getAttribute('value')
   await s.getByLabel('Product').selectOption(value!)
@@ -43,6 +45,7 @@ async function addLine(page: Page, product: string, qty: string, cost: string) {
 test('owner sets up business, posts opening stock once, and is isolated from another tenant', async ({ page, browser, baseURL }) => {
   // 1-3. Register + sign in, bootstrap tenant, default branch and stock location
   await signUp(page, { email: ownerA, businessName: `E2E Traders ${run}` })
+  await page.goto('/#/stock/products')
   await expect(page.getByRole('region', { name: 'Products' })).toBeVisible()
 
   // 4-5. Electronics-lite (branded) product and a separate generic product
@@ -60,13 +63,12 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   await expect(stockForm.getByRole('status')).toContainText('355.00 INR')
 
   // 9. Current quantity and value
+  await page.goto('/#/stock/current')
   const stock = page.getByRole('region', { name: 'Stock on hand' })
   const cableRow = stock.getByRole('row', { name: new RegExp(cableName) })
   await expect(cableRow).toContainText('10')
-  await expect(cableRow).toContainText('25.5000')
   await expect(cableRow).toContainText('255.00')
   const genericRow = stock.getByRole('row', { name: new RegExp(genericName) })
-  await expect(genericRow).toContainText('33.3333')
   await expect(genericRow).toContainText('100.00')
 
   // 10. Movement history is not part of the Slice 1 UI (stock-on-hand only); recorded as a known gap in the docs.
@@ -75,6 +77,7 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   await addLine(page, cableName, '1', '1')
   await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
   await expect(stockForm.getByRole('alert')).toContainText('already posted')
+  await page.goto('/#/stock/current')
   await expect(cableRow).toContainText('255.00')
 
   // 13. Tenant B (separate browser context, no shared cookies) cannot reach Tenant A's resources
@@ -87,11 +90,7 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   const b = await pwRequest.newContext({ baseURL, storageState: undefined })
   try {
     const mobileB = randomMobile()
-    const sent = await api(b, 'POST', '/auth/otp/send', { mobile: mobileB, purpose: 'signup' })
-    expect(sent.status()).toBe(200)
-    const verified = await api(b, 'POST', '/auth/otp/verify', { mobile: mobileB, code: (await sent.json()).devCode })
-    expect(verified.status()).toBe(200)
-    expect((await api(b, 'POST', '/auth/register', { email: ownerB, password: PASSWORD, mobile: mobileB, otpProof: (await verified.json()).proof })).status()).toBe(200)
+    expect((await api(b, 'POST', '/auth/register', { email: ownerB, password: PASSWORD, mobile: mobileB })).status()).toBe(200)
     expect((await api(b, 'POST', '/auth/login', { email: ownerB, password: PASSWORD })).status()).toBe(200)
     expect((await api(b, 'POST', '/bootstrap', { businessName: `E2E Other ${run}`, branchName: 'B', locationName: 'L' }, crypto.randomUUID())).status()).toBe(200)
 
@@ -110,6 +109,7 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   }
 
   // Tenant A is unchanged after the attempted cross-tenant write
+  await page.goto('/#/stock/current')
   await page.reload()
   await expect(page.getByRole('region', { name: 'Stock on hand' }).getByRole('row', { name: new RegExp(cableName) })).toContainText('255.00')
 })

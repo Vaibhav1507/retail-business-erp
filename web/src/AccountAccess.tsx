@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { api, resetCsrf } from './api'
+import { useEffect, useState } from 'react'
+import { api, otpEnabled, resetCsrf } from './api'
 import { BusinessSetup } from './BusinessSetup'
 
 const MOBILE_RE = /^[6-9][0-9]{9}$/
@@ -13,9 +13,11 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
   const [dev, setDev] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [otp, setOtp] = useState(false)
+  useEffect(() => { otpEnabled().then(setOtp) }, [])
 
   const value = id.trim()
-  const isMobile = /^[0-9]+$/.test(value)
+  const isMobile = otp && /^[0-9]+$/.test(value)
   const isEmail = value.includes('@')
 
   function change(v: string) { setId(v); setSent(false); setCode(''); setError('') }
@@ -23,7 +25,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
   async function submit(e: React.FormEvent) {
 	e.preventDefault()
 	setError('')
-	if (!isEmail && !isMobile) { setError('Enter your 10-digit mobile number or your email.'); return }
+	if (!isEmail && !isMobile) { setError(otp ? 'Enter your 10-digit mobile number or your email.' : 'Enter your email address.'); return }
 	if (isMobile && !MOBILE_RE.test(value)) { setError('Enter a valid 10-digit mobile number.'); return }
 	setBusy(true)
 	try {
@@ -54,8 +56,8 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
 	  <p className="hint">Sign in to your business.</p>
 	  <form onSubmit={submit} aria-label="Sign in">
 		<h2>Sign in</h2>
-		<label className="wide">Mobile number or email<input value={id} onChange={e => change(e.target.value)} required autoComplete="username" placeholder="10-digit mobile or email" /></label>
-		{isEmail && <label className="wide">Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" /></label>}
+		<label className="wide">{otp ? 'Mobile number or email' : 'Email'}<input value={id} onChange={e => change(e.target.value)} required autoComplete="username" placeholder={otp ? '10-digit mobile or email' : 'you@example.com'} /></label>
+		{(isEmail || !otp) && <label className="wide">Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" /></label>}
 		{isMobile && sent && <>
 		  <label className="wide">Enter the 6-digit code sent to {value}<input inputMode="numeric" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} required autoComplete="one-time-code" /></label>
 		  {dev && <p className="hint wide">Development code: {dev}</p>}

@@ -29,8 +29,21 @@ export async function api<T>(method: string, path: string, body?: unknown, idemp
   if (method !== 'GET' && r.status === 400) csrf = null
   const text = await r.text()
   const data = text ? JSON.parse(text) : undefined
-  if (!r.ok) throw new ApiError(r.status, (data as { error?: string } | undefined)?.error ?? `Request failed (${r.status})`)
+  if (!r.ok) {
+    const d = data as { error?: string; detail?: string; title?: string } | undefined
+    throw new ApiError(r.status, d?.error ?? d?.detail ?? d?.title ?? 'Request failed')
+  }
   return data as T
 }
 
 export const resetCsrf = () => { csrf = null }
+
+let otpConfig: Promise<boolean> | null = null
+
+export function otpEnabled(): Promise<boolean> {
+  otpConfig ??= fetch('/api/auth/config', { credentials: 'same-origin' })
+	.then(r => (r.ok ? r.json() : { otpEnabled: false }))
+	.then(d => d?.otpEnabled === true)
+	.catch(() => false)
+  return otpConfig
+}

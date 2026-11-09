@@ -8,7 +8,7 @@ import { BarcodeManager } from './BarcodeManager'
 
 export type Product = {
   id: string; name: string; categoryId: string; category: string; isGeneric: boolean; sku: string; unit: string
-  brand: string | null; model: string | null; attributes: Record<string, string>; isActive: boolean
+  brand: string | null; model: string | null; attributes: Record<string, string>; isActive: boolean; hsnCode?: string | null; gstRate?: number | null
 }
 export type Category = { id: string; name: string; productCount: number }
 
@@ -16,9 +16,9 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wr
 const UNITS = ['pcs', 'set', 'pack', 'm']
 const ATTRS: [string, string][] = [['colour', 'Colour'], ['capacity', 'Capacity'], ['connector_type', 'Connector type'], ['compatible_with', 'Compatible with']]
 
-export type Draft = { name: string; category: string; unit: string; generic: boolean; brand: string; model: string; attrs: Record<string, string>; active: boolean }
-export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true }
-export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive })
+export type Draft = { name: string; category: string; unit: string; generic: boolean; brand: string; model: string; attrs: Record<string, string>; active: boolean; hsn: string; gst: string }
+export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true, hsn: '', gst: '' }
+export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate) })
 
 const ELECTRONICS_ATTRS: [string, string][] = [['capacity', 'Screen size or capacity (e.g. 43 inch, 10000mAh)'], ['colour', 'Colour'], ['connector_type', 'Connector / resolution (e.g. USB-C, 4K)'], ['compatible_with', 'Compatible with']]
 
@@ -51,7 +51,7 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active }
+    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst) }
     try {
       if (editingId) await api('PUT', `/products/${editingId}`, body)
       else {
@@ -78,6 +78,8 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
       <label>Unit
         <select value={d.unit} disabled={!!editingId} onChange={e => set({ unit: e.target.value })}>{UNITS.map(u => <option key={u}>{u}</option>)}</select>
       </label>
+      <label>HSN code (optional) <input value={d.hsn} onChange={e => set({ hsn: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={8} placeholder="4, 6 or 8 digits" /></label>
+      <label>GST rate % (optional) <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
       <label className="check"><input type="checkbox" checked={d.generic} onChange={e => set({ generic: e.target.checked })} /> Generic / unbranded</label>
       {!d.generic && <>
         <label>Brand <input value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} /></label>

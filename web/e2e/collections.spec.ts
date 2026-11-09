@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, postInvoice } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
@@ -18,9 +18,9 @@ test('credit sale, outstanding balance, later collection, balance update', async
   await page.goto('/#/stock/products')
   await expect(page.getByRole('region', { name: 'Products' })).toBeVisible()
 
-  const form = page.getByRole('region', { name: 'Products' }).getByRole('form', { name: 'Add product' })
+  const form = await openAddProduct(page)
   await form.getByLabel('Name', { exact: true }).fill(item)
-  await form.getByLabel('Category').fill('Cables')
+  await chooseCategory(form, 'Cables')
   await form.getByLabel('Generic / unbranded').setChecked(true)
   await form.getByRole('button', { name: 'Add product' }).click()
   await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name: item, exact: true })).toBeVisible()
@@ -34,24 +34,11 @@ test('credit sale, outstanding balance, later collection, balance update', async
   await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
   await expect(stockForm.getByRole('status')).toContainText('200.00 INR')
 
-  await page.goto('/#/parties/customers')
   const sales = page.getByRole('region', { name: 'Sales', exact: true })
-  await sales.getByLabel('Customer name').fill(customer)
-  await sales.getByRole('button', { name: 'Add customer' }).click()
-  await expect(sales.getByRole('table', { name: 'Customers' }).getByRole('cell', { name: customer })).toBeVisible()
-
-  await page.goto('/#/sell/bill')
-  await pick(page, 'Sales', 'Customer', customer)
-  await sales.getByLabel('Sale type').selectOption('Credit')
-  await pick(page, 'Sales', 'Product', item)
-  await sales.getByLabel('Quantity').fill('3')
-  await sales.getByLabel('Unit price (INR)').fill('100')
-  await sales.getByRole('button', { name: 'Add line' }).click()
-  await sales.getByLabel('Paid now (INR)').fill('100')
-  await sales.getByRole('button', { name: 'Post sale' }).click()
-  await expect(sales.getByRole('status')).toContainText('balance due 200.00')
+  await postInvoice(page, { product: item, qty: '3', price: '100', mode: 'Credit', paid: '100', name: customer, phone: randomMobile() })
+  await expect(page.getByRole('status')).toContainText('Saved as INV-')
   await page.goto('/#/parties/customers')
-  const custRow = sales.getByRole('table', { name: 'Customers' }).getByRole('row', { name: new RegExp(customer) })
+  const custRow = page.getByRole('table', { name: 'Customers' }).getByRole('row', { name: new RegExp(customer) })
   await expect(custRow).toContainText('200.00')
 
   await page.goto('/#/sell/collect')

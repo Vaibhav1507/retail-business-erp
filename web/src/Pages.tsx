@@ -4,10 +4,21 @@ import { api } from './api'
 import { Catalogue } from './Catalogue'
 import { SetupAssistant } from './SetupAssistant'
 import { Procurement } from './Procurement'
-import { Sales } from './Sales'
+import { SalesHistory } from './SalesHistory'
+import { Customers } from './Customers'
 import { GenerateInvoice } from './GenerateInvoice'
 import { AfterSales } from './AfterSales'
-import { Finance } from './Finance'
+import { CaWorkspace } from './CaWorkspace'
+import { AccountsPanel, Finance, LoansPanel, ReconcilePanel, StockVerifyPanel } from './Finance'
+import { CashClosing } from './CashClosing'
+import { AuditHistory } from './AuditHistory'
+import { GstWorkspace } from './GstWorkspace'
+import { TeamAccess } from './TeamAccess'
+import { BranchesPanel } from './BranchesPanel'
+import { LocationMovesPanel } from './LocationMovesPanel'
+import { OrdersPanel } from './OrdersPanel'
+import { StockCount, AdjustmentHistory, StockAlerts, UnitConversions } from './StockTools'
+import { CustomerHistory, CustomerDues } from './CustomerTools'
 import './launcher.css'
 import { t as tr } from './i18n'
 
@@ -15,16 +26,16 @@ export type Opt = { id: string; name: string; sku?: string }
 export type Common = { products: Opt[]; locations: Opt[]; reload: () => void }
 
 export const NAV = [
-  { key: 'home', label: 'Home', ico: '🏠' },
-  { key: 'sell', label: 'Sell', ico: '🧾' },
-  { key: 'buy', label: 'Buy', ico: '📦' },
-  { key: 'stock', label: 'Stock', ico: '🏷️' },
-  { key: 'parties', label: 'People', ico: '👥' },
-  { key: 'money', label: 'Money', ico: '₹' },
-  { key: 'more', label: 'More', ico: '⋯' },
+  { key: 'home', label: 'Home', ico: 'ðŸ ' },
+  { key: 'sell', label: 'Sell', ico: 'ðŸ§¾' },
+  { key: 'buy', label: 'Buy', ico: 'ðŸ“¦' },
+  { key: 'stock', label: 'Stock', ico: 'ðŸ·ï¸' },
+  { key: 'parties', label: 'People', ico: 'ðŸ‘¥' },
+  { key: 'money', label: 'Money', ico: 'â‚¹' },
+  { key: 'more', label: 'More', ico: 'â‹¯' },
 ]
 
-const inr = (n: number) => '₹ ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const inr = (n: number) => 'â‚¹ ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export function Tabs({ page, tab, items }: { page: string; tab: string; items: [string, string][] }) {
   return (
@@ -49,16 +60,16 @@ export function Home({ stockCount }: { stockCount: number }) {
     <div>
       <Title title={tr('home.title')} />
       <div className="actions">
-        <a className="action primary" href="#/sell/bill"><span className="ico">🧾</span><strong>Make Bill</strong></a>
-        <a className="action" href="#/buy/receive"><span className="ico">📦</span><strong>Add Purchase</strong></a>
-        <a className="action" href="#/stock/current"><span className="ico">🏷️</span><strong>Check Stock</strong></a>
-        <a className="action" href="#/sell/collect"><span className="ico">💵</span><strong>Collect Money</strong></a>
+        <a className="action primary" href="#/sell/bill"><span className="ico">ðŸ§¾</span><strong>Make Bill</strong></a>
+        <a className="action" href="#/buy/receive"><span className="ico">ðŸ“¦</span><strong>Add Purchase</strong></a>
+        <a className="action" href="#/stock/current"><span className="ico">ðŸ·ï¸</span><strong>Check Stock</strong></a>
+        <a className="action" href="#/sell/collect"><span className="ico">ðŸ’µ</span><strong>Collect Money</strong></a>
         <strong>{tr('home.pay')}</strong>
-        <a className="action" href="#/money/expenses"><span className="ico">🧮</span><strong>Record Expense</strong></a>
-        <a className="action" href="#/stock/products"><span className="ico">➕</span><strong>Add Product</strong></a>
+        <a className="action" href="#/money/expenses"><span className="ico">ðŸ§®</span><strong>Record Expense</strong></a>
+        <a className="action" href="#/stock/products"><span className="ico">âž•</span><strong>Add Product</strong></a>
       </div>
       <div className="tiles">
-        <a className="tile collect" href="#/parties/customers"><span>Money to Collect</span><b>{owed ? inr(owed.collect) : '—'}</b></a>
+        <a className="tile collect" href="#/parties/customers"><span>Money to Collect</span><b>{owed ? inr(owed.collect) : 'â€”'}</b></a>
         <span>{tr('home.toPay')}</span>
         <a className="tile" href="#/stock/current"><span>Items in stock</span><b>{stockCount}</b></a>
         <a className="tile" href="#/money/cash"><span>Cash &amp; Bank</span><b>View</b></a>
@@ -72,15 +83,15 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
   return (
     <div className={menu ? 'launcher-page' : undefined}>
       <Title title={tr('area.sell')} hint={tr('sell.hint')} />
-      {['bill', 'bills', 'collect', 'return'].includes(tab) ? <p><a className="back-link" href="#/sell/menu">← {tr('area.sell')}</a></p> : (
+      {['bill', 'bills', 'collect', 'return'].includes(tab) ? <p><a className="back-link" href="#/sell/menu">â† {tr('area.sell')}</a></p> : (
         <div className="areas">
-          {([['bill', '🧾', tr('sell.invoice')], ['bills', '🗂️', tr('sell.old')], ['return', '↩️', tr('sell.return')], ['collect', '💰', tr('sell.due')]] as const).map(([k, i, t]) => (
+          {([['bill', 'ðŸ§¾', tr('sell.invoice')], ['bills', 'ðŸ—‚ï¸', tr('sell.old')], ['return', 'â†©ï¸', tr('sell.return')], ['collect', 'ðŸ’°', tr('sell.due')]] as const).map(([k, i, t]) => (
             <a key={k} className="area" href={'#/sell/' + k}><span className="ico" aria-hidden="true">{i}</span><strong>{t}</strong></a>
           ))}
         </div>
       )}
       {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} />}
-      {tab === 'bills' && <Sales {...c} show="bills" />}
+      {tab === 'bills' && <SalesHistory locations={c.locations} />}
       {tab === 'collect' && <AfterSales reload={c.reload} show="collect" />}
       {tab === 'return' && <AfterSales reload={c.reload} show="sreturn" />}
     </div>
@@ -129,12 +140,16 @@ export function StockPage({ tab, c, rows, opening }: { tab: string; c: Common; r
   return (
     <div>
       <Title title={tr('nav.stock')} hint={tr('stock.hint')} />
-      [['current', tr('stock.tabCheck')], ['products', tr('stock.tabProducts')], ['opening', tr('stock.tabOpening')], ['import', tr('stock.tabImport')], ['adjust', tr('stock.tabAdjust')]]
+      <Tabs page="stock" tab={tab} items={[['current', tr('stock.tabCheck')], ['products', tr('stock.tabProducts')], ['opening', tr('stock.tabOpening')], ['import', tr('stock.tabImport')], ['adjust', tr('stock.tabAdjust')], ['count', 'Stock count'], ['history', 'Adjustment history'], ['alerts', 'Alerts and ageing'], ['units', 'Units']]} />
       {tab === 'current' && <StockList rows={rows} />}
       {tab === 'products' && <Catalogue reload={c.reload} />}
       {tab === 'opening' && opening}
       {tab === 'import' && <SetupAssistant reload={c.reload} />}
       {tab === 'adjust' && <Finance key="adjust" only={['adjust']} />}
+      {tab === 'count' && <StockCount />}
+      {tab === 'history' && <AdjustmentHistory />}
+      {tab === 'alerts' && <StockAlerts />}
+      {tab === 'units' && <UnitConversions />}
     </div>
   )
 }
@@ -143,9 +158,11 @@ export function PartiesPage({ tab, c }: { tab: string; c: Common }) {
   return (
     <div>
       <Title title={tr('nav.parties')} hint={tr('parties.hint')} />
-      <Tabs page="parties" tab={tab} items={[['customers', tr('area.customers')], ['suppliers', tr('area.suppliers')]]} />
-      {tab === 'customers' && <Sales {...c} show="customers" />}
+      <Tabs page="parties" tab={tab} items={[['customers', tr('area.customers')], ['suppliers', tr('area.suppliers')], ['purchases', 'Purchase history'], ['dues', 'Dues ageing']]} />
+      {tab === 'customers' && <Customers reload={c.reload} />}
       {tab === 'suppliers' && <Procurement {...c} show="suppliers" />}
+      {tab === 'purchases' && <CustomerHistory />}
+      {tab === 'dues' && <CustomerDues />}
     </div>
   )
 }
@@ -156,27 +173,37 @@ export function MoneyPage({ tab }: { tab: string }) {
   return (
     <div>
       <Title title={tr('nav.money')} hint={tr('money.hint')} />
-      <Tabs page="money" tab={tab} items={[['cash', tr('money.cash')], ['expenses', tr('money.expenses')], ['owner', tr('money.owner')]]} />
-      <Finance key={t} only={[t]} />
+      <Tabs page="money" tab={tab} items={[['cash', tr('money.cash')], ['expenses', tr('money.expenses')], ['owner', tr('money.owner')], ['closing', 'Day closing']]} />
+      {tab === 'closing' ? <CashClosing /> : <Finance key={t} only={[t]} />}
     </div>
   )
 }
 
 export function MorePage({ tab, onLogout, email }: { tab: string; onLogout: () => void; email: string }) {
-  const moreTabs: [string, string][] = [['reports', tr('more.reports')], ['print', tr('more.print')], ['lock', tr('more.lock')]]
+  const moreTabs: [string, string][] = [['reports', tr('more.reports')], ['print', tr('more.print')], ['lock', tr('more.lock')], ['audit', tr('hist.title')], ['gst', 'GST'], ['staff', 'Staff'], ['branches', 'Branches'], ['transfers', 'Transfers'], ['orders', 'Orders'], ['reconcile', 'Reconcile'], ['loans', 'Loans'], ['accounts', 'Accounts'], ['ca', 'CA']]
   if (tab === 'reports') return <div><Title title={tr('more.reports')} hint={tr('more.reportsHint')} /><Tabs page="more" tab="reports" items={moreTabs} /><Finance key="reports" only={['reports']} /></div>
   if (tab === 'print') return <div><Title title={tr('more.print')} /><Tabs page="more" tab="print" items={moreTabs} /><AfterSales reload={() => undefined} show="print" /></div>
+  if (tab === 'gst') return <div><Title title="GST" /><Tabs page="more" tab="gst" items={moreTabs} /><GstWorkspace /></div>
+  if (tab === 'staff') return <div><Title title="Staff" /><Tabs page="more" tab="staff" items={moreTabs} /><TeamAccess /></div>
+  if (tab === 'ca') return <div><Title title="CA workspace" /><Tabs page="more" tab="ca" items={moreTabs} /><CaWorkspace /></div>
+  if (tab === 'accounts') return <div><Title title="Chart of accounts" /><Tabs page="more" tab="accounts" items={moreTabs} /><AccountsPanel /><StockVerifyPanel /></div>
+  if (tab === 'loans') return <div><Title title="Loans" /><Tabs page="more" tab="loans" items={moreTabs} /><LoansPanel /></div>
+      if (tab === 'reconcile') return <div><Title title="Bank reconciliation" /><Tabs page="more" tab="reconcile" items={moreTabs} /><ReconcilePanel /></div>
+  if (tab === 'orders') return <div><Title title="Purchase orders" /><Tabs page="more" tab="orders" items={moreTabs} /><OrdersPanel /></div>
+  if (tab === 'transfers') return <div><Title title="Stock transfers" /><Tabs page="more" tab="transfers" items={moreTabs} /><LocationMovesPanel /></div>
+  if (tab === 'branches') return <div><Title title="Branches" /><Tabs page="more" tab="branches" items={moreTabs} /><BranchesPanel /></div>
+  if (tab === 'audit') return <div><Title title={tr('hist.title')} /><Tabs page="more" tab="audit" items={moreTabs} /><AuditHistory /></div>
   if (tab === 'lock') return <div><Title title={tr('more.lock')} hint={tr('more.lockHint')} /><Tabs page="more" tab="lock" items={moreTabs} /><Finance key="lock" only={['lock']} /></div>
   return (
     <div>
       <Title title={tr('more.title')} hint={email} />
       <div className="linklist">
-        <a href="#/more/reports"><span className="ico">📊</span>{tr('more.reportsLink')}</a>
-        <a href="#/more/print"><span className="ico">🖨️</span>{tr('more.printLink')}</a>
-        <a href="#/more/lock"><span className="ico">🔒</span>{tr('more.lock')}</a>
-        <a href="#/stock/import"><span className="ico">📥</span>{tr('more.import')}</a>
-        <a href="#/sell/return"><span className="ico">↩️</span>{tr('more.custReturns')}</a>
-        <a href="#/buy/return"><span className="ico">↪️</span>{tr('more.returns')}</a>
+        <a href="#/more/reports"><span className="ico">ðŸ“Š</span>{tr('more.reportsLink')}</a>
+        <a href="#/more/print"><span className="ico">ðŸ–¨ï¸</span>{tr('more.printLink')}</a>
+        <a href="#/more/lock"><span className="ico">ðŸ”’</span>{tr('more.lock')}</a>
+        <a href="#/stock/import"><span className="ico">ðŸ“¥</span>{tr('more.import')}</a>
+        <a href="#/sell/return"><span className="ico">â†©ï¸</span>{tr('more.custReturns')}</a>
+        <a href="#/buy/return"><span className="ico">â†ªï¸</span>{tr('more.returns')}</a>
       </div>
       <p style={{ marginTop: 16 }}><button className="secondary" onClick={onLogout}>{tr('more.signout')}</button></p>
     </div>

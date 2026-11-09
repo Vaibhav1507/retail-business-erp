@@ -1,4 +1,4 @@
-﻿import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 export const PASSWORD = 'Synthetic#Pass123'
 
@@ -16,12 +16,15 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   await page.getByLabel('Email').fill(opts.email)
   await page.getByLabel(/Password/).fill(PASSWORD)
   await page.getByLabel('Mobile number').fill(mobile)
-  await page.getByRole('button', { name: 'Send code' }).click()
-  const hint = await page.getByText(/Development code: \d{6}/).textContent()
-  const code = /(\d{6})/.exec(hint ?? '')![1]
-  await page.getByLabel('Enter the 6-digit code').fill(code)
-  await page.getByRole('button', { name: 'Verify code' }).click()
-  await expect(page.getByText('Mobile number verified.')).toBeVisible()
+  const sendCode = page.getByRole('button', { name: 'Send code' })
+  if (await sendCode.isVisible()) {
+    await sendCode.click()
+    const hint = await page.getByText(/Development code: \d{6}/).textContent()
+    const code = /(\d{6})/.exec(hint ?? '')![1]
+    await page.getByLabel('Enter the 6-digit code').fill(code)
+    await page.getByRole('button', { name: 'Verify code' }).click()
+    await expect(page.getByText('Mobile number verified.')).toBeVisible()
+  }
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByLabel('Business name').fill(opts.businessName)
   await page.getByLabel('Business category').selectOption({ index: 1 })
@@ -35,4 +38,38 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Review' }).click()
   await page.getByRole('button', { name: 'Create account' }).click()
+}
+
+/** Opens the Add product form from the Products list (the form is not shown by default). */
+export async function openAddProduct(page: Page) {
+  const products = page.getByRole('region', { name: 'Products' })
+  await products.getByRole('button', { name: 'Add product', exact: true }).click()
+  return products.getByRole('form', { name: 'Add product' })
+}
+
+/** Category is a select: pick an existing one, otherwise choose "Other" and type a new one. */
+export async function chooseCategory(form: Locator, name: string) {
+  const select = form.getByLabel('Category')
+  if (await select.locator('option', { hasText: name }).count()) await select.selectOption({ label: name })
+  else {
+    await select.selectOption('__other')
+    await form.getByLabel('New category').fill(name)
+  }
+}
+
+/** Posts a sale through the Generate invoice screen (/#/sell/bill). Leaves the page on the "Saved as INV-..." status. */
+export async function postInvoice(page: Page, o: { product: string; qty: string; price: string; discount?: string; mode?: 'Cash' | 'UPI' | 'Credit'; paid?: string; name?: string; phone?: string }) {
+  await page.goto('/#/sell/bill')
+  const bill = page.getByRole('region', { name: 'Generate invoice' })
+  if (o.phone) await bill.locator('#billing-phone').fill(o.phone)
+  if (o.name) await bill.locator('#billing-name').fill(o.name)
+  if (o.mode) await bill.locator('#billing-mode').selectOption(o.mode)
+  if (o.paid) await bill.locator('#billing-paid').fill(o.paid)
+  await bill.locator('#billing-prod').fill(o.product)
+  await bill.locator('#billing-qty').fill(o.qty)
+  await bill.locator('#billing-price').fill(o.price)
+  if (o.discount) await bill.locator('#billing-disc').fill(o.discount)
+  await bill.getByRole('button', { name: 'Add product', exact: true }).click()
+  await bill.getByRole('button', { name: 'Generate invoice' }).click()
+  await page.getByRole('button', { name: 'Confirm & print' }).click()
 }

@@ -30,7 +30,7 @@ export function BarcodeManager({ productId }: { productId: string }) {
   }
   async function remove(id: string) {
     setError('')
-    try { await api('DELETE', `/products/${productId}/barcodes/${id}`); await load() } catch (e) { setError(msg(e)) }
+    if (!window.confirm('Remove this barcode?')) return; try { await api('DELETE', `/products/${productId}/barcodes/${id}`); await load() } catch (e) { setError(msg(e)) }
   }
   async function toggleTrack(enabled: boolean) {
     setError('')

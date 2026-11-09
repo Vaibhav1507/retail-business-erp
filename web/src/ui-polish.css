@@ -1,0 +1,67 @@
+/* Shared UI polish: consistent focus, touch targets, motion and overflow safety (F2, F6, F9). */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --target: 44px;
+  --focus-ring: 3px solid #0b5e3b;
+}
+
+/* F9: one visible keyboard focus style for every interactive control. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* F6: minimum 44px touch targets, including pagers and top bar. */
+.topbar button,
+.pager button,
+.pager select,
+.tabs button,
+.tabs a,
+a.btn,
+button {
+  min-height: var(--target);
+}
+.pager select { padding-block: var(--space-2); }
+
+/* F6: stop long words, numbers and IDs pushing the page sideways on phones. */
+html, body { max-width: 100%; overflow-x: hidden; }
+main, section, .card, td, th { overflow-wrap: anywhere; }
+img, svg, video, canvas { max-width: 100%; height: auto; }
+table { max-width: 100%; }
+
+/* F6: wide tables scroll inside their own region instead of the whole page. */
+section:has(> table), div:has(> table) { overflow-x: auto; }
+
+/* F9: respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* F9: honour high-contrast / forced-colors modes. */
+@media (forced-colors: active) {
+  button, a.btn, input, select, textarea { border: 1px solid ButtonText; }
+  :focus-visible { outline: 3px solid Highlight; }
+}
+
+label:has(> input[type='checkbox']) { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+input[type='checkbox'] { width: 24px; height: 24px; min-width: 24px; min-height: 24px; }
+
+/* H4: dark theme, opt-in via the header toggle. */
+:root[data-theme="dark"] { color-scheme: dark; --ink: #e7ecef; --muted: #a3afbb; --bg: #11161b; --card: #1a2128; --line: #2c3640; --brand: #1f9d68; --brand-dark: #3ab784; --brand-soft: #16302a; --danger: #ff8a80; --danger-soft: #3a1f1d; --warn-soft: #3a2f12; --success: #4cc790; --success-soft: #16302a; --warn: #f0c36a; --info: #7db5ee; --info-soft: #172a3d; --focus-ring: 3px solid #7db5ee; }
+:root[data-theme="dark"] select option { background: #1a2128; color: #e7ecef; }
+:root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: #11161b; color: #e7ecef; border-color: #2c3640; }

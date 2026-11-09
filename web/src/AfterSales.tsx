@@ -51,6 +51,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
   const [retQty, setRetQty] = useState<Record<string, string>>({})
   const [retReason, setRetReason] = useState('')
   const [retKey, setRetKey] = useState(newKey)
+  const [retMethod, setRetMethod] = useState('Cash')
 
   const [retReceipt, setRetReceipt] = useState('')
   const [recLines, setRecLines] = useState<PurchaseDetail['lines']>([])
@@ -67,7 +68,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
     ])
     setCustomers(c); setSales(s); setReceipts(r); setPayments(p); setSaleReturns(sr); setPurchaseReturns(pr)
   }, [srSearch, prSearch])
-  useEffect(() => { loadAll().catch(() => undefined) }, [loadAll])
+  useEffect(() => { loadAll().catch(e => setError(msg(e))) }, [loadAll])
 
   const run = async (fn: () => Promise<string>) => {
     setError(''); setDone('')
@@ -75,9 +76,11 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
   }
 
   const payCust = customers.find(c => c.id === payCustomer)
+  const [saleBillId, setSaleBillId] = useState(''); const [openSales, setOpenSales] = useState<{ id: string; date: string; invoiceNo: string | null; number: number; open: number }[]>([])
+  useEffect(() => { setSaleBillId(''); if (!payCustomer) { setOpenSales([]); return } api<typeof openSales>('GET', '/customers/' + payCustomer + '/open-sales').then(setOpenSales).catch(() => setOpenSales([])) }, [payCustomer, payments])
   const collect = () => run(async () => {
-    const r = await api<{ owed: number; replayed?: boolean }>('POST', '/customer-payments', { customerId: payCustomer, paymentDate: payDate, amount: Number(payAmount), method: payMethod, reference: payRef || null }, payKey)
-    setPayAmount(''); setPayRef(''); setPayKey(newKey())
+    const r = await api<{ owed: number; replayed?: boolean }>('POST', '/customer-payments', { customerId: payCustomer, paymentDate: payDate, amount: Number(payAmount), method: payMethod, reference: payRef || null, allocations: saleBillId ? [{ billId: saleBillId, amount: Math.min(Number(payAmount), openSales.find(b => b.id === saleBillId)?.open ?? 0) }] : undefined }, payKey)
+    setPayAmount(''); setPayRef(''); setSaleBillId(''); setPayKey(newKey())
     if (statement) await showStatement(payCustomer)
     return 'Payment recorded. Customer now owes ' + r.owed.toFixed(2) + ' INR.'
   })
@@ -93,11 +96,11 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
     setCancelKey(newKey()); setRetSale(''); setRetLines([]); setRetReason('')
     return 'Sale cancelled. Stock restored and the books reversed.'
   })
-  const toLines = (q: Record<string, string>)
+  const toLines = (q: Record<string, string>) => Object.entries(q).map(([productId, v]) => ({ productId, quantity: Number(v) })).filter(x => x.quantity > 0)
   const returnSale = () => run(async () => {
-    const r = await api<{ total: number; balanceCredit: number; cashRefund: number }>('POST', '/sale-returns', { saleId: retSale, returnDate: today(), reason: retReason || null, lines: toLines(retQty) }, retKey)
+    const r = await api<{ total: number; balanceCredit: number; cashRefund: number }>('POST', '/sale-returns', { saleId: retSale, returnDate: today(), reason: retReason || null, refundMethod: retMethod, lines: toLines(retQty) }, retKey)
     setRetKey(newKey()); setRetQty({}); setRetReason(''); await pickSale(retSale)
-    return 'Return posted: ' + r.total.toFixed(2) + ' INR (balance reduced ' + r.balanceCredit.toFixed(2) + ', cash refund ' + r.cashRefund.toFixed(2) + '). Stock increased.'
+    return 'Return posted: ' + r.total.toFixed(2) + ' INR. For an exchange, bill the replacement items from Sell > New bill and settle the difference there (balance reduced ' + r.balanceCredit.toFixed(2) + ', cash refund ' + r.cashRefund.toFixed(2) + '). Stock increased.'
   })
 
   async function pickReceipt(id: string) {
@@ -114,7 +117,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
   return (
     <section aria-label="Collections and returns" className="billing-screen">
       {!show && <h2>Collections and returns</h2>}
-      <button type="button" onClick={() => { loadAll().catch(() => undefined) }}>Refresh</button>
+      <button type="button" onClick={() => { setError(''); loadAll().catch(e => setError(msg(e))) }}>Refresh</button>
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
 
@@ -123,7 +126,8 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
       <label>Collect from <select value={payCustomer} onChange={e => setPayCustomer(e.target.value)}><option value="">Select</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name} (owes {c.owed.toFixed(2)})</option>)}</select></label>
       {payCust && <p data-testid="collect-owed">Outstanding: {payCust.owed.toFixed(2)} INR</p>}
       <label>Collection amount (INR) <input inputMode="decimal" value={payAmount} onChange={e => setPayAmount(e.target.value)} /></label>
-      <label>Collection method <select value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option>UPI</option><option>Bank</option></select></label>
+      {openSales.length > 0 && <label>Apply to bill (optional) <select value={saleBillId} onChange={e => setSaleBillId(e.target.value)}><option value="">On account (no specific bill)</option>{openSales.map(b => <option key={b.id} value={b.id}>{b.date} {b.invoiceNo ?? b.number} - open {b.open.toFixed(2)}</option>)}</select></label>}
+        <label>Collection method <select value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option>UPI</option><option>Bank</option></select></label>
       <label>Collection date <input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} /></label>
       <label>Collection reference <input value={payRef} onChange={e => setPayRef(e.target.value)} /></label>
       <button type="button" onClick={collect} disabled={!payCustomer || !(Number(payAmount) > 0)}>Record payment</button>
@@ -148,12 +152,13 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
       </>}
       {v('sreturn') && <>
       <h3>Customer return</h3>
-      {sales.filter(s => !s.cancelled).map(s => <option key={s.id}
+      <label>Return against sale <select value={retSale} onChange={e => pickSale(e.target.value)}><option value="">Select</option>{sales.filter(s => !s.cancelled).map(s => <option key={s.id} value={s.id}>#{s.number} {s.customer} {s.total.toFixed(2)}</option>)}</select></label>
       {retLines.map(l => <label key={l.productId}>Return qty: {l.product} (remaining {l.remaining})
         <input inputMode="decimal" value={retQty[l.productId] ?? ''} onChange={e => setRetQty({ ...retQty, [l.productId]: e.target.value })} /></label>)}
       {retLines.length > 0 && <button type="button" onClick={() => setRetQty(Object.fromEntries(retLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>Return everything remaining</button>}
       <label>Customer return reason <input value={retReason} onChange={e => setRetReason(e.target.value)} /></label>
-      Post customer return</button>
+      <label>Refund method <select value={retMethod} onChange={e => setRetMethod(e.target.value)}><option>Cash</option><option>Bank</option><option>UPI</option></select></label>
+      <button type="button" onClick={returnSale} disabled={!retSale || toLines(retQty).length === 0}>Post customer return</button>
             <button type="button" onClick={() => { if (window.confirm('Cancel this whole sale? Stock is restored and the books are reversed.')) void cancelSale() }} disabled={!retSale}>Cancel entire sale</button>
 
       <h3>Customer returns</h3>

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { api, resetCsrf } from './api'
+import { useEffect, useState } from 'react'
+import { api, otpEnabled, resetCsrf } from './api'
 
 export type Profile = {
   businessName: string; businessCategory: string; ownerName: string; mobile: string; address: string; city: string; state: string
@@ -95,7 +95,9 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
   const [proof, setProof] = useState('')
   const off = signup ? 1 : 0
   const locked = !!editing
-  const mobileOk = !!verifiedMobile && p.mobile === verifiedMobile && (!signup || !!proof)
+  const [otp, setOtp] = useState(false)
+  useEffect(() => { otpEnabled().then(setOtp) }, [])
+  const mobileOk = otp ? !!verifiedMobile && p.mobile === verifiedMobile && (!signup || !!proof) : MOBILE_RE.test(p.mobile)
   const [step, setStep] = useState(0)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -108,7 +110,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
     if (signup && step === 0) {
       if (!email.trim() || !email.includes('@')) e = 'Enter a valid email address.'
       else if (password.length < 12) e = 'Password must be at least 12 characters.'
-      else if (!mobileOk) e = 'Verify your mobile number with the code we send you.'
+      else if (!mobileOk) e = otp ? 'Verify your mobile number with the code we send you.' : 'Enter a valid 10-digit mobile number.'
     } else e = stepError(step - off, p)
     if (e) { setError(e); return }
     setError(''); setStep(step + 1)
@@ -117,7 +119,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
     setError(''); setBusy(true)
     try {
       if (signup) {
-        await api('POST', '/auth/register', { email: email.trim(), password, mobile: p.mobile, otpProof: proof })
+        await api('POST', '/auth/register', { email: email.trim(), password, mobile: p.mobile, otpProof: otp ? proof : undefined })
         await api('POST', '/auth/login', { email: email.trim(), password })
         resetCsrf()
       }
@@ -139,7 +141,8 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
         {signup && step === 0 && <>
           <label className="wide">Email *<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
           <label className="wide">Password * (at least 12 characters)<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" /></label>
-          <MobileVerify signup mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={(m, pr) => { setVerifiedMobile(m); if (pr) setProof(pr) }} />
+          {otp ? <MobileVerify signup mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={(m, pr) => { setVerifiedMobile(m); if (pr) setProof(pr) }} />
+            : <label className="wide">Mobile number *<input inputMode="numeric" value={p.mobile} onChange={e => set({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit number" autoComplete="tel-national" /></label>}
         </>}
         {step === off && <>
           <label>Business name *<input disabled={locked} value={p.businessName} onChange={e => set({ businessName: e.target.value })} maxLength={120} placeholder="e.g. Sharma Mobile Store" /></label>
@@ -151,7 +154,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
           </label>
           {p.businessCategory === 'pharmacy_medical' && <p className="notice">Pharmacy and medical shops need additional setup and rules that are not available yet. You can still save this category.</p>}
           <label>Owner or contact name *<input disabled={locked} value={p.ownerName} onChange={e => set({ ownerName: e.target.value })} maxLength={120} placeholder="e.g. Ramesh Sharma" /></label>
-          {!signup && <MobileVerify signup={false} mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={m => setVerifiedMobile(m)} />}
+          {!signup && otp && <MobileVerify signup={false} mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={m => setVerifiedMobile(m)} />}
         </>}
         {step === 1 + off && <>
           <label className="wide">Business address *<input value={p.address} onChange={e => set({ address: e.target.value })} maxLength={250} placeholder="Shop number, street, area" /></label>
@@ -175,7 +178,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
         {review && <dl className="review">
           <dt>Business</dt><dd>{p.businessName}</dd>
           <dt>Category</dt><dd>{categoryLabel(p.businessCategory)}</dd>
-          <dt>Contact</dt><dd>{p.ownerName}, {p.mobile} ({mobileOk ? 'verified' : 'not verified'})</dd>
+          {otp ? ` (${mobileOk ? 'verified' : 'not verified'})` : ''}
           <dt>Address</dt><dd>{p.address}, {p.city}, {p.state} {p.pinCode}</dd>
           <dt>GST</dt><dd>{GST.find(g => g[0] === p.gstStatus)?.[1]}{needsGstin(p.gstStatus) ? `, ${p.gstin}` : ''}</dd>
           <dt>Financial year</dt><dd>Starts in {MONTHS[p.financialYearStartMonth - 1]}</dd>

@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory } from './signup'
 import { expect, test } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -10,17 +10,18 @@ const names = ['E2E Invoice Cable', 'E2E Invoice Charger', 'E2E Invoice Earphone
 test('invoice extraction returns multi-line draft', async ({ page }) => {
   test.setTimeout(120_000)
   await signUp(page, { email: 'e2e-inv-' + run + '@example.test', businessName: 'E2E Invoice ' + run })
+  await page.goto('/#/stock/products')
   const products = page.getByRole('region', { name: 'Products' })
   await expect(products).toBeVisible()
   for (const n of names) {
-    const form = products.getByRole('form', { name: 'Add product' })
+    const form = await openAddProduct(page)
     await form.getByLabel('Name', { exact: true }).fill(n)
-    await form.getByLabel('Category').fill('Cables')
+    await chooseCategory(form, 'Cables')
     await form.getByLabel('Generic / unbranded').setChecked(true)
     await form.getByRole('button', { name: 'Add product' }).click()
     await expect(products.getByRole('cell', { name: n, exact: true })).toBeVisible()
   }
-  const data = fs.readFileSync(path.join(__dirname, 'test-invoice.png')).toString('base64')
+  const data = fs.readFileSync(path.join(process.cwd(), 'e2e', 'test-invoice.png')).toString('base64')
   const result = await page.evaluate(async (d) => {
     const c = await (await fetch('/api/csrf', { credentials: 'same-origin' })).json()
     const r = await fetch('/api/purchases/extract', {

@@ -3,7 +3,7 @@ import { api } from './api'
 import { BusinessSetup, categoryLabel } from './BusinessSetup'
 import type { Profile } from './BusinessSetup'
 import './launcher.css'
-import { t, getLanguage, setLanguage, toLang } from './i18n'
+import { t, getLanguage, setLanguage, toLang, formatInr } from './i18n'
 import type { MessageKey } from './i18n'
 
 const AREAS: [string, MessageKey, MessageKey, string][] = [
@@ -18,10 +18,35 @@ const AREAS: [string, MessageKey, MessageKey, string][] = [
   ['⚙️', 'area.settings', 'area.settingsHint', '#/settings'],
 ]
 
+type Summary = { salesToday: { bills: number; total: number }; moneyToCollect: number; moneyToPay: number; lowStockCount: number; cashAndBank: number }
+
 export function HomePage({ businessName }: { businessName?: string }) {
+  const [sum, setSum] = useState<Summary | null>(null)
+  const [sumError, setSumError] = useState(false)
+  const [rem, setRem] = useState<{ kind: string; count: number | null }[]>([])
+  useEffect(() => { api<Summary>('GET', '/dashboard').then(setSum).catch(() => setSumError(true)) }, [])
+  useEffect(() => { api<{ kind: string; count: number | null }[]>('GET', '/reminders').then(setRem).catch(() => undefined) }, [])
   return (
     <div className="launcher-page">
       <div className="page-title"><h2>{businessName ? t('home.welcomeNamed', { name: businessName }) : t('home.welcome')}</h2><p>{t('home.prompt')}</p></div>
+      {sumError && <p role="alert">{t('dash.error')}</p>}
+      {sum && <div className="dash-tiles">
+        <a className="dash-tile" href="#/sell"><small>{t('dash.salesToday')}</small><strong>{formatInr(sum.salesToday.total)}</strong><small>{sum.salesToday.bills} {t('dash.bills')}</small></a>
+        <a className="dash-tile" href="#/sell/collect"><small>{t('dash.collect')}</small><strong>{formatInr(sum.moneyToCollect)}</strong></a>
+        <a className="dash-tile" href="#/parties/suppliers"><small>{t('area.suppliers')}</small><strong>{formatInr(sum.moneyToPay)}</strong></a>
+        <a className="dash-tile" href="#/stock"><small>{t('dash.lowStock')}</small><strong>{sum.lowStockCount}</strong></a>
+        <a className="dash-tile" href="#/money"><small>{t('dash.cash')}</small><strong>{formatInr(sum.cashAndBank)}</strong></a>
+      </div>}
+      {sum && <ul className="insights" aria-label="Insights">
+        {sum.salesToday.bills === 0 && <li>{t('ins.noSales')}</li>}
+        {sum.moneyToCollect > 0 && <li>{t('ins.collect', { amount: formatInr(sum.moneyToCollect) })}</li>}
+        {sum.lowStockCount > 0 && <li>{t('ins.stock', { n: sum.lowStockCount })}</li>}
+        {sum.moneyToPay > 0 && <li>{t('ins.pay', { amount: formatInr(sum.moneyToPay) })}</li>}
+      </ul>}
+      {rem.some(r => r.kind === 'orders' || r.kind === 'dayClosing') && <ul className="insights" aria-label="Reminders">
+        {rem.filter(r => r.kind === 'orders').map(r => <li key={r.kind}>{t('rem.orders', { n: r.count ?? 0 })}</li>)}
+        {rem.filter(r => r.kind === 'dayClosing').map(r => <li key={r.kind}>{t('rem.dayClosing', { n: r.count ?? 0 })}</li>)}
+      </ul>}
       <div className="areas">
         {AREAS.map(([ico, name, hint, href]) => <a key={name} className="area" href={href}><span className="ico" aria-hidden="true">{ico}</span><strong>{t(name)}</strong><small>{t(hint)}</small></a>)}
       </div>

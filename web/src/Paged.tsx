@@ -4,7 +4,7 @@ const SIZES = [10, 25, 50]
 type Sort = { col: number; dir: 1 | -1; keys: Map<unknown, string> }
 const num = (s: string) => { const n = Number(s.replace(/[\u20B9,\s]/g, '')); return s.trim() !== '' && !Number.isNaN(n) ? n : null }
 
-export function Paged<T>({ rows, children, label = 'rows' }: { rows: T[]; children: (page: T[]) => ReactNode; label?: string }) {
+export function Paged<T>({ rows, children, label = 'rows', empty }: { rows: T[]; children: (page: T[]) => ReactNode; label?: string; empty?: string }) {
   const [size, setSize] = useState(10)
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<Sort | null>(null)
@@ -48,6 +48,7 @@ export function Paged<T>({ rows, children, label = 'rows' }: { rows: T[]; childr
   }
   return (
     <>
+      {rows.length === 0 && empty && <p className="empty">{empty}</p>}
       <div ref={ref} className="paged" onClick={onSort}>{children(sorted)}</div>
       {rows.length > SIZES[0] && <nav className="pager no-print" aria-label="Pagination">
         <span>{from}-{to} of {rows.length} {label}</span>

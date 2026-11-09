@@ -21,13 +21,14 @@ function Inventory({ rows, products }: { rows: StockRow[]; products: Product[] }
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
   const [sup, setSup] = useState('')
+  const [avail, setAvail] = useState('')
   const byId = useMemo(() => new Map(products.map(p => [p.id, p])), [products])
   const cats = useMemo(() => [...new Set(products.map(p => p.category))].sort(), [products])
   const sups = useMemo(() => [...new Set(rows.flatMap(r => r.suppliers ?? []))].sort(), [rows])
   const shown = rows.filter(r => {
     const p = byId.get(r.productId)
     const text = `${r.name} ${r.sku} ${p?.brand ?? ''} ${p?.model ?? ''} ${(r.suppliers ?? []).join(' ')}`.toLowerCase()
-    return text.includes(q.trim().toLowerCase()) && (!cat || p?.category === cat) && (!sup || (r.suppliers ?? []).includes(sup))
+    return text.includes(q.trim().toLowerCase()) && (!cat || p?.category === cat) && (!sup || (r.suppliers ?? []).includes(sup)) && (!avail || (avail === 'in' ? r.quantity > 0 : r.quantity <= 0))
   })
   const status = (n: number) => (n > 0 ? 'In stock' : 'Out of stock')
   return (
@@ -36,6 +37,7 @@ function Inventory({ rows, products }: { rows: StockRow[]; products: Product[] }
         <label>Search<input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Name, brand, model, supplier or SKU" /></label>
         <label>Category<select value={cat} onChange={e => setCat(e.target.value)}><option value="">All categories</option>{cats.map(x => <option key={x}>{x}</option>)}</select></label>
         <label>Supplier<select value={sup} onChange={e => setSup(e.target.value)}><option value="">All suppliers</option>{sups.map(x => <option key={x}>{x}</option>)}</select></label>
+        <label>Availability<select value={avail} onChange={e => setAvail(e.target.value)}><option value="">All</option><option value="in">In stock</option><option value="out">Out of stock</option></select></label>
       </div>
       {shown.length === 0 ? (rows.length === 0 ? <div className="empty"><p>{t('stock.empty')}</p><p><a className="btn" href="#/stock/products">{t('stock.addProducts')}</a> <a className="btn secondary" href="#/stock/opening">{t('stock.addOpening')}</a></p></div> : <p className="empty">Nothing matches your search.</p>) : (
         <>

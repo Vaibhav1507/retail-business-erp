@@ -12,5 +12,5 @@ $g.DrawString('E2E Invoice Cable             10     50.00    500.00', $s, $b, 40
 $g.DrawString('E2E Invoice Charger            4    120.00    480.00', $s, $b, 40, 260)
 $g.DrawString('E2E Invoice Earphones          6     80.00    480.00', $s, $b, 40, 310)
 $g.DrawString('Total                                         1460.00', $s, $b, 40, 400)
-$bmp.Save('C:\Users\A1137066\Personal-Lab\projects\retail-business-os\web\e2e\test-invoice.png', [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp.Save((Join-Path $PSScriptRoot 'test-invoice.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose(); $bmp.Dispose()
