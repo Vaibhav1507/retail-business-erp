@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Rbos.Api.Application;
 
+using static Rbos.Api.ApiResults;
+
 namespace Rbos.Api;
 
-public sealed record ProductUpsertRequest(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool? IsActive);
+public sealed record ProductUpsertRequest(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool? IsActive, string? HsnCode = null, decimal? GstRate = null);
 public sealed record ImportRowRequest(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes);
 public sealed record ImportRequest(List<ImportRowRequest>? Rows);
 public sealed record RenameCategoryRequest(string? Name);
@@ -40,14 +42,8 @@ public static class CatalogueEndpoints
 
     static Guid Uid(ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    static ProductCommand ToCommand(ProductUpsertRequest m) => new(m.Name, m.CategoryName, m.IsGeneric, m.BaseUnit, m.Brand, m.Model, m.Attributes, m.IsActive ?? true);
+    static ProductCommand ToCommand(ProductUpsertRequest m) => new(m.Name, m.CategoryName, m.IsGeneric, m.BaseUnit, m.Brand, m.Model, m.Attributes, m.IsActive ?? true, m.HsnCode, m.GstRate);
 
     static List<ImportRowInput>? ToRows(ImportRequest m) =>
         m.Rows?.Select(r => new ImportRowInput(r.Name, r.CategoryName, r.IsGeneric, r.BaseUnit, r.Brand, r.Model, r.Attributes)).ToList();
-
-    static IResult Reply<T>(ServiceResult<T> r) => r.Error is null
-        ? Results.Ok(r.Value)
-        : r.Status == 409 ? Results.Conflict(new { error = r.Error })
-        : r.Status == 404 ? Results.NotFound(new { error = r.Error })
-        : Results.BadRequest(new { error = r.Error });
 }

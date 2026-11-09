@@ -52,10 +52,10 @@ public static class ProfileEndpoints
         api.MapPut("/business-profile", async (ProfileRequest m, ClaimsPrincipal p, TenantDb db, Microsoft.AspNetCore.Identity.UserManager<Microsoft.AspNetCore.Identity.IdentityUser<Guid>> um, CancellationToken ct) =>
         {
             var err = Validate(m);
-            if (err is not null) return Results.BadRequest(new { error = err });
+            if (err is not null) return ApiResults.Fail(400, err);
             var uid = Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var tid = await db.FindTenantAsync(uid, ct);
-            if (tid is null) return Results.Conflict(new { error = "No business set up." });
+            if (tid is null) return ApiResults.Fail(409, "No business set up.");
             var user = await um.FindByIdAsync(uid.ToString());
             var verified = user is { PhoneNumberConfirmed: true, PhoneNumber: not null } ? user.PhoneNumber : null;
             await using var s = await db.BeginAsync(uid, tid, ct);
@@ -80,7 +80,7 @@ public static class ProfileEndpoints
             c.Parameters.AddWithValue("fy", (short)m.FinancialYearStartMonth);
             c.Parameters.AddWithValue("l", m.Language!);
             var n = await c.ExecuteNonQueryAsync(ct);
-            if (n == 0) return Results.Conflict(new { error = "No business profile found." });
+            if (n == 0) return ApiResults.Fail(409, "No business profile found.");
             await s.CommitAsync(ct);
             return Results.Ok();
         }).RequireAuthorization();

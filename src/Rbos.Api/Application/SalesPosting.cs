@@ -9,7 +9,8 @@ using Rbos.Domain;
 namespace Rbos.Api.Application;
 
 public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true);
-public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null);
+public sealed record SalePaymentInput(string Method, decimal Amount);
+public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null);
 
 /// <summary>Customers and sales (stock deduction at WAC, balanced journal, customer receivable). All amounts are recomputed server-side.</summary>
 public sealed class SalesService(TenantDb db)
@@ -66,7 +67,8 @@ public sealed class SalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, c.name, x.number, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id)
+        await using var c = s.Command(@"select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, c.name, x.number,
+            exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no
             from sales.sale x left join sales.customer c on c.id=x.customer_id
             where (@c::uuid is null or x.customer_id=@c)
               and (@q::text is null or lower(coalesce(c.name,'walk-in')) like '%' || lower(@q) || '%'
@@ -78,7 +80,8 @@ public sealed class SalesService(TenantDb db)
         var list = new List<object>();
         await using var r = await c.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
-            number = r.GetInt64(6), cancelled = r.GetBoolean(7) });
+            list.Add(new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), customer = r.IsDBNull(5) ? "Walk-in" : r.GetString(5),
+                number = r.GetInt64(6), cancelled = r.GetBoolean(7), invoiceNo = r.IsDBNull(8) ? null : r.GetString(8) });
         return ServiceResult<object>.Ok(list);
     }
 
@@ -88,15 +91,16 @@ public sealed class SalesService(TenantDb db)
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
         object? head = null;
-        c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id)
+        await using (var c = s.Command(@"select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, x.pay_method, c.name, l.name, x.number, c.phone,
+            c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no
             from sales.sale x left join sales.customer c on c.id=x.customer_id join core.stock_location l on l.id=x.location_id where x.id=@i"))
         {
             c.Parameters.AddWithValue("i", id);
             await using var r = await c.ExecuteReaderAsync(ct);
             if (await r.ReadAsync(ct))
-                head = new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), payMethod = r.IsDBNull(5) ? null : r.GetString(5), customer = r.IsDBNull(6) ? "Walk-in" : r.GetString(6), location = r.GetString(7),
-                customerNotes = r.IsDBNull(10) ? null : r.GetString(10), gstRate = r.IsDBNull(11) ? (decimal?)null : r.GetDecimal(11), cancelled = r.GetBoolean(12) };
-        }
+                head = new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), payMethod = r.IsDBNull(5) ? null : r.GetString(5), customer = r.IsDBNull(6) ? "Walk-in" : r.GetString(6), location = r.GetString(7), number = r.GetInt64(8), customerPhone = r.IsDBNull(9) ? null : r.GetString(9),
+                cancelled = r.GetBoolean(12), invoiceNo = r.IsDBNull(13) ? null : r.GetString(13) };
+                        }
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
         await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials
@@ -110,15 +114,37 @@ public sealed class SalesService(TenantDb db)
         return ServiceResult<object>.Ok(new { sale = head, lines });
     }
 
+    static bool TrySplitPayments(List<SalePaymentInput> input, out List<(string Method, decimal Amount)> split, out string? error)
+    {
+        split = [];
+        foreach (var p in input)
+        {
+            if (p.Method is null || !SalesRules.PayMethods.Contains(p.Method)) { error = "Payment method must be Cash, Bank or UPI."; return false; }
+            if (p.Amount <= 0 || decimal.Round(p.Amount, 2) != p.Amount) { error = "Each payment amount must be positive with at most 2 decimal places."; return false; }
+            if (split.Any(x => x.Method == p.Method)) { error = "Each payment method can appear only once."; return false; }
+            split.Add((p.Method, p.Amount));
+        }
+        error = null; return true;
+    }
+
     public async Task<ServiceResult<object>> SellAsync(Guid uid, string? key, SaleCommand m, string correlationId, CancellationToken ct)
     {
         key ??= "";
         if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
-        if (!SalesRules.TryValidateSale(m.Lines, m.SaleType, m.AmountPaid, m.PayMethod, m.CustomerId is not null, m.SaleDate, DateOnly.FromDateTime(DateTime.UtcNow),
+        var amountPaid = m.AmountPaid; var payMethod = m.PayMethod;
+        var split = new List<(string Method, decimal Amount)>();
+        if (m.Payments is { Count: > 0 })
+        {
+            if (!TrySplitPayments(m.Payments, out split, out var splitErr)) return ServiceResult<object>.Fail(splitErr!);
+            amountPaid = split.Sum(x => x.Amount); payMethod = split.OrderByDescending(x => x.Amount).First().Method;
+        }
+        if (!SalesRules.TryValidateSale(m.Lines, m.SaleType, amountPaid, payMethod, m.CustomerId is not null, m.SaleDate, DateOnly.FromDateTime(DateTime.UtcNow),
                 out var lines, out var total, out var paid, out var method, out var err))
             return ServiceResult<object>.Fail(err!);
+        var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
+        if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
         var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}"))));
+            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -169,8 +195,11 @@ public sealed class SalesService(TenantDb db)
             for (var i = 0; i < journal.Count; i++)
                 await Exec(s, ct, "insert into accounting.journal_line(tenant_id,id,entry_id,account_id,debit,credit) values (@t,@i,@e,@a,@d,@c)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("e", entry), ("a", accounts[i]), ("d", journal[i].Debit), ("c", journal[i].Credit));
-            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@k,@h,@j,@u,@g)",
-                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value));
+            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate,invoice_no,place_of_supply,is_inter_state) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@k,@h,@j,@u,@g,@iv,@pos,(@pos::text is not null and exists (select 1 from core.business_profile b where b.state is not null and lower(btrim(b.state)) <> lower(btrim(@pos::text)))))",
+                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value), ("iv", await NextInvoiceNoAsync(s, tenantId, m.SaleDate, ct)), ("pos", string.IsNullOrWhiteSpace(m.PlaceOfSupply) ? DBNull.Value : m.PlaceOfSupply.Trim()));
+
+            foreach (var (payMethodName, payAmount) in split)
+                await Exec(s, ct, "insert into sales.sale_payment(tenant_id,sale_id,method,amount) values (@t,@s,@m,@a)", ("t", tenantId), ("s", id), ("m", payMethodName), ("a", payAmount));
 
             foreach (var (l, unitCost, cost, next) in costed)
             {

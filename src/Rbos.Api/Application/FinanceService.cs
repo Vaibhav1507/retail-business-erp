@@ -10,6 +10,9 @@ namespace Rbos.Api.Application;
 public sealed record ExpenseCommand(DateOnly Date, string Category, Guid MoneyAccountId, decimal Amount, string? Note);
 public sealed record OwnerTxnCommand(string Kind, DateOnly Date, Guid MoneyAccountId, decimal Amount, string? Note);
 public sealed record StockAdjustCommand(Guid ProductId, Guid LocationId, DateOnly Date, decimal Quantity, string Direction, string Reason, string? Note);
+public sealed record CashClosingCommand(Guid MoneyAccountId, DateOnly Date, decimal Counted, string? Note);
+public sealed record LoanCommand(string Lender, DateOnly Date, Guid MoneyAccountId, decimal Principal, decimal InterestRate, string? Note);
+public sealed record LoanPaymentCommand(DateOnly Date, Guid MoneyAccountId, decimal Principal, decimal Interest, string? Note);
 
 /// <summary>Slice 6: expenses, cash/bank, capital/drawings, stock adjustment, period lock and financial reports.</summary>
 public sealed class FinanceService(TenantDb db)
@@ -316,7 +319,7 @@ public sealed class FinanceService(TenantDb db)
         var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
         await using var __ = s!;
         var docs = receivable
-            from sales.sale s join sales.customer c on c.id=s.customer_id where s.sale_date<=@d and s.total-s.amount_paid>0 and not exists (select 1 from sales.sale_cancellation k where k.sale_id=s.id)
+            ? await Rows(s!, "select c.id, c.name, s.sale_date, s.total-s.amount_paid from sales.sale s join sales.customer c on c.id=s.customer_id where s.sale_date<=@d and s.total-s.amount_paid>0 and not exists (select 1 from sales.sale_cancellation k where k.sale_id=s.id) order by s.sale_date, s.created_at", ct, ("d", asOf))
             : await Rows(s!, "select p.id, p.name, r.receipt_date, r.total from procurement.purchase_receipt r join procurement.supplier p on p.id=r.supplier_id where r.receipt_date<=@d order by r.receipt_date, r.created_at", ct, ("d", asOf));
         var credits = receivable
             ? await Rows(s!, "select customer_id, sum(x) from (select customer_id, amount x from sales.customer_payment where payment_date<=@d union all select customer_id, receivable_credit from sales.sale_return where return_date<=@d and customer_id is not null) q group by customer_id", ct, ("d", asOf))
@@ -347,6 +350,220 @@ public sealed class FinanceService(TenantDb db)
         var rows = await Rows(s!, "select p.id, p.name, c.total_quantity, c.wac, c.inventory_value from inventory.item_cost c join catalog.product p on p.id=c.product_id where c.total_quantity>0 order by p.name", ct);
         var items = rows.Select(r => new { id = r[0], name = r[1], quantity = r[2], wac = r[3], value = r[4] }).ToList();
         return ServiceResult<object>.Ok(new { items, totalValue = rows.Sum(r => (decimal)r[4]) });
+    }
+
+    // ---------- Chart of accounts (A10) ----------
+    static readonly Dictionary<string, (long From, long To)> CustomRanges = new() { ["Asset"] = (1600, 1999), ["Liability"] = (2600, 2999), ["Expense"] = (7000, 7999), ["Income"] = (8000, 8999) };
+
+    public async Task<ServiceResult<object>> ChartAsync(Guid uid, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var rows = await Rows(s!, "select a.id, a.code, a.name, a.type, a.is_custom, coalesce(sum(l.debit-l.credit),0), a.is_active from accounting.account a left join accounting.journal_line l on l.account_id=a.id and l.tenant_id=a.tenant_id group by a.id, a.code, a.name, a.type, a.is_custom, a.is_active order by a.code", ct);
+        return ServiceResult<object>.Ok(rows.Select(r => new { id = r[0], code = r[1], name = r[2], type = r[3], custom = r[4], balance = r[5], active = r[6] }).ToList());
+    }
+
+    public async Task<ServiceResult<object>> AddAccountAsync(Guid uid, string name, string type, CancellationToken ct)
+    {
+        name = (name ?? "").Trim();
+        if (name.Length is < 1 or > 80) return ServiceResult<object>.Fail("Name is required (max 80).");
+        if (!CustomRanges.TryGetValue(type ?? "", out var range)) return ServiceResult<object>.Fail("Type must be Asset, Liability, Income or Expense.");
+        var (s, t, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var _ = s!;
+        try
+        {
+            var next = await Scalar<long?>(s!, "select coalesce(max(code::bigint), @f-1)+1 from accounting.account where code ~ '^[0-9]{4}$' and code::bigint between @f and @e", ct, ("f", range.From), ("e", range.To)) ?? range.From;
+            if (next > range.To) return ServiceResult<object>.Fail("No free account codes left for this type.");
+            var id = Guid.NewGuid(); var code = next.ToString(CultureInfo.InvariantCulture);
+            await Exec(s!, ct, "insert into accounting.account(tenant_id,id,code,name,type,is_custom) values (@t,@i,@c,@n,@y,true)", ("t", t), ("i", id), ("c", code), ("n", name), ("y", type));
+            await s!.CommitAsync(ct);
+            return ServiceResult<object>.Ok(new { id, code });
+        }
+        catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("That code was just taken. Try again.", 409); }
+    }
+
+    public async Task<ServiceResult<object>> RenameAccountAsync(Guid uid, Guid id, string name, CancellationToken ct)
+    {
+        name = (name ?? "").Trim();
+        if (name.Length is < 1 or > 80) return ServiceResult<object>.Fail("Name is required (max 80).");
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var custom = await Scalar<bool?>(s!, "select is_custom from accounting.account where id=@i", ct, ("i", id));
+        if (custom is null) return ServiceResult<object>.Fail("Unknown account.", 404);
+        if (custom == false) return ServiceResult<object>.Fail("System accounts cannot be renamed.", 409);
+        await Exec(s!, ct, "update accounting.account set name=@n where id=@i", ("n", name), ("i", id));
+        await s!.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { id });
+    }
+
+    public async Task<ServiceResult<object>> SetAccountActiveAsync(Guid uid, Guid id, bool active, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var custom = await Scalar<bool?>(s!, "select is_custom from accounting.account where id=@i", ct, ("i", id));
+        if (custom is null) return ServiceResult<object>.Fail("Unknown account.", 404);
+        if (custom == false) return ServiceResult<object>.Fail("System accounts cannot be deactivated.", 409);
+        if (!active)
+        {
+            var balance = await Scalar<decimal?>(s!, "select coalesce(sum(debit-credit),0) from accounting.journal_line where account_id=@i", ct, ("i", id)) ?? 0m;
+            if (balance != 0m) return ServiceResult<object>.Fail("Only an account with a zero balance can be deactivated.", 409);
+        }
+        await Exec(s!, ct, "update accounting.account set is_active=@a where id=@i", ("a", active), ("i", id));
+        await s!.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { id, active });
+    }
+
+    // ---------- Stock cost verification (A12) ----------
+    /// <summary>Read-only: replays stock movements and compares them with item_cost and stock_balance. Lists only products that disagree.</summary>
+    public async Task<ServiceResult<object>> StockVerificationAsync(Guid uid, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var rows = await Rows(s!, @"select p.id, p.name, c.total_quantity, c.inventory_value, c.wac,
+                coalesce(m.q,0), coalesce(m.v,0), coalesce(b.q,0)
+            from catalog.product p
+            left join inventory.item_cost c on c.product_id=p.id and c.tenant_id=p.tenant_id
+            left join (select tenant_id, product_id, sum(quantity_delta) q, sum(value_delta) v from inventory.stock_movement group by tenant_id, product_id) m on m.product_id=p.id and m.tenant_id=p.tenant_id
+            left join (select tenant_id, product_id, sum(quantity) q from inventory.stock_balance group by tenant_id, product_id) b on b.product_id=p.id and b.tenant_id=p.tenant_id
+            where coalesce(c.total_quantity,0) <> coalesce(m.q,0) or abs(coalesce(c.inventory_value,0) - coalesce(m.v,0)) > 0.05 or coalesce(c.total_quantity,0) <> coalesce(b.q,0)
+            order by p.name limit 200", ct);
+        var items = rows.Select(r => new { productId = r[0], name = r[1], costQuantity = r[2] is DBNull ? 0m : (decimal)r[2], costValue = r[3] is DBNull ? 0m : (decimal)r[3], wac = r[4] is DBNull ? 0m : (decimal)r[4], movementQuantity = (decimal)r[5], movementValue = (decimal)r[6], balanceQuantity = (decimal)r[7] }).ToList();
+        var replay = await ReplayFlagsAsync(s!, ct); return ServiceResult<object>.Ok(new { ok = items.Count == 0 && replay.Count == 0, items, replay });
+    }
+
+    /// <summary>Replays each product's movements in order at the running average cost and reports the first issue per product.</summary>
+    static async Task<List<object>> ReplayFlagsAsync(TenantSession s, CancellationToken ct)
+    {
+        var replay = new List<object>();
+        var moves = await Rows(s, "select m.product_id, p.name, m.id, m.quantity_delta, m.value_delta from inventory.stock_movement m join catalog.product p on p.id=m.product_id and p.tenant_id=m.tenant_id order by m.product_id, m.occurred_at, m.id", ct);
+        Guid? current = null; decimal qty = 0m, val = 0m; var flagged = false;
+        foreach (var mv in moves)
+        {
+            var pid = (Guid)mv[0];
+            if (current != pid) { current = pid; qty = 0m; val = 0m; flagged = false; }
+            var dq = (decimal)mv[3]; var dv = (decimal)mv[4];
+            if (dq < 0m && !flagged)
+            {
+                var expected = qty <= 0m ? 0m : -decimal.Round(-dq * val / qty, 2);
+                if (qty + dq < 0m || Math.Abs(expected - dv) > 0.05m)
+                {
+                    flagged = true;
+                    replay.Add(new { productId = pid, name = mv[1], movementId = mv[2], quantity = dq, recordedValue = dv, expectedValue = expected, runningQuantity = qty });
+                }
+            }
+            qty += dq; val += dv;
+        }
+        return replay;
+    }
+
+    // ---------- Export audit (D9) ----------
+    public async Task<ServiceResult<object>> RecordExportAsync(Guid uid, string report, int rows, CancellationToken ct)
+    {
+        report = (report ?? "").Trim();
+        if (report.Length == 0 || report.Length > 60) return ServiceResult<object>.Fail("A report name up to 60 characters is required.");
+        if (rows < 0) return ServiceResult<object>.Fail("Row count cannot be negative.");
+        var (s, tenantId, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var id = Guid.NewGuid();
+        await Exec(s!, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'ReportExported','Report',@d,@s,@c)",
+            ("t", tenantId), ("a", Guid.NewGuid()), ("u", uid), ("d", id), ("s", $"{report} exported as CSV ({rows} rows)"), ("c", Guid.NewGuid()));
+        await s!.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { id });
+    }
+
+    // ---------- Loans (A9) ----------
+    public async Task<ServiceResult<object>> LoansAsync(Guid uid, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var rows = await Rows(s!, @"select l.id, l.number, l.lender, l.principal, l.start_date, l.interest_rate, l.note,
+            coalesce((select sum(p.principal_paid) from accounting.loan_payment p where p.loan_id=l.id),0),
+            coalesce((select sum(p.interest_paid) from accounting.loan_payment p where p.loan_id=l.id),0)
+            from accounting.loan l order by l.start_date desc, l.number desc limit 200", ct);
+        return ServiceResult<object>.Ok(rows.Select(r => new { id = r[0], number = r[1], lender = r[2], principal = r[3], startDate = r[4], interestRate = r[5], note = r[6], principalPaid = r[7], interestPaid = r[8], outstanding = (decimal)r[3] - (decimal)r[7] }).ToList());
+    }
+
+    /// <summary>Read-only repayment schedule: payments so far plus simple interest accrued since the last payment (or start date).</summary>
+    public async Task<ServiceResult<object>> LoanScheduleAsync(Guid uid, Guid loanId, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var __ = s!;
+        var loan = await Rows(s!, "select lender, principal, start_date, interest_rate from accounting.loan where id=@i", ct, ("i", loanId));
+        if (loan.Count == 0) return ServiceResult<object>.Fail("Unknown loan.", 404);
+        var principal = (decimal)loan[0][1]; var start = (DateOnly)loan[0][2]; var rate = (decimal)loan[0][3];
+        var pays = await Rows(s!, "select pay_date, principal_paid, interest_paid from accounting.loan_payment where loan_id=@i order by pay_date, created_at", ct, ("i", loanId));
+        var payments = pays.Select(r => new { date = r[0], principalPaid = (decimal)r[1], interestPaid = (decimal)r[2] }).ToList();
+        var outstanding = principal - payments.Sum(p => p.principalPaid);
+        var lastDate = pays.Count == 0 ? start : (DateOnly)pays[^1][0];
+        var days = Math.Max(0, DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - lastDate.DayNumber);
+        var accrued = decimal.Round(outstanding * rate / 100m * days / 365m, 2);
+        return ServiceResult<object>.Ok(new { lender = loan[0][0], principal, interestRate = rate, outstanding, accruedInterest = accrued, accruedSince = lastDate, payments });
+    }
+
+    public async Task<ServiceResult<object>> AddLoanAsync(Guid uid, string? key, LoanCommand m, CancellationToken ct)
+    {
+        if (key is null || key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
+        var lender = (m.Lender ?? "").Trim();
+        if (lender.Length is < 1 or > 100) return ServiceResult<object>.Fail("Lender name is required (max 100).");
+        if (m.Principal <= 0 || decimal.Round(m.Principal, 2) != m.Principal) return ServiceResult<object>.Fail("Amount must be positive with at most 2 decimals.");
+        if (m.InterestRate < 0 || m.InterestRate > 100 || decimal.Round(m.InterestRate, 2) != m.InterestRate) return ServiceResult<object>.Fail("Interest rate must be 0-100 with at most 2 decimals.");
+        if ((m.Note?.Length ?? 0) > 200) return ServiceResult<object>.Fail("Note is too long.");
+        if (m.Date > DateOnly.FromDateTime(DateTime.UtcNow)) return ServiceResult<object>.Fail("Date cannot be in the future.");
+        var hash = Hash(string.Join('|', lender, m.Date.ToString("O"), m.MoneyAccountId, m.Principal.ToString(CultureInfo.InvariantCulture), m.InterestRate.ToString(CultureInfo.InvariantCulture), m.Note));
+        var (s, t, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var _ = s!;
+        try
+        {
+            var prior = await Prior(s!, "accounting.loan", key, hash, ct); if (prior is not null) return prior;
+            var money = await Scalar<Guid?>(s!, "select account_id from accounting.money_account where id=@i", ct, ("i", m.MoneyAccountId));
+            if (money is null) return ServiceResult<object>.Fail("Unknown cash/bank account.");
+            var id = Guid.NewGuid();
+            var liability = await AccountAsync(s!, t, "2500", ct, "Loans Payable", "Liability");
+            var entry = await Post(s!, t, m.Date, "LoanReceived", id, [(money.Value, m.Principal, 0m), (liability, 0m, m.Principal)], ct);
+            await Exec(s!, ct, "insert into accounting.loan(tenant_id,id,lender,principal,start_date,interest_rate,money_account_id,note,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@l,@p,@d,@r,@a,@n,@k,@h,@j,@u)",
+                ("t", t), ("i", id), ("l", lender), ("p", m.Principal), ("d", m.Date), ("r", m.InterestRate), ("a", m.MoneyAccountId), ("n", Blank(m.Note)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
+            await s!.CommitAsync(ct);
+            return ServiceResult<object>.Ok(new { id });
+        }
+        catch (PostgresException e) when (e.SqlState == "RB001") { return ServiceResult<object>.Fail(e.MessageText, 409); }
+        catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("Duplicate request.", 409); }
+    }
+
+    public async Task<ServiceResult<object>> RepayLoanAsync(Guid uid, Guid loanId, string? key, LoanPaymentCommand m, CancellationToken ct)
+    {
+        if (key is null || key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
+        if (m.Principal < 0 || m.Interest < 0 || decimal.Round(m.Principal, 2) != m.Principal || decimal.Round(m.Interest, 2) != m.Interest || m.Principal + m.Interest <= 0)
+            return ServiceResult<object>.Fail("Enter a principal and/or interest amount (at most 2 decimals).");
+        if ((m.Note?.Length ?? 0) > 200) return ServiceResult<object>.Fail("Note is too long.");
+        if (m.Date > DateOnly.FromDateTime(DateTime.UtcNow)) return ServiceResult<object>.Fail("Date cannot be in the future.");
+        var hash = Hash(string.Join('|', loanId, m.Date.ToString("O"), m.MoneyAccountId, m.Principal.ToString(CultureInfo.InvariantCulture), m.Interest.ToString(CultureInfo.InvariantCulture), m.Note));
+        var (s, t, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var _ = s!;
+        try
+        {
+            var prior = await Prior(s!, "accounting.loan_payment", key, hash, ct); if (prior is not null) return prior;
+            await Exec(s!, ct, "select pg_advisory_xact_lock(hashtextextended(@l::text, 0))", ("l", loanId));
+            var loan = await Scalar<decimal?>(s!, "select principal - coalesce((select sum(principal_paid) from accounting.loan_payment where loan_id=@l),0) from accounting.loan where id=@l", ct, ("l", loanId));
+            if (loan is null) return ServiceResult<object>.Fail("Unknown loan.", 404);
+            if (m.Principal > loan.Value) return ServiceResult<object>.Fail("Principal repayment is more than the outstanding loan.");
+            var money = await Scalar<Guid?>(s!, "select account_id from accounting.money_account where id=@i", ct, ("i", m.MoneyAccountId));
+            if (money is null) return ServiceResult<object>.Fail("Unknown cash/bank account.");
+            var bal = await Scalar<decimal?>(s!, "select coalesce(sum(debit-credit),0) from accounting.journal_line where account_id=@a", ct, ("a", money.Value)) ?? 0m;
+            if (bal < m.Principal + m.Interest) return ServiceResult<object>.Fail("Not enough balance in that account for this repayment.");
+            var id = Guid.NewGuid();
+            var liability = await AccountAsync(s!, t, "2500", ct, "Loans Payable", "Liability");
+            var lines = new List<(Guid Account, decimal Dr, decimal Cr)>();
+            if (m.Principal > 0) lines.Add((liability, m.Principal, 0m));
+            if (m.Interest > 0) lines.Add((await AccountAsync(s!, t, "6100", ct, "Interest Expense", "Expense"), m.Interest, 0m));
+            lines.Add((money.Value, 0m, m.Principal + m.Interest));
+            var entry = await Post(s!, t, m.Date, "LoanRepayment", id, [.. lines], ct);
+            await Exec(s!, ct, "insert into accounting.loan_payment(tenant_id,id,loan_id,pay_date,principal_paid,interest_paid,money_account_id,note,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@l,@d,@p,@x,@a,@n,@k,@h,@j,@u)",
+                ("t", t), ("i", id), ("l", loanId), ("d", m.Date), ("p", m.Principal), ("x", m.Interest), ("a", m.MoneyAccountId), ("n", Blank(m.Note)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
+            await s!.CommitAsync(ct);
+            return ServiceResult<object>.Ok(new { id });
+        }
+        catch (PostgresException e) when (e.SqlState == "RB001") { return ServiceResult<object>.Fail(e.MessageText, 409); }
+        catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("Duplicate request.", 409); }
     }
 
     // ---------- helpers ----------
@@ -387,5 +604,46 @@ public sealed class FinanceService(TenantDb db)
             list.Add(row);
         }
         return list;
+    }
+
+    // ---------- Cash day closing (A6) ----------
+    const string CashBalanceSql = "select coalesce(sum(l.debit-l.credit),0) from accounting.journal_line l join accounting.journal_entry e on e.id=l.entry_id where l.account_id=@a and e.effective_date<=@d";
+
+    public async Task<ServiceResult<object>> CashClosingsAsync(Guid uid, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var _s = s!;
+        var rows = await Rows(s!, @"select c.id, c.closing_date, m.name, c.expected, c.counted, c.difference, c.note from accounting.cash_closing c
+            join accounting.money_account m on m.id=c.money_account_id order by c.closing_date desc, m.name limit 200", ct);
+        return ServiceResult<object>.Ok(rows.Select(r => new { id = r[0], date = r[1], account = r[2], expected = r[3], counted = r[4], difference = r[5], note = r[6] }).ToList());
+    }
+
+    public async Task<ServiceResult<object>> CashClosingPreviewAsync(Guid uid, Guid moneyAccountId, DateOnly date, CancellationToken ct)
+    {
+        var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var _s = s!;
+        var acc = await Scalar<Guid?>(s!, "select account_id from accounting.money_account where id=@i", ct, ("i", moneyAccountId));
+        if (acc is null) return ServiceResult<object>.Fail("Unknown cash/bank account.", 404);
+        var expected = await Scalar<decimal?>(s!, CashBalanceSql, ct, ("a", acc.Value), ("d", date)) ?? 0m;
+        return ServiceResult<object>.Ok(new { date, expected });
+    }
+
+    public async Task<ServiceResult<object>> CloseCashAsync(Guid uid, CashClosingCommand m, CancellationToken ct)
+    {
+        if (m.Counted < 0 || decimal.Round(m.Counted, 2) != m.Counted) return ServiceResult<object>.Fail("Counted cash must be zero or more with at most 2 decimals.");
+        if ((m.Note?.Length ?? 0) > 200) return ServiceResult<object>.Fail("Note is too long.");
+        if (m.Date > DateOnly.FromDateTime(DateTime.UtcNow)) return ServiceResult<object>.Fail("Date cannot be in the future.");
+        var (s, t, err) = await OpenAsync(uid, ct); if (err is not null) return err;
+        await using var _s = s!;
+        var acc = await Scalar<Guid?>(s!, "select account_id from accounting.money_account where id=@i", ct, ("i", m.MoneyAccountId));
+        if (acc is null) return ServiceResult<object>.Fail("Unknown cash/bank account.", 404);
+        if (await Scalar<long?>(s!, "select count(*) from accounting.cash_closing where money_account_id=@i and closing_date=@d", ct, ("i", m.MoneyAccountId), ("d", m.Date)) > 0)
+            return ServiceResult<object>.Fail("This account is already closed for that day.", 409);
+        var expected = await Scalar<decimal?>(s!, CashBalanceSql, ct, ("a", acc.Value), ("d", m.Date)) ?? 0m;
+        var diff = m.Counted - expected;
+        await Exec(s!, ct, "insert into accounting.cash_closing(tenant_id,id,money_account_id,closing_date,expected,counted,difference,note,created_by) values (@t,@i,@a,@d,@e,@c,@df,@n,@u)",
+            ("t", t), ("i", Guid.NewGuid()), ("a", m.MoneyAccountId), ("d", m.Date), ("e", expected), ("c", m.Counted), ("df", diff), ("n", Blank(m.Note)), ("u", uid));
+        await s!.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { date = m.Date, expected, counted = m.Counted, difference = diff });
     }
 }

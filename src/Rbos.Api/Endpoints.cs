@@ -37,6 +37,7 @@ public static class Endpoints
 		});
 
 		var api = app.MapGroup("/api");
+		PermissionFilter.Apply(api);
 		api.MapGet("/csrf", (HttpContext c, IAntiforgery af) => Results.Ok(new { token = af.GetAndStoreTokens(c).RequestToken })).AllowAnonymous();
 
 		AuthOtpEndpoints.Map(api);
@@ -44,13 +45,13 @@ public static class Endpoints
 		api.MapPost("/auth/login", async (Credentials m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, IWebHostEnvironment env) =>
 		{
 			var u = await um.FindByNameAsync(m.Email?.Trim() ?? "");
-			if (u is null) return Results.Json(new { error = "Invalid credentials." }, statusCode: 401);
+			if (u is null) return ApiResults.Fail(401, "Invalid credentials.");
 			// TEMPORARY (testing only): passwordless demo login, Development environment only. Remove before release.
 			if (env.IsDevelopment() && string.IsNullOrEmpty(m.Password) && u.UserName == "demo.electronics@example.test")
 			{ await sm.SignInAsync(u, isPersistent: false); return Results.Ok(); }
 			var r = await sm.CheckPasswordSignInAsync(u, m.Password ?? "", lockoutOnFailure: true);
 			if (!r.Succeeded)
-				return Results.Json(new { error = "Invalid credentials." }, statusCode: 401);
+				return ApiResults.Fail(401, "Invalid credentials.");
 			await sm.SignInAsync(u, isPersistent: false);
 			return Results.Ok();
 		}).AllowAnonymous();
@@ -69,14 +70,15 @@ public static class Endpoints
 				await using var r = await c.ExecuteReaderAsync(ct);
 				if (await r.ReadAsync(ct)) { done = r.GetBoolean(0); category = r.IsDBNull(1) ? null : r.GetString(1); }
 			}
-			return Results.Ok(new { email = p.Identity?.Name, tenantId = tid, profileComplete = done, businessCategory = category });
+			var role = await db.FindRoleAsync(uid, ct);
+			return Results.Ok(new { email = p.Identity?.Name, tenantId = tid, profileComplete = done, businessCategory = category, role, permissions = Permissions.For(role) });
 		}).RequireAuthorization();
 
 		api.MapPost("/bootstrap", async (BootstrapRequest m, HttpRequest req, ClaimsPrincipal p, TenantDb db, CancellationToken ct) =>
 		{
 			var key = req.Headers["Idempotency-Key"].ToString();
-			if (key.Length is < 8 or > 100) return Results.BadRequest(new { error = "Idempotency-Key header (8-100 chars) required." });
-			if (Blank(m.BusinessName, 120) || Blank(m.BranchName, 120) || Blank(m.LocationName, 120)) return Results.BadRequest(new { error = "Names are required (max 120 chars)." });
+			if (key.Length is < 8 or > 100) return ApiResults.Fail(400, "Idempotency-Key header (8-100 chars) required.");
+			if (Blank(m.BusinessName, 120) || Blank(m.BranchName, 120) || Blank(m.LocationName, 120)) return ApiResults.Fail(400, "Names are required (max 120 chars).");
 			var uid = UserId(p);
 			var existing = await db.FindTenantAsync(uid, ct);
 			if (existing is not null) return Results.Ok(new { tenantId = existing, replayed = true });
@@ -98,13 +100,13 @@ public static class Endpoints
 			catch (PostgresException e) when (e.SqlState == "23505")
 			{
 				var again = await db.FindTenantAsync(uid, ct);
-				return again is null ? Results.Conflict(new { error = "Business already exists for this user." }) : Results.Ok(new { tenantId = again, replayed = true });
+				return again is null ? ApiResults.Fail(409, "Business already exists for this user.") : Results.Ok(new { tenantId = again, replayed = true });
 			}
 		}).RequireAuthorization();
 
 		api.MapGet("/locations", async (ClaimsPrincipal p, TenantDb db, CancellationToken ct) =>
 		{
-			var (s, tid) = await Open(p, db, ct); if (s is null) return Results.Conflict(new { error = "No business set up." });
+			var (s, tid) = await Open(p, db, ct); if (s is null) return ApiResults.Fail(409, "No business set up.");
 			await using var _ = s;
 			await using var c = s.Command("select id,name from core.stock_location order by name");
 			return Results.Ok(await Rows(c, ct, r => new { id = r.GetGuid(0), name = r.GetString(1) }));
@@ -117,6 +119,17 @@ public static class Endpoints
         SalesEndpoints.Map(api);
                 AfterSalesEndpoints.Map(api);
                 FinanceEndpoints.Map(api);
+                ReportChecksEndpoints.Map(api);
+                GstEndpoints.Map(api);
+                StaffEndpoints.Map(api);
+                BranchEndpoints.Map(api);
+                LocationMoveEndpoints.Map(api);
+        OrderingEndpoints.Map(api);
+        BankMatchEndpoints.Map(api);
+                StockEndpoints.Map(api);
+        CustomerInsightsEndpoints.Map(api);
+        DashboardEndpoints.Map(api); ReminderEndpoints.Map(api);
+                AuditEndpoints.Map(api);
 
 		api.MapPost("/opening-stock", async (OpeningStockRequest m, HttpRequest req, ClaimsPrincipal p, OpeningStockService svc, CancellationToken ct) =>
 		{
@@ -126,14 +139,14 @@ public static class Endpoints
 			{
 				OpeningStockStatus.Posted => Results.Ok(new { documentId = o.DocumentId, total = o.Total, replayed = false }),
 				OpeningStockStatus.Replayed => Results.Ok(new { documentId = o.DocumentId, replayed = true }),
-				OpeningStockStatus.Invalid => Results.BadRequest(new { error = o.Error }),
-				_ => Results.Conflict(new { error = o.Error }),
+				OpeningStockStatus.Invalid => ApiResults.Fail(400, o.Error),
+				_ => ApiResults.Fail(409, o.Error),
 			};
 		}).RequireAuthorization();
 
 		api.MapGet("/stock", async (ClaimsPrincipal p, TenantDb db, CancellationToken ct) =>
 		{
-			var (s, _) = await Open(p, db, ct); if (s is null) return Results.Conflict(new { error = "No business set up." });
+			var (s, _) = await Open(p, db, ct); if (s is null) return ApiResults.Fail(409, "No business set up.");
 			await using var __ = s;
 			await using var c = s.Command("select p.id,p.name,p.internal_sku,l.name,b.quantity,ic.wac,ic.inventory_value,cat.name,(select array_agg(distinct sp.name order by sp.name) from procurement.purchase_receipt_line rl join procurement.purchase_receipt pr on pr.tenant_id=rl.tenant_id and pr.id=rl.receipt_id join procurement.supplier sp on sp.tenant_id=pr.tenant_id and sp.id=pr.supplier_id where rl.tenant_id=b.tenant_id and rl.product_id=b.product_id) from inventory.stock_balance b join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id join catalog.category cat on cat.tenant_id=p.tenant_id and cat.id=p.category_id join core.stock_location l on l.tenant_id=b.tenant_id and l.id=b.location_id join inventory.item_cost ic on ic.tenant_id=b.tenant_id and ic.product_id=b.product_id order by p.name");
 			return Results.Ok(await Rows(c, ct, r => new { productId = r.GetGuid(0), name = r.GetString(1), sku = r.GetString(2), location = r.GetString(3), quantity = r.GetDecimal(4), wac = r.GetDecimal(5), value = r.GetDecimal(6), category = r.GetString(7), suppliers = r.IsDBNull(8) ? Array.Empty<string>() : r.GetFieldValue<string[]>(8) }));
@@ -175,3 +188,4 @@ public static class Endpoints
 		return list;
 	}
 }
+

@@ -2,18 +2,22 @@ using System.Security.Claims;
 using Rbos.Api.Application;
 using Rbos.Domain;
 
+using static Rbos.Api.ApiResults;
+
 namespace Rbos.Api;
 
 public sealed record SupplierRequest(string? Name, string? Phone, string? Notes, bool? IsActive);
 public sealed record ReceiptRequest(Guid SupplierId, Guid LocationId, DateOnly ReceiptDate, string? SupplierRef, List<PurchaseLineInput>? Lines, Guid? InvoiceFileId = null);
 public sealed record InvoicePage(string? ContentType, string? Data);
 public sealed record InvoiceUpload(string? ContentType, string? Data, List<InvoicePage>? Pages = null);
-public sealed record PaymentRequest(Guid SupplierId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference);
+public sealed record PaymentRequest(Guid SupplierId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference, List<BillAllocation>? Allocations = null);
 
 public static class ProcurementEndpoints
 {
 	public static void Map(RouteGroupBuilder api)
 	{
+		api.MapGet("/suppliers/{id:guid}/statement", async (Guid id, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct) => Reply(await svc.SupplierStatementAsync(Uid(p), id, ct))).RequireAuthorization();
+		api.MapGet("/suppliers/{id:guid}/open-bills", async (Guid id, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct) => Reply(await svc.OpenBillsAsync(Uid(p), id, ct))).RequireAuthorization();
 		api.MapGet("/suppliers", async (ClaimsPrincipal p, ProcurementService svc, CancellationToken ct) => Reply(await svc.SuppliersAsync(Uid(p), ct))).RequireAuthorization();
 		api.MapPost("/suppliers", async (SupplierRequest m, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct)
 			=> Reply(await svc.CreateSupplierAsync(Uid(p), new(m.Name, m.Phone, m.Notes), ct))).RequireAuthorization();
@@ -33,14 +37,8 @@ public static class ProcurementEndpoints
 
 		api.MapGet("/supplier-payments", async (Guid? supplierId, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct) => Reply(await svc.PaymentsAsync(Uid(p), supplierId, ct))).RequireAuthorization();
 		api.MapPost("/supplier-payments", async (PaymentRequest m, HttpRequest req, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct)
-			=> Reply(await svc.PayAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.SupplierId, m.PaymentDate, m.Amount, m.Method, m.Reference), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
+			=> Reply(await svc.PayAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.SupplierId, m.PaymentDate, m.Amount, m.Method, m.Reference, m.Allocations), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
 	}
 
 	static Guid Uid(ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-	static IResult Reply<T>(ServiceResult<T> r) => r.Error is null
-		? Results.Ok(r.Value)
-		: r.Status == 409 ? Results.Conflict(new { error = r.Error })
-		: r.Status == 404 ? Results.NotFound(new { error = r.Error })
-		: Results.BadRequest(new { error = r.Error });
 }

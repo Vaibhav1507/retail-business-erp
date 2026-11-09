@@ -17,7 +17,13 @@ public sealed class DevSmsSender(ILogger<DevSmsSender> log) : ISmsSender
     }
 }
 
-/// <summary>MSG91 OTP API. Needs Sms:Provider=msg91, Sms:AuthKey and Sms:TemplateId (DLT-approved template) in user secrets.</summary>
+/// <summary>Used when Otp:Enabled=false. OTP endpoints are disabled, so this is never expected to run; it never logs or returns a code.</summary>
+public sealed class DisabledSmsSender : ISmsSender
+{
+    public Task SendAsync(string mobile, string code, CancellationToken ct) => throw new InvalidOperationException("OTP is disabled.");
+}
+
+/// <summary>MSG91 OTP API.
 public sealed class Msg91SmsSender(HttpClient http, IConfiguration cfg) : ISmsSender
 {
     public async Task SendAsync(string mobile, string code, CancellationToken ct)

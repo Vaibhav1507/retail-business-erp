@@ -8,13 +8,29 @@ using Rbos.Domain;
 
 namespace Rbos.Api.Application;
 
-public sealed record CollectionCommand(Guid CustomerId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference);
-public sealed record SaleReturnCommand(Guid SaleId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines);
+public sealed record CollectionCommand(Guid CustomerId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference, IReadOnlyList<BillAllocation>? Allocations = null);
+public sealed record SaleReturnCommand(Guid SaleId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines, string? RefundMethod = null);
 public sealed record PurchaseReturnCommand(Guid ReceiptId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines);
 
 /// <summary>Slice 5: customer collections, customer returns, supplier returns and print data. All amounts are recomputed server-side.</summary>
 public sealed class AfterSalesService(TenantDb db)
 {
+    const string OpenSaleSql = @"select s.total - s.amount_paid - coalesce((select sum(a.amount) from sales.customer_payment_allocation a where a.sale_id=s.id),0) from sales.sale s where s.id=@b and s.customer_id=@p and not exists (select 1 from sales.sale_cancellation k where k.sale_id=s.id)";
+
+    public async Task<ServiceResult<object>> OpenSalesAsync(Guid uid, Guid customerId, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        var list = new List<object>();
+        await using var c = s.Command(@"select x.id, x.sale_date, x.invoice_no, x.number, x.total, x.total - x.amount_paid - coalesce((select sum(a.amount) from sales.customer_payment_allocation a where a.sale_id=x.id),0) from sales.sale x where x.customer_id=@c and not exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id) order by x.sale_date, x.created_at");
+        c.Parameters.AddWithValue("c", customerId);
+        await using var r = await c.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            if (r.GetDecimal(5) > 0) list.Add(new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), invoiceNo = r.IsDBNull(2) ? null : r.GetString(2), number = r.GetInt64(3), total = r.GetDecimal(4), open = r.GetDecimal(5) });
+        return ServiceResult<object>.Ok(list);
+    }
+
     const string OwedSql = @"coalesce((select sum(total - amount_paid) from sales.sale where customer_id=@c and not exists (select 1 from sales.sale_cancellation k where k.sale_id=sales.sale.id)),0)
         - coalesce((select sum(amount) from sales.customer_payment where customer_id=@c),0)
         - coalesce((select sum(receivable_credit) from sales.sale_return where customer_id=@c),0)";
@@ -25,7 +41,7 @@ public sealed class AfterSalesService(TenantDb db)
         key ??= "";
         if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
         if ((m.Reference?.Trim().Length ?? 0) > 60) return ServiceResult<object>.Fail("Reference is too long.");
-        var hash = Hash(string.Join('|', m.CustomerId, m.PaymentDate.ToString("O"), m.Amount.ToString(CultureInfo.InvariantCulture), m.Method, m.Reference?.Trim()));
+        var hash = Hash(string.Join('|', m.CustomerId, m.PaymentDate.ToString("O"), m.Amount.ToString(CultureInfo.InvariantCulture), m.Method, m.Reference?.Trim(), string.Join(',', (m.Allocations ?? []).Select(a => a.BillId.ToString() + ':' + a.Amount.ToString(CultureInfo.InvariantCulture)))));
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -45,6 +61,8 @@ public sealed class AfterSalesService(TenantDb db)
             await PostJournal(s, tenantId, entry, m.PaymentDate, "CustomerPayment", id, journal, ct);
             await Exec(s, ct, "insert into sales.customer_payment(tenant_id,id,customer_id,payment_date,amount,method,reference,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@c,@d,@a,@m,@r,@k,@h,@j,@u)",
                 ("t", tenantId), ("i", id), ("c", m.CustomerId), ("d", m.PaymentDate), ("a", money.Amount), ("m", m.Method), ("r", Blank(m.Reference)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
+            var allocErr = await AllocateAsync(s, tenantId, "sales.customer_payment_allocation", "sale_id", OpenSaleSql, m.CustomerId, id, money.Amount, m.Allocations, ct);
+            if (allocErr is not null) return ServiceResult<object>.Fail(allocErr);
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, owed = owed - money.Amount });
         }
@@ -101,8 +119,9 @@ public sealed class AfterSalesService(TenantDb db)
         var name = await Scalar<string>(s, "select name from sales.customer where id=@i", ct, ("i", customerId));
         if (name is null) return ServiceResult<object>.Fail("Customer not found.", 404);
         var rows = new List<(string Type, long Number, DateOnly Date, decimal Debit, decimal Credit, Guid Id)>();
-        from sales.sale where customer_id=@c and not exists (select 1 from sales.sale_cancellation k where k.sale_id=sales.sale.id)
-            union all
+        await using (var c = s.Command(@"select 'Sale' t, number, sale_date, created_at, total - amount_paid, 0::numeric, id
+            from sales.sale where customer_id=@c and not exists (select 1 from sales.sale_cancellation k where k.sale_id=sales.sale.id)
+            union all select 'Payment', number, payment_date, created_at, 0, amount, id from sales.customer_payment where customer_id=@c
             union all select 'Return', number, return_date, created_at, 0, receivable_credit, id from sales.sale_return where customer_id=@c and receivable_credit > 0
             order by 3, 4"))
         {
@@ -140,7 +159,8 @@ public sealed class AfterSalesService(TenantDb db)
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (m.ReturnDate > today) return ServiceResult<object>.Fail("Return date cannot be in the future.");
         if (m.ReturnDate < today.AddYears(-5)) return ServiceResult<object>.Fail("Return date is too old.");
-        var hash = Hash(string.Join('|', m.SaleId, m.ReturnDate.ToString("O"), m.Reason?.Trim(), LinesKey(lines)));
+        if (m.RefundMethod is not null && !SalesRules.PayMethods.Contains(m.RefundMethod)) return ServiceResult<object>.Fail("Refund method must be Cash, Bank or UPI.");
+        var hash = Hash(string.Join('|', m.SaleId, m.ReturnDate.ToString("O"), m.Reason?.Trim(), m.RefundMethod, LinesKey(lines)));
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -159,8 +179,7 @@ public sealed class AfterSalesService(TenantDb db)
             }
             if (!found) return ServiceResult<object>.Fail("Sale not found.", 404);
             if (await Scalar<Guid?>(s, "select id from sales.sale_cancellation where sale_id=@i", ct, ("i", m.SaleId)) is not null) return ServiceResult<object>.Fail("This sale is cancelled and cannot be returned.", 409);
-            if (m.ReturnDate < saleDate)
-
+            if (m.ReturnDate < saleDate) return ServiceResult<object>.Fail("Return date cannot be before the sale date.");
             var costed = new List<(Guid ProductId, decimal Qty, Money Amount, decimal UnitCost, Money Cost)>();
             foreach (var (productId, qty) in lines.OrderBy(x => x.ProductId))
             {
@@ -195,8 +214,8 @@ public sealed class AfterSalesService(TenantDb db)
             await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'SaleReturned','SaleReturn',@d,@s,@c)",
                 ("t", tenantId), ("a", Guid.NewGuid()), ("u", uid), ("d", id), ("s", string.Create(CultureInfo.InvariantCulture, $"Customer return, {costed.Count} lines, value {total.Amount:0.00} INR")), ("c", correlationId));
             await PostJournal(s, tenantId, entry, m.ReturnDate, "SaleReturn", id, journal, ct);
-            await Exec(s, ct, "insert into sales.sale_return(tenant_id,id,sale_id,customer_id,return_date,reason,total,receivable_credit,cash_refund,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@c,@d,@r,@v,@rc,@cr,@k,@h,@j,@u)",
-                ("t", tenantId), ("i", id), ("s", m.SaleId), ("c", customerId), ("d", m.ReturnDate), ("r", Blank(m.Reason)), ("v", total.Amount), ("rc", credit), ("cr", refund), ("k", key), ("h", hash), ("j", entry), ("u", uid));
+            await Exec(s, ct, "insert into sales.sale_return(tenant_id,id,sale_id,customer_id,return_date,reason,total,receivable_credit,cash_refund,refund_method,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@c,@d,@r,@v,@rc,@cr,@rm,@k,@h,@j,@u)",
+                ("t", tenantId), ("i", id), ("s", m.SaleId), ("c", customerId), ("d", m.ReturnDate), ("r", Blank(m.Reason)), ("v", total.Amount), ("rc", credit), ("cr", refund), ("rm", refund > 0 ? m.RefundMethod : null), ("k", key), ("h", hash), ("j", entry), ("u", uid));
             foreach (var x in costed)
             {
                 await Exec(s, ct, "insert into sales.sale_return_line(tenant_id,return_id,sale_id,product_id,quantity,amount,unit_cost) values (@t,@r,@s,@p,@q,@a,@c)",
@@ -226,7 +245,7 @@ public sealed class AfterSalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        await using var c = s.Command(@"select r.id, r.number, r.return_date, sl.number, coalesce(c.name,'Walk-in'), r.total, r.receivable_credit, r.cash_refund, r.reason
+        await using var c = s.Command(@"select r.id, r.number, r.return_date, sl.number, coalesce(c.name,'Walk-in'), r.total, r.receivable_credit, r.cash_refund, r.reason, r.refund_method
             from sales.sale_return r join sales.sale sl on sl.id=r.sale_id left join sales.customer c on c.id=r.customer_id
             where (@q::text is null or lower(coalesce(c.name,'walk-in')) like '%' || lower(@q) || '%' or r.number::text=@q or sl.number::text=@q or lower(coalesce(r.reason,'')) like '%' || lower(@q) || '%')
             order by r.return_date desc, r.created_at desc limit 100");
@@ -234,7 +253,7 @@ public sealed class AfterSalesService(TenantDb db)
         var list = new List<object>();
         await using var r = await c.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
-            list.Add(new { id = r.GetGuid(0), number = r.GetInt64(1), date = r.GetFieldValue<DateOnly>(2), saleNumber = r.GetInt64(3), customer = r.GetString(4), total = r.GetDecimal(5), balanceCredit = r.GetDecimal(6), cashRefund = r.GetDecimal(7), reason = r.IsDBNull(8) ? null : r.GetString(8) });
+            list.Add(new { id = r.GetGuid(0), number = r.GetInt64(1), date = r.GetFieldValue<DateOnly>(2), saleNumber = r.GetInt64(3), customer = r.GetString(4), total = r.GetDecimal(5), balanceCredit = r.GetDecimal(6), cashRefund = r.GetDecimal(7), reason = r.IsDBNull(8) ? null : r.GetString(8), refundMethod = r.IsDBNull(9) ? null : r.GetString(9) });
         return ServiceResult<object>.Ok(list);
     }
 
@@ -448,7 +467,7 @@ public sealed class AfterSalesService(TenantDb db)
             if (prior is not null) return prior;
 
             Guid locationId = Guid.Empty; DateOnly saleDate = default; decimal total = 0, paid = 0, costTotal = 0; var found = false;
-            await using (var q = s.Command("select location_id, sale_date, total, amount_paid, cost_total from sales.sale where id=@i for update"))
+            await using (var q = s.Command("select location_id, sale_date, total, amount_paid, cost_total from sales.sale where id=@i"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);

@@ -23,6 +23,15 @@ public sealed class TenantDb(NpgsqlDataSource dataSource)
 		var r = await cmd.ExecuteScalarAsync(ct);
 		return r as Guid?;
 	}
+
+	/// <summary>Role of the caller in their active tenant, or null when they have none yet.</summary>
+	public async Task<string?> FindRoleAsync(Guid userId, CancellationToken ct)
+	{
+		await using var s = await BeginAsync(userId, null, ct);
+		await using var cmd = s.Command("select role from core.tenant_membership where user_id = @u and status = 'Active' order by created_at limit 1");
+		cmd.Parameters.AddWithValue("u", userId);
+		return await cmd.ExecuteScalarAsync(ct) as string;
+	}
 }
 
 public sealed class TenantSession(NpgsqlConnection conn, NpgsqlTransaction tx) : IAsyncDisposable

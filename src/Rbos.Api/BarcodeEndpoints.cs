@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Rbos.Api.Application;
 
+using static Rbos.Api.ApiResults;
+
 namespace Rbos.Api;
 
 public sealed record BarcodeRequest(string? Code, string? Symbology, int? PackQuantity);
@@ -27,10 +29,4 @@ public static class BarcodeEndpoints
     }
 
     static Guid Uid(ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-    static IResult Reply<T>(ServiceResult<T> r) => r.Error is null
-        ? Results.Ok(r.Value)
-        : r.Status == 409 ? Results.Conflict(new { error = r.Error })
-        : r.Status == 404 ? Results.NotFound(new { error = r.Error })
-        : Results.BadRequest(new { error = r.Error });
 }

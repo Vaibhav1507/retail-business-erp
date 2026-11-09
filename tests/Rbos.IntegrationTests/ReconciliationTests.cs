@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -117,6 +117,33 @@ public class ReconciliationTests(ApiFactory f) : IClassFixture<ApiFactory>
         await Id(await c.Send(HttpMethod.Post, "/sale-returns", new { saleId = sale, returnDate = Today, lines = new[] { new { productId = p, quantity = 1m } } }, K()));
         Assert.Equal(HttpStatusCode.Conflict, (await c.Send(HttpMethod.Post, $"/sales/{sale}/cancel", new { }, K())).StatusCode);
         await AssertSubledgersMatchLedger(c);
+    }
+
+    [Fact] public async Task Customer_payment_allocates_to_specific_sale_and_rejects_over_allocation()
+    {
+        var (c, loc, p, _, cust) = await Setup();
+        object Body() => new { customerId = cust, locationId = loc, saleDate = Today, saleType = "Credit", amountPaid = 0m, payMethod = "Cash", lines = new[] { new { productId = p, quantity = 1m, unitPrice = 50m, discount = 0m } } };
+        var sale = await Id(await c.Send(HttpMethod.Post, "/sales", Body(), K()));
+        var open = (await c.GetJson($"/customers/{cust}/open-sales")).EnumerateArray().Single();
+        Assert.Equal(sale, open.GetProperty("id").GetGuid());
+        object Pay(decimal amt, decimal alloc) => new { customerId = cust, paymentDate = Today, amount = amt, method = "Cash", allocations = new[] { new { billId = sale, amount = alloc } } };
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/customer-payments", Pay(10m, open.GetProperty("open").GetDecimal() + 1m), K())).StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/customer-payments", Pay(10m, 10m), K())).StatusCode);
+        Assert.Equal(open.GetProperty("open").GetDecimal() - 10m, (await c.GetJson($"/customers/{cust}/open-sales")).EnumerateArray().Single().GetProperty("open").GetDecimal());
+    }
+
+    [Fact] public async Task Invoice_numbers_are_sequential_and_replay_does_not_consume_one()
+    {
+        var (c, loc, p, _, cust) = await Setup();
+        object Body() => new { customerId = cust, locationId = loc, saleDate = Today, saleType = "Credit", amountPaid = 0m, payMethod = "Cash", lines = new[] { new { productId = p, quantity = 1m, unitPrice = 50m, discount = 0m } } };
+        var k1 = K();
+        var a = await Id(await c.Send(HttpMethod.Post, "/sales", Body(), k1));
+        await c.Send(HttpMethod.Post, "/sales", Body(), k1);
+        var b = await Id(await c.Send(HttpMethod.Post, "/sales", Body(), K()));
+        var na = (await c.GetJson($"/sales/{a}")).GetProperty("sale").GetProperty("invoiceNo").GetString();
+        var nb = (await c.GetJson($"/sales/{b}")).GetProperty("sale").GetProperty("invoiceNo").GetString();
+        Assert.Matches(@"^INV/\d{4}-\d{2}/000001$", na!);
+        Assert.Equal(na![..^1] + "2", nb);
     }
 
     [Fact] public async Task Another_business_report_totals_are_independent()

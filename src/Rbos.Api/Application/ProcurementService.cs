@@ -10,11 +10,49 @@ namespace Rbos.Api.Application;
 
 public sealed record SupplierCommand(string? Name, string? Phone, string? Notes, bool IsActive = true);
 public sealed record ReceiptCommand(Guid SupplierId, Guid LocationId, DateOnly ReceiptDate, string? SupplierRef, List<PurchaseLineInput>? Lines, Guid? InvoiceFileId = null);
-public sealed record PaymentCommand(Guid SupplierId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference);
+public sealed record PaymentCommand(Guid SupplierId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference, IReadOnlyList<BillAllocation>? Allocations = null);
 
 /// <summary>Suppliers, purchase receipts (stock + WAC + payable) and supplier payments. All amounts are recomputed server-side.</summary>
 public sealed class ProcurementService(TenantDb db)
 {
+    const string OpenReceiptSql = @"select r.total - coalesce((select sum(a.amount) from procurement.supplier_payment_allocation a where a.receipt_id=r.id),0) from procurement.purchase_receipt r where r.id=@b and r.supplier_id=@p";
+
+    public async Task<ServiceResult<object>> OpenBillsAsync(Guid uid, Guid supplierId, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        var list = new List<object>();
+        await using var c = s.Command(@"select r.id, r.receipt_date, r.supplier_ref, r.total, r.total - coalesce((select sum(a.amount) from procurement.supplier_payment_allocation a where a.receipt_id=r.id),0) from procurement.purchase_receipt r where r.supplier_id=@s order by r.receipt_date, r.created_at");
+        c.Parameters.AddWithValue("s", supplierId);
+        await using var r = await c.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            if (r.GetDecimal(4) > 0) list.Add(new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), reference = r.IsDBNull(2) ? null : r.GetString(2), total = r.GetDecimal(3), open = r.GetDecimal(4) });
+        return ServiceResult<object>.Ok(list);
+    }
+
+    public async Task<ServiceResult<object>> SupplierStatementAsync(Guid uid, Guid supplierId, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        var name = await Scalar<string>(s, "select name from procurement.supplier where id=@i", ct, ("i", supplierId));
+        if (name is null) return ServiceResult<object>.Fail("Supplier not found.", 404);
+        var rows = new List<(string Type, DateOnly Date, decimal Debit, decimal Credit, Guid Id)>();
+        await using (var c = s.Command(@"select 'Purchase' t, receipt_date d, created_at, total, 0::numeric, id from procurement.purchase_receipt where supplier_id=@s
+            union all select 'Payment', payment_date, created_at, 0, amount, id from procurement.supplier_payment where supplier_id=@s
+            union all select 'Return', return_date, created_at, 0, total, id from procurement.purchase_return where supplier_id=@s
+            order by 2, 3"))
+        {
+            c.Parameters.AddWithValue("s", supplierId);
+            await using var r = await c.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) rows.Add((r.GetString(0), r.GetFieldValue<DateOnly>(1), r.GetDecimal(3), r.GetDecimal(4), r.GetGuid(5)));
+        }
+        decimal bal = 0; var entries = new List<object>();
+        foreach (var x in rows) { bal += x.Debit - x.Credit; entries.Add(new { type = x.Type, date = x.Date, debit = x.Debit, credit = x.Credit, balance = bal, id = x.Id }); }
+        return ServiceResult<object>.Ok(new { supplier = name, outstanding = bal, entries });
+    }
+
     public async Task<ServiceResult<object>> SuppliersAsync(Guid uid, CancellationToken ct)
     {
         var tid = await db.FindTenantAsync(uid, ct);
@@ -176,7 +214,7 @@ public sealed class ProcurementService(TenantDb db)
         key ??= "";
         if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
         if ((m.Reference?.Trim().Length ?? 0) > 60) return ServiceResult<object>.Fail("Reference is too long.");
-        var hash = Hash(string.Join('|', m.SupplierId, m.PaymentDate.ToString("O"), m.Amount.ToString(CultureInfo.InvariantCulture), m.Method, m.Reference?.Trim()));
+        var hash = Hash(string.Join('|', m.SupplierId, m.PaymentDate.ToString("O"), m.Amount.ToString(CultureInfo.InvariantCulture), m.Method, m.Reference?.Trim(), string.Join(',', (m.Allocations ?? []).Select(a => a.BillId.ToString() + ':' + a.Amount.ToString(CultureInfo.InvariantCulture)))));
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -207,6 +245,8 @@ public sealed class ProcurementService(TenantDb db)
                     ("t", tenantId), ("i", Guid.NewGuid()), ("e", entry), ("a", accounts[i]), ("d", journal[i].Debit), ("c", journal[i].Credit));
             await Exec(s, ct, "insert into procurement.supplier_payment(tenant_id,id,supplier_id,payment_date,amount,method,reference,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@d,@a,@m,@r,@k,@h,@j,@u)",
                 ("t", tenantId), ("i", id), ("s", m.SupplierId), ("d", m.PaymentDate), ("a", money.Amount), ("m", m.Method), ("r", Blank(m.Reference)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
+            var allocErr = await AllocateAsync(s, tenantId, "procurement.supplier_payment_allocation", "receipt_id", OpenReceiptSql, m.SupplierId, id, money.Amount, m.Allocations, ct);
+            if (allocErr is not null) return ServiceResult<object>.Fail(allocErr);
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, owed = owed - money.Amount });
         }

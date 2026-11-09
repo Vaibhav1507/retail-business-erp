@@ -7,7 +7,7 @@ using Rbos.Domain;
 
 namespace Rbos.Api.Application;
 
-public sealed record ProductCommand(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool IsActive = true)
+public sealed record ProductCommand(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool IsActive = true, string? HsnCode = null, decimal? GstRate = null)
 {
     public ProductInput ToInput() => new(Name, CategoryName, IsGeneric, BaseUnit, Brand, Model, Attributes);
 }
@@ -35,7 +35,7 @@ public sealed class CatalogueService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid.Value, ct);
-        await using var c = s.Command(@"select p.id,p.name,p.category_id,c.name,p.is_generic,p.internal_sku,p.base_unit,p.brand,p.model,p.attributes::text,p.is_active
+        await using var c = s.Command(@"select p.id,p.name,p.category_id,c.name,p.is_generic,p.internal_sku,p.base_unit,p.brand,p.model,p.attributes::text,p.is_active,p.hsn_code,p.gst_rate
             from catalog.product p join catalog.category c on c.tenant_id=p.tenant_id and c.id=p.category_id
             where (@act or p.is_active)
               and (@cat::uuid is null or p.category_id=@cat)
@@ -51,7 +51,8 @@ public sealed class CatalogueService(TenantDb db)
             {
                 id = r.GetGuid(0), name = r.GetString(1), categoryId = r.GetGuid(2), category = r.GetString(3), isGeneric = r.GetBoolean(4), sku = r.GetString(5), unit = r.GetString(6),
                 brand = r.IsDBNull(7) ? null : r.GetString(7), model = r.IsDBNull(8) ? null : r.GetString(8),
-                attributes = JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(9)) ?? new(), isActive = r.GetBoolean(10),
+                attributes = JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(9)) ?? new Dictionary<string, string>(), isActive = r.GetBoolean(10),
+                                hsnCode = r.IsDBNull(11) ? null : r.GetString(11), gstRate = r.IsDBNull(12) ? (decimal?)null : r.GetDecimal(12),
             });
         return ServiceResult<object>.Ok(list);
     }
@@ -87,7 +88,7 @@ public sealed class CatalogueService(TenantDb db)
 
     public async Task<ServiceResult<object>> CreateAsync(Guid uid, ProductCommand m, CancellationToken ct)
     {
-        var err = ProductRules.Validate(m.ToInput());
+        var err = ProductRules.Validate(m.ToInput()) ?? ValidateTax(m);
         if (err is not null) return ServiceResult<object>.Fail(err);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -98,15 +99,19 @@ public sealed class CatalogueService(TenantDb db)
         var first = await NextSkuAsync(s, tid.Value, 1, ct);
         var id = Guid.NewGuid();
         var sku = ProductRules.FormatSku(first);
-        try { await InsertAsync(s, tid.Value, id, cat, sku, m.ToInput(), ct); }
+        try { await InsertAsync(s, tid.Value, id, cat, sku, m.ToInput(), ct); await SetTaxAsync(s, id, m, ct); }
         catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("A product with the same name, brand and model already exists.", 409); }
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id, sku });
     }
 
+    static string? ValidateTax(ProductCommand m) =>
+        !string.IsNullOrWhiteSpace(m.HsnCode) && !Rbos.Domain.GstCalculator.IsValidHsn(m.HsnCode.Trim()) ? "HSN code must be 4, 6 or 8 digits."
+        : m.GstRate is < 0 or > 100 ? "GST rate must be between 0 and 100." : null;
+
     public async Task<ServiceResult<object>> UpdateAsync(Guid uid, Guid id, ProductCommand m, CancellationToken ct)
     {
-        var err = ProductRules.Validate(m.ToInput());
+        var err = ProductRules.Validate(m.ToInput()) ?? ValidateTax(m);
         if (err is not null) return ServiceResult<object>.Fail(err);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -124,6 +129,7 @@ public sealed class CatalogueService(TenantDb db)
             c.Parameters.AddWithValue("b", (object?)NullIfBlank(m.Brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(m.Model) ?? DBNull.Value);
             c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes))); c.Parameters.AddWithValue("x", m.IsActive); c.Parameters.AddWithValue("i", id);
             if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Product not found.", 404);
+            await SetTaxAsync(s, id, m, ct);
         }
         catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("A product with the same name, brand and model already exists.", 409); }
         await s.CommitAsync(ct);
@@ -255,6 +261,15 @@ public sealed class CatalogueService(TenantDb db)
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("g", m.IsGeneric); c.Parameters.AddWithValue("s", sku); c.Parameters.AddWithValue("u", m.BaseUnit!);
         c.Parameters.AddWithValue("b", (object?)NullIfBlank(m.Brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(m.Model) ?? DBNull.Value);
         c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes)));
+        await c.ExecuteNonQueryAsync(ct);
+    }
+
+    static async Task SetTaxAsync(TenantSession s, Guid id, ProductCommand m, CancellationToken ct)
+    {
+        await using var c = s.Command("update catalog.product set hsn_code=@h,gst_rate=@g where id=@i");
+        c.Parameters.AddWithValue("h", (object?)NullIfBlank(m.HsnCode) ?? DBNull.Value);
+        c.Parameters.AddWithValue("g", (object?)m.GstRate ?? DBNull.Value);
+        c.Parameters.AddWithValue("i", id);
         await c.ExecuteNonQueryAsync(ct);
     }
 

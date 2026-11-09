@@ -2,10 +2,12 @@ using System.Security.Claims;
 using Rbos.Api.Application;
 using Rbos.Domain;
 
+using static Rbos.Api.ApiResults;
+
 namespace Rbos.Api;
 
 public sealed record CustomerRequest(string? Name, string? Phone, string? Notes, bool? IsActive);
-public sealed record SaleRequest(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines);
+public sealed record SaleRequest(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, List<SalePaymentInput>? Payments = null, decimal? GstRate = null, string? PlaceOfSupply = null);
 
 public static class SalesEndpoints
 {
@@ -20,14 +22,8 @@ public static class SalesEndpoints
         api.MapGet("/sales", async (string? q, Guid? customerId, ClaimsPrincipal p, SalesService svc, CancellationToken ct) => Reply(await svc.SalesAsync(Uid(p), q, customerId, ct))).RequireAuthorization();
         api.MapGet("/sales/{id:guid}", async (Guid id, ClaimsPrincipal p, SalesService svc, CancellationToken ct) => Reply(await svc.SaleAsync(Uid(p), id, ct))).RequireAuthorization();
         api.MapPost("/sales", async (SaleRequest m, HttpRequest req, ClaimsPrincipal p, SalesService svc, CancellationToken ct)
-            => Reply(await svc.SellAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.CustomerId, m.LocationId, m.SaleDate, m.SaleType, m.AmountPaid, m.PayMethod, m.Lines), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
+            => Reply(await svc.SellAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.CustomerId, m.LocationId, m.SaleDate, m.SaleType, m.AmountPaid, m.PayMethod, m.Lines, m.GstRate, m.Payments, m.PlaceOfSupply), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
     }
 
     static Guid Uid(ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-    static IResult Reply<T>(ServiceResult<T> r) => r.Error is null
-        ? Results.Ok(r.Value)
-        : r.Status == 409 ? Results.Conflict(new { error = r.Error })
-        : r.Status == 404 ? Results.NotFound(new { error = r.Error })
-        : Results.BadRequest(new { error = r.Error });
 }

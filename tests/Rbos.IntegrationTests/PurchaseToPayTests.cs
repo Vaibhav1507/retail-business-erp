@@ -19,6 +19,34 @@ public class PurchaseToPayTests(ApiFactory f) : IClassFixture<ApiFactory>
     static async Task<decimal> Owed(Client c, Guid supplier)
         => (await c.GetJson("/suppliers")).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == supplier).GetProperty("owed").GetDecimal();
     static string K() => Guid.NewGuid().ToString();
+    [Fact] public async Task Supplier_payment_allocates_to_specific_bills_and_rejects_over_allocation()
+    {
+        var c = await NewClient(f); var sup = await Supplier(c); var loc = await c.Location(); var p = await c.AddProduct("Cable");
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/purchases", Receipt(sup, loc, p, 10, 5000m), K())).StatusCode);
+        var bills = (await c.GetJson($"/suppliers/{sup}/open-bills")).EnumerateArray().ToList();
+        Assert.Single(bills); Assert.Equal(50000m, bills[0].GetProperty("open").GetDecimal());
+        var bill = bills[0].GetProperty("id").GetGuid();
+        object Pay(decimal amt, decimal alloc) => new { supplierId = sup, paymentDate = Today, amount = amt, method = "Cash", allocations = new[] { new { billId = bill, amount = alloc } } };
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/supplier-payments", Pay(20000m, 25000m), K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/supplier-payments", Pay(20000m, 20000m), K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/supplier-payments", Pay(15000m, 15000m), K())).StatusCode);
+        Assert.Equal(15000m, (await c.GetJson($"/suppliers/{sup}/open-bills")).EnumerateArray().Single().GetProperty("open").GetDecimal());
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/supplier-payments", Pay(20000m, 20000m), K())).StatusCode);
+    }
+
+    [Fact] public async Task Supplier_statement_lists_purchase_and_payment_with_running_balance()
+    {
+        var c = await NewClient(f); var sup = await Supplier(c); var loc = await c.Location(); var p = await c.AddProduct("Cable");
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/purchases", Receipt(sup, loc, p, 10, 20m), K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/supplier-payments", new { supplierId = sup, paymentDate = Today, amount = 50m, method = "Cash" }, K())).StatusCode);
+        var st = await c.GetJson($"/suppliers/{sup}/statement");
+        Assert.Equal(150m, st.GetProperty("outstanding").GetDecimal());
+        var e = st.GetProperty("entries").EnumerateArray().ToList();
+        Assert.Equal(2, e.Count);
+        Assert.Equal(200m, e[0].GetProperty("balance").GetDecimal());
+        Assert.Equal(150m, e[1].GetProperty("balance").GetDecimal());
+    }
+
 
     [Fact] public async Task Supplier_names_unique_ignoring_case()
     {
