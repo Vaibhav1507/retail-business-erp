@@ -8,8 +8,7 @@ import { SalesHistory } from './SalesHistory'
 import { Customers } from './Customers'
 import { GenerateInvoice } from './GenerateInvoice'
 import { AfterSales } from './AfterSales'
-import { CaWorkspace } from './CaWorkspace'
-import { AccountsPanel, Finance, LoansPanel, ReconcilePanel, StockVerifyPanel } from './Finance'
+import { Finance, LoansPanel, ReconcilePanel } from './Finance'
 import { CashClosing } from './CashClosing'
 import { AuditHistory } from './AuditHistory'
 import { GstWorkspace } from './GstWorkspace'
@@ -26,16 +25,16 @@ export type Opt = { id: string; name: string; sku?: string }
 export type Common = { products: Opt[]; locations: Opt[]; reload: () => void }
 
 export const NAV = [
-  { key: 'home', label: 'Home', ico: 'ðŸ ' },
-  { key: 'sell', label: 'Sell', ico: 'ðŸ§¾' },
-  { key: 'buy', label: 'Buy', ico: 'ðŸ“¦' },
-  { key: 'stock', label: 'Stock', ico: 'ðŸ·ï¸' },
-  { key: 'parties', label: 'People', ico: 'ðŸ‘¥' },
-  { key: 'money', label: 'Money', ico: 'â‚¹' },
-  { key: 'more', label: 'More', ico: 'â‹¯' },
+  { key: 'home', label: 'Home', ico: '\u{1F3E0}' },
+  { key: 'sell', label: 'Sell', ico: '\u{1F9FE}' },
+  { key: 'buy', label: 'Buy', ico: '\u{1F4E6}' },
+  { key: 'stock', label: 'Stock', ico: '\u{1F3F7}\uFE0F' },
+  { key: 'parties', label: 'People', ico: '\u{1F465}' },
+  { key: 'money', label: 'Money', ico: '\u20B9' },
+  { key: 'more', label: 'More', ico: '\u22EF' },
 ]
 
-const inr = (n: number) => 'â‚¹ ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const inr = (n: number) => '\u20B9 ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export function Tabs({ page, tab, items }: { page: string; tab: string; items: [string, string][] }) {
   return (
@@ -60,17 +59,17 @@ export function Home({ stockCount }: { stockCount: number }) {
     <div>
       <Title title={tr('home.title')} />
       <div className="actions">
-        <a className="action primary" href="#/sell/bill"><span className="ico">ðŸ§¾</span><strong>Make Bill</strong></a>
-        <a className="action" href="#/buy/receive"><span className="ico">ðŸ“¦</span><strong>Add Purchase</strong></a>
-        <a className="action" href="#/stock/current"><span className="ico">ðŸ·ï¸</span><strong>Check Stock</strong></a>
-        <a className="action" href="#/sell/collect"><span className="ico">ðŸ’µ</span><strong>Collect Money</strong></a>
+        <a className="action primary" href="#/sell/bill"><span className="ico">{'\u{1F9FE}'}</span><strong>Make Bill</strong></a>
+        <a className="action" href="#/buy/receive"><span className="ico">{'\u{1F4E6}'}</span><strong>Add Purchase</strong></a>
+        <a className="action" href="#/stock/current"><span className="ico">{'\u{1F3F7}\uFE0F'}</span><strong>Check Stock</strong></a>
+        <a className="action" href="#/sell/collect"><span className="ico">{'\u{1F4B5}'}</span><strong>Collect Money</strong></a>
         <strong>{tr('home.pay')}</strong>
-        <a className="action" href="#/money/expenses"><span className="ico">ðŸ§®</span><strong>Record Expense</strong></a>
-        <a className="action" href="#/stock/products"><span className="ico">âž•</span><strong>Add Product</strong></a>
+        <a className="action" href="#/money/expenses"><span className="ico">{'\u{1F9EE}'}</span><strong>Record Expense</strong></a>
+        <a className="action" href="#/stock/products"><span className="ico">{'\u2795'}</span><strong>Add Product</strong></a>
       </div>
       <div className="tiles">
-        <a className="tile collect" href="#/parties/customers"><span>Money to Collect</span><b>{owed ? inr(owed.collect) : 'â€”'}</b></a>
-        <span>{tr('home.toPay')}</span>
+        <a className="tile collect" href="#/parties/customers"><span>Money to Collect</span><b>{owed ? inr(owed.collect) : '\u2014'}</b></a>
+        <a className="tile pay" href="#/parties/suppliers"><span>{tr('home.toPay')}</span><b>{owed ? inr(owed.pay) : '\u2014'}</b></a>
         <a className="tile" href="#/stock/current"><span>Items in stock</span><b>{stockCount}</b></a>
         <a className="tile" href="#/money/cash"><span>Cash &amp; Bank</span><b>View</b></a>
       </div>
@@ -83,9 +82,9 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
   return (
     <div className={menu ? 'launcher-page' : undefined}>
       <Title title={tr('area.sell')} hint={tr('sell.hint')} />
-      {['bill', 'bills', 'collect', 'return'].includes(tab) ? <p><a className="back-link" href="#/sell/menu">â† {tr('area.sell')}</a></p> : (
+      {['bill', 'bills', 'collect', 'return'].includes(tab) ? <p><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p> : (
         <div className="areas">
-          {([['bill', 'ðŸ§¾', tr('sell.invoice')], ['bills', 'ðŸ—‚ï¸', tr('sell.old')], ['return', 'â†©ï¸', tr('sell.return')], ['collect', 'ðŸ’°', tr('sell.due')]] as const).map(([k, i, t]) => (
+          {([['bill', '\u{1F9FE}', tr('sell.invoice')], ['bills', '\u{1F5C2}\uFE0F', tr('sell.old')], ['return', '\u21A9\uFE0F', tr('sell.return')], ['collect', '\u{1F4B0}', tr('sell.due')]] as const).map(([k, i, t]) => (
             <a key={k} className="area" href={'#/sell/' + k}><span className="ico" aria-hidden="true">{i}</span><strong>{t}</strong></a>
           ))}
         </div>
@@ -180,13 +179,11 @@ export function MoneyPage({ tab }: { tab: string }) {
 }
 
 export function MorePage({ tab, onLogout, email }: { tab: string; onLogout: () => void; email: string }) {
-  const moreTabs: [string, string][] = [['reports', tr('more.reports')], ['print', tr('more.print')], ['lock', tr('more.lock')], ['audit', tr('hist.title')], ['gst', 'GST'], ['staff', 'Staff'], ['branches', 'Branches'], ['transfers', 'Transfers'], ['orders', 'Orders'], ['reconcile', 'Reconcile'], ['loans', 'Loans'], ['accounts', 'Accounts'], ['ca', 'CA']]
+  const moreTabs: [string, string][] = [['reports', tr('more.reports')], ['print', tr('more.print')], ['lock', tr('more.lock')], ['audit', tr('hist.title')], ['gst', 'GST'], ['staff', 'Staff'], ['branches', 'Branches'], ['transfers', 'Transfers'], ['orders', 'Orders'], ['reconcile', 'Reconcile'], ['loans', 'Loans']]
   if (tab === 'reports') return <div><Title title={tr('more.reports')} hint={tr('more.reportsHint')} /><Tabs page="more" tab="reports" items={moreTabs} /><Finance key="reports" only={['reports']} /></div>
   if (tab === 'print') return <div><Title title={tr('more.print')} /><Tabs page="more" tab="print" items={moreTabs} /><AfterSales reload={() => undefined} show="print" /></div>
   if (tab === 'gst') return <div><Title title="GST" /><Tabs page="more" tab="gst" items={moreTabs} /><GstWorkspace /></div>
   if (tab === 'staff') return <div><Title title="Staff" /><Tabs page="more" tab="staff" items={moreTabs} /><TeamAccess /></div>
-  if (tab === 'ca') return <div><Title title="CA workspace" /><Tabs page="more" tab="ca" items={moreTabs} /><CaWorkspace /></div>
-  if (tab === 'accounts') return <div><Title title="Chart of accounts" /><Tabs page="more" tab="accounts" items={moreTabs} /><AccountsPanel /><StockVerifyPanel /></div>
   if (tab === 'loans') return <div><Title title="Loans" /><Tabs page="more" tab="loans" items={moreTabs} /><LoansPanel /></div>
       if (tab === 'reconcile') return <div><Title title="Bank reconciliation" /><Tabs page="more" tab="reconcile" items={moreTabs} /><ReconcilePanel /></div>
   if (tab === 'orders') return <div><Title title="Purchase orders" /><Tabs page="more" tab="orders" items={moreTabs} /><OrdersPanel /></div>
@@ -198,12 +195,12 @@ export function MorePage({ tab, onLogout, email }: { tab: string; onLogout: () =
     <div>
       <Title title={tr('more.title')} hint={email} />
       <div className="linklist">
-        <a href="#/more/reports"><span className="ico">ðŸ“Š</span>{tr('more.reportsLink')}</a>
-        <a href="#/more/print"><span className="ico">ðŸ–¨ï¸</span>{tr('more.printLink')}</a>
-        <a href="#/more/lock"><span className="ico">ðŸ”’</span>{tr('more.lock')}</a>
-        <a href="#/stock/import"><span className="ico">ðŸ“¥</span>{tr('more.import')}</a>
-        <a href="#/sell/return"><span className="ico">â†©ï¸</span>{tr('more.custReturns')}</a>
-        <a href="#/buy/return"><span className="ico">â†ªï¸</span>{tr('more.returns')}</a>
+        <a href="#/more/reports"><span className="ico">{'\u{1F4CA}'}</span>{tr('more.reportsLink')}</a>
+        <a href="#/more/print"><span className="ico">{'\u{1F5A8}\uFE0F'}</span>{tr('more.printLink')}</a>
+        <a href="#/more/lock"><span className="ico">{'\u{1F512}'}</span>{tr('more.lock')}</a>
+        <a href="#/stock/import"><span className="ico">{'\u{1F4E5}'}</span>{tr('more.import')}</a>
+        <a href="#/sell/return"><span className="ico">{'\u21A9\uFE0F'}</span>{tr('more.custReturns')}</a>
+        <a href="#/buy/return"><span className="ico">{'\u21AA\uFE0F'}</span>{tr('more.returns')}</a>
       </div>
       <p style={{ marginTop: 16 }}><button className="secondary" onClick={onLogout}>{tr('more.signout')}</button></p>
     </div>

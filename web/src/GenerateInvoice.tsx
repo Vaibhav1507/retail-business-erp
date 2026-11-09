@@ -210,7 +210,7 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
     return (
       <section aria-label="Invoice overview" className="invoice-wrap">
         <div className="invoice-tools no-print">
-          {step === 'review' && <><button type="button" onClick={confirm} disabled={busy}>{busy ? 'SavingÃ¢â‚¬Â¦' : 'Confirm & print'}</button><button type="button" className="secondary" onClick={() => setStep('form')}>Back to edit</button></>}
+          'Saving\u2026'
           {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}

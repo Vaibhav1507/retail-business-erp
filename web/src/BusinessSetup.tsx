@@ -104,12 +104,13 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
   const [key] = useState(() => crypto.randomUUID())
   const set = (patch: Partial<Profile>) => setP(prev => ({ ...prev, ...patch }))
   const review = step === 3 + off
+  const passwordError = password.length < 12 ? 'Password must be at least 12 characters.' : !/\d/.test(password) ? 'Password must include at least one number.' : ''
 
   function next() {
     let e = ''
     if (signup && step === 0) {
       if (!email.trim() || !email.includes('@')) e = 'Enter a valid email address.'
-      else if (password.length < 12) e = 'Password must be at least 12 characters.'
+      else if (passwordError) e = passwordError
       else if (!mobileOk) e = otp ? 'Verify your mobile number with the code we send you.' : 'Enter a valid 10-digit mobile number.'
     } else e = stepError(step - off, p)
     if (e) { setError(e); return }
@@ -140,7 +141,8 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
       <form onSubmit={e => { e.preventDefault(); review ? save() : next() }} aria-label="Business profile">
         {signup && step === 0 && <>
           <label className="wide">Email *<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
-          <label className="wide">Password * (at least 12 characters)<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" /></label>
+          <label className="wide">Password * (at least 12 characters, including a number)<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" aria-invalid={!!password && !!passwordError} /></label>
+                    {password && passwordError && <p className="error" role="alert">{passwordError}</p>}
           {otp ? <MobileVerify signup mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={(m, pr) => { setVerifiedMobile(m); if (pr) setProof(pr) }} />
             : <label className="wide">Mobile number *<input inputMode="numeric" value={p.mobile} onChange={e => set({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit number" autoComplete="tel-national" /></label>}
         </>}
