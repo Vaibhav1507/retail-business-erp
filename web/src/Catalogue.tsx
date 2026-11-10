@@ -3,22 +3,26 @@ import { Paged } from './Paged'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import { SetupAssistant } from './SetupAssistant'
+import { ManufacturerRegistry } from './ManufacturerRegistry'
 import { BarcodeScanner, type ScanResult } from './BarcodeScanner'
 import { BarcodeManager } from './BarcodeManager'
 
 export type Product = {
   id: string; name: string; categoryId: string; category: string; isGeneric: boolean; sku: string; unit: string
-  brand: string | null; model: string | null; attributes: Record<string, string>; isActive: boolean; hsnCode?: string | null; gstRate?: number | null
+  brand: string | null; model: string | null; attributes: Record<string, string>; isActive: boolean; hsnCode?: string | null; gstRate?: number | null; mrp?: number | null
+  specs?: Record<string, string>; sources?: ProductSource[]; possibleDuplicate?: boolean
 }
+export type ProductSource = { documentId: string; documentName: string; brand: string | null; versionLabel: string | null; page: number | null }
+export const sourceLabel = (s: ProductSource) => `${s.documentName}${s.versionLabel ? ` (${s.versionLabel})` : ''}${s.page ? `, page ${s.page}` : ''}`
 export type Category = { id: string; name: string; productCount: number }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong')
 const UNITS = ['pcs', 'set', 'pack', 'm']
 const ATTRS: [string, string][] = [['colour', 'Colour'], ['capacity', 'Capacity'], ['connector_type', 'Connector type'], ['compatible_with', 'Compatible with']]
 
-export type Draft = { name: string; category: string; unit: string; generic: boolean; brand: string; model: string; attrs: Record<string, string>; active: boolean; hsn: string; gst: string }
-export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true, hsn: '', gst: '' }
-export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate) })
+export type Draft = { name: string; category: string; unit: string; generic: boolean; brand: string; model: string; attrs: Record<string, string>; active: boolean; hsn: string; gst: string; mrp: string }
+export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true, hsn: '', gst: '', mrp: '' }
+export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate), mrp: p.mrp == null ? '' : String(p.mrp) })
 
 const ELECTRONICS_ATTRS: [string, string][] = [['capacity', 'Screen size or capacity (e.g. 43 inch, 10000mAh)'], ['colour', 'Colour'], ['connector_type', 'Connector / resolution (e.g. USB-C, 4K)'], ['compatible_with', 'Compatible with']]
 
@@ -44,6 +48,8 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   const set = (patch: Partial<Draft>) => setD(prev => ({ ...prev, ...patch }))
   const setAttr = (k: string, value: string) => setD(prev => ({ ...prev, attrs: { ...prev.attrs, [k]: value } }))
   const [otherCat, setOtherCat] = useState(false)
+  const [brandNames, setBrandNames] = useState<string[]>([])
+  useEffect(() => { api<{ name: string; isActive: boolean }[]>('GET', '/brands').then(b => setBrandNames(b.filter(x => x.isActive).map(x => x.name))).catch(() => undefined) }, [])
   const pickCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
 	if (e.target.value === '__other') { setOtherCat(true); set({ category: '' }) } else { setOtherCat(false); set({ category: e.target.value }) }
   }
@@ -51,7 +57,7 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst) }
+    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp) }
     try {
       if (editingId) await api('PUT', `/products/${editingId}`, body)
       else {
@@ -80,10 +86,11 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
       </label>
       <label>HSN code (optional) <input value={d.hsn} onChange={e => set({ hsn: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={8} placeholder="4, 6 or 8 digits" /></label>
       <label>GST rate % (optional) <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
+      <label>MRP (optional, reference only) <input value={d.mrp} onChange={e => set({ mrp: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" maxLength={12} /></label>
       <label className="check"><input type="checkbox" checked={d.generic} onChange={e => set({ generic: e.target.checked })} /> Generic / unbranded</label>
       {!d.generic && <>
-        <label>Brand <input value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} /></label>
-        <label>Model <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} /></label>
+        <label>Brand <input list="brand-options" value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} placeholder="Pick or type a brand" /></label><datalist id="brand-options">{brandNames.map(n => <option key={n} value={n} />)}</datalist>
+        <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} /></label>
       </>}
       <fieldset>
         <legend>Details (optional)</legend>
@@ -112,6 +119,12 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   const [error, setError] = useState('')
   const [scanning, setScanning] = useState(false)
   const [scanned, setScanned] = useState<ScanResult | null>(null)
+  type Suggestion = { id: string; name: string; brand: string | null; model: string | null; sku: string; match: string }
+	type ExternalSuggestion = { source: string; name: string | null; brand: string | null; model: string | null; description: string | null; imageUrl: string | null; attribution?: string | null; lookedUpAtUtc?: string | null }
+  type ProviderResult = { provider: string; status: 'Found' | 'NotFound' | 'Timeout' | 'RateLimited' | 'Unavailable' | 'Error'; message?: string | null; lookedUpAtUtc?: string | null }
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [external, setExternal] = useState<ExternalSuggestion[]>([])
+  const [providerResults, setProviderResults] = useState<ProviderResult[]>([])
 
   async function onScan(r: ScanResult) {
     setScanning(false); setError('')
@@ -120,7 +133,12 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
       const found = (await api<Product[]>('GET', `/products?q=${encodeURIComponent(hit.sku)}&includeInactive=true`)).find(p => p.sku === hit.sku)
       if (found) { setScanned(null); setEditing(found); setView('form') }
     } catch (e) {
-      if (msg(e).includes('No product has this barcode')) { setScanned(r); setEditing(null); setView('form') } else setError(msg(e))
+      if (msg(e).includes('No product has this barcode')) {
+		setScanned(r); setEditing(null); setView('form'); setSuggestions([]); setExternal([]); setProviderResults([])
+		api<{ local: { suggestions: Suggestion[] }; external?: ExternalSuggestion[]; providerResults?: ProviderResult[] }>('GET', `/products/suggest-for-barcode?code=${encodeURIComponent(r.code)}`)
+		  .then(s => { setSuggestions(s.local?.suggestions ?? []); setExternal(s.external ?? []); setProviderResults(s.providerResults ?? []) })
+		  .catch(() => undefined)
+      } else setError(msg(e))
     }
   }
 
@@ -158,7 +176,28 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 	  {view === 'form' && (
 		<>
 		  <p><a href="#/stock/products" onClick={e => { e.preventDefault(); closeForm() }}>&larr; Back to products</a></p>
-		  {!editing && <div className="import-block"><SetupAssistant reload={() => { load().catch(() => undefined); reload() }} /></div>}
+		  {!editing && scanned && suggestions.length > 0 && (
+		<div className="import-block" role="region" aria-label="Possible matches">
+		  <h3>Possible matches for {scanned.code}</h3>
+		  <p className="hint-line">Link this barcode to an existing product only after verification, or add a new one manually below.</p>
+		  <ul>{suggestions.map(s => <li key={s.id}>{s.name} ({s.brand ?? 'generic'} {s.model ?? ''}, {s.sku}, {s.match}) <button type="button" className="secondary" onClick={() => { api('POST', `/products/${s.id}/barcodes`, { code: scanned.code, symbology: scanned.symbology }).then(() => { setScanned(null); setSuggestions([]); setView('list'); load().catch(() => undefined) }).catch(err => setError(msg(err))) }}>Link barcode</button></li>)}</ul>
+		</div>
+	  )}
+	  {!editing && scanned && external.length > 0 && (
+		<div className="import-block" role="region" aria-label="External barcode suggestions">
+		  <h3>External references for {scanned.code}</h3>
+		  <p className="hint-line">Review only. This data never auto-creates or auto-updates products.</p>
+		  <ul>{external.map((x, i) => <li key={`${x.source}-${i}`}>{x.name ?? 'Unnamed'} ({x.brand ?? 'unknown brand'}) — {x.source}{x.model ? `, model ${x.model}` : ''}{x.attribution ? ` · ${x.attribution}` : ''}</li>)}</ul>
+		</div>
+	  )}
+	  {!editing && scanned && providerResults.length > 0 && (
+		<div className="import-block" role="region" aria-label="External provider status">
+		  <h3>External lookup status</h3>
+		  <ul>{providerResults.map((p, i) => <li key={`${p.provider}-${i}`}>{p.provider}: {p.status}{p.message ? ` (${p.message})` : ''}</li>)}</ul>
+		</div>
+	  )}
+	  {!editing && <div className="import-block"><SetupAssistant reload={() => { load().catch(() => undefined); reload() }} /></div>}
+	  {!editing && <ManufacturerRegistry />}
 
 		  {!editing && <h3>Or add one product by hand</h3>}
 
@@ -186,17 +225,18 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 		  <Paged rows={items}>{page => (
 			<div className="table-scroll">
 			  <table>
-				<thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / model</th><th>Details</th><th>Actions</th></tr></thead>
+				<thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / model</th><th>Details</th><th>Source</th><th>Actions</th></tr></thead>
 				<tbody>
 				  {page.map(p => (
 					<tr key={p.id} style={p.isActive ? undefined : { opacity: 0.55 }}>
 					  <td>{p.sku}</td><td>{p.name}{p.isActive ? '' : ' (inactive)'}</td><td>{p.category}</td><td>{p.unit}</td>
 					  <td>{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
-					  <td>{Object.entries(p.attributes).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(', ')}</td>
+					  <td>{Object.entries(p.attributes).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(', ')}{p.specs && Object.keys(p.specs).length > 0 && <div className="hint-line">{Object.entries(p.specs).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ')}</div>}{p.possibleDuplicate && <div className="hint-line" role="status">Possible duplicate: same brand and model number as another product. Review before merging.</div>}</td>
+					  <td data-label="Source">{(p.sources ?? []).length === 0 ? '-' : <ul className="plain-list">{p.sources!.map((s, i) => <li key={i}>{sourceLabel(s)}</li>)}</ul>}</td>
 					  <td><button type="button" className="secondary" onClick={() => { setEditing(p); setView('form') }} aria-label={`Edit ${p.name}`}>Edit</button></td>
 					</tr>
 				  ))}
-				  {items.length === 0 && <tr><td colSpan={7}>No products match.</td></tr>}
+				  {items.length === 0 && <tr><td colSpan={8}>No products match.</td></tr>}
 				</tbody>
 			  </table>
 			</div>

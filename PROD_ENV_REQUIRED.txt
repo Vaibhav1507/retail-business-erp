@@ -1,0 +1,14 @@
+﻿REQUIRED PRODUCTION ENV / SECRETS (Google Cloud hosting)
+1) Rbos:Database=prod
+2) ConnectionStrings__RbosProdApp=<postgres app connection string using rbos_app user>
+3) ConnectionStrings__RbosProdMigrator=<postgres migrator connection string>
+4) Otp:Pepper=<strong random secret>
+5) Sms:Provider=msg91 OR set Otp:Enabled=false
+   - If Sms:Provider=msg91, also set: Sms:AuthKey and Sms:TemplateId
+6) Providers:OpenFoodFacts:Enabled=true (optional, default true)
+7) Gemini:ApiKey=<required only for invoice extraction feature>
+
+Notes:
+- External barcode lookup uses only Open Food Facts in current build.
+- Product import read endpoint supports 12 MB file payload via JSON base64 envelope.
+- Migration 042 must be applied in prod workflow before using external lookup cache.

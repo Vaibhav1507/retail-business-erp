@@ -8,11 +8,21 @@ import { FIELDS, MAX_ROWS, SAMPLE_CSV, autoMap, missingRequired, parseCsv, toImp
 type RowResult = { row: number; status: 'ok' | 'duplicate' | 'duplicate_in_file' | 'invalid'; message: string | null }
 type Preview = { rows: RowResult[]; ok: number; duplicate: number; invalid: number; newCategories: string[] }
 type Commit = { created: number; skipped: number; replayed: boolean }
-type FileRead = { rows: string[][]; usedAi: boolean }
+type FileRead = {
+  rows: string[][]
+  usedAi?: boolean
+  pages?: number[] | null
+  documentKind?: string | null
+  contentHash?: string | null
+  incomplete?: boolean
+  warning?: string | null
+}
+type SourceForm = { documentName: string; sourceUrl: string; publishedOn: string; versionLabel: string; documentKind: string; contentHash: string }
+const NO_SOURCE: SourceForm = { documentName: '', sourceUrl: '', publishedOn: '', versionLabel: '', documentKind: 'catalogue', contentHash: '' }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong')
 const label: Record<RowResult['status'], string> = { ok: 'Will be added', duplicate: 'Skipped: already exists', duplicate_in_file: 'Skipped: repeated in file', invalid: 'Skipped: invalid' }
-const MAX_BYTES = 8 * 1024 * 1024
+const MAX_BYTES = 12 * 1024 * 1024
 
 export function SetupAssistant({ reload }: { reload: () => void }) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
@@ -25,6 +35,9 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
   const [key, setKey] = useState(() => crypto.randomUUID())
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pages, setPages] = useState<number[]>([])
+  const [source, setSource] = useState<SourceForm>(NO_SOURCE)
+  const sourceBody = source.documentName.trim() ? { ...source, brand: null } : undefined
 
   const headers = rows[0] ?? []
 
@@ -43,10 +56,15 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       if (name.endsWith('.csv') || file.type === 'text/csv') {
         if (file.size > 40_000) throw new Error('File is too large. Keep it under 40 KB (about 200 products).')
         accept(parseCsv(await file.text()), false)
-      } else if (name.endsWith('.xlsx') || name.endsWith('.docx')) {
-        if (file.size > MAX_BYTES) throw new Error('File is larger than 8 MB.')
+      } else if (name.endsWith('.xlsx') || name.endsWith('.docx') || name.endsWith('.pdf')) {
+        if (file.size > MAX_BYTES) throw new Error('File is larger than 12 MB. Split or compress it and try again.')
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: file.type, data: await toBase64(file) })
         accept(r.rows, false)
+        if (r.incomplete && r.warning) setError(r.warning)
+        if (name.endsWith('.pdf')) {
+          setPages(r.pages ?? [])
+          setSource({ ...NO_SOURCE, documentName: file.name, documentKind: r.documentKind ?? 'catalogue', contentHash: r.contentHash ?? '' })
+        }
       } else if (name.endsWith('.xls') || name.endsWith('.doc')) {
         throw new Error('Old .xls / .doc files are not supported. Open the file, choose Save As .xlsx / .docx (or CSV), then upload again.')
       } else if (file.type.startsWith('image/')) {
@@ -54,7 +72,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: img.contentType, data: img.data })
         accept(r.rows, r.usedAi)
       } else {
-        throw new Error('Choose an Excel (.xlsx), Word (.docx) or CSV file, or a photo.')
+        throw new Error('Choose an Excel (.xlsx), Word (.docx), CSV or PDF file, or a photo.')
       }
     } catch (e) { setError(msg(e)) } finally { setBusy(false) }
   }
@@ -66,9 +84,9 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
   async function runPreview() {
     setError(''); setBusy(true)
     try {
-      const d = toImportRows(rows.slice(1), mapping)
+      const d = toImportRows(rows.slice(1), mapping).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
       setData(d)
-      setPreview(await api<Preview>('POST', '/products/import/preview', { rows: d }))
+      setPreview(await api<Preview>('POST', '/products/import/preview', { rows: d, source: sourceBody }))
       setStep(3)
     } catch (e) { setError(msg(e)) } finally { setBusy(false) }
   }
@@ -76,12 +94,12 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
   async function commit() {
     setError(''); setBusy(true)
     try {
-      setResult(await api<Commit>('POST', '/products/import/commit', { rows: data }, key))
+      setResult(await api<Commit>('POST', '/products/import/commit', { rows: data, source: sourceBody }, key))
       setStep(4); reload()
     } catch (e) { setError(msg(e)) } finally { setBusy(false) }
   }
 
-  function restart() { setRows([]); setFromAi(false); setMapping({}); setData([]); setPreview(null); setResult(null); setKey(crypto.randomUUID()); setError(''); setStep(1) }
+  function restart() { setRows([]); setPages([]); setSource(NO_SOURCE); setFromAi(false); setMapping({}); setData([]); setPreview(null); setResult(null); setKey(crypto.randomUUID()); setError(''); setStep(1) }
 
   const missing = missingRequired(mapping)
 
@@ -92,8 +110,8 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       {step === 1 && (
         <div role="region" aria-label="Upload product list" className="invoice-upload">
           <label className="invoice-upload-pick">
-            Upload a product list (optional). Excel, Word or CSV files are read directly. A photo of a list is read with AI.
-            <input type="file" accept=".csv,.xlsx,.docx,text/csv,image/*" disabled={busy} onChange={e => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
+            Upload a product list (optional). Excel, Word, CSV or text PDF catalogues are read directly (scanned PDFs need OCR, not enabled). A photo of a list is read with AI.
+            <input type="file" accept=".csv,.xlsx,.docx,.pdf,text/csv,application/pdf,image/*" disabled={busy} onChange={e => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
           </label>
           {busy && <p role="status">Reading file...</p>}
           <p>or <button type="button" className="secondary" onClick={() => accept(parseCsv(SAMPLE_CSV), false)}>Try with sample data</button></p>

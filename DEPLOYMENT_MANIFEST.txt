@@ -1,0 +1,17 @@
+﻿Generated: 2026-11-10T15:53:13.2658271+05:30 Deployment package type: SOURCE PATCH ONLY Baseline assumption: prior _upload snapshot (~2026-11-10 10:45 local) Previous _upload backup: C:\Users\A1137066\Personal-Lab\_upload_backup_20261110-155238  Files included:
+db\migrations\039_brand_master.sql
+db\migrations\040_catalogue_provenance.sql
+db\migrations\041_product_source_references.sql
+db\migrations\042_external_barcode_lookup_cache.sql
+src\Rbos.Api\CatalogueEndpoints.cs
+src\Rbos.Api\Program.cs
+src\Rbos.Api\Application\CatalogueFileParsers.cs
+src\Rbos.Api\Application\CatalogueService.cs
+src\Rbos.Api\Application\ExternalBarcodeLookupCache.cs
+src\Rbos.Api\Application\ProductFileReader.cs
+src\Rbos.Api\Application\ProductLookupProviders.cs
+src\Rbos.Api\Security\SecurityMiddleware.cs
+tests\Rbos.IntegrationTests\CatalogueUploadLimitTests.cs
+tests\Rbos.UnitTests\ProductLookupCoordinatorTests.cs
+web\src\Catalogue.tsx
+web\src\SetupAssistant.tsx

@@ -5,15 +5,22 @@ using System.Xml.Linq;
 
 namespace Rbos.Api.Application;
 
-public sealed record ProductFileResult(List<List<string>> Rows, bool UsedAi);
+public sealed record ProductFileResult(
+	List<List<string>> Rows,
+	bool UsedAi = false,
+	List<int>? Pages = null,
+	string DocumentKind = "catalogue",
+	string? ContentHash = null,
+	bool Incomplete = false,
+	string? Warning = null);
 
 /// <summary>
 /// Turns an uploaded product list into plain table rows (header row first).
 /// Excel and Word files are parsed locally; only photos are sent to Gemini.
 /// </summary>
-public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogger<ProductFileReader> log)
+public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogger<ProductFileReader> log, LocalOcr ocr)
 {
-	public const int MaxFileBytes = 8 * 1024 * 1024;
+	public const int MaxFileBytes = 12 * 1024 * 1024;
 	const long MaxEntryBytes = 20L * 1024 * 1024;
 	const int MaxRows = 200;
 	const int MaxCols = 30;
@@ -29,10 +36,10 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 
 	public async Task<ServiceResult<ProductFileResult>> ReadAsync(string? fileName, string? contentType, string? b64, CancellationToken ct)
 	{
-		if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<ProductFileResult>.Fail("File is empty or larger than 8 MB.");
+		if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<ProductFileResult>.Fail("File is empty or larger than 12 MB. Split the PDF into smaller parts or compress it, then upload again.");
 		byte[] bytes;
 		try { bytes = Convert.FromBase64String(b64); } catch (FormatException) { return ServiceResult<ProductFileResult>.Fail("File could not be read."); }
-		if (bytes.Length is 0 or > MaxFileBytes) return ServiceResult<ProductFileResult>.Fail("File is empty or larger than 8 MB.");
+		if (bytes.Length is 0 or > MaxFileBytes) return ServiceResult<ProductFileResult>.Fail("File is empty or larger than 12 MB. Split the PDF into smaller parts or compress it, then upload again.");
 
 		var name = (fileName ?? "").ToLowerInvariant();
 		var isZip = bytes.Length > 3 && bytes[0] == 0x50 && bytes[1] == 0x4B;
@@ -40,15 +47,61 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		{
 			if (name.EndsWith(".xlsx") && isZip) return Finish(ReadXlsx(bytes), false);
 			if (name.EndsWith(".docx") && isZip) return Finish(ReadDocx(bytes), false);
+			if (name.EndsWith(".csv") || name.EndsWith(".txt") || contentType is "text/csv") return Finish(CatalogueFileParsers.ParseCsv(System.Text.Encoding.UTF8.GetString(bytes)), false);
+			if ((name.EndsWith(".pdf") || contentType is "application/pdf") && CatalogueFileParsers.IsPdf(bytes))
+			{
+				var (paged, skippedPages) = await ReadPdfWithOcrAsync(bytes, ct);
+				var pdf = paged.Select(r => r.Cells).ToList();
+				if (pdf.Count >= 2)
+				{
+					var incomplete = paged.Count > MaxRows;
+					var kept = paged.Take(MaxRows).ToList();
+					return ServiceResult<ProductFileResult>.Ok(new(
+						kept.Select(r => r.Cells).ToList(),
+						false,
+						kept.Select(r => r.Page).ToList(),
+						CatalogueFileParsers.ClassifyDocument(pdf),
+						Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(),
+						incomplete,
+						incomplete ? $"Only the first {MaxRows} rows were read; the rest of this PDF was NOT extracted. Split the PDF by page range or onboard the remaining products by CSV/Excel." : null));
+				}
+				return ServiceResult<ProductFileResult>.Fail(skippedPages.Count > 0 ? $"This PDF has scanned pages ({string.Join(", ", skippedPages.Take(10))}) and local OCR (Tesseract) is not installed or configured (Ocr:TesseractPath). Install Tesseract or upload Excel/CSV." : "No readable text table was found in this PDF. Upload Excel/CSV or a photo instead.");
+			}
 			if (name.EndsWith(".xls") || name.EndsWith(".doc")) return ServiceResult<ProductFileResult>.Fail("Old .xls / .doc files are not supported. Open the file, choose Save As .xlsx / .docx (or CSV), then upload again.");
-			if (contentType is "image/jpeg" or "image/png" or "image/webp" && LooksLikeImage(bytes, contentType)) return await ReadImageAsync(contentType, b64, ct);
+			if (contentType is "image/jpeg" or "image/png" or "image/webp" && LooksLikeImage(bytes, contentType))
+			{
+				var local = await ocr.ReadImageAsync(bytes, ct);
+				if (local is { Count: >= 2 }) return Finish(local, false);
+				return await ReadImageAsync(contentType, b64, ct);
+			}
 		}
 		catch (Exception e) when (e is InvalidDataException or XmlException or IOException)
 		{
 			log.LogWarning(e, "Product file could not be parsed");
 			return ServiceResult<ProductFileResult>.Fail("This file could not be read. Check that it is a valid Excel (.xlsx) or Word (.docx) file with the product list as a table.");
 		}
-		return ServiceResult<ProductFileResult>.Fail("Upload an Excel (.xlsx), Word (.docx) or CSV file, or a photo (JPEG, PNG or WebP).");
+		return ServiceResult<ProductFileResult>.Fail("Upload an Excel (.xlsx), Word (.docx), CSV or PDF file, or a photo (JPEG, PNG or WebP).");
+	}
+
+	/// <summary>Text pages come from the PDF; pages with no text layer are rendered and OCR'd locally. Page numbers are the actual PDF page numbers.</summary>
+	async Task<(List<CatalogueFileParsers.PdfRow> Rows, List<int> Skipped)> ReadPdfWithOcrAsync(byte[] bytes, CancellationToken ct)
+	{
+		var skipped = new List<int>();
+		var pages = PdfPageReader.Read(bytes);
+		if (pages is null) return (CatalogueFileParsers.ReadPdfPaged(bytes), skipped);
+		var rows = new List<CatalogueFileParsers.PdfRow>();
+		foreach (var p in pages)
+		{
+			var cells = p.Rows;
+			if (p.NeedsOcr)
+			{
+				if (!ocr.Available) { log.LogWarning("PDF page {Page} has no text layer and local OCR (Tesseract) is not available; page skipped", p.Page); skipped.Add(p.Page); continue; }
+				var png = PdfPageReader.RenderPng(bytes, p.Page);
+				cells = png is null ? [] : await ocr.ReadImageAsync(png, ct) ?? [];
+			}
+			rows.AddRange(cells.Select(c => new CatalogueFileParsers.PdfRow(p.Page, c)));
+		}
+		return (rows, skipped);
 	}
 
 	static ServiceResult<ProductFileResult> Finish(List<List<string>> rows, bool ai)
