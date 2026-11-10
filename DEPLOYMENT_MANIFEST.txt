@@ -16,3 +16,7 @@ tests\Rbos.UnitTests\ProductLookupCoordinatorTests.cs
 web\src\Catalogue.tsx
 web\src\ManufacturerRegistry.tsx
 web\src\SetupAssistant.tsx
+
+Dependency additions for migration/build:
+- src/Rbos.Api/Application/LocalOcr.cs
+- src/Rbos.Api/Application/PdfPageReader.cs
