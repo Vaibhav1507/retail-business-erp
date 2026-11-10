@@ -22,6 +22,8 @@ export function cameraErrorMessage(e: unknown): string {
 export function BarcodeScanner({ onScan, onClose, title = 'Scan barcode' }: { onScan: (r: ScanResult) => void; onClose: () => void; title?: string }) {
   const video = useRef<HTMLVideoElement>(null)
   const last = useRef({ code: '', at: 0 })
+  const onScanRef = useRef(onScan)
+  onScanRef.current = onScan
   const [error, setError] = useState('')
   const [torch, setTorch] = useState<boolean | null>(null)
   const [manual, setManual] = useState('')
@@ -30,8 +32,8 @@ export function BarcodeScanner({ onScan, onClose, title = 'Scan barcode' }: { on
 	const now = Date.now()
 	if (code === last.current.code && now - last.current.at < 1500) return
 	last.current = { code, at: now }
-	onScan({ code, symbology })
-  }, [onScan])
+	onScanRef.current({ code, symbology })
+  }, [])
 
   useEffect(() => {
 	let cancelled = false
@@ -45,7 +47,7 @@ export function BarcodeScanner({ onScan, onClose, title = 'Scan barcode' }: { on
 	  try {
 		if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('insecure')
 		const controls = await reader.decodeFromConstraints(
-		  { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+		  { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] } as MediaTrackConstraints },
 		  el ?? undefined,
 		  result => { if (result) emit(result.getText(), FORMATS[result.getBarcodeFormat()] ?? 'UNKNOWN') })
 		if (cancelled) { controls.stop(); return }

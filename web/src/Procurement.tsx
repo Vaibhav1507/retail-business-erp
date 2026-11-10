@@ -134,7 +134,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
         <button type="button" onClick={addLine}>Add line</button>
       </div>
       {scanning && <BarcodeScanner title="Scan product barcode" onScan={onScan} onClose={() => setScanning(false)} />}
-      {unknownCode && <p role="status">Barcode <strong>{unknownCode.code}</strong> is not in your products. Pick the matching product above and <button type="button" className="secondary" onClick={linkUnknown}>Link barcode to selected product</button>, or add it as a new product under Manage Products and scan it there.</p>}
+      {unknownCode && <p role="status">Barcode <strong>{unknownCode.code}</strong> is new to your shop. Step 1: choose the matching product in the Product list above. Step 2: tap <button type="button" className="secondary" onClick={linkUnknown}>Link barcode to selected product</button>. Next time this barcode will fill the product automatically. If the product does not exist yet, add it under Manage Products first.</p>}
       <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}{l.gstAmount ? ` + GST ${l.gstAmount}` : ''}</li>)}</ul>
       <button type="button" onClick={receive} disabled={lines.length === 0 || !sup}>Post receipt</button>
       </>}

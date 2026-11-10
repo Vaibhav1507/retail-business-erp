@@ -43,8 +43,8 @@ describe('App', () => {
   it('clears tenant-specific data after sign out', async () => {
     mock({ ...signedIn, '/api/auth/logout': () => ({}) })
     render(<App />)
-    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Profile menu' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }))
     expect(await screen.findByRole('form', { name: 'Sign in' })).toBeInTheDocument()
     expect(screen.queryByText('Test Cable (SKU-1)')).not.toBeInTheDocument()
   })

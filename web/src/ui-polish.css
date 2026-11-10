@@ -65,3 +65,37 @@ input[type='checkbox'] { width: 24px; height: 24px; min-width: 24px; min-height:
 :root[data-theme="dark"] { color-scheme: dark; --ink: #e7ecef; --muted: #a3afbb; --bg: #11161b; --card: #1a2128; --line: #2c3640; --brand: #1f9d68; --brand-dark: #3ab784; --brand-soft: #16302a; --danger: #ff8a80; --danger-soft: #3a1f1d; --warn-soft: #3a2f12; --success: #4cc790; --success-soft: #16302a; --warn: #f0c36a; --info: #7db5ee; --info-soft: #172a3d; --focus-ring: 3px solid #7db5ee; }
 :root[data-theme="dark"] select option { background: #1a2128; color: #e7ecef; }
 :root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea { background: #11161b; color: #e7ecef; border-color: #2c3640; }
+
+/* Dark theme: cards, tiles, inputs and buttons that had hard-coded white */
+:root[data-theme="dark"] .billing-card, :root[data-theme="dark"] .launcher-page .dash-tile, :root[data-theme="dark"] .launcher-page .insights li, :root[data-theme="dark"] tr, :root[data-theme="dark"] .bill, :root[data-theme="dark"] .invoice-modal-box, :root[data-theme="dark"] .stock-page section section ol li { background: var(--card); color: var(--ink); }
+:root[data-theme="dark"] .launcher-page .area .ico { background: #e9eef2; }
+:root[data-theme="dark"] .billing-screen input, :root[data-theme="dark"] .billing-screen select, :root[data-theme="dark"] .billing-screen textarea, :root[data-theme="dark"] form input, :root[data-theme="dark"] form select, :root[data-theme="dark"] form textarea, :root[data-theme="dark"] .catalogue-screen .invoice-upload-pick input[type="file"] { background: #11161b; color: var(--ink); border-color: var(--line); }
+:root[data-theme="dark"] form.product-form select { background-color: #11161b; }
+:root[data-theme="dark"] button.secondary, :root[data-theme="dark"] a.btn.secondary, :root[data-theme="dark"] form.product-form button.secondary, :root[data-theme="dark"] .stock-page section section button.secondary { background: transparent; color: var(--brand-dark); border-color: var(--brand); }
+:root[data-theme="dark"] button.secondary:hover:not(:disabled) { background: var(--brand-soft); }
+:root[data-theme="dark"] .launcher-page .insights, :root[data-theme="dark"] .billing-hint, :root[data-theme="dark"] .billing-field label { color: var(--muted); }
+:root[data-theme="dark"] .billing-card h3 { color: var(--brand-dark); }
+:root[data-theme="dark"] .billing-card, :root[data-theme="dark"] .billing-card * { --ink: #e7ecef; }
+:root[data-theme="dark"] .tabs button, :root[data-theme="dark"] .tabs a { background: var(--card); color: var(--ink); }
+:root[data-theme="dark"] .tabs button[aria-selected='true'], :root[data-theme="dark"] .tabs a[aria-current='true'] { background: var(--brand); color: #fff; }
+:root[data-theme="dark"] input[type=checkbox] { accent-color: var(--brand); }
+
+/* Dark theme, app-wide: remaining hard-coded light surfaces. Invoice documents stay white on purpose. */
+:root[data-theme="dark"] th { background: #222c35; color: var(--ink); }
+:root[data-theme="dark"] .billing-screen tbody tr:hover { background: #202a33; }
+:root[data-theme="dark"] .billing-screen div[role="region"], :root[data-theme="dark"] .billing-screen > ul > li, :root[data-theme="dark"] .setup .mobile-verify { background: #202a33; border-color: var(--line); color: var(--ink); }
+:root[data-theme="dark"] [role='alert'], :root[data-theme="dark"] .billing-screen > p[role="alert"], :root[data-theme="dark"] .billing-screen .invoice-upload [role="alert"] { background: var(--danger-soft); color: var(--danger); border-color: #6b2f2b; }
+:root[data-theme="dark"] .billing-screen > p[role="status"], :root[data-theme="dark"] .billing-screen .invoice-upload [role="status"] { background: var(--success-soft); color: var(--success); }
+:root[data-theme="dark"] .invoice-upload-warn { background: var(--warn-soft); color: var(--warn); }
+:root[data-theme="dark"] .invoice-upload-pick input[type="file"], :root[data-theme="dark"] .stock-page section section input[type="file"], :root[data-theme="dark"] .catalogue-screen .invoice-upload-pick input[type="file"] { background: #11161b; color: var(--ink); border-color: var(--line); }
+:root[data-theme="dark"] .stock-page section section ol li[aria-current="true"] { background: var(--brand-soft); color: var(--ink); }
+:root[data-theme="dark"] input:disabled, :root[data-theme="dark"] select:disabled { background: #202a33; color: var(--muted); }
+:root[data-theme="dark"] .scanner { background: var(--bg); color: var(--ink); }
+:root[data-theme="dark"] a.btn:not(.secondary) { color: #fff; }
+:root[data-theme="dark"] .invoice-modal-box { background: #fff; color: #1a1a1a; }
+:root[data-theme="dark"] .invoice-modal-box button.secondary { background: #fff; color: var(--brand-dark); }
+:root[data-theme="dark"] .invoice tr, :root[data-theme="dark"] .invoice-modal-box tr { background: transparent; color: #1a1a1a; }
+:root[data-theme="dark"] .invoice .invoice-lines tbody tr:nth-child(even) { background: #fafbfe; }
+:root[data-theme="dark"] .invoice th { color: #fff; background: #17369a; }
+@media (max-width: 720px) { :root[data-theme="dark"] tr { background: var(--card); } :root[data-theme="dark"] .invoice tr { background: transparent; } }
+

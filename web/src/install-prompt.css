@@ -1,0 +1,5 @@
+.install-prompt { position: fixed; left: 12px; right: 12px; bottom: 84px; z-index: 40; max-width: 460px; margin: 0 auto; padding: 14px 16px; background: var(--card, #fff); color: var(--ink, #1a2430); border: 1px solid var(--line, #dfe5e2); border-radius: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); display: grid; gap: 10px; }
+.install-prompt p { margin: 0; font-size: 14px; }
+.install-prompt .install-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.install-prompt .install-actions button { flex: 1 1 120px; }
+@media (min-width: 721px) { .install-prompt { bottom: 16px; } }

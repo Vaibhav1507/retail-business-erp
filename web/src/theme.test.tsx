@@ -31,10 +31,13 @@ beforeEach(() => {
 })
 
 describe('theme toggle (H4)', () => {
+  const openMenu = async () => userEvent.click(await screen.findByRole('button', { name: 'Profile menu' }))
+
   it('defaults to light and applies the data-theme attribute', async () => {
     mock()
     render(<App />)
-    await screen.findByRole('button', { name: 'Dark mode' })
+    await openMenu()
+    await screen.findByRole('menuitem', { name: 'Dark mode' })
     expect(document.documentElement.dataset.theme).toBe('light')
     expect(localStorage.getItem('rbos.theme')).toBe('light')
   })
@@ -42,10 +45,12 @@ describe('theme toggle (H4)', () => {
   it('switches to dark, persists the choice and offers light mode back', async () => {
     mock()
     render(<App />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Dark mode' }))
+    await openMenu()
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dark mode' }))
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(localStorage.getItem('rbos.theme')).toBe('dark')
-    await userEvent.click(screen.getByRole('button', { name: 'Light mode' }))
+    await openMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Light mode' }))
     expect(document.documentElement.dataset.theme).toBe('light')
   })
 
@@ -53,7 +58,8 @@ describe('theme toggle (H4)', () => {
     localStorage.setItem('rbos.theme', 'dark')
     mock()
     render(<App />)
-    await screen.findByRole('button', { name: 'Light mode' })
+    await openMenu()
+    await screen.findByRole('menuitem', { name: 'Light mode' })
     expect(document.documentElement.dataset.theme).toBe('dark')
   })
 })

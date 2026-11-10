@@ -77,7 +77,7 @@ function MoneyTab({ money, submit }: { money: Money[]; submit: Submit }) {
   return <div>
     <h3>Accounts</h3>
     {money.map(m => <div key={m.id} style={{ borderBottom: '1px solid #eee', padding: '6px 0' }}>
-      <Row l={<>{m.name} <small>({m.kind})</small></>} r={'₹ ' + inr(m.balance)} />
+      <Row l={<>{m.name} <small>({m.kind})</small></>} r={'â‚¹ ' + inr(m.balance)} />
       <button onClick={async () => setHist({ id: m.id, name: m.name, rows: await api<any[]>('GET', `/money-accounts/${m.id}/history`) })}>History</button>
     </div>)}
     <form className="form" onSubmit={e => { e.preventDefault(); void submit(async () => { await api('POST', '/money-accounts', { name, kind }); setName('') }, 'Account added.') }}>
@@ -85,9 +85,9 @@ function MoneyTab({ money, submit }: { money: Money[]; submit: Submit }) {
       <label>Type <select value={kind} onChange={e => setKind(e.target.value)}><option>Bank</option><option>Cash</option><option>UPI</option></select></label>
       <button type="submit">Add account</button>
     </form>
-    {hist && <div><h3>{hist.name} — history</h3>
+    {hist && <div><h3>{hist.name} â€” history</h3>
       {hist.rows.length === 0 && <p>No transactions yet.</p>}
-      {hist.rows.map((r, i) => <Row key={i} l={<>{r.date} · {r.source}</>} r={<>{Number(r.in) > 0 ? '+' + inr(r.in) : '-' + inr(r.out)} <small>bal {inr(r.balance)}</small></>} />)}
+      {hist.rows.map((r, i) => <Row key={i} l={<>{r.date} Â· {r.source}</>} r={<>{Number(r.in) > 0 ? '+' + inr(r.in) : '-' + inr(r.out)} <small>bal {inr(r.balance)}</small></>} />)}
     </div>}
   </div>
 }
@@ -100,13 +100,13 @@ function ExpenseTab({ money, categories, rows, submit }: { money: Money[]; categ
       <label>Date <input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} required /></label>
       <label>Category <select value={category} onChange={e => setCategory(e.target.value)}>{categories.map(c => <option key={c}>{c}</option>)}</select></label>
       <label>Paid from <select value={a} onChange={e => setAcc(e.target.value)}>{money.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-      <label>Amount (₹) <input type="number" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} required /></label>
+      <label>Amount (â‚¹) <input type="number" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} required /></label>
       <label>Note <input value={note} maxLength={200} onChange={e => setNote(e.target.value)} /></label>
       <button type="submit">Record expense</button>
     </form>
     <h3>Recent expenses</h3>
     {rows.length === 0 && <p>No expenses yet.</p>}
-    {rows.map(r => <Row key={r.id} l={<>#{r.number} · {r.date} · {r.category}<br /><small>{r.paidFrom}{r.note ? ' · ' + r.note : ''}</small></>} r={'₹ ' + inr(r.amount)} />)}
+    {rows.map(r => <Row key={r.id} l={<>#{r.number} Â· {r.date} Â· {r.category}<br /><small>{r.paidFrom}{r.note ? ' Â· ' + r.note : ''}</small></>} r={'â‚¹ ' + inr(r.amount)} />)}
   </div>
 }
 
@@ -118,13 +118,13 @@ function OwnerTab({ money, rows, submit }: { money: Money[]; rows: any[]; submit
       <label>Type <select value={kind} onChange={e => setKind(e.target.value)}><option value="Capital">Capital introduced</option><option value="Drawing">Owner drawing</option></select></label>
       <label>Date <input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} required /></label>
       <label>Account <select value={a} onChange={e => setAcc(e.target.value)}>{money.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
-      <label>Amount (₹) <input type="number" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} required /></label>
+      <label>Amount (â‚¹) <input type="number" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} required /></label>
       <label>Note <input value={note} maxLength={200} onChange={e => setNote(e.target.value)} /></label>
       <button type="submit">Record</button>
     </form>
     <h3>History</h3>
     {rows.length === 0 && <p>Nothing recorded yet.</p>}
-    {rows.map(r => <Row key={r.id} l={<>{r.date} · {r.kind}<br /><small>{r.account}{r.note ? ' · ' + r.note : ''}</small></>} r={'₹ ' + inr(r.amount)} />)}
+    {rows.map(r => <Row key={r.id} l={<>{r.date} Â· {r.kind}<br /><small>{r.account}{r.note ? ' Â· ' + r.note : ''}</small></>} r={'â‚¹ ' + inr(r.amount)} />)}
   </div>
 }
 
@@ -145,7 +145,7 @@ function AdjustTab({ products, locations, rows, submit }: { products: Opt[]; loc
     </form>
     <h3>Recent adjustments</h3>
     {rows.length === 0 && <p>No adjustments yet.</p>}
-    {rows.map(r => <Row key={r.id} l={<>#{r.number} · {r.date} · {r.product}<br /><small>{r.reason}{r.note ? ' · ' + r.note : ''}</small></>} r={<>{r.quantity > 0 ? '+' : ''}{r.quantity} <small>(₹ {inr(r.value)})</small></>} />)}
+    {rows.map(r => <Row key={r.id} l={<>#{r.number} Â· {r.date} Â· {r.product}<br /><small>{r.reason}{r.note ? ' Â· ' + r.note : ''}</small></>} r={<>{r.quantity > 0 ? '+' : ''}{r.quantity} <small>(â‚¹ {inr(r.value)})</small></>} />)}
   </div>
 }
 
@@ -159,7 +159,7 @@ function LockTab({ lock, submit }: { lock: { lockedThrough: string | null; histo
       <button type="submit">Save lock</button>
     </form>
     <h3>Lock history</h3>
-    {(lock?.history ?? []).map((h, i) => <Row key={i} l={<>{String(h.at).slice(0, 10)} <small>{h.reason}</small></>} r={<>{h.previous || '—'} → {h.value || '—'}</>} />)}
+    {(lock?.history ?? []).map((h, i) => <Row key={i} l={<>{String(h.at).slice(0, 10)} <small>{h.reason}</small></>} r={<>{h.previous || 'â€”'} â†’ {h.value || 'â€”'}</>} />)}
   </div>
 }
 
@@ -197,8 +197,8 @@ function Reports({ setError }: { setError: (s: string) => void }) {
     {(rep === 'pl' || rep === 'gl' || rep === 'cf') && <label> From <input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>}
     {rep !== 'sv' && <label> {rep === 'pl' || rep === 'gl' || rep === 'cf' ? 'To' : 'As of'} <input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>}
     {rep === 'gl' && <label> Account <select value={account || accounts[0]?.id || ''} onChange={e => setAccount(e.target.value)}>{accounts.map(a => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select></label>}
-    {data && rep !== 'gl' && <button type="button" onClick={() => { if (!exportReport(rep, data, names.find(n => n[0] === rep)?.[1] ?? rep)) setError('Nothing to export.') }}>Download CSV</button>}
-    {!data && <p>Loading…</p>}
+    {data && rep !== 'gl' && <button type="button" onClick={() => { if (!exportReport(rep, data, names.find(n => n[0] === rep)?.[1] ?? rep)) setError('Nothing to export.') }} style={{ marginTop: 16 }}>Download CSV</button>}
+    {!data && <p>Loadingâ€¦</p>}
     {data && rep === 'tb' && <div><h3>Trial Balance</h3>
       {data.lines.map((l: any) => <Row key={l.id} l={<>{l.code} {l.name}</>} r={l.debit > 0 ? 'Dr ' + inr(l.debit) : 'Cr ' + inr(l.credit)} />)}
       <Row strong l="Total debit" r={inr(data.totalDebit)} /><Row strong l="Total credit" r={inr(data.totalCredit)} /></div>}
@@ -214,7 +214,7 @@ function Reports({ setError }: { setError: (s: string) => void }) {
       <Row strong l="Closing cash" r={inr(data.closingCash)} /></div>}
     {data && rep === 'gl' && <div><h3>{data.code} {data.name}</h3>
       <Row strong l="Opening" r={inr(data.opening)} />
-      {data.lines.map((l: any, i: number) => <Row key={i} l={<>{l.date} · {l.source}</>} r={<>{l.debit > 0 ? 'Dr ' + inr(l.debit) : 'Cr ' + inr(l.credit)} <small>bal {inr(l.balance)}</small></>} />)}
+      {data.lines.map((l: any, i: number) => <Row key={i} l={<>{l.date} Â· {l.source}</>} r={<>{l.debit > 0 ? 'Dr ' + inr(l.debit) : 'Cr ' + inr(l.credit)} <small>bal {inr(l.balance)}</small></>} />)}
       <Row strong l="Closing" r={inr(data.closing)} /></div>}
     {data && rep === 'pl' && <div><h3>Profit &amp; Loss</h3><h4>Income</h4>
       {data.income.map((l: any) => <Row key={l.code} l={l.name} r={inr(l.amount)} />)}<Row strong l="Total income" r={inr(data.totalIncome)} />
@@ -224,15 +224,15 @@ function Reports({ setError }: { setError: (s: string) => void }) {
       {data.assets.map((l: any) => <Row key={l.code} l={l.name} r={inr(l.amount)} />)}<Row strong l="Total assets" r={inr(data.totalAssets)} />
       <h4>Liabilities</h4>{data.liabilities.map((l: any) => <Row key={l.code} l={l.name} r={inr(l.amount)} />)}<Row strong l="Total liabilities" r={inr(data.totalLiabilities)} />
       <h4>Equity</h4>{data.equity.map((l: any) => <Row key={l.code} l={l.name} r={inr(l.amount)} />)}<Row l="Current year result" r={inr(data.currentYearResult)} />
-      <Row strong l="Total equity" r={inr(data.totalEquity)} /><p>{data.balanced ? 'Balanced ✔' : 'Not balanced'}</p></div>}
+      <Row strong l="Total equity" r={inr(data.totalEquity)} /><p>{data.balanced ? 'Balanced âœ”' : 'Not balanced'}</p></div>}
     {ageing && <div><h3>{rep === 'ar' ? 'Receivable' : 'Payable'} ageing</h3>
       {data.parties.length === 0 && <p>Nothing outstanding.</p>}
       {data.parties.map((p: any) => <div key={p.id} style={{ borderBottom: '1px solid #eee', padding: '6px 0' }}><Row strong l={p.name} r={inr(p.total)} />
-        <small>0–30: {inr(p.current)} · 31–60: {inr(p.d31to60)} · 61–90: {inr(p.d61to90)} · 90+: {inr(p.over90)}</small></div>)}
+        <small>0â€“30: {inr(p.current)} Â· 31â€“60: {inr(p.d31to60)} Â· 61â€“90: {inr(p.d61to90)} Â· 90+: {inr(p.over90)}</small></div>)}
       <Row strong l="Total" r={inr(data.total)} />
-      <small>0–30: {inr(data.current)} · 31–60: {inr(data.d31to60)} · 61–90: {inr(data.d61to90)} · 90+: {inr(data.over90)}</small></div>}
+      <small>0â€“30: {inr(data.current)} Â· 31â€“60: {inr(data.d31to60)} Â· 61â€“90: {inr(data.d61to90)} Â· 90+: {inr(data.over90)}</small></div>}
     {data && rep === 'sv' && <div><h3>Stock valuation</h3>
-      {data.items.map((i: any) => <Row key={i.id} l={<>{i.name}<br /><small>{i.quantity} × ₹ {inr(i.wac)}</small></>} r={inr(i.value)} />)}
+      {data.items.map((i: any) => <Row key={i.id} l={<>{i.name}<br /><small>{i.quantity} Ã— â‚¹ {inr(i.wac)}</small></>} r={inr(i.value)} />)}
       <Row strong l="Total stock value" r={inr(data.totalValue)} /></div>}
   </div>
 }
