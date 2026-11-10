@@ -70,7 +70,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       } else if (file.type.startsWith('image/')) {
         const img = await prepare(file)
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: img.contentType, data: img.data })
-        accept(r.rows, r.usedAi)
+        accept(r.rows, r.usedAi ?? false)
       } else {
         throw new Error('Choose an Excel (.xlsx), Word (.docx), CSV or PDF file, or a photo.')
       }
