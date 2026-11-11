@@ -1,3 +1,4 @@
+using Rbos.Domain;
 using Npgsql;
 using Rbos.Api.Persistence;
 
@@ -104,6 +105,41 @@ public sealed class BarcodeService(TenantDb db)
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id, code = norm, packQuantity = pack });
     }
+
+	/// <summary>Links a barcode to a product inside an existing session; skips codes already mapped (never re-points a mapping).</summary>
+	public static async Task<bool> LinkIfFreeAsync(TenantSession s, Guid tid, Guid productId, string code, CancellationToken ct)
+	{
+		var (norm, err) = BarcodeRules.Normalize(code);
+		if (err is not null) return false;
+		await using var c = s.Command("insert into catalog.product_barcode(tenant_id,id,product_id,code,pack_quantity) values (@t,@i,@p,@c,1) on conflict do nothing");
+		c.Parameters.AddWithValue("t", tid); c.Parameters.AddWithValue("i", Guid.NewGuid()); c.Parameters.AddWithValue("p", productId); c.Parameters.AddWithValue("c", norm!);
+		return await c.ExecuteNonQueryAsync(ct) > 0;
+	}
+
+	/// <summary>Suggestions for an unknown barcode by model number, brand and name text. Never links automatically.</summary>
+	public async Task<ServiceResult<object>> SuggestAsync(Guid uid, string? code, string? model, Guid? brandId, string? text, CancellationToken ct)
+	{
+		var tid = await db.FindTenantAsync(uid, ct);
+		if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+		var mk = IdentifierRules.ModelKey(model);
+		var like = string.IsNullOrWhiteSpace(text) ? null : "%" + text.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+		await using var s = await db.BeginAsync(uid, tid.Value, ct);
+		var list = new List<object>();
+		if (mk.Length > 0 || like is not null || brandId is not null)
+		{
+			await using var c = s.Command(@"select p.id,p.name,p.brand,p.model,p.internal_sku,
+					(case when @mk<>'' and p.model_norm=@mk then 3 when @mk<>'' and p.model_norm like '%'||@mk||'%' then 2 else 1 end) score
+				from catalog.product p
+				where p.is_active and (@br::uuid is null or p.brand_id=@br)
+				  and ((@mk<>'' and p.model_norm like '%'||@mk||'%') or (@lk::text is not null and (p.name ilike @lk or p.brand ilike @lk or p.model ilike @lk)) or (@mk='' and @lk::text is null and @br::uuid is not null))
+				order by score desc, p.name limit 10");
+			c.Parameters.AddWithValue("mk", mk); c.Parameters.AddWithValue("br", (object?)brandId ?? DBNull.Value); c.Parameters.AddWithValue("lk", (object?)like ?? DBNull.Value);
+			await using var r = await c.ExecuteReaderAsync(ct);
+			while (await r.ReadAsync(ct))
+				list.Add(new { id = r.GetGuid(0), name = r.GetString(1), brand = r.IsDBNull(2) ? null : r.GetString(2), model = r.IsDBNull(3) ? null : r.GetString(3), sku = r.GetString(4), match = r.GetInt32(5) == 3 ? "exact model" : r.GetInt32(5) == 2 ? "similar model" : "name/brand" });
+		}
+		return ServiceResult<object>.Ok(new { code, suggestions = list, externalProviders = Array.Empty<string>() });
+	}
 
     public async Task<ServiceResult<object>> RemoveAsync(Guid uid, Guid productId, Guid barcodeId, CancellationToken ct)
     {

@@ -20,3 +20,16 @@ web\src\SetupAssistant.tsx
 Dependency additions for migration/build:
 - src/Rbos.Api/Application/LocalOcr.cs
 - src/Rbos.Api/Application/PdfPageReader.cs
+
+Additional parity files from latest zip comparison:
+- src/Rbos.Api/Rbos.Api.csproj
+- web/vite.config.ts
+
+Build-closure additions for missing symbol errors:
+- src/Rbos.Domain/BrandCatalogue.cs
+- src/Rbos.Domain/ManufacturerSources.cs
+- src/Rbos.Domain/ProductRules.cs
+- src/Rbos.Api/Application/BrandService.cs
+- src/Rbos.Api/BrandEndpoints.cs
+- src/Rbos.Api/Application/BarcodeService.cs
+- src/Rbos.Api/Rbos.Api.csproj

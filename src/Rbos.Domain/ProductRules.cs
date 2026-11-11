@@ -33,6 +33,17 @@ public static class ProductRules
         return null;
     }
 
+    public static string? ValidateCatalogueData(decimal? mrp, IReadOnlyDictionary<string, string>? specs)
+    {
+        if (mrp is < 0 or > 100000000) return "MRP must be between 0 and 100,000,000.";
+        if (specs is not null && (specs.Count > 40 || specs.Any(kv => kv.Key.Trim().Length is 0 or > 60 || (kv.Value?.Length ?? 0) > 200))) return "Specifications: at most 40 entries, names up to 60 and values up to 200 characters.";
+        return null;
+    }
+
+    public static Dictionary<string, string> CleanSpecs(IReadOnlyDictionary<string, string>? specs) =>
+        (specs ?? new Dictionary<string, string>()).Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
+            .GroupBy(kv => kv.Key.Trim(), StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Value.Trim());
+
     /// <summary>Drops blank attribute values and trims the rest.</summary>
     public static Dictionary<string, string> CleanAttributes(IReadOnlyDictionary<string, string>? a) =>
         (a ?? new Dictionary<string, string>()).Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value.Trim());
