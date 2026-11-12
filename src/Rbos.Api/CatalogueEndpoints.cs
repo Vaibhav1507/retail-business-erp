@@ -24,6 +24,12 @@ public static class CatalogueEndpoints
 		api.MapPut("/products/{id:guid}", async (Guid id, ProductUpsertRequest m, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
 			=> Reply(await svc.UpdateAsync(Uid(p), id, ToCommand(m), ct))).RequireAuthorization();
 
+		api.MapGet("/categories/{id:guid}/attributes", async (Guid id, ClaimsPrincipal p, CategoryAttributeService svc, CancellationToken ct)
+			=> Reply(await svc.GetAsync(Uid(p), id, ct))).RequireAuthorization();
+
+		api.MapPut("/categories/{id:guid}/attributes", async (Guid id, List<CategoryAttributeDefinition> definitions, ClaimsPrincipal p, CategoryAttributeService svc, CancellationToken ct)
+			=> Reply(await svc.SaveAsync(Uid(p), id, definitions, ct))).RequireAuthorization();
+
 		api.MapGet("/categories", async (ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
 			=> Reply(await svc.CategoriesAsync(Uid(p), ct))).RequireAuthorization();
 
