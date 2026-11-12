@@ -304,11 +304,31 @@ public sealed class CatalogueService(TenantDb db)
         }
         var seen = new HashSet<string>();
         var seenCodes = new HashSet<string>();
-        var results = new List<ImportRowResult>();
-        for (var i = 0; i < rows.Count; i++)
+        var requiredByCategory = new Dictionary<string, List<(string Key, string Label)>>(StringComparer.OrdinalIgnoreCase);
+        await using (var required = s.Command(@"select lower(btrim(cat.name)),d.attribute_key,d.label
+            from catalog.category_attribute_definition d
+            join catalog.category cat on cat.tenant_id=d.tenant_id and cat.id=d.category_id
+            where d.is_required"))
         {
+            await using var rr = await required.ExecuteReaderAsync(ct);
+            while (await rr.ReadAsync(ct))
+            {
+                var category = rr.GetString(0);
+                if (!requiredByCategory.TryGetValue(category, out var list)) requiredByCategory[category] = list = [];
+                list.Add((rr.GetString(1), rr.GetString(2)));
+            }
+        }
+        var results = new List<ImportRowResult>();
+        for (var i = 0; i < rows.Count; i++)        {
             var row = rows[i];
             var err = ProductRules.Validate(row.ToInput()) ?? ProductRules.ValidateCatalogueData(row.Mrp, row.Specs);
+            if (err is null && requiredByCategory.TryGetValue((row.CategoryName ?? "").Trim().ToLowerInvariant(), out var requiredFields))
+            {
+                var values = new Dictionary<string, string>(row.Attributes ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+                foreach (var pair in row.Specs ?? new Dictionary<string, string>()) values[pair.Key] = pair.Value;
+                var missing = requiredFields.Where(f => !values.TryGetValue(f.Key, out var value) || string.IsNullOrWhiteSpace(value)).Select(f => f.Label).ToArray();
+                if (missing.Length > 0) err = "Required specifications missing: " + string.Join(", ", missing);
+            }
             string? code = null;
             if (err is null && !string.IsNullOrWhiteSpace(row.Barcode))
             {
