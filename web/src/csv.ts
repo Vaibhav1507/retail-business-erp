@@ -89,6 +89,7 @@ export function toImportRows(data: string[][], m: Mapping, headers: string[] = [
     const model = get(r, 'model')
     const unitRaw = get(r, 'unit')
     const attributes: Record<string, string> = {}
+    const specs: Record<string, string> = {}
     for (const k of ['colour', 'capacity', 'connector_type', 'compatible_with'] as const) {
       const v = get(r, k)
       if (v) attributes[k] = v
@@ -98,7 +99,7 @@ export function toImportRows(data: string[][], m: Mapping, headers: string[] = [
       if (mapped.has(index) || !raw?.trim()) return
       const label = (headers[index] ?? '').replace(/^attribute:\\s*/i, '').trim()
       const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-      if (key && !['name', 'category', 'unit', 'brand', 'model'].includes(key)) attributes[key] = raw.trim()
+      if (key && !['name', 'category', 'unit', 'brand', 'model'].includes(key)) specs[key] = raw.trim()
     })
     return {
       name: get(r, 'name'),
@@ -108,6 +109,7 @@ export function toImportRows(data: string[][], m: Mapping, headers: string[] = [
       brand: brand || null,
       model: model || null,
       attributes,
+      specs,
     }
   })
 }
