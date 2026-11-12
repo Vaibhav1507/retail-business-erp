@@ -59,7 +59,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       } else if (name.endsWith('.xlsx') || name.endsWith('.docx') || name.endsWith('.pdf')) {
         if (file.size > MAX_BYTES) throw new Error('File is larger than 12 MB. Split or compress it and try again.')
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: file.type, data: await toBase64(file) })
-        accept(r.rows, false)
+        accept(r.rows, r.usedAi ?? false)
         if (r.incomplete && r.warning) setError(r.warning)
         if (name.endsWith('.pdf')) {
           setPages(r.pages ?? [])
@@ -84,7 +84,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
   async function runPreview() {
     setError(''); setBusy(true)
     try {
-      const d = toImportRows(rows.slice(1), mapping).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
+      const d = toImportRows(rows.slice(1), mapping, headers).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
       setData(d)
       setPreview(await api<Preview>('POST', '/products/import/preview', { rows: d, source: sourceBody }))
       setStep(3)
@@ -110,8 +110,8 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       {step === 1 && (
         <div role="region" aria-label="Upload product list" className="invoice-upload">
           <label className="invoice-upload-pick">
-            Upload a product list (optional). Excel, Word, CSV or text PDF catalogues are read directly. Scanned PDFs are read using local OCR (English). A photo of a list is read with AI.
-            <input type="file" accept=".csv,.xlsx,.docx,.pdf,text/csv,application/pdf,image/*" disabled={busy} onChange={e => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
+            Upload a product list (optional). Excel, Word, CSV or text PDF catalogues are read directly. Scanned PDFs can be processed using server-side OCR when available. A photo of a list is read with AI.
+            <input type="file" accept="*/*" disabled={busy} onChange={e => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
           </label>
           {busy && <p role="status">Reading file...</p>}
           <p>or <button type="button" className="secondary" onClick={() => accept(parseCsv(SAMPLE_CSV), false)}>Try with sample data</button></p>
@@ -122,7 +122,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         <div className="invoice-upload">
           {fromAi ? (
             <>
-              <p className="invoice-upload-meta">We read these products from your photo using AI. Check and fix anything wrong, then continue. Name and Category are required.</p>
+              <p className="invoice-upload-meta">We identified these products from your document using AI. Check the model, brand, category and specifications, correct anything needed, then preview the import.</p>
               <div className="table-scroll">
                 <table>
                   <thead><tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
