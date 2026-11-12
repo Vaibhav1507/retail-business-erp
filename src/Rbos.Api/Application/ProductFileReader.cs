@@ -188,7 +188,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		JsonNode? parsed = null;
 		foreach (var model in models)
 		{
-			try { parsed = await CallAsync(model, apiKey, "application/pdf", b64, PdfCataloguePrompt + (string.IsNullOrWhiteSpace(attributeGuidance) ? "" : "\\n" + attributeGuidance), ct); break; }
+			try { parsed = await CallAsync(model, apiKey, "application/pdf", b64, PdfCataloguePrompt + (string.IsNullOrWhiteSpace(attributeGuidance) ? "" : "\n" + attributeGuidance), ct); break; }
 			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
 			{ return ServiceResult<ProductFileResult>.Fail("The free AI reading limit was reached. Try again later, or use an Excel/CSV product list."); }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
@@ -215,7 +215,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		JsonNode? parsed = null;
 		foreach (var model in models)
 		{
-			try { parsed = await CallAsync(model, apiKey, mime, b64, Prompt + (string.IsNullOrWhiteSpace(attributeGuidance) ? "" : "\\n" + attributeGuidance), ct); break; }
+			try { parsed = await CallAsync(model, apiKey, mime, b64, Prompt + (string.IsNullOrWhiteSpace(attributeGuidance) ? "" : "\n" + attributeGuidance), ct); break; }
 			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
 			{ return ServiceResult<ProductFileResult>.Fail("Free photo reading limit reached. Try again later or upload an Excel / CSV file."); }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
