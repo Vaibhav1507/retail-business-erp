@@ -51,15 +51,15 @@ export const navigationTargets: NavigationTarget[] = [
 ]
 
 const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke'])
-const dataQuestion = /\\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\\b/i
-const transaction = /\\b(delete|remove|cancel|create|make payment|pay \\d|send|transfer \\d|post|save|submit|bhejo|bhej do|jama karo|darj karo|बना दो|हटा दो|भेजो|जमा करो|पोस्ट करो)\\b/i
+const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
+const transaction = /\b(delete|remove|cancel|create|make payment|pay \d|send|transfer \d|post|save|submit|bhejo|bhej do|jama karo|darj karo|बना दो|हटा दो|भेजो|जमा करो|पोस्ट करो)\b/i
 const ambiguous = new Map<string, string[]>([
   ['return', ['sell.return','buy.return']], ['returns', ['sell.return','buy.return']], ['wapasi', ['sell.return','buy.return']], ['वापसी', ['sell.return','buy.return']],
   ['payment', ['sell.collect','buy.pay']], ['pay', ['sell.collect','buy.pay']], ['history', ['sell.bills','buy.history','stock.history','parties.purchases','more.audit']],
   ['stock', ['stock.current','stock.adjust','stock.count']], ['udhaar', ['sell.collect','parties.dues']], ['order', ['more.orders','sell.bill']],
 ])
 function normalise(value: string): string {
-  return value.normalize('NFC').toLocaleLowerCase().replace(/[’']/g, '').replace(/[^\\p{L}\\p{N}\\s]/gu, ' ').replace(/\\s+/g, ' ').trim()
+  return value.normalize('NFC').toLocaleLowerCase().replace(/[’']/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
     .replace(/उधार/g, 'udhar').replace(/बिल/g, 'bill').replace(/माल/g, 'maal').replace(/सामान/g, 'saman').replace(/खरीद/g, 'kharid').replace(/वापस/g, 'wapas').replace(/खर्च/g, 'kharch').replace(/स्टॉक/g, 'stock')
 }
 function tokens(value: string): string[] { return normalise(value).split(' ').filter(t => t && !stopWords.has(t)) }
@@ -74,7 +74,7 @@ function similarity(query: string[], phrase: string[]): number {
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
-  if (dataQuestion.test(q) || transaction.test(q) || /https?:|\\.com\\b|\\d/.test(q)) return { kind: 'reject' }
+  if (dataQuestion.test(q) || transaction.test(q) || /https?:|\.com\b|\d/.test(q)) return { kind: 'reject' }
   const qTokens = tokens(q)
   if (qTokens.length === 1 && ambiguous.has(qTokens[0])) {
     const ids = ambiguous.get(qTokens[0])!
