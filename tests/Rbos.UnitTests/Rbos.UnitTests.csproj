@@ -19,8 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Rbos.Domain\Rbos.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Rbos.Api\Rbos.Api.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\\..\\src\\Rbos.Domain\\Rbos.Domain.csproj" />
+    <ProjectReference Include="..\\..\\src\\Rbos.Api\\Rbos.Api.csproj" />
   </ItemGroup>
 
 </Project>

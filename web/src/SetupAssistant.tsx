@@ -60,7 +60,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         if (file.size > MAX_BYTES) throw new Error('File is larger than 12 MB. Split or compress it and try again.')
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: file.type, data: await toBase64(file) })
         accept(r.rows, r.usedAi ?? false)
-        if (r.incomplete && r.warning) setError(r.warning)
+        if (r.warning) setError(r.warning)
         if (name.endsWith('.pdf')) {
           setPages(r.pages ?? [])
           setSource({ ...NO_SOURCE, documentName: file.name, documentKind: r.documentKind ?? 'catalogue', contentHash: r.contentHash ?? '' })
@@ -169,13 +169,14 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
           <Paged rows={preview.rows}>{page => (
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Row</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / Model</th><th>Result</th></tr></thead>
+                <thead><tr><th>Row</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / Model</th><th>Specifications</th><th>Result</th></tr></thead>
                 <tbody>
                   {page.map(r => {
                     const d = data[r.row - 1]
                     return (
                       <tr key={r.row}>
                         <td>{r.row}</td><td>{d.name}</td><td>{d.categoryName}</td><td>{d.baseUnit}</td><td>{d.isGeneric ? 'Generic' : `${d.brand ?? ''} ${d.model ?? ''}`}</td>
+                        <td>{Object.entries({ ...(d.attributes ?? {}), ...(d.specs ?? {}) }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ') || 'No specifications extracted'}</td>
                         <td>{label[r.status]}{r.message && r.status === 'invalid' ? `: ${r.message}` : ''}</td>
                       </tr>
                     )
