@@ -129,6 +129,56 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   )
 }
 
+function CategoryAttributeEditor({ categories }: { categories: Category[] }) {
+  const [categoryId, setCategoryId] = useState('')
+  const [definitions, setDefinitions] = useState<CategoryAttribute[]>([])
+  const [key, setKey] = useState('')
+  const [label, setLabel] = useState('')
+  const [dataType, setDataType] = useState('text')
+  const [unit, setUnit] = useState('')
+  const [options, setOptions] = useState('')
+  const [required, setRequired] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  useEffect(() => {
+    if (!categoryId) { setDefinitions([]); return }
+    api<CategoryAttribute[]>('GET', `/categories/${categoryId}/attributes`).then(setDefinitions).catch(e => setMessage(msg(e)))
+  }, [categoryId])
+  function add() {
+    const k = key.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    if (!k || !label.trim() || definitions.some(d => d.key === k)) return
+    setDefinitions([...definitions, { key: k, label: label.trim(), dataType, unit: unit.trim() || null, isRequired: required, isSearchable: false, isFilterable: false, displayOrder: definitions.length, options: dataType === 'select' ? options.split(',').map(x => x.trim()).filter(Boolean) : [] }])
+    setKey(''); setLabel(''); setUnit(''); setOptions(''); setRequired(false)
+  }
+  async function save() {
+    if (!categoryId) return
+    setBusy(true); setMessage('')
+    try { await api('PUT', `/categories/${categoryId}/attributes`, definitions); setMessage('Category attributes saved.') }
+    catch (e) { setMessage(msg(e)) }
+    finally { setBusy(false) }
+  }
+  return <div className="import-block" aria-label="Category attribute configuration">
+    <h3>Product attributes by category</h3>
+    <p className="hint-line">Configure the specifications that matter for each category. These definitions belong to this business only.</p>
+    <label>Category <select value={categoryId} onChange={e => setCategoryId(e.target.value)}><option value="">Choose category</option>{categories.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+    {categoryId && <>
+      {definitions.map((d, i) => <div className="area" key={d.key}>
+        <strong>{d.label}</strong> <span className="hint-line">({d.key} · {d.dataType}{d.unit ? ` · ${d.unit}` : ''})</span>
+        <label className="check"><input type="checkbox" checked={d.isRequired} onChange={e => setDefinitions(definitions.map((x, n) => n === i ? { ...x, isRequired: e.target.checked } : x))}/> Required</label>
+        <button type="button" className="secondary" onClick={() => setDefinitions(definitions.filter((_, n) => n !== i))}>Remove</button>
+      </div>)}
+      <label>Attribute key <input value={key} onChange={e => setKey(e.target.value)} placeholder="e.g. screen_size" /></label>
+      <label>Display label <input value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Screen size" /></label>
+      <label>Type <select value={dataType} onChange={e => setDataType(e.target.value)}>{['text','number','decimal','boolean','date','select'].map(x => <option key={x}>{x}</option>)}</select></label>
+      <label>Unit (optional) <input value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g. inch, kg, litre" /></label>
+      {dataType === 'select' && <label>Options (comma separated) <input value={options} onChange={e => setOptions(e.target.value)} placeholder="Front load, Top load" /></label>}
+      <label className="check"><input type="checkbox" checked={required} onChange={e => setRequired(e.target.checked)}/> Required</label>
+      <div className="form-actions"><button type="button" className="secondary" onClick={add} disabled={!key.trim() || !label.trim()}>Add attribute</button><button type="button" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save category attributes'}</button></div>
+    </>}
+    {message && <p role="status">{message}</p>}
+  </div>
+}
+
 export function Catalogue({ reload, businessCategory }: { reload: () => void; businessCategory?: string | null }) {
   const [q, setQ] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -288,6 +338,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 			</form>
 		  )}
 		</>
+          <CategoryAttributeEditor categories={categories} />
 	  )}
 	</section>
   )
