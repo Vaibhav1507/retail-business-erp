@@ -36,6 +36,16 @@ const quick: NavigationTarget[] = [
 ]
 const riskyRoutes = new Set(['sell.bill','buy.receive','stock.opening'])
 const SAMPLE_RATE = 16000
+
+const labelsHi: Record<string,string> = {
+ 'sell.bill':'नया बिल','buy.receive':'खरीद जोड़ें','stock.current':'स्टॉक देखें','sell.collect':'पैसे वसूलें','money.expenses':'खर्च दर्ज करें','parties.customers':'ग्राहक',
+ 'sell.return':'ग्राहक वापसी','buy.return':'सप्लायर को वापसी','sell.bills':'पुराने बिल','buy.history':'खरीद इतिहास','stock.history':'स्टॉक बदलाव इतिहास','parties.purchases':'ग्राहक खरीद इतिहास','more.audit':'ऑडिट इतिहास',
+ 'buy.pay':'सप्लायर को भुगतान','parties.dues':'ग्राहक बकाया','stock.adjust':'स्टॉक ठीक करें','stock.count':'स्टॉक गिनती','more.orders':'खरीद ऑर्डर','settings':'बिज़नेस सेटिंग',
+ 'home':'होम','sell.menu':'बिक्री','stock.products':'सामान','stock.opening':'शुरुआती स्टॉक','stock.import':'प्रोडक्ट इम्पोर्ट','stock.alerts':'कम स्टॉक अलर्ट','stock.units':'यूनिट','parties.suppliers':'सप्लायर',
+ 'money.cash':'नकद और बैंक','money.owner':'मालिक का पैसा','money.closing':'दिन बंद करें','more.menu':'और विकल्प','more.reports':'रिपोर्ट','more.print':'प्रिंट','more.lock':'पुरानी तारीखें लॉक','more.gst':'GST','more.staff':'स्टाफ','more.branches':'शाखाएँ','more.transfers':'स्टॉक ट्रांसफर','more.reconcile':'बैंक मिलान','more.loans':'लोन'
+}
+function targetLabel(target: NavigationTarget, language: 'en'|'hi') { return language === 'hi' ? labelsHi[target.id] || target.label : target.label }
+
 type WorkerMessage = {type:string; loaded?:number; total?:number; source?:string; saved?:boolean; id?:number; text?:string; message?:string}
 export function NavigationAssistant() {
  const [query,setQuery] = useState('')
@@ -83,7 +93,7 @@ export function NavigationAssistant() {
    const data = event.data
    if (data.type === 'progress') setVoiceProgress(data.total ? Math.min(100,Math.round((data.loaded||0)/data.total*100)) : 0)
    if (data.type === 'ready') { setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100) }
-   if (data.type === 'error') { setVoiceLoading(false); setVoiceError(data.message || text.failed); worker.terminate(); workerRef.current = null }
+   if (data.type === 'error') { setVoiceLoading(false); setVoiceError(data.message || text.failed); if (data.stage !== 'transcribe') { worker.terminate(); workerRef.current = null; setVoiceReady(false) } }
    if (data.type === 'result') {
     const transcript = (data.text || '').trim()
     if (!transcript) { setVoiceError(text.tooShort); return }
@@ -155,7 +165,7 @@ export function NavigationAssistant() {
    <button type="submit" disabled={!query.trim()}>{text.go}</button>
   </form>
   <div className="navigation-shortcuts" aria-label={text.shortcuts}>
-   {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{target.label}</button>)}
+   {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
   </div>
   <div className="navigation-voice">
    {!voiceReady && <button type="button" onClick={enableVoice} disabled={voiceLoading}>{voiceLoading ? text.loading : text.enableVoice}</button>}
@@ -166,6 +176,6 @@ export function NavigationAssistant() {
   <p className="navigation-privacy">{text.voiceNote}</p>
   {voiceError && <p className="navigation-feedback" role="alert">{voiceError}</p>}
   {message && <p className="navigation-feedback" role="status">{message}</p>}
-  {choices.length>0 && <div className="navigation-choices" aria-label={text.choose}>{choices.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{target.label}</button>)}</div>}
+  {choices.length>0 && <div className="navigation-choices" aria-label={text.choose}>{choices.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}</div>}
  </section>
 }
