@@ -138,7 +138,7 @@ GST, CA workspace and team screens plus Finance heading/tabs translated; rest of
 | G7 | Income-tax preparation | Product | Low | XL | Ref | - | Undecided | Deferred | Much later |
 | D7 | Background jobs, only when a scheduled job needs them | Engineering | Low | M | Seen (none) | - | Rejected | Dropped | Owner decision: not needed; G5 reminders are in-app and computed on request |
 | H1 | AI-assisted document extraction improvements | AI | Low | M | Seen | - | Approved | Deferred | Owner order: after unit tests and Playwright E2E; do whatever is possible without paid AI APIs |
-| H2 | Voice assistant | AI | Low | L | - | - | Undecided | Deferred | Only if shopkeeper testing shows value |
+All WER figures vendor-reported, unverified. Local-AI track (section 9): option C = STT + on-device multilingual embedding classifier (e5-small / MiniLM-L12, ~113 MB int8, MIT/Apache, ungated) + allowlist guard; generative LLMs (Qwen 0.5-0.6B ~460-540 MB, Gemma gated/custom terms, SmolLM weak Hindi) not recommended now. Next decision: approve offline text-only bake-off A vs C; adopt C only if >=5 pt better with wrong-nav <=2% quiet / <=3% noisy within device limits. X1 remains separate |
 | H3 | Additional retail verticals, one at a time | Product | Low | XL | - | - | Undecided | Deferred | |
 | H4 | Multiple themes | UX | Low | S | - | - | Approved | Done: light/dark toggle in the header, persisted in localStorage; theme.test.tsx passes; no visual check yet | |
 | H5 | AI sales forecasting | AI | Low | L | - | - | Approved | Deferred | Owner order: after H1, last, once unit tests and Playwright E2E are done |
@@ -149,7 +149,7 @@ Proposed as "do not do now". Change the status here only if the reasoning change
 
 | ID | Idea | Suggested decision | Reason | Decision | Status |
 |---|---|---|---|---|---|
-| X1 | AI chatbot | Defer | Does not solve an established critical gap | Undecided | Deferred |
+| X1 | AI chatbot | Defer | Does not solve an established critical gap. H2 is deliberately navigation-only and deterministic (no LLM, no data questions, no actions), so it does not reopen X1 | Undecided | Deferred |
 | X2 | Microservices | Do not do | Operational complexity without benefit at this scale | Undecided | Skipped |
 | X3 | Kafka or other message broker | Do not do | No demonstrated need | Undecided | Skipped |
 | X4 | Kubernetes | Do not do | Unnecessary for the current stage | Undecided | Skipped |
@@ -194,3 +194,5 @@ For each approved item, record:
 |---|---|
 | 2026-11-05 | Register created with all items, phases 1-5 and Not planned. All decisions Undecided. |
 | 2026-11-07 | Phase 1 worked: E3, D13, A11, E5 done; E1, E2, E4, D4, D3, D11, E7 partly done; D12 blocked; E6 needs owner input. Open items listed above. |
+| 2026-11-08 | Catalogue provenance work (local dev/test databases only; nothing deployed, no production migration). Migration 041 (catalog.product_source_reference, tenant RLS, backfill from 040, rollback in db/rollback) applied to rbos_dev and rbos_test after pre-migration dumps with rbos_backup. Products keep multiple source references (document, version, actual PDF page) shown in the Catalogue Source column. PDF import now reads actual pages with PdfPig; scanned pages are rendered with PDFtoImage and OCR-ed by local Tesseract 5.4 (default Windows path detected); legacy content-stream parser kept only as fallback for unparseable PDFs. Category attributes (AttributeDefinitions) applied on create/update/import into generic specs JSON. Same brand + normalized model is flagged possibleDuplicate for review, never merged. Tests: unit 86, integration 142, frontend 62, all passing. Limitations: no dedicated product details screen (sources shown in list); ProductFileReader mixed-PDF flow not tested end to end (components are); PDFtoImage is Windows/Skia-platform dependent (CA1416 warning); Tesseract must be installed on any host doing OCR; migration 041 not yet applied to production. |
+| 2026-11-08 | Final local-pilot verification: suites pass (86/142/62), migrations 039-041 consistent in rbos_dev and rbos_test, seven LG PDFs parsed with real pages and scheme separated, CA1416 reviewed, Tesseract setup documented. See catalogue-scanning-and-master-list-status.md. |

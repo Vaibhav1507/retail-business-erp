@@ -123,7 +123,7 @@ Next step
   "next recommended slice" text in section 12 is outdated.
 
 
-Location: <repo>
+Location: C:\Users\A1137066\Personal-Lab\projects\retail-business-os
 Rules of engagement: read docs/00-guardrails.md and .github/copilot-instructions.md
 (Personal-Lab root) first. Personal project, local-first, synthetic data only,
 public package feeds only, no company resources, no secrets in files.
@@ -224,8 +224,8 @@ Top level of projects/retail-business-os:
   docs/                 See section 3.
 
 Local environment (outside the repo):
-  PostgreSQL 17.11 portable at <pg17>\pgsql\bin, data in
-  <pgdata17>, localhost:5432 only. Not a Windows service. A
+  PostgreSQL 17.11 portable at C:\Users\A1137066\pg17\pgsql\bin, data in
+  C:\Users\A1137066\pgdata17, localhost:5432 only. Not a Windows service. A
   per-user scheduled task "RBOS-PostgreSQL17-Local" starts it at logon (reboot
   behaviour not yet verified).
 
