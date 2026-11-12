@@ -49,7 +49,7 @@ public class CatalogueUploadLimitTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(1, json.GetProperty("pages")[0].GetInt32());
         // CI does not configure Gemini: searchable PDFs must remain uploadable via local extraction.
         Assert.False(json.GetProperty("usedAi").GetBoolean());
-        Assert.Contains("map its columns manually", json.GetProperty("warning").GetString());
+        Assert.Contains("map the columns manually", json.GetProperty("warning").GetString());
     }
 
     [Fact]
