@@ -76,7 +76,7 @@ function transcribe(message) {
   if (length < 0) throw new Error(lastError())
   const result = JSON.parse(M.UTF8ToString(outputPointer))
   send({ type: 'result', id: message.id, text: result.text || '', language: result.language || null, ms: performance.now() - started })
- } finally { M._free(outputPointer); M._free(audioPointer); if (languagePointer) M._free(languagePointer) }
+ } finally { pcm.fill(0); M.HEAPU8.fill(0, audioPointer, audioPointer + pcm.byteLength); M._free(outputPointer); M._free(audioPointer); if (languagePointer) M._free(languagePointer) }
 }
 self.onmessage = event => {
  const message = event.data || {}
