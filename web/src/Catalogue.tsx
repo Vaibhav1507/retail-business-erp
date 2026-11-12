@@ -15,17 +15,16 @@ export type Product = {
 export type ProductSource = { documentId: string; documentName: string; brand: string | null; versionLabel: string | null; page: number | null }
 export const sourceLabel = (s: ProductSource) => `${s.documentName}${s.versionLabel ? ` (${s.versionLabel})` : ''}${s.page ? `, page ${s.page}` : ''}`
 export type Category = { id: string; name: string; productCount: number }
-export type CategoryAttribute = { key: string; label: string; dataType: string; unit: string | null; isRequired: boolean; isSearchable: boolean; isFilterable: boolean; displayOrder: number; options: string[] }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong')
 const UNITS = ['pcs', 'set', 'pack', 'm']
-const attributeLabel = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, x => x.toUpperCase())
+const ATTRS: [string, string][] = [['colour', 'Colour'], ['capacity', 'Capacity'], ['connector_type', 'Connector type'], ['compatible_with', 'Compatible with']]
 
 export type Draft = { name: string; category: string; unit: string; generic: boolean; brand: string; model: string; attrs: Record<string, string>; active: boolean; hsn: string; gst: string; mrp: string }
 export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true, hsn: '', gst: '', mrp: '' }
-export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...(p.specs ?? {}), ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate), mrp: p.mrp == null ? '' : String(p.mrp) })
+export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate), mrp: p.mrp == null ? '' : String(p.mrp) })
 
-
+const ELECTRONICS_ATTRS: [string, string][] = [['capacity', 'Screen size or capacity (e.g. 43 inch, 10000mAh)'], ['colour', 'Colour'], ['connector_type', 'Connector / resolution (e.g. USB-C, 4K)'], ['compatible_with', 'Compatible with']]
 
 const ELECTRONICS_CATEGORIES = ['LED TVs', 'Mobile Phones', 'Chargers', 'Cables', 'Earphones and Headphones', 'Power Banks', 'Smartwatches', 'Speakers and Soundbars', 'Cases and Guards', 'Memory and Storage', 'Home Appliances', 'Lighting and Bulbs', 'Batteries', 'Computer Accessories', 'Accessories', 'Other']
 
@@ -43,20 +42,13 @@ const PRODUCT_NAMES: string[] = [
 
 export function ProductForm({ initial, categories, editingId, onSaved, onCancel, businessCategory, barcode }: { initial: Draft; categories: Category[]; editingId: string | null; onSaved: () => void; onCancel?: () => void; businessCategory?: string | null; barcode?: ScanResult | null }) {
   const electronics = businessCategory === 'electronics_mobile'
-  const [newAttrKey, setNewAttrKey] = useState('')
-  const [newAttrValue, setNewAttrValue] = useState('')
+  const attrFields = electronics ? ELECTRONICS_ATTRS : ATTRS
   const [d, setD] = useState<Draft>(!editingId && electronics ? { ...initial, generic: false } : initial)
   const [error, setError] = useState('')
   const set = (patch: Partial<Draft>) => setD(prev => ({ ...prev, ...patch }))
   const setAttr = (k: string, value: string) => setD(prev => ({ ...prev, attrs: { ...prev.attrs, [k]: value } }))
   const [otherCat, setOtherCat] = useState(false)
   const [brandNames, setBrandNames] = useState<string[]>([])
-  const [categoryAttributes, setCategoryAttributes] = useState<CategoryAttribute[]>([])
-  useEffect(() => {
-    const categoryId = categories.find(x => x.name === d.category)?.id
-    if (!categoryId) { setCategoryAttributes([]); return }
-    api<CategoryAttribute[]>('GET', `/categories/${categoryId}/attributes`).then(setCategoryAttributes).catch(() => setCategoryAttributes([]))
-  }, [d.category, categories])
   useEffect(() => { api<{ name: string; isActive: boolean }[]>('GET', '/brands').then(b => setBrandNames(b.filter(x => x.isActive).map(x => x.name))).catch(() => undefined) }, [])
   const pickCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
 	if (e.target.value === '__other') { setOtherCat(true); set({ category: '' }) } else { setOtherCat(false); set({ category: e.target.value }) }
@@ -65,10 +57,7 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const coreKeys = new Set(['colour', 'capacity', 'connector_type', 'compatible_with'])
-    const attributes = Object.fromEntries(Object.entries(d.attrs).filter(([k]) => coreKeys.has(k)))
-    const specs = Object.fromEntries(Object.entries(d.attrs).filter(([k]) => !coreKeys.has(k)))
-    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes, specs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp) }
+    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp) }
     try {
       if (editingId) await api('PUT', `/products/${editingId}`, body)
       else {
@@ -104,21 +93,8 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
         <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} /></label>
       </>}
       <fieldset>
-        <legend>Product specifications (optional)</legend>
-        {categoryAttributes.map(def => <label key={def.key}>{def.label}{def.unit ? ` (${def.unit})` : ''}{def.isRequired ? ' *' : ''}
-          {def.dataType === 'select' ? <select required={def.isRequired} value={d.attrs[def.key] ?? ''} onChange={e => setAttr(def.key, e.target.value)}><option value="">Not set</option>{def.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
-            : def.dataType === 'boolean' ? <select required={def.isRequired} value={d.attrs[def.key] ?? ''} onChange={e => setAttr(def.key, e.target.value)}><option value="">Not set</option><option value="true">Yes</option><option value="false">No</option></select>
-            : <input required={def.isRequired} type={def.dataType === 'number' || def.dataType === 'decimal' ? 'number' : def.dataType === 'date' ? 'date' : 'text'} value={d.attrs[def.key] ?? ''} onChange={e => setAttr(def.key, e.target.value)} maxLength={160} />}
-        </label>)}
-        {Object.entries(d.attrs).filter(([k]) => !categoryAttributes.some(def => def.key === k)).map(([k, value]) => <label key={k}>{attributeLabel(k)} <input value={value} onChange={e => setAttr(k, e.target.value)} maxLength={160} /></label>)}
-        <div className="form-actions">
-          <input aria-label="Specification name" value={newAttrKey} onChange={e => setNewAttrKey(e.target.value)} placeholder="e.g. energy_rating, fabric, pack_size" maxLength={60} />
-          <input aria-label="Specification value" value={newAttrValue} onChange={e => setNewAttrValue(e.target.value)} placeholder="Value" maxLength={160} />
-          <button type="button" className="secondary" disabled={!newAttrKey.trim() || !newAttrValue.trim()} onClick={() => {
-            const key = newAttrKey.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-            if (key) { setAttr(key, newAttrValue.trim()); setNewAttrKey(''); setNewAttrValue('') }
-          }}>Add specification</button>
-        </div>
+        <legend>Details (optional)</legend>
+        {attrFields.map(([k, label]) => <label key={k}>{label} <input value={d.attrs[k] ?? ''} onChange={e => setAttr(k, e.target.value)} maxLength={100} /></label>)}
       </fieldset>
       {editingId && <label className="check"><input type="checkbox" checked={d.active} onChange={e => set({ active: e.target.checked })} /> Active (untick to hide from lists)</label>}
       {barcode && !editingId && <p className="hint-line">Barcode <strong>{barcode.code}</strong> will be linked to this product when you save.</p>}
@@ -130,56 +106,6 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
       {error && <p role="alert">{error}</p>}
     </form>
   )
-}
-
-function CategoryAttributeEditor({ categories }: { categories: Category[] }) {
-  const [categoryId, setCategoryId] = useState('')
-  const [definitions, setDefinitions] = useState<CategoryAttribute[]>([])
-  const [key, setKey] = useState('')
-  const [label, setLabel] = useState('')
-  const [dataType, setDataType] = useState('text')
-  const [unit, setUnit] = useState('')
-  const [options, setOptions] = useState('')
-  const [required, setRequired] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  useEffect(() => {
-    if (!categoryId) { setDefinitions([]); return }
-    api<CategoryAttribute[]>('GET', `/categories/${categoryId}/attributes`).then(setDefinitions).catch(e => setMessage(msg(e)))
-  }, [categoryId])
-  function add() {
-    const k = key.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-    if (!k || !label.trim() || definitions.some(d => d.key === k)) return
-    setDefinitions([...definitions, { key: k, label: label.trim(), dataType, unit: unit.trim() || null, isRequired: required, isSearchable: false, isFilterable: false, displayOrder: definitions.length, options: dataType === 'select' ? options.split(',').map(x => x.trim()).filter(Boolean) : [] }])
-    setKey(''); setLabel(''); setUnit(''); setOptions(''); setRequired(false)
-  }
-  async function save() {
-    if (!categoryId) return
-    setBusy(true); setMessage('')
-    try { await api('PUT', `/categories/${categoryId}/attributes`, definitions); setMessage('Category attributes saved.') }
-    catch (e) { setMessage(msg(e)) }
-    finally { setBusy(false) }
-  }
-  return <div className="import-block" aria-label="Category attribute configuration">
-    <h3>Product attributes by category</h3>
-    <p className="hint-line">Configure the specifications that matter for each category. These definitions belong to this business only.</p>
-    <label>Category <select value={categoryId} onChange={e => setCategoryId(e.target.value)}><option value="">Choose category</option>{categories.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-    {categoryId && <>
-      {definitions.map((d, i) => <div className="area" key={d.key}>
-        <strong>{d.label}</strong> <span className="hint-line">({d.key} · {d.dataType}{d.unit ? ` · ${d.unit}` : ''})</span>
-        <label className="check"><input type="checkbox" checked={d.isRequired} onChange={e => setDefinitions(definitions.map((x, n) => n === i ? { ...x, isRequired: e.target.checked } : x))}/> Required</label>
-        <button type="button" className="secondary" onClick={() => setDefinitions(definitions.filter((_, n) => n !== i))}>Remove</button>
-      </div>)}
-      <label>Attribute key <input value={key} onChange={e => setKey(e.target.value)} placeholder="e.g. screen_size" /></label>
-      <label>Display label <input value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Screen size" /></label>
-      <label>Type <select value={dataType} onChange={e => setDataType(e.target.value)}>{['text','number','decimal','boolean','date','select'].map(x => <option key={x}>{x}</option>)}</select></label>
-      <label>Unit (optional) <input value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g. inch, kg, litre" /></label>
-      {dataType === 'select' && <label>Options (comma separated) <input value={options} onChange={e => setOptions(e.target.value)} placeholder="Front load, Top load" /></label>}
-      <label className="check"><input type="checkbox" checked={required} onChange={e => setRequired(e.target.checked)}/> Required</label>
-      <div className="form-actions"><button type="button" className="secondary" onClick={add} disabled={!key.trim() || !label.trim()}>Add attribute</button><button type="button" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save category attributes'}</button></div>
-    </>}
-    {message && <p role="status">{message}</p>}
-  </div>
 }
 
 export function Catalogue({ reload, businessCategory }: { reload: () => void; businessCategory?: string | null }) {
@@ -340,7 +266,6 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 			  <button type="submit">Save</button> <button type="button" className="secondary" onClick={() => setRenaming(null)}>Cancel</button>
 			</form>
 		  )}
-          <CategoryAttributeEditor categories={categories} />
 		</>
 	  )}
 	</section>

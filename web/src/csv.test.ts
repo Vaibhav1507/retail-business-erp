@@ -23,17 +23,4 @@ describe('csv import helpers', () => {
     expect(rows[0]).toMatchObject({ isGeneric: true, baseUnit: 'pcs', brand: null, attributes: { colour: 'Black' } })
     expect(rows[1]).toMatchObject({ isGeneric: false, baseUnit: 'pcs', brand: 'Volt', attributes: {} })
   })
-
-  it('preserves arbitrary category-specific columns as flexible product specs', () => {
-    const headers = ['Product Name', 'Category', 'Brand', 'Model', 'Attribute: Energy Rating', 'Attribute: Load Type']
-    const mapping = autoMap(headers)
-    const rows = toImportRows([['Washer', 'Washing Machines', 'LG', 'TX-1', '5 Star', 'Top Load']], mapping, headers)
-    expect(rows[0]).toMatchObject({
-      attributes: {},
-      specs: { energy_rating: '5 Star', load_type: 'Top Load' },
-      brand: 'LG',
-      model: 'TX-1',
-    })
-  })
-
 })
