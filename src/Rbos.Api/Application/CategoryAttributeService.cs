@@ -39,6 +39,29 @@ public sealed class CategoryAttributeService(TenantDb db)
         return ServiceResult<object>.Ok(result);
     }
 
+    public async Task<string?> PromptGuidanceAsync(Guid uid, CancellationToken ct)
+    {
+        var tenantId = await db.FindTenantAsync(uid, ct);
+        if (tenantId is null) return null;
+        await using var s = await db.BeginAsync(uid, tenantId.Value, ct);
+        await using var c = s.Command(@"select cat.name,d.attribute_key,d.label,d.unit
+            from catalog.category_attribute_definition d
+            join catalog.category cat on cat.tenant_id=d.tenant_id and cat.id=d.category_id
+            where d.tenant_id=@t order by cat.name,d.display_order,d.label");
+        c.Parameters.AddWithValue("t", tenantId.Value);
+        var groups = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        await using var r = await c.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            var category = r.GetString(0);
+            if (!groups.TryGetValue(category, out var fields)) groups[category] = fields = [];
+            fields.Add(r.GetString(1) + " (" + r.GetString(2) + (r.IsDBNull(3) ? "" : ", unit " + r.GetString(3)) + ")");
+        }
+        if (groups.Count == 0) return null;
+        return "Tenant-configured category attribute guidance (use when a category matches; also extract other relevant attributes when present): " +
+            string.Join("; ", groups.Select(g => g.Key + ": " + string.Join(", ", g.Value)));
+    }
+
     public async Task<ServiceResult<object>> SaveAsync(Guid uid, Guid categoryId, List<CategoryAttributeDefinition>? definitions, CancellationToken ct)
     {
         if (definitions is null || definitions.Count > 40)
