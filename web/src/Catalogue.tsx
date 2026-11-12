@@ -337,8 +337,8 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 			  <button type="submit">Save</button> <button type="button" className="secondary" onClick={() => setRenaming(null)}>Cancel</button>
 			</form>
 		  )}
-		</>
           <CategoryAttributeEditor categories={categories} />
+		</>
 	  )}
 	</section>
   )
