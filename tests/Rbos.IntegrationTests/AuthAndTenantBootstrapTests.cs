@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Rbos.Api.Application;
 
 namespace Rbos.IntegrationTests;
 
@@ -16,6 +19,27 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 		builder.UseEnvironment("Development");
 		builder.UseSetting("Rbos:Database", "test");
 		builder.UseSetting("Rbos:AllowOpenRegistration", OpenRegistration ? "true" : "false");
+		builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+		{
+			["Gemini:ApiKey"] = "integration-test-only",
+			["Gemini:Model"] = "integration-test-model",
+			["Gemini:FallbackModel"] = "integration-test-model"
+		}));
+		builder.ConfigureTestServices(services => services
+			.AddHttpClient<ProductFileReader>()
+			.ConfigurePrimaryHttpMessageHandler(() => new StubGeminiHandler()));
+	}
+}
+
+internal sealed class StubGeminiHandler : HttpMessageHandler
+{
+	protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+	{
+		if (request.RequestUri?.Host != "generativelanguage.googleapis.com")
+			throw new InvalidOperationException("Unexpected outbound HTTP request in integration test.");
+		const string extracted = """{"products":[{"name":"LG Washer 7kg","category":"Washing Machine","unit":"pcs","brand":"LG","model":"FHM1207","attributes":{"capacity":"7kg"}},{"name":"LG Top Load 9kg","category":"Washing Machine","unit":"pcs","brand":"LG","model":"T9585","attributes":{"capacity":"9kg"}}]}""";
+		var response = new { candidates = new[] { new { content = new { parts = new[] { new { text = extracted } } } } } };
+		return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) });
 	}
 }
 
