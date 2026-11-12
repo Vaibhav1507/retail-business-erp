@@ -45,7 +45,7 @@ const labelsHi: Record<string,string> = {
 }
 function targetLabel(target: NavigationTarget, language: 'en'|'hi') { return language === 'hi' ? labelsHi[target.id] || target.label : target.label }
 
-type WorkerMessage = {type:string; loaded?:number; total?:number; source?:string; saved?:boolean; id?:number; text?:string; message?:string}
+type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; source?:string; saved?:boolean; id?:number; text?:string; message?:string}
 export function NavigationAssistant() {
  const [query,setQuery] = useState('')
  const [message,setMessage] = useState('')
