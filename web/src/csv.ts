@@ -6,6 +6,7 @@ export type ImportRow = {
   brand: string | null
   model: string | null
   attributes: Record<string, string>
+  specs: Record<string, string>
 }
 
 export const FIELDS = [
@@ -81,17 +82,26 @@ export function missingRequired(m: Mapping): string[] {
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
 
 /** Converts data rows (header excluded) to API rows. A product with no brand and no model is generic. */
-export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
+export function toImportRows(data: string[][], m: Mapping, headers: string[] = []): ImportRow[] {
   const get = (r: string[], k: FieldKey) => (m[k] === undefined ? '' : (r[m[k]!] ?? '').trim())
+  const mapped = new Set(Object.values(m).filter((v): v is number => v !== undefined))
   return data.map(r => {
     const brand = get(r, 'brand')
     const model = get(r, 'model')
     const unitRaw = get(r, 'unit')
     const attributes: Record<string, string> = {}
+    const specs: Record<string, string> = {}
     for (const k of ['colour', 'capacity', 'connector_type', 'compatible_with'] as const) {
       const v = get(r, k)
       if (v) attributes[k] = v
     }
+    // Preserve additional AI-extracted or user-supplied specification columns.
+    r.forEach((raw, index) => {
+      if (mapped.has(index) || !raw?.trim()) return
+      const label = (headers[index] ?? '').replace(/^attribute:\s*/i, '').trim()
+      const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+      if (key && !['name', 'category', 'unit', 'brand', 'model'].includes(key)) specs[key] = raw.trim()
+    })
     return {
       name: get(r, 'name'),
       categoryName: get(r, 'category'),
@@ -100,8 +110,8 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
       brand: brand || null,
       model: model || null,
       attributes,
+      specs,
     }
   })
 }
-
 export const SAMPLE_CSV = 'Product Name,Category,Unit,Brand,Model,Colour,Capacity,Connector Type,Compatible With\nUSB-C Cable 1m,Cables,pcs,,,Black,1m,USB-C,\nFast Charger 20W,Chargers,pcs,Volt,VC-20,White,20W,USB-C,Phones\nHDMI Cable 2m,Cables,pcs,,,,2m,HDMI,\n'

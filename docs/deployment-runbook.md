@@ -13,9 +13,11 @@ Every step that creates accounts, cloud resources or touches the production data
 2. Create two roles:
    - `rbos_app`: runtime role, no DDL rights.
    - a migrator role: used only from a trusted machine.
-3. Run migrations with the migrator role (`ConnectionStrings:RbosProdMigrator`):
+3. Run pending migrations with the migrator role (`ConnectionStrings:RbosProdMigrator`):
    `dotnet run --project src/Rbos.Api -- --migrate prod`
-   This applies 001 to 037, including `037_data_protection_keys.sql`.
+   The runner applies all unapplied `db/migrations/*.sql` files in filename order. Before deploying code that uses tenant-configured category specifications, confirm that `043_category_attribute_definitions.sql` has been applied and that `catalog.category_attribute_definition` exists.
+   Verify the migration record with: `select name, applied_at from public.schema_migrations where name = '043_category_attribute_definitions.sql';`
+   Migrations are not applied automatically by API startup. The production GitHub migration workflow is manual and must be deliberately dispatched.
 4. Confirm `rbos_app` can select and insert on `identity.data_protection_key`.
 
 ## 3. Secrets and settings (Cloud Run)
