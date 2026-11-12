@@ -99,3 +99,164 @@ input[type='checkbox'] { width: 24px; height: 24px; min-width: 24px; min-height:
 :root[data-theme="dark"] .invoice th { color: #fff; background: #17369a; }
 @media (max-width: 720px) { :root[data-theme="dark"] tr { background: var(--card); } :root[data-theme="dark"] .invoice tr { background: transparent; } }
 
+
+
+/* Mobile usability pass: compact layouts, readable table cards and safe-area navigation. */
+@media (max-width: 720px) {
+  :root { --nav-h: 68px; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { min-width: 320px; }
+  .topbar { min-height: 54px; padding: 7px 12px; gap: 8px; }
+  .topbar h1 { min-width: 0; font-size: 17px; line-height: 1.2; }
+  .topbar .brand-logo { width: 34px; height: 34px; }
+  .content {
+    padding: 12px 12px calc(var(--nav-h) + env(safe-area-inset-bottom) + 20px);
+    min-width: 0;
+  }
+  .page-title { margin-bottom: 10px; }
+  .page-title h2 { font-size: 20px; line-height: 1.25; }
+  .page-title p { font-size: 14px; line-height: 1.4; }
+  section { padding: 12px; border-radius: 12px; }
+  .tabs {
+    gap: 6px;
+    margin: 0 -12px 12px;
+    padding: 0 12px 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+  }
+  .tabs a, .tabs button { scroll-snap-align: start; padding-inline: 13px; font-size: 14px; white-space: nowrap; }
+  .nav {
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    padding: 3px 2px env(safe-area-inset-bottom);
+    align-items: stretch;
+  }
+  .nav a {
+    min-width: 0;
+    padding: 4px 1px;
+    gap: 3px;
+    font-size: clamp(9px, 2.8vw, 11px);
+    line-height: 1.1;
+    text-align: center;
+    overflow-wrap: normal;
+  }
+  .nav a .ico { font-size: 21px; line-height: 1.05; }
+  form, .row-form { gap: 10px; align-items: stretch; }
+  label { min-width: 0; flex-basis: 100%; gap: 5px; }
+  input, select, textarea { min-width: 0; font-size: 16px; }
+  button, a.btn { max-width: 100%; }
+  .step-actions, .invoice-upload-actions, form .form-actions { display: grid; grid-template-columns: 1fr; width: 100%; }
+  .step-actions button, .invoice-upload-actions button, form .form-actions button { width: 100%; }
+  div[role='search'] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: stretch; }
+  .summary-bar { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .stock-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stock-actions > * { min-width: 0; }
+  .areas { gap: 10px; }
+  .area { min-width: 0; padding: 12px; }
+  .actions, .tiles { gap: 8px; }
+  .action, .tile { min-width: 0; padding: 12px; }
+  .pager {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    white-space: normal;
+    overflow: visible;
+    padding: 8px 0;
+  }
+  .pager > span:first-child { flex: 1 1 100%; }
+  .pager label { flex: 1 1 100%; }
+  .pager select { max-width: 110px; }
+  .paged, .table-scroll, .billing-screen .paged .table-scroll {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
+  table, tbody { display: block; width: 100%; }
+  thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  tbody { display: grid; gap: 9px; }
+  tbody tr {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 1px 2px rgba(27, 36, 48, .05);
+  }
+  tbody td {
+    display: grid;
+    grid-template-columns: minmax(92px, 38%) minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 5px 0;
+    border: 0;
+    text-align: left;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  tbody td::before {
+    content: attr(data-label);
+    min-width: 0;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.35;
+    text-align: left;
+  }
+  tbody td[data-label=''] { display: block; }
+  tbody td[data-label='']::before { content: none; }
+  tbody td:empty { display: none; }
+  tbody td > input, tbody td > select, tbody td > textarea { width: 100%; min-width: 0; }
+  tbody td > button { width: 100%; }
+  .billing-screen {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
+    padding: 12px;
+    border-radius: 12px;
+  }
+  .billing-screen > div:not([role]):not(.paged):not(.table-scroll) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .billing-screen button { width: 100%; justify-self: stretch; }
+  .billing-card { padding: 13px; border-radius: 12px; }
+  .billing-grid { grid-template-columns: minmax(0, 1fr); }
+  .billing-col-2, .billing-col-3, .billing-col-4, .billing-col-5,
+  .billing-col-6, .billing-col-8, .billing-col-12 { grid-column: 1 / -1; }
+  .billing-foot { align-items: stretch; flex-direction: column; gap: 10px; }
+  .billing-total { margin-left: 0; }
+  .billing-gst { flex-wrap: wrap; }
+  .bill { padding: 12px; }
+  .bill-head { flex-direction: column; align-items: stretch; gap: 8px; }
+  .line-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .line-grid .wide { grid-column: auto; }
+  .invoice-upload { gap: 10px; }
+  .invoice-upload-meta { line-height: 1.4; }
+  .invoice-upload-review { min-width: 0; }
+  .invoice-upload-actions { gap: 8px; }
+  .catalogue-screen div[role='search'] { grid-template-columns: minmax(0, 1fr); }
+  .catalogue-screen .stock-actions { grid-template-columns: minmax(0, 1fr); }
+  .catalogue-screen .invoice-upload-pick input[type='file'],
+  .invoice-upload-pick input[type='file'] { width: 100%; min-width: 0; padding: 10px; }
+  .setup form { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  form.product-form, form.product-form fieldset { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  form.product-form fieldset { padding: 12px; }
+  .linklist a { padding: 12px; font-size: 15px; }
+  .list-row { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .scanner { padding: 12px; }
+  .scanner-manual { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 380px) {
+  .nav a { font-size: 9px; }
+  .nav a .ico { font-size: 19px; }
+  .content { padding-inline: 10px; }
+  .stock-actions { grid-template-columns: minmax(0, 1fr); }
+  .areas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  tbody td { grid-template-columns: minmax(78px, 36%) minmax(0, 1fr); gap: 6px; }
+}
