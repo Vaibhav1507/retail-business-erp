@@ -111,7 +111,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         <div role="region" aria-label="Upload product list" className="invoice-upload">
           <label className="invoice-upload-pick">
             Upload a product list (optional). Excel, Word, CSV or text PDF catalogues are read directly. Scanned PDFs can be processed using server-side OCR when available. A photo of a list is read with AI.
-            <input type="file" accept=".csv,.xlsx,.docx,.pdf,text/csv,application/pdf,image/*" disabled={busy} onChange={e => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
+            <input type="file" accept="*/*" disabled={busy} onChange={e => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
           </label>
           {busy && <p role="status">Reading file...</p>}
           <p>or <button type="button" className="secondary" onClick={() => accept(parseCsv(SAMPLE_CSV), false)}>Try with sample data</button></p>
