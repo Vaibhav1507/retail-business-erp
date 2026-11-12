@@ -91,7 +91,7 @@ public class MembershipIsolationTests(ApiFactory f) : IClassFixture<ApiFactory>
 {
     static NpgsqlConnection Migrator()
     {
-        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
+        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
         return new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]);
     }
 
@@ -109,7 +109,7 @@ public class MembershipIsolationTests(ApiFactory f) : IClassFixture<ApiFactory>
     {
         var a = new Client(f); var b = new Client(f);
         await a.SignUpAndBootstrap(); await b.SignUpAndBootstrap();
-        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
+        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
         await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestApp"]);
         await conn.OpenAsync();
         await using var tx = await conn.BeginTransactionAsync();
