@@ -18,13 +18,13 @@ export type Category = { id: string; name: string; productCount: number }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong')
 const UNITS = ['pcs', 'set', 'pack', 'm']
-const ATTRS: [string, string][] = [['colour', 'Colour'], ['capacity', 'Capacity'], ['connector_type', 'Connector type'], ['compatible_with', 'Compatible with']]
+const attributeLabel = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, x => x.toUpperCase())
 
 export type Draft = { name: string; category: string; unit: string; generic: boolean; brand: string; model: string; attrs: Record<string, string>; active: boolean; hsn: string; gst: string; mrp: string }
 export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true, hsn: '', gst: '', mrp: '' }
-export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate), mrp: p.mrp == null ? '' : String(p.mrp) })
+export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...(p.specs ?? {}), ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate), mrp: p.mrp == null ? '' : String(p.mrp) })
 
-const ELECTRONICS_ATTRS: [string, string][] = [['capacity', 'Screen size or capacity (e.g. 43 inch, 10000mAh)'], ['colour', 'Colour'], ['connector_type', 'Connector / resolution (e.g. USB-C, 4K)'], ['compatible_with', 'Compatible with']]
+
 
 const ELECTRONICS_CATEGORIES = ['LED TVs', 'Mobile Phones', 'Chargers', 'Cables', 'Earphones and Headphones', 'Power Banks', 'Smartwatches', 'Speakers and Soundbars', 'Cases and Guards', 'Memory and Storage', 'Home Appliances', 'Lighting and Bulbs', 'Batteries', 'Computer Accessories', 'Accessories', 'Other']
 
@@ -42,7 +42,8 @@ const PRODUCT_NAMES: string[] = [
 
 export function ProductForm({ initial, categories, editingId, onSaved, onCancel, businessCategory, barcode }: { initial: Draft; categories: Category[]; editingId: string | null; onSaved: () => void; onCancel?: () => void; businessCategory?: string | null; barcode?: ScanResult | null }) {
   const electronics = businessCategory === 'electronics_mobile'
-  const attrFields = electronics ? ELECTRONICS_ATTRS : ATTRS
+  const [newAttrKey, setNewAttrKey] = useState('')
+  const [newAttrValue, setNewAttrValue] = useState('')
   const [d, setD] = useState<Draft>(!editingId && electronics ? { ...initial, generic: false } : initial)
   const [error, setError] = useState('')
   const set = (patch: Partial<Draft>) => setD(prev => ({ ...prev, ...patch }))
@@ -93,8 +94,16 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
         <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} /></label>
       </>}
       <fieldset>
-        <legend>Details (optional)</legend>
-        {attrFields.map(([k, label]) => <label key={k}>{label} <input value={d.attrs[k] ?? ''} onChange={e => setAttr(k, e.target.value)} maxLength={100} /></label>)}
+        <legend>Product specifications (optional)</legend>
+        {Object.entries(d.attrs).map(([k, value]) => <label key={k}>{attributeLabel(k)} <input value={value} onChange={e => setAttr(k, e.target.value)} maxLength={160} /></label>)}
+        <div className="form-actions">
+          <input aria-label="Specification name" value={newAttrKey} onChange={e => setNewAttrKey(e.target.value)} placeholder="e.g. energy_rating, fabric, pack_size" maxLength={60} />
+          <input aria-label="Specification value" value={newAttrValue} onChange={e => setNewAttrValue(e.target.value)} placeholder="Value" maxLength={160} />
+          <button type="button" className="secondary" disabled={!newAttrKey.trim() || !newAttrValue.trim()} onClick={() => {
+            const key = newAttrKey.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+            if (key) { setAttr(key, newAttrValue.trim()); setNewAttrKey(''); setNewAttrValue('') }
+          }}>Add specification</button>
+        </div>
       </fieldset>
       {editingId && <label className="check"><input type="checkbox" checked={d.active} onChange={e => set({ active: e.target.checked })} /> Active (untick to hide from lists)</label>}
       {barcode && !editingId && <p className="hint-line">Barcode <strong>{barcode.code}</strong> will be linked to this product when you save.</p>}
