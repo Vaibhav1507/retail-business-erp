@@ -8,7 +8,7 @@ public class SchemaGuardTests
     [Fact]
     public async Task Every_table_with_tenant_id_has_forced_row_level_security()
     {
-        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
+        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
         await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]);
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand(@"
@@ -27,7 +27,7 @@ public class SchemaGuardTests
     [Fact]
     public async Task Application_role_cannot_bypass_rls_or_own_tables()
     {
-        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
+        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
         await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]);
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand(@"
