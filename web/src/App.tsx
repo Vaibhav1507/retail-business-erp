@@ -106,6 +106,25 @@ export default function App() {
     api<{ businessName: string; language: string }>('GET', '/business-profile').then(p => { setBusinessName(p.businessName); const l = toLang(localStorage.getItem('rbos.lang') ?? p.language); setLanguage(l); setLang(l) }).catch(() => undefined)
   }, [me?.tenantId, me?.profileComplete])
   useEffect(() => { document.documentElement.lang = lang; document.title = t('app.title') }, [lang])
+  useEffect(() => {
+    const root = document.getElementById('root')
+    if (!root) return
+    const labelTables = () => {
+      root.querySelectorAll<HTMLTableElement>('table').forEach(table => {
+        const labels = Array.from(table.tHead?.querySelectorAll('th') ?? []).map(th => (th.textContent ?? '').trim())
+        if (labels.length === 0) return
+        table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => {
+          Array.from(row.cells).forEach((cell, index) => {
+            if (!cell.hasAttribute('data-label') && labels[index]) cell.setAttribute('data-label', labels[index])
+          })
+        })
+      })
+    }
+    labelTables()
+    const observer = new MutationObserver(labelTables)
+    observer.observe(root, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [])
   useEffect(() => { if (me?.tenantId) loadData().catch(() => undefined) }, [me?.tenantId, loadData])
   useEffect(() => {
 	const on = () => { setRoute(parseRoute()); window.scrollTo(0, 0) }
