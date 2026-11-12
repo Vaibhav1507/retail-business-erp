@@ -59,7 +59,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       } else if (name.endsWith('.xlsx') || name.endsWith('.docx') || name.endsWith('.pdf')) {
         if (file.size > MAX_BYTES) throw new Error('File is larger than 12 MB. Split or compress it and try again.')
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: file.type, data: await toBase64(file) })
-        accept(r.rows, false)
+        accept(r.rows, r.usedAi ?? false)
         if (r.incomplete && r.warning) setError(r.warning)
         if (name.endsWith('.pdf')) {
           setPages(r.pages ?? [])
@@ -122,7 +122,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         <div className="invoice-upload">
           {fromAi ? (
             <>
-              <p className="invoice-upload-meta">We read these products from your photo using AI. Check and fix anything wrong, then continue. Name and Category are required.</p>
+              <p className="invoice-upload-meta">We identified these products from your document using AI. Check the model, brand, category and specifications, correct anything needed, then preview the import.</p>
               <div className="table-scroll">
                 <table>
                   <thead><tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
