@@ -80,7 +80,7 @@ public class AuthAndTenantBootstrapTests(ApiFactory f) : IClassFixture<ApiFactor
 {
 	static string AppConnection()
 	{
-		var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
+		var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
 		return cfg["ConnectionStrings:RbosTestApp"]!;
 	}
 
@@ -205,7 +205,7 @@ public class AuthAndTenantBootstrapTests(ApiFactory f) : IClassFixture<ApiFactor
 
 	static async Task<Guid> UserId(string email)
 	{
-		var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().Build();
+		var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
 		await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestApp"]);
 		await conn.OpenAsync();
 		await using var cmd = new NpgsqlCommand("select \"Id\" from identity.\"AspNetUsers\" where \"NormalizedUserName\" = @n", conn);
