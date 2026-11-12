@@ -52,7 +52,7 @@ export const navigationTargets: NavigationTarget[] = [
 
 const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke'])
 const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
-const transaction = /\b(delete|remove|cancel|create|make payment|pay \d|send|transfer \d|post|save|submit|bhejo|bhej do|jama karo|darj karo|बना दो|हटा दो|भेजो|जमा करो|पोस्ट करो)\b/i
+const transaction = /\\b(delete|remove|cancel|make payment|pay \\d|send|transfer \\d|post|save|submit|bhejo|bhej do|jama karo|darj karo|हटा दो|भेजो|जमा करो|पोस्ट करो)\\b/i
 const ambiguous = new Map<string, string[]>([
   ['return', ['sell.return','buy.return']], ['returns', ['sell.return','buy.return']], ['wapasi', ['sell.return','buy.return']], ['वापसी', ['sell.return','buy.return']],
   ['payment', ['sell.collect','buy.pay']], ['pay', ['sell.collect','buy.pay']], ['history', ['sell.bills','buy.history','stock.history','parties.purchases','more.audit']],
@@ -74,7 +74,7 @@ function similarity(query: string[], phrase: string[]): number {
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
-  if (dataQuestion.test(q) || transaction.test(q) || /https?:|\.com\b|\d/.test(q)) return { kind: 'reject' }
+  if (dataQuestion.test(q) || /कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री|मेरे पास|मेरी दुकान|मेरा बकाया/.test(q) || transaction.test(q) || /https?:|\\.com\\b|\\d/.test(q)) return { kind: 'reject' }
   const qTokens = tokens(q)
   if (qTokens.length === 1 && ambiguous.has(qTokens[0])) {
     const ids = ambiguous.get(qTokens[0])!
