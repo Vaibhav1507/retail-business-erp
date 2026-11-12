@@ -3,6 +3,7 @@
 export type Lang = 'en' | 'hi'
 
 const en = {
+  'navigation.leave': 'You may have unsaved work on this screen. Leave without saving?',
   'app.title': 'Retail Business OS',
   'app.signOut': 'Sign out',
   'app.loading': 'Loading...',
@@ -187,6 +188,7 @@ const en = {
 
 export type MessageKey = keyof typeof en
 
+  'navigation.leave': 'इस स्क्रीन पर आपका काम सेव नहीं हुआ हो सकता है। बिना सेव किए आगे बढ़ें?',
 const hi: Record<MessageKey, string> = {
   'navigation.leave': 'इस स्क्रीन पर आपका काम सेव नहीं हुआ हो सकता है। बिना सेव किए आगे बढ़ें?',
   'app.title': 'रिटेल बिज़नेस OS',
