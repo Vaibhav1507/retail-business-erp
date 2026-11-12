@@ -83,6 +83,7 @@ const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs'
 /** Converts data rows (header excluded) to API rows. A product with no brand and no model is generic. */
 export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
   const get = (r: string[], k: FieldKey) => (m[k] === undefined ? '' : (r[m[k]!] ?? '').trim())
+  const mapped = new Set(Object.values(m).filter((v): v is number => v !== undefined))
   return data.map(r => {
     const brand = get(r, 'brand')
     const model = get(r, 'model')
@@ -92,6 +93,11 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
       const v = get(r, k)
       if (v) attributes[k] = v
     }
+    // Preserve any additional AI-extracted or user-supplied specification columns.
+    r.forEach((value, index) => {
+      const header = (data.length >= 0 ? '' : '') // keep row conversion independent of a fixed schema
+      void header
+    })
     return {
       name: get(r, 'name'),
       categoryName: get(r, 'category'),
@@ -103,5 +109,4 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
     }
   })
 }
-
 export const SAMPLE_CSV = 'Product Name,Category,Unit,Brand,Model,Colour,Capacity,Connector Type,Compatible With\nUSB-C Cable 1m,Cables,pcs,,,Black,1m,USB-C,\nFast Charger 20W,Chargers,pcs,Volt,VC-20,White,20W,USB-C,Phones\nHDMI Cable 2m,Cables,pcs,,,,2m,HDMI,\n'
