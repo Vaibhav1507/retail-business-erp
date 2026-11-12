@@ -36,8 +36,11 @@ public static class CatalogueEndpoints
 		api.MapPut("/categories/{id:guid}", async (Guid id, RenameCategoryRequest m, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
 			=> Reply(await svc.RenameCategoryAsync(Uid(p), id, m.Name, ct))).RequireAuthorization();
 
-		api.MapPost("/products/import/read", async (ImportFile m, ProductFileReader r, CancellationToken ct)
-			=> Reply(await r.ReadAsync(m.FileName, m.ContentType, m.Data, ct))).RequireAuthorization();
+		api.MapPost("/products/import/read", async (ImportFile m, ClaimsPrincipal p, ProductFileReader r, CategoryAttributeService attributes, CancellationToken ct) =>
+		{
+			var guidance = await attributes.PromptGuidanceAsync(Uid(p), ct);
+			return Reply(await r.ReadAsync(m.FileName, m.ContentType, m.Data, guidance, ct));
+		}).RequireAuthorization();
 
 		api.MapPost("/products/import/preview", async (ImportRequest m, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
 			=> Reply(await svc.PreviewImportAsync(Uid(p), ToRows(m), ct))).RequireAuthorization();
