@@ -1,0 +1,1732 @@
+{
+  "version": "v1",
+  "generator": "scripts/build-lexicon.mjs",
+  "sourceHashes": {
+    "destinations": "54f2bd7bb30be11bf08141b68fa5ed7981fdf2538bd2463818e6388288813e25",
+    "anchors": "9a3c016d6339a026f3690d7e43d99ea29dd390a99f7b0e6135275ca997db5b06"
+  },
+  "stats": {
+    "anchors": 200,
+    "keys": 260,
+    "taggedKeys": 199,
+    "synonymPairs": 0,
+    "synonymClasses": 0,
+    "foldCollisions": 39
+  },
+  "synonymPairs": [],
+  "foldCollisions": [
+    {
+      "key": "aur",
+      "sources": [
+        "aur",
+        "और"
+      ]
+    },
+    {
+      "key": "aya",
+      "sources": [
+        "aaya",
+        "आया"
+      ]
+    },
+    {
+      "key": "baki",
+      "sources": [
+        "baaki",
+        "baki"
+      ]
+    },
+    {
+      "key": "banao",
+      "sources": [
+        "banao",
+        "बनाओ"
+      ]
+    },
+    {
+      "key": "band",
+      "sources": [
+        "band",
+        "बंद"
+      ]
+    },
+    {
+      "key": "bil",
+      "sources": [
+        "bill",
+        "बिल"
+      ]
+    },
+    {
+      "key": "dekho",
+      "sources": [
+        "dekho",
+        "देखो"
+      ]
+    },
+    {
+      "key": "dikhao",
+      "sources": [
+        "dikhao",
+        "दिखाओ"
+      ]
+    },
+    {
+      "key": "dukan",
+      "sources": [
+        "dukaan",
+        "दुकान"
+      ]
+    },
+    {
+      "key": "grahak",
+      "sources": [
+        "grahak",
+        "ग्राहक"
+      ]
+    },
+    {
+      "key": "hai",
+      "sources": [
+        "hai",
+        "है"
+      ]
+    },
+    {
+      "key": "hain",
+      "sources": [
+        "hain",
+        "हैं"
+      ]
+    },
+    {
+      "key": "hisab",
+      "sources": [
+        "hisaab",
+        "हिसाब"
+      ]
+    },
+    {
+      "key": "import",
+      "sources": [
+        "import",
+        "इम्पोर्ट"
+      ]
+    },
+    {
+      "key": "ka",
+      "sources": [
+        "ka",
+        "का"
+      ]
+    },
+    {
+      "key": "kam",
+      "sources": [
+        "kam",
+        "कम"
+      ]
+    },
+    {
+      "key": "karo",
+      "sources": [
+        "karo",
+        "करो"
+      ]
+    },
+    {
+      "key": "kharcha",
+      "sources": [
+        "kharcha",
+        "खर्चा"
+      ]
+    },
+    {
+      "key": "kharid",
+      "sources": [
+        "kharid",
+        "खरीद"
+      ]
+    },
+    {
+      "key": "ki",
+      "sources": [
+        "ki",
+        "की"
+      ]
+    },
+    {
+      "key": "kiya",
+      "sources": [
+        "kiya",
+        "किया"
+      ]
+    },
+    {
+      "key": "ko",
+      "sources": [
+        "ko",
+        "को"
+      ]
+    },
+    {
+      "key": "kya",
+      "sources": [
+        "kya",
+        "क्या"
+      ]
+    },
+    {
+      "key": "list",
+      "sources": [
+        "list",
+        "लिस्ट"
+      ]
+    },
+    {
+      "key": "lok",
+      "sources": [
+        "lock",
+        "लॉक"
+      ]
+    },
+    {
+      "key": "mal",
+      "sources": [
+        "maal",
+        "माल"
+      ]
+    },
+    {
+      "key": "malik",
+      "sources": [
+        "malik",
+        "मालिक"
+      ]
+    },
+    {
+      "key": "menu",
+      "sources": [
+        "menu",
+        "मेनू"
+      ]
+    },
+    {
+      "key": "naya",
+      "sources": [
+        "naya",
+        "नया"
+      ]
+    },
+    {
+      "key": "ne",
+      "sources": [
+        "ne",
+        "ने"
+      ]
+    },
+    {
+      "key": "print",
+      "sources": [
+        "print",
+        "प्रिंट"
+      ]
+    },
+    {
+      "key": "purana",
+      "sources": [
+        "purana",
+        "पुराना"
+      ]
+    },
+    {
+      "key": "purane",
+      "sources": [
+        "purane",
+        "पुराने"
+      ]
+    },
+    {
+      "key": "saman",
+      "sources": [
+        "saman",
+        "सामान"
+      ]
+    },
+    {
+      "key": "se",
+      "sources": [
+        "se",
+        "से"
+      ]
+    },
+    {
+      "key": "setings",
+      "sources": [
+        "settings",
+        "सेटिंग्स"
+      ]
+    },
+    {
+      "key": "stok",
+      "sources": [
+        "stock",
+        "स्टॉक"
+      ]
+    },
+    {
+      "key": "vala",
+      "sources": [
+        "wala",
+        "वाला"
+      ]
+    },
+    {
+      "key": "vapas",
+      "sources": [
+        "wapas",
+        "वापस"
+      ]
+    }
+  ],
+  "tokens": {
+    "a": {
+      "tags": [],
+      "classRep": "a"
+    },
+    "aces": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "aces"
+    },
+    "ad": {
+      "tags": [],
+      "classRep": "ad"
+    },
+    "adjust": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "adjust"
+    },
+    "adjustment": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "adjustment"
+    },
+    "age": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "age"
+    },
+    "ageing": {
+      "tags": [],
+      "classRep": "ageing"
+    },
+    "aj": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "aj"
+    },
+    "al": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "al"
+    },
+    "alerts": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "alerts"
+    },
+    "and": {
+      "tags": [],
+      "classRep": "and"
+    },
+    "asistant": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "asistant"
+    },
+    "audit": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "audit"
+    },
+    "aur": {
+      "tags": [],
+      "classRep": "aur"
+    },
+    "aya": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "aya"
+    },
+    "bacha": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "bacha"
+    },
+    "badalav": {
+      "tags": [],
+      "classRep": "badalav"
+    },
+    "badalo": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "badalo"
+    },
+    "badla": {
+      "tags": [],
+      "classRep": "badla"
+    },
+    "badlo": {
+      "tags": [
+        "@settings"
+      ],
+      "classRep": "badlo"
+    },
+    "baink": {
+      "tags": [],
+      "classRep": "baink"
+    },
+    "bakaya": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "bakaya"
+    },
+    "baki": {
+      "tags": [],
+      "classRep": "baki"
+    },
+    "balance": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "balance"
+    },
+    "banao": {
+      "tags": [],
+      "classRep": "banao"
+    },
+    "band": {
+      "tags": [],
+      "classRep": "band"
+    },
+    "bank": {
+      "tags": [],
+      "classRep": "bank"
+    },
+    "bechane": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "bechane"
+    },
+    "betvin": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "betvin"
+    },
+    "bhejna": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "bhejna"
+    },
+    "bhejo": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "bhejo"
+    },
+    "bhugtan": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "bhugtan"
+    },
+    "bikri": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "bikri"
+    },
+    "bil": {
+      "tags": [],
+      "classRep": "bil"
+    },
+    "bils": {
+      "tags": [],
+      "classRep": "bils"
+    },
+    "borovings": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "borovings"
+    },
+    "bought": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "bought"
+    },
+    "box": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "box"
+    },
+    "branch": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "branch"
+    },
+    "branches": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "branches"
+    },
+    "buks": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "buks"
+    },
+    "busines": {
+      "tags": [
+        "@settings"
+      ],
+      "classRep": "busines"
+    },
+    "by": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "by"
+    },
+    "capital": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "capital"
+    },
+    "cash": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "cash"
+    },
+    "catalogue": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "catalogue"
+    },
+    "chalo": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "chalo"
+    },
+    "change": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "change"
+    },
+    "chapai": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "chapai"
+    },
+    "chek": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "chek"
+    },
+    "chetavani": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "chetavani"
+    },
+    "close": {
+      "tags": [],
+      "classRep": "close"
+    },
+    "closing": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "closing"
+    },
+    "colect": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "colect"
+    },
+    "conversion": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "conversion"
+    },
+    "corection": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "corection"
+    },
+    "corections": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "corections"
+    },
+    "count": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "count"
+    },
+    "curent": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "curent"
+    },
+    "customer": {
+      "tags": [],
+      "classRep": "customer"
+    },
+    "customers": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "customers"
+    },
+    "dala": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "dala"
+    },
+    "dalna": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "dalna"
+    },
+    "dalo": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "dalo"
+    },
+    "dashboard": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "dashboard"
+    },
+    "day": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "day"
+    },
+    "dekhna": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "dekhna"
+    },
+    "dekhne": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "dekhne"
+    },
+    "dekho": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "dekho"
+    },
+    "dena": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "dena"
+    },
+    "details": {
+      "tags": [
+        "@settings"
+      ],
+      "classRep": "details"
+    },
+    "dikhao": {
+      "tags": [],
+      "classRep": "dikhao"
+    },
+    "din": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "din"
+    },
+    "do": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "do"
+    },
+    "documents": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "documents"
+    },
+    "dravings": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "dravings"
+    },
+    "dues": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "dues"
+    },
+    "dukan": {
+      "tags": [],
+      "classRep": "dukan"
+    },
+    "dusari": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "dusari"
+    },
+    "dusri": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "dusri"
+    },
+    "entry": {
+      "tags": [],
+      "classRep": "entry"
+    },
+    "excel": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "excel"
+    },
+    "expense": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "expense"
+    },
+    "expenses": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "expenses"
+    },
+    "file": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "file"
+    },
+    "from": {
+      "tags": [],
+      "classRep": "from"
+    },
+    "fysical": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "fysical"
+    },
+    "gala": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "gala"
+    },
+    "gina": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "gina"
+    },
+    "ginati": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "ginati"
+    },
+    "ginti": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "ginti"
+    },
+    "go": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "go"
+    },
+    "godovn": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "godovn"
+    },
+    "grahak": {
+      "tags": [],
+      "classRep": "grahak"
+    },
+    "grahakon": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "grahakon"
+    },
+    "gst": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "gst"
+    },
+    "guds": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "guds"
+    },
+    "hai": {
+      "tags": [],
+      "classRep": "hai"
+    },
+    "hain": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "hain"
+    },
+    "hisab": {
+      "tags": [],
+      "classRep": "hisab"
+    },
+    "history": {
+      "tags": [],
+      "classRep": "history"
+    },
+    "hom": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "hom"
+    },
+    "home": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "home"
+    },
+    "ikai": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "ikai"
+    },
+    "import": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "import"
+    },
+    "inventory": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "inventory"
+    },
+    "invoice": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "invoice"
+    },
+    "invoices": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "invoices"
+    },
+    "item": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "item"
+    },
+    "items": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "items"
+    },
+    "itihas": {
+      "tags": [],
+      "classRep": "itihas"
+    },
+    "jiesati": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "jiesati"
+    },
+    "jodo": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "jodo"
+    },
+    "ka": {
+      "tags": [],
+      "classRep": "ka"
+    },
+    "kab": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "kab"
+    },
+    "kam": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "kam"
+    },
+    "karana": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "karana"
+    },
+    "karja": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "karja"
+    },
+    "karmachari": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "karmachari"
+    },
+    "karna": {
+      "tags": [],
+      "classRep": "karna"
+    },
+    "karni": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "karni"
+    },
+    "karo": {
+      "tags": [],
+      "classRep": "karo"
+    },
+    "katna": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "katna"
+    },
+    "kharch": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "kharch"
+    },
+    "kharcha": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "kharcha"
+    },
+    "kharid": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "kharid"
+    },
+    "kharida": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "kharida"
+    },
+    "kharidari": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "kharidari"
+    },
+    "khata": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "khata"
+    },
+    "kholo": {
+      "tags": [],
+      "classRep": "kholo"
+    },
+    "ki": {
+      "tags": [],
+      "classRep": "ki"
+    },
+    "kiska": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "kiska"
+    },
+    "kisne": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "kisne"
+    },
+    "kitna": {
+      "tags": [],
+      "classRep": "kitna"
+    },
+    "kiya": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "kiya"
+    },
+    "ko": {
+      "tags": [],
+      "classRep": "ko"
+    },
+    "kya": {
+      "tags": [],
+      "classRep": "kya"
+    },
+    "lena": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "lena"
+    },
+    "lene": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "lene"
+    },
+    "likho": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "likho"
+    },
+    "list": {
+      "tags": [],
+      "classRep": "list"
+    },
+    "liya": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "liya"
+    },
+    "loan": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "loan"
+    },
+    "loans": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "loans"
+    },
+    "locations": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "locations"
+    },
+    "log": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "log"
+    },
+    "login": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "login"
+    },
+    "lok": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "lok"
+    },
+    "lon": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "lon"
+    },
+    "los": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "los"
+    },
+    "lov": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "lov"
+    },
+    "mahina": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "mahina"
+    },
+    "main": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "main"
+    },
+    "make": {
+      "tags": [],
+      "classRep": "make"
+    },
+    "mal": {
+      "tags": [],
+      "classRep": "mal"
+    },
+    "malik": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "malik"
+    },
+    "mangvana": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "mangvana"
+    },
+    "match": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "match"
+    },
+    "members": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "members"
+    },
+    "menu": {
+      "tags": [],
+      "classRep": "menu"
+    },
+    "milan": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "milan"
+    },
+    "milana": {
+      "tags": [],
+      "classRep": "milana"
+    },
+    "money": {
+      "tags": [],
+      "classRep": "money"
+    },
+    "more": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "more"
+    },
+    "move": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "move"
+    },
+    "nakad": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "nakad"
+    },
+    "nap": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "nap"
+    },
+    "naukar": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "naukar"
+    },
+    "naya": {
+      "tags": [],
+      "classRep": "naya"
+    },
+    "ne": {
+      "tags": [],
+      "classRep": "ne"
+    },
+    "nev": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "nev"
+    },
+    "nikale": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "nikale"
+    },
+    "old": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "old"
+    },
+    "opening": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "opening"
+    },
+    "options": {
+      "tags": [],
+      "classRep": "options"
+    },
+    "ordar": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "ordar"
+    },
+    "order": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "order"
+    },
+    "orders": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "orders"
+    },
+    "outstanding": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "outstanding"
+    },
+    "ovner": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "ovner"
+    },
+    "pada": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "pada"
+    },
+    "page": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "page"
+    },
+    "paisa": {
+      "tags": [],
+      "classRep": "paisa"
+    },
+    "paise": {
+      "tags": [],
+      "classRep": "paise"
+    },
+    "par": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "par"
+    },
+    "pasbuk": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "pasbuk"
+    },
+    "past": {
+      "tags": [],
+      "classRep": "past"
+    },
+    "pay": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "pay"
+    },
+    "payment": {
+      "tags": [],
+      "classRep": "payment"
+    },
+    "pej": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "pej"
+    },
+    "period": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "period"
+    },
+    "piece": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "piece"
+    },
+    "po": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "po"
+    },
+    "print": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "print"
+    },
+    "printing": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "printing"
+    },
+    "prodakt": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "prodakt"
+    },
+    "product": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "product"
+    },
+    "products": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "products"
+    },
+    "profit": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "profit"
+    },
+    "purana": {
+      "tags": [],
+      "classRep": "purana"
+    },
+    "purane": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "purane"
+    },
+    "purani": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "purani"
+    },
+    "purchase": {
+      "tags": [],
+      "classRep": "purchase"
+    },
+    "receive": {
+      "tags": [],
+      "classRep": "receive"
+    },
+    "reconcile": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "reconcile"
+    },
+    "reconciliation": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "reconciliation"
+    },
+    "record": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "record"
+    },
+    "records": {
+      "tags": [
+        "@buy"
+      ],
+      "classRep": "records"
+    },
+    "report": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "report"
+    },
+    "reports": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "reports"
+    },
+    "return": {
+      "tags": [],
+      "classRep": "return"
+    },
+    "rikord": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "rikord"
+    },
+    "riport": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "riport"
+    },
+    "sale": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "sale"
+    },
+    "sales": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "sales"
+    },
+    "saman": {
+      "tags": [],
+      "classRep": "saman"
+    },
+    "saplayar": {
+      "tags": [],
+      "classRep": "saplayar"
+    },
+    "scrin": {
+      "tags": [
+        "@home"
+      ],
+      "classRep": "scrin"
+    },
+    "se": {
+      "tags": [],
+      "classRep": "se"
+    },
+    "section": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "section"
+    },
+    "sel": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "sel"
+    },
+    "seling": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "seling"
+    },
+    "seting": {
+      "tags": [
+        "@settings"
+      ],
+      "classRep": "seting"
+    },
+    "setings": {
+      "tags": [],
+      "classRep": "setings"
+    },
+    "setup": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "setup"
+    },
+    "shakhaen": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "shakhaen"
+    },
+    "shops": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "shops"
+    },
+    "shuru": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "shuru"
+    },
+    "shuruati": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "shuruati"
+    },
+    "staf": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "staf"
+    },
+    "starting": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "starting"
+    },
+    "statement": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "statement"
+    },
+    "stok": {
+      "tags": [],
+      "classRep": "stok"
+    },
+    "store": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "store"
+    },
+    "suchi": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "suchi"
+    },
+    "sumary": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "sumary"
+    },
+    "suplier": {
+      "tags": [],
+      "classRep": "suplier"
+    },
+    "supliers": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "supliers"
+    },
+    "tax": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "tax"
+    },
+    "team": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "team"
+    },
+    "the": {
+      "tags": [
+        "@money"
+      ],
+      "classRep": "the"
+    },
+    "thik": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "thik"
+    },
+    "to": {
+      "tags": [],
+      "classRep": "to"
+    },
+    "trail": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "trail"
+    },
+    "transfer": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "transfer"
+    },
+    "tuta": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "tuta"
+    },
+    "udhar": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "udhar"
+    },
+    "unit": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "unit"
+    },
+    "units": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "units"
+    },
+    "upload": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "upload"
+    },
+    "vala": {
+      "tags": [],
+      "classRep": "vala"
+    },
+    "vale": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "vale"
+    },
+    "vapas": {
+      "tags": [],
+      "classRep": "vapas"
+    },
+    "vapsi": {
+      "tags": [],
+      "classRep": "vapsi"
+    },
+    "vasuli": {
+      "tags": [
+        "@sell"
+      ],
+      "classRep": "vasuli"
+    },
+    "vendor": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "vendor"
+    },
+    "vhat": {
+      "tags": [
+        "@parties"
+      ],
+      "classRep": "vhat"
+    },
+    "vikalp": {
+      "tags": [
+        "@more"
+      ],
+      "classRep": "vikalp"
+    },
+    "vyapari": {
+      "tags": [],
+      "classRep": "vyapari"
+    },
+    "yunit": {
+      "tags": [
+        "@stock"
+      ],
+      "classRep": "yunit"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "node": "v24.11.0",
+  "platform": "win32",
+  "release": "10.0.26200",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) Ultra 7 165U",
+  "cpuCount": 14,
+  "totalMemMb": 32217,
+  "transformers": "4.3.2",
+  "packageLockSha256": "475d661e228d8071ca9f87cc9a79d4041d9d475f049003f86767b130113e7be1",
+  "models": {},
+  "gitless": true,
+  "timezone": "Asia/Calcutta",
+  "npm": "11.6.1",
+  "lexiconStats": {
+    "anchors": 200,
+    "keys": 260,
+    "taggedKeys": 199,
+    "synonymPairs": 0,
+    "synonymClasses": 0,
+    "foldCollisions": 39
+  }
+}

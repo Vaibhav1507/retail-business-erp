@@ -1,0 +1,63 @@
+{
+  "version": "v1",
+  "frozen": "2026-11-11",
+  "source": "projects/retail-business-os/web/src/App.tsx (parseRoute, page switch) and web/src/Pages.tsx (Tabs items, MorePage branches), read 2026-11-11",
+  "reconciliation": {
+    "previousClaim": "39 destinations (37 page/tab + home + settings)",
+    "finding": "37 page/tab + home + settings + the More menu (#/more with no tab, MorePage link list) = 40 distinct screens",
+    "aliases": {
+      "#/": "home", "#/home": "home",
+      "#/sell": "sell.menu", "#/buy": "buy.receive", "#/stock": "stock.current",
+      "#/parties": "parties.customers", "#/money": "money.cash"
+    },
+    "excluded": ["#/print/<kind>/<uuid> (requires a document id; not a navigation target)", "unknown tabs (App falls back to page default; never generated)"],
+    "notes": [
+      "money.cash and money.owner both render Finance with different 'only' sections; treated as distinct screens",
+      "parties.purchases is the CUSTOMER purchase history (CustomerHistory), distinct from buy.history (supplier purchases)",
+      "stock.history is stock ADJUSTMENT history, distinct from buy.history",
+      "sell.return = customer return (AfterSales sreturn); buy.return = return to supplier (AfterSales preturn)"
+    ]
+  },
+  "destinations": [
+    { "id": "home", "hash": "#/home", "label": "Home / dashboard" },
+    { "id": "sell.menu", "hash": "#/sell/menu", "label": "Sell menu" },
+    { "id": "sell.bill", "hash": "#/sell/bill", "label": "Make a new sale bill" },
+    { "id": "sell.bills", "hash": "#/sell/bills", "label": "Old sale bills" },
+    { "id": "sell.collect", "hash": "#/sell/collect", "label": "Collect money from customers" },
+    { "id": "sell.return", "hash": "#/sell/return", "label": "Customer return (sales return)" },
+    { "id": "buy.receive", "hash": "#/buy/receive", "label": "Add purchase / receive goods" },
+    { "id": "buy.pay", "hash": "#/buy/pay", "label": "Pay supplier" },
+    { "id": "buy.history", "hash": "#/buy/history", "label": "Purchase history (supplier bills)" },
+    { "id": "buy.return", "hash": "#/buy/return", "label": "Return to supplier (purchase return)" },
+    { "id": "stock.current", "hash": "#/stock/current", "label": "Check stock" },
+    { "id": "stock.products", "hash": "#/stock/products", "label": "Products / catalogue" },
+    { "id": "stock.opening", "hash": "#/stock/opening", "label": "Opening stock" },
+    { "id": "stock.import", "hash": "#/stock/import", "label": "Import products (setup assistant)" },
+    { "id": "stock.adjust", "hash": "#/stock/adjust", "label": "Stock adjustment" },
+    { "id": "stock.count", "hash": "#/stock/count", "label": "Stock count" },
+    { "id": "stock.history", "hash": "#/stock/history", "label": "Stock adjustment history" },
+    { "id": "stock.alerts", "hash": "#/stock/alerts", "label": "Stock alerts and ageing" },
+    { "id": "stock.units", "hash": "#/stock/units", "label": "Units / unit conversions" },
+    { "id": "parties.customers", "hash": "#/parties/customers", "label": "Customers" },
+    { "id": "parties.suppliers", "hash": "#/parties/suppliers", "label": "Suppliers" },
+    { "id": "parties.purchases", "hash": "#/parties/purchases", "label": "Customer purchase history" },
+    { "id": "parties.dues", "hash": "#/parties/dues", "label": "Customer dues ageing" },
+    { "id": "money.cash", "hash": "#/money/cash", "label": "Cash and bank" },
+    { "id": "money.expenses", "hash": "#/money/expenses", "label": "Expenses" },
+    { "id": "money.owner", "hash": "#/money/owner", "label": "Owner money (drawings / capital)" },
+    { "id": "money.closing", "hash": "#/money/closing", "label": "Day closing" },
+    { "id": "more.menu", "hash": "#/more", "label": "More menu" },
+    { "id": "more.reports", "hash": "#/more/reports", "label": "Reports" },
+    { "id": "more.print", "hash": "#/more/print", "label": "Print documents" },
+    { "id": "more.lock", "hash": "#/more/lock", "label": "Lock period" },
+    { "id": "more.audit", "hash": "#/more/audit", "label": "Audit / change history" },
+    { "id": "more.gst", "hash": "#/more/gst", "label": "GST" },
+    { "id": "more.staff", "hash": "#/more/staff", "label": "Staff access" },
+    { "id": "more.branches", "hash": "#/more/branches", "label": "Branches" },
+    { "id": "more.transfers", "hash": "#/more/transfers", "label": "Stock transfers between locations" },
+    { "id": "more.orders", "hash": "#/more/orders", "label": "Purchase orders" },
+    { "id": "more.reconcile", "hash": "#/more/reconcile", "label": "Bank reconciliation" },
+    { "id": "more.loans", "hash": "#/more/loans", "label": "Loans" },
+    { "id": "settings", "hash": "#/settings", "label": "Business settings" }
+  ]
+}

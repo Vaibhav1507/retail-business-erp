@@ -1,0 +1,54 @@
+{
+  "runId": "baseline-a-r2",
+  "createdAt": "2026-11-12T12:30:01.097Z",
+  "frozenBeforeTest": true,
+  "filesOpened": [
+    "MANIFEST.sha256",
+    "config.v1.json",
+    "data/anchors.v1.json",
+    "data/tuning.v1.jsonl",
+    "destinations.v1.json",
+    "lexicon.v1.json"
+  ],
+  "lexiconSha256": "3f5a27f2a4c27fcfc9ba87c9b1530e87399629bcee9111919c8fecbf513227f4",
+  "skippedResolvers": {},
+  "modelMeta": {},
+  "thresholds": {
+    "A/L0": {
+      "tau": 0.7,
+      "delta": 0.3,
+      "feasible": false,
+      "feasibleCount": 0,
+      "gridSize": 42,
+      "tuning": {
+        "correctNavigate": 6,
+        "wrongNavigateRate": 0.09259259259259259,
+        "rejectNavigated": 0
+      }
+    },
+    "A/L1": {
+      "tau": 0.6,
+      "delta": 0.3,
+      "feasible": false,
+      "feasibleCount": 0,
+      "gridSize": 42,
+      "tuning": {
+        "correctNavigate": 11,
+        "wrongNavigateRate": 0.09259259259259259,
+        "rejectNavigated": 0
+      }
+    },
+    "A/L2": {
+      "tau": 0.7,
+      "delta": 0.25,
+      "feasible": true,
+      "feasibleCount": 15,
+      "gridSize": 42,
+      "tuning": {
+        "correctNavigate": 8,
+        "wrongNavigateRate": 0.018518518518518517,
+        "rejectNavigated": 0
+      }
+    }
+  }
+}

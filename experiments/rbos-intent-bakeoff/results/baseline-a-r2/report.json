@@ -1,0 +1,1837 @@
+{
+  "runId": "baseline-a-r2",
+  "thresholds": {
+    "A/L0": {
+      "tau": 0.7,
+      "delta": 0.3,
+      "feasible": false,
+      "feasibleCount": 0,
+      "gridSize": 42,
+      "tuning": {
+        "correctNavigate": 6,
+        "wrongNavigateRate": 0.09259259259259259,
+        "rejectNavigated": 0
+      }
+    },
+    "A/L1": {
+      "tau": 0.6,
+      "delta": 0.3,
+      "feasible": false,
+      "feasibleCount": 0,
+      "gridSize": 42,
+      "tuning": {
+        "correctNavigate": 11,
+        "wrongNavigateRate": 0.09259259259259259,
+        "rejectNavigated": 0
+      }
+    },
+    "A/L2": {
+      "tau": 0.7,
+      "delta": 0.25,
+      "feasible": true,
+      "feasibleCount": 15,
+      "gridSize": 42,
+      "tuning": {
+        "correctNavigate": 8,
+        "wrongNavigateRate": 0.018518518518518517,
+        "rejectNavigated": 0
+      }
+    }
+  },
+  "scopes": {
+    "all": {
+      "summary": {
+        "A/L0": {
+          "overall": {
+            "items": 160,
+            "navigateItems": 110,
+            "askItems": 30,
+            "rejectItems": 20,
+            "correctNavigate": 10,
+            "correctNavigateRate": 0.09090909090909091,
+            "wrongNavigate": 14,
+            "wrongNavigateRate": 0.0875,
+            "correctAsk": 0,
+            "correctAskRate": 0,
+            "askPrecision": 0,
+            "askRate": 0.01875,
+            "notUnderstoodRate": 0.83125,
+            "correctReject": 18,
+            "rejectNavigated": 2,
+            "guardHits": 6,
+            "outcomes": {
+              "not_understood": 115,
+              "wrong_navigate": 12,
+              "ask_containing_target": 3,
+              "correct_navigate": 10,
+              "correct_reject": 18,
+              "reject_navigated": 2
+            }
+          },
+          "byLang": {
+            "en": {
+              "items": 59,
+              "navigateItems": 38,
+              "askItems": 12,
+              "rejectItems": 9,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.13157894736842105,
+              "wrongNavigate": 8,
+              "wrongNavigateRate": 0.13559322033898305,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.01694915254237288,
+              "notUnderstoodRate": 0.7627118644067796,
+              "correctReject": 7,
+              "rejectNavigated": 2,
+              "guardHits": 5,
+              "outcomes": {
+                "not_understood": 38,
+                "wrong_navigate": 6,
+                "correct_navigate": 5,
+                "ask_containing_target": 1,
+                "reject_navigated": 2,
+                "correct_reject": 7
+              }
+            },
+            "hi-Deva": {
+              "items": 44,
+              "navigateItems": 34,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 1,
+              "correctNavigateRate": 0.029411764705882353,
+              "wrongNavigate": 0,
+              "wrongNavigateRate": 0,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": null,
+              "askRate": 0,
+              "notUnderstoodRate": 0.9772727272727273,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 39,
+                "correct_navigate": 1,
+                "correct_reject": 4
+              }
+            },
+            "hi-Latn": {
+              "items": 25,
+              "navigateItems": 16,
+              "askItems": 6,
+              "rejectItems": 3,
+              "correctNavigate": 0,
+              "correctNavigateRate": 0,
+              "wrongNavigate": 3,
+              "wrongNavigateRate": 0.12,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": null,
+              "askRate": 0,
+              "notUnderstoodRate": 0.88,
+              "correctReject": 3,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 19,
+                "wrong_navigate": 3,
+                "correct_reject": 3
+              }
+            },
+            "mixed": {
+              "items": 32,
+              "navigateItems": 22,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 4,
+              "correctNavigateRate": 0.18181818181818182,
+              "wrongNavigate": 3,
+              "wrongNavigateRate": 0.09375,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.0625,
+              "notUnderstoodRate": 0.71875,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 1,
+              "outcomes": {
+                "not_understood": 19,
+                "ask_containing_target": 2,
+                "correct_navigate": 4,
+                "wrong_navigate": 3,
+                "correct_reject": 4
+              }
+            }
+          },
+          "latencyMs": {
+            "p50": 1.4146,
+            "p95": 3.605
+          },
+          "confusion": {
+            "home": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "sell.bill": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.bills": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.collect": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "sell.return": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "buy.receive": {
+              "NOT_UNDERSTOOD": 3,
+              "buy.receive": 1
+            },
+            "buy.pay": {
+              "NOT_UNDERSTOOD": 4
+            },
+            "buy.history": {
+              "parties.suppliers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "buy.return": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.current": {
+              "NOT_UNDERSTOOD": 3,
+              "stock.current": 1
+            },
+            "stock.products": {
+              "stock.products": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "stock.opening": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.import": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.adjust": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.count": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.history": {
+              "ASK": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "stock.alerts": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.units": {
+              "NOT_UNDERSTOOD": 2,
+              "settings": 1
+            },
+            "parties.customers": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "parties.suppliers": {
+              "NOT_UNDERSTOOD": 2,
+              "parties.suppliers": 1
+            },
+            "parties.purchases": {
+              "NOT_UNDERSTOOD": 2,
+              "parties.customers": 1
+            },
+            "parties.dues": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "money.cash": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.expenses": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.owner": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.closing": {
+              "NOT_UNDERSTOOD": 2,
+              "more.loans": 1
+            },
+            "more.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reports": {
+              "more.reports": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.print": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.lock": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.audit": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.gst": {
+              "more.gst": 2
+            },
+            "more.staff": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.branches": {
+              "NOT_UNDERSTOOD": 1,
+              "settings": 1
+            },
+            "more.transfers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.orders": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reconcile": {
+              "more.reconcile": 1
+            },
+            "more.loans": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "settings": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "ASK": {
+              "NOT_UNDERSTOOD": 25,
+              "more.loans": 1,
+              "parties.suppliers": 1,
+              "parties.customers": 1,
+              "settings": 1,
+              "more.reports": 1
+            },
+            "REJECT": {
+              "NOT_UNDERSTOOD": 18,
+              "parties.customers": 2
+            }
+          }
+        },
+        "A/L1": {
+          "overall": {
+            "items": 160,
+            "navigateItems": 110,
+            "askItems": 30,
+            "rejectItems": 20,
+            "correctNavigate": 15,
+            "correctNavigateRate": 0.13636363636363635,
+            "wrongNavigate": 16,
+            "wrongNavigateRate": 0.1,
+            "correctAsk": 0,
+            "correctAskRate": 0,
+            "askPrecision": 0.20833333333333334,
+            "askRate": 0.15,
+            "notUnderstoodRate": 0.65625,
+            "correctReject": 18,
+            "rejectNavigated": 2,
+            "guardHits": 6,
+            "outcomes": {
+              "not_understood": 87,
+              "correct_navigate": 15,
+              "wrong_navigate": 14,
+              "ask_without_target": 6,
+              "ask_containing_target": 13,
+              "ask_with_stray": 5,
+              "correct_reject": 18,
+              "reject_navigated": 2
+            }
+          },
+          "byLang": {
+            "en": {
+              "items": 59,
+              "navigateItems": 38,
+              "askItems": 12,
+              "rejectItems": 9,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.13157894736842105,
+              "wrongNavigate": 8,
+              "wrongNavigateRate": 0.13559322033898305,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0.5,
+              "askRate": 0.06779661016949153,
+              "notUnderstoodRate": 0.711864406779661,
+              "correctReject": 7,
+              "rejectNavigated": 2,
+              "guardHits": 5,
+              "outcomes": {
+                "not_understood": 35,
+                "wrong_navigate": 6,
+                "correct_navigate": 5,
+                "ask_containing_target": 2,
+                "ask_with_stray": 2,
+                "reject_navigated": 2,
+                "correct_reject": 7
+              }
+            },
+            "hi-Deva": {
+              "items": 44,
+              "navigateItems": 34,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.14705882352941177,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.045454545454545456,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.20454545454545456,
+              "notUnderstoodRate": 0.6363636363636364,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "correct_navigate": 5,
+                "not_understood": 24,
+                "wrong_navigate": 2,
+                "ask_containing_target": 6,
+                "ask_without_target": 3,
+                "correct_reject": 4
+              }
+            },
+            "hi-Latn": {
+              "items": 25,
+              "navigateItems": 16,
+              "askItems": 6,
+              "rejectItems": 3,
+              "correctNavigate": 0,
+              "correctNavigateRate": 0,
+              "wrongNavigate": 3,
+              "wrongNavigateRate": 0.12,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.2,
+              "notUnderstoodRate": 0.68,
+              "correctReject": 3,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 14,
+                "ask_without_target": 3,
+                "ask_containing_target": 2,
+                "wrong_navigate": 3,
+                "correct_reject": 3
+              }
+            },
+            "mixed": {
+              "items": 32,
+              "navigateItems": 22,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.22727272727272727,
+              "wrongNavigate": 3,
+              "wrongNavigateRate": 0.09375,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0.5,
+              "askRate": 0.1875,
+              "notUnderstoodRate": 0.5625,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 1,
+              "outcomes": {
+                "not_understood": 14,
+                "correct_navigate": 5,
+                "ask_containing_target": 3,
+                "wrong_navigate": 3,
+                "ask_with_stray": 3,
+                "correct_reject": 4
+              }
+            }
+          },
+          "latencyMs": {
+            "p50": 1.3193,
+            "p95": 2.941
+          },
+          "confusion": {
+            "home": {
+              "NOT_UNDERSTOOD": 2,
+              "home": 1
+            },
+            "sell.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "sell.bill": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.bills": {
+              "NOT_UNDERSTOOD": 1,
+              "stock.products": 1,
+              "sell.bills": 1
+            },
+            "sell.collect": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 2
+            },
+            "sell.return": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "buy.receive": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1,
+              "buy.receive": 1
+            },
+            "buy.pay": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "buy.history": {
+              "parties.suppliers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "buy.return": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.current": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1,
+              "stock.current": 1
+            },
+            "stock.products": {
+              "stock.products": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "stock.opening": {
+              "NOT_UNDERSTOOD": 2,
+              "stock.alerts": 1
+            },
+            "stock.import": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.adjust": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "stock.count": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "stock.history": {
+              "ASK": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.alerts": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "stock.units": {
+              "NOT_UNDERSTOOD": 2,
+              "settings": 1
+            },
+            "parties.customers": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "parties.suppliers": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1,
+              "parties.suppliers": 1
+            },
+            "parties.purchases": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1,
+              "parties.customers": 1
+            },
+            "parties.dues": {
+              "parties.customers": 1,
+              "ASK": 1,
+              "NOT_UNDERSTOOD": 1
+            },
+            "money.cash": {
+              "ASK": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "money.expenses": {
+              "NOT_UNDERSTOOD": 2,
+              "money.expenses": 1
+            },
+            "money.owner": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.closing": {
+              "NOT_UNDERSTOOD": 1,
+              "money.closing": 1,
+              "more.loans": 1
+            },
+            "more.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reports": {
+              "more.reports": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.print": {
+              "NOT_UNDERSTOOD": 1,
+              "more.print": 1
+            },
+            "more.lock": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "more.audit": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "more.gst": {
+              "more.gst": 2
+            },
+            "more.staff": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.branches": {
+              "NOT_UNDERSTOOD": 1,
+              "settings": 1
+            },
+            "more.transfers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.orders": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "more.reconcile": {
+              "more.reconcile": 1
+            },
+            "more.loans": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "settings": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "ASK": {
+              "NOT_UNDERSTOOD": 20,
+              "more.loans": 1,
+              "ASK": 5,
+              "parties.suppliers": 1,
+              "parties.customers": 1,
+              "settings": 1,
+              "more.reports": 1
+            },
+            "REJECT": {
+              "NOT_UNDERSTOOD": 18,
+              "parties.customers": 2
+            }
+          }
+        },
+        "A/L2": {
+          "overall": {
+            "items": 160,
+            "navigateItems": 110,
+            "askItems": 30,
+            "rejectItems": 20,
+            "correctNavigate": 15,
+            "correctNavigateRate": 0.13636363636363635,
+            "wrongNavigate": 9,
+            "wrongNavigateRate": 0.05625,
+            "correctAsk": 0,
+            "correctAskRate": 0,
+            "askPrecision": 0.14285714285714285,
+            "askRate": 0.04375,
+            "notUnderstoodRate": 0.80625,
+            "correctReject": 20,
+            "rejectNavigated": 0,
+            "guardHits": 6,
+            "outcomes": {
+              "not_understood": 109,
+              "correct_navigate": 15,
+              "wrong_navigate": 9,
+              "ask_containing_target": 4,
+              "ask_without_target": 2,
+              "ask_with_stray": 1,
+              "correct_reject": 20
+            }
+          },
+          "byLang": {
+            "en": {
+              "items": 59,
+              "navigateItems": 38,
+              "askItems": 12,
+              "rejectItems": 9,
+              "correctNavigate": 4,
+              "correctNavigateRate": 0.10526315789473684,
+              "wrongNavigate": 3,
+              "wrongNavigateRate": 0.05084745762711865,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.03389830508474576,
+              "notUnderstoodRate": 0.847457627118644,
+              "correctReject": 9,
+              "rejectNavigated": 0,
+              "guardHits": 5,
+              "outcomes": {
+                "not_understood": 41,
+                "wrong_navigate": 3,
+                "correct_navigate": 4,
+                "ask_containing_target": 2,
+                "correct_reject": 9
+              }
+            },
+            "hi-Deva": {
+              "items": 44,
+              "navigateItems": 34,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 3,
+              "correctNavigateRate": 0.08823529411764706,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.045454545454545456,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.09090909090909091,
+              "notUnderstoodRate": 0.7954545454545454,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "correct_navigate": 3,
+                "not_understood": 31,
+                "wrong_navigate": 2,
+                "ask_without_target": 2,
+                "ask_containing_target": 2,
+                "correct_reject": 4
+              }
+            },
+            "hi-Latn": {
+              "items": 25,
+              "navigateItems": 16,
+              "askItems": 6,
+              "rejectItems": 3,
+              "correctNavigate": 0,
+              "correctNavigateRate": 0,
+              "wrongNavigate": 1,
+              "wrongNavigateRate": 0.04,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": null,
+              "askRate": 0,
+              "notUnderstoodRate": 0.96,
+              "correctReject": 3,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 21,
+                "wrong_navigate": 1,
+                "correct_reject": 3
+              }
+            },
+            "mixed": {
+              "items": 32,
+              "navigateItems": 22,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 8,
+              "correctNavigateRate": 0.36363636363636365,
+              "wrongNavigate": 3,
+              "wrongNavigateRate": 0.09375,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 1,
+              "askRate": 0.03125,
+              "notUnderstoodRate": 0.625,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 1,
+              "outcomes": {
+                "not_understood": 16,
+                "correct_navigate": 8,
+                "wrong_navigate": 3,
+                "ask_with_stray": 1,
+                "correct_reject": 4
+              }
+            }
+          },
+          "latencyMs": {
+            "p50": 2.8955,
+            "p95": 7.4498
+          },
+          "confusion": {
+            "home": {
+              "NOT_UNDERSTOOD": 2,
+              "home": 1
+            },
+            "sell.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "sell.bill": {
+              "NOT_UNDERSTOOD": 4
+            },
+            "sell.bills": {
+              "NOT_UNDERSTOOD": 1,
+              "stock.products": 1,
+              "sell.bills": 1
+            },
+            "sell.collect": {
+              "NOT_UNDERSTOOD": 3,
+              "sell.collect": 1
+            },
+            "sell.return": {
+              "NOT_UNDERSTOOD": 3,
+              "sell.return": 1
+            },
+            "buy.receive": {
+              "NOT_UNDERSTOOD": 3,
+              "buy.receive": 1
+            },
+            "buy.pay": {
+              "NOT_UNDERSTOOD": 4
+            },
+            "buy.history": {
+              "parties.suppliers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "buy.return": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.current": {
+              "NOT_UNDERSTOOD": 3,
+              "stock.current": 1
+            },
+            "stock.products": {
+              "stock.products": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "stock.opening": {
+              "NOT_UNDERSTOOD": 2,
+              "stock.alerts": 1
+            },
+            "stock.import": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.adjust": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.count": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.history": {
+              "ASK": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.alerts": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.units": {
+              "NOT_UNDERSTOOD": 2,
+              "settings": 1
+            },
+            "parties.customers": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "parties.suppliers": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "parties.purchases": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1,
+              "parties.customers": 1
+            },
+            "parties.dues": {
+              "parties.customers": 1,
+              "ASK": 1,
+              "NOT_UNDERSTOOD": 1
+            },
+            "money.cash": {
+              "ASK": 1,
+              "NOT_UNDERSTOOD": 1,
+              "money.cash": 1
+            },
+            "money.expenses": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "money.owner": {
+              "NOT_UNDERSTOOD": 2,
+              "money.owner": 1
+            },
+            "money.closing": {
+              "NOT_UNDERSTOOD": 2,
+              "money.closing": 1
+            },
+            "more.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reports": {
+              "more.reports": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.print": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.lock": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.audit": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.gst": {
+              "more.gst": 2
+            },
+            "more.staff": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.branches": {
+              "NOT_UNDERSTOOD": 1,
+              "settings": 1
+            },
+            "more.transfers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.orders": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reconcile": {
+              "more.reconcile": 1
+            },
+            "more.loans": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "settings": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "ASK": {
+              "NOT_UNDERSTOOD": 27,
+              "ASK": 1,
+              "settings": 1,
+              "more.reports": 1
+            },
+            "REJECT": {
+              "NOT_UNDERSTOOD": 20
+            }
+          }
+        }
+      },
+      "gate": {
+        "rule": {
+          "minAdvantagePp": 5,
+          "maxWrongNavigate": 0.02,
+          "rejectItemsNavigated": 0,
+          "appliesTo": "every language bucket (en, hi-Deva, hi-Latn, mixed), test set, best A vs each C at the same level"
+        },
+        "byCandidate": {},
+        "evaluated": false
+      }
+    },
+    "excludingDebatable": {
+      "summary": {
+        "A/L0": {
+          "overall": {
+            "items": 152,
+            "navigateItems": 105,
+            "askItems": 27,
+            "rejectItems": 20,
+            "correctNavigate": 9,
+            "correctNavigateRate": 0.08571428571428572,
+            "wrongNavigate": 11,
+            "wrongNavigateRate": 0.07236842105263158,
+            "correctAsk": 0,
+            "correctAskRate": 0,
+            "askPrecision": 0,
+            "askRate": 0.019736842105263157,
+            "notUnderstoodRate": 0.8486842105263158,
+            "correctReject": 18,
+            "rejectNavigated": 2,
+            "guardHits": 6,
+            "outcomes": {
+              "not_understood": 111,
+              "wrong_navigate": 9,
+              "ask_containing_target": 3,
+              "correct_navigate": 9,
+              "correct_reject": 18,
+              "reject_navigated": 2
+            }
+          },
+          "byLang": {
+            "en": {
+              "items": 57,
+              "navigateItems": 38,
+              "askItems": 10,
+              "rejectItems": 9,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.13157894736842105,
+              "wrongNavigate": 7,
+              "wrongNavigateRate": 0.12280701754385964,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.017543859649122806,
+              "notUnderstoodRate": 0.7719298245614035,
+              "correctReject": 7,
+              "rejectNavigated": 2,
+              "guardHits": 5,
+              "outcomes": {
+                "not_understood": 37,
+                "wrong_navigate": 5,
+                "correct_navigate": 5,
+                "ask_containing_target": 1,
+                "reject_navigated": 2,
+                "correct_reject": 7
+              }
+            },
+            "hi-Deva": {
+              "items": 43,
+              "navigateItems": 33,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 1,
+              "correctNavigateRate": 0.030303030303030304,
+              "wrongNavigate": 0,
+              "wrongNavigateRate": 0,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": null,
+              "askRate": 0,
+              "notUnderstoodRate": 0.9767441860465116,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 38,
+                "correct_navigate": 1,
+                "correct_reject": 4
+              }
+            },
+            "hi-Latn": {
+              "items": 23,
+              "navigateItems": 14,
+              "askItems": 6,
+              "rejectItems": 3,
+              "correctNavigate": 0,
+              "correctNavigateRate": 0,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.08695652173913043,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": null,
+              "askRate": 0,
+              "notUnderstoodRate": 0.9130434782608695,
+              "correctReject": 3,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 18,
+                "wrong_navigate": 2,
+                "correct_reject": 3
+              }
+            },
+            "mixed": {
+              "items": 29,
+              "navigateItems": 20,
+              "askItems": 5,
+              "rejectItems": 4,
+              "correctNavigate": 3,
+              "correctNavigateRate": 0.15,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.06896551724137931,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.06896551724137931,
+              "notUnderstoodRate": 0.7586206896551724,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 1,
+              "outcomes": {
+                "not_understood": 18,
+                "ask_containing_target": 2,
+                "correct_navigate": 3,
+                "wrong_navigate": 2,
+                "correct_reject": 4
+              }
+            }
+          },
+          "latencyMs": {
+            "p50": 1.4128,
+            "p95": 3.605
+          },
+          "confusion": {
+            "home": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "sell.bill": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.bills": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.collect": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "sell.return": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "buy.receive": {
+              "NOT_UNDERSTOOD": 3,
+              "buy.receive": 1
+            },
+            "buy.pay": {
+              "NOT_UNDERSTOOD": 4
+            },
+            "buy.history": {
+              "parties.suppliers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "buy.return": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.current": {
+              "NOT_UNDERSTOOD": 3,
+              "stock.current": 1
+            },
+            "stock.products": {
+              "stock.products": 1,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.opening": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.import": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.adjust": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.count": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.history": {
+              "ASK": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "stock.alerts": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.units": {
+              "NOT_UNDERSTOOD": 1,
+              "settings": 1
+            },
+            "parties.customers": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "parties.suppliers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "parties.purchases": {
+              "NOT_UNDERSTOOD": 2,
+              "parties.customers": 1
+            },
+            "parties.dues": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 1
+            },
+            "money.cash": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.expenses": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.owner": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.closing": {
+              "NOT_UNDERSTOOD": 2,
+              "more.loans": 1
+            },
+            "more.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reports": {
+              "more.reports": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.print": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.lock": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.audit": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.gst": {
+              "more.gst": 2
+            },
+            "more.staff": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.branches": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.transfers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.orders": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reconcile": {
+              "more.reconcile": 1
+            },
+            "more.loans": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "settings": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "ASK": {
+              "NOT_UNDERSTOOD": 24,
+              "more.loans": 1,
+              "parties.suppliers": 1,
+              "parties.customers": 1
+            },
+            "REJECT": {
+              "NOT_UNDERSTOOD": 18,
+              "parties.customers": 2
+            }
+          }
+        },
+        "A/L1": {
+          "overall": {
+            "items": 152,
+            "navigateItems": 105,
+            "askItems": 27,
+            "rejectItems": 20,
+            "correctNavigate": 14,
+            "correctNavigateRate": 0.13333333333333333,
+            "wrongNavigate": 13,
+            "wrongNavigateRate": 0.08552631578947369,
+            "correctAsk": 0,
+            "correctAskRate": 0,
+            "askPrecision": 0.17391304347826086,
+            "askRate": 0.1513157894736842,
+            "notUnderstoodRate": 0.6710526315789473,
+            "correctReject": 18,
+            "rejectNavigated": 2,
+            "guardHits": 6,
+            "outcomes": {
+              "not_understood": 84,
+              "correct_navigate": 14,
+              "wrong_navigate": 11,
+              "ask_without_target": 6,
+              "ask_containing_target": 13,
+              "ask_with_stray": 4,
+              "correct_reject": 18,
+              "reject_navigated": 2
+            }
+          },
+          "byLang": {
+            "en": {
+              "items": 57,
+              "navigateItems": 38,
+              "askItems": 10,
+              "rejectItems": 9,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.13157894736842105,
+              "wrongNavigate": 7,
+              "wrongNavigateRate": 0.12280701754385964,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0.3333333333333333,
+              "askRate": 0.05263157894736842,
+              "notUnderstoodRate": 0.7368421052631579,
+              "correctReject": 7,
+              "rejectNavigated": 2,
+              "guardHits": 5,
+              "outcomes": {
+                "not_understood": 35,
+                "wrong_navigate": 5,
+                "correct_navigate": 5,
+                "ask_containing_target": 2,
+                "ask_with_stray": 1,
+                "reject_navigated": 2,
+                "correct_reject": 7
+              }
+            },
+            "hi-Deva": {
+              "items": 43,
+              "navigateItems": 33,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 5,
+              "correctNavigateRate": 0.15151515151515152,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.046511627906976744,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.20930232558139536,
+              "notUnderstoodRate": 0.627906976744186,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "correct_navigate": 5,
+                "not_understood": 23,
+                "wrong_navigate": 2,
+                "ask_containing_target": 6,
+                "ask_without_target": 3,
+                "correct_reject": 4
+              }
+            },
+            "hi-Latn": {
+              "items": 23,
+              "navigateItems": 14,
+              "askItems": 6,
+              "rejectItems": 3,
+              "correctNavigate": 0,
+              "correctNavigateRate": 0,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.08695652173913043,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.21739130434782608,
+              "notUnderstoodRate": 0.6956521739130435,
+              "correctReject": 3,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 13,
+                "ask_without_target": 3,
+                "ask_containing_target": 2,
+                "wrong_navigate": 2,
+                "correct_reject": 3
+              }
+            },
+            "mixed": {
+              "items": 29,
+              "navigateItems": 20,
+              "askItems": 5,
+              "rejectItems": 4,
+              "correctNavigate": 4,
+              "correctNavigateRate": 0.2,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.06896551724137931,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0.5,
+              "askRate": 0.20689655172413793,
+              "notUnderstoodRate": 0.5862068965517241,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 1,
+              "outcomes": {
+                "not_understood": 13,
+                "correct_navigate": 4,
+                "ask_containing_target": 3,
+                "wrong_navigate": 2,
+                "ask_with_stray": 3,
+                "correct_reject": 4
+              }
+            }
+          },
+          "latencyMs": {
+            "p50": 1.3143,
+            "p95": 2.9519
+          },
+          "confusion": {
+            "home": {
+              "NOT_UNDERSTOOD": 2,
+              "home": 1
+            },
+            "sell.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "sell.bill": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 3
+            },
+            "sell.bills": {
+              "NOT_UNDERSTOOD": 1,
+              "stock.products": 1,
+              "sell.bills": 1
+            },
+            "sell.collect": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 2
+            },
+            "sell.return": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "buy.receive": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1,
+              "buy.receive": 1
+            },
+            "buy.pay": {
+              "NOT_UNDERSTOOD": 3,
+              "ASK": 1
+            },
+            "buy.history": {
+              "parties.suppliers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "buy.return": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.current": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1,
+              "stock.current": 1
+            },
+            "stock.products": {
+              "stock.products": 1,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.opening": {
+              "NOT_UNDERSTOOD": 2,
+              "stock.alerts": 1
+            },
+            "stock.import": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.adjust": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "stock.count": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "stock.history": {
+              "ASK": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.alerts": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "stock.units": {
+              "NOT_UNDERSTOOD": 1,
+              "settings": 1
+            },
+            "parties.customers": {
+              "parties.customers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "parties.suppliers": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "parties.purchases": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1,
+              "parties.customers": 1
+            },
+            "parties.dues": {
+              "parties.customers": 1,
+              "ASK": 1
+            },
+            "money.cash": {
+              "ASK": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "money.expenses": {
+              "NOT_UNDERSTOOD": 2,
+              "money.expenses": 1
+            },
+            "money.owner": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "money.closing": {
+              "NOT_UNDERSTOOD": 1,
+              "money.closing": 1,
+              "more.loans": 1
+            },
+            "more.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reports": {
+              "more.reports": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.print": {
+              "NOT_UNDERSTOOD": 1,
+              "more.print": 1
+            },
+            "more.lock": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "more.audit": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "more.gst": {
+              "more.gst": 2
+            },
+            "more.staff": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.branches": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.transfers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.orders": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1
+            },
+            "more.reconcile": {
+              "more.reconcile": 1
+            },
+            "more.loans": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "settings": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "ASK": {
+              "NOT_UNDERSTOOD": 20,
+              "more.loans": 1,
+              "ASK": 4,
+              "parties.suppliers": 1,
+              "parties.customers": 1
+            },
+            "REJECT": {
+              "NOT_UNDERSTOOD": 18,
+              "parties.customers": 2
+            }
+          }
+        },
+        "A/L2": {
+          "overall": {
+            "items": 152,
+            "navigateItems": 105,
+            "askItems": 27,
+            "rejectItems": 20,
+            "correctNavigate": 15,
+            "correctNavigateRate": 0.14285714285714285,
+            "wrongNavigate": 6,
+            "wrongNavigateRate": 0.039473684210526314,
+            "correctAsk": 0,
+            "correctAskRate": 0,
+            "askPrecision": 0.14285714285714285,
+            "askRate": 0.046052631578947366,
+            "notUnderstoodRate": 0.8157894736842105,
+            "correctReject": 20,
+            "rejectNavigated": 0,
+            "guardHits": 6,
+            "outcomes": {
+              "not_understood": 104,
+              "correct_navigate": 15,
+              "wrong_navigate": 6,
+              "ask_containing_target": 4,
+              "ask_without_target": 2,
+              "ask_with_stray": 1,
+              "correct_reject": 20
+            }
+          },
+          "byLang": {
+            "en": {
+              "items": 57,
+              "navigateItems": 38,
+              "askItems": 10,
+              "rejectItems": 9,
+              "correctNavigate": 4,
+              "correctNavigateRate": 0.10526315789473684,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.03508771929824561,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.03508771929824561,
+              "notUnderstoodRate": 0.8596491228070176,
+              "correctReject": 9,
+              "rejectNavigated": 0,
+              "guardHits": 5,
+              "outcomes": {
+                "not_understood": 40,
+                "wrong_navigate": 2,
+                "correct_navigate": 4,
+                "ask_containing_target": 2,
+                "correct_reject": 9
+              }
+            },
+            "hi-Deva": {
+              "items": 43,
+              "navigateItems": 33,
+              "askItems": 6,
+              "rejectItems": 4,
+              "correctNavigate": 3,
+              "correctNavigateRate": 0.09090909090909091,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.046511627906976744,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 0,
+              "askRate": 0.09302325581395349,
+              "notUnderstoodRate": 0.7906976744186046,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "correct_navigate": 3,
+                "not_understood": 30,
+                "wrong_navigate": 2,
+                "ask_without_target": 2,
+                "ask_containing_target": 2,
+                "correct_reject": 4
+              }
+            },
+            "hi-Latn": {
+              "items": 23,
+              "navigateItems": 14,
+              "askItems": 6,
+              "rejectItems": 3,
+              "correctNavigate": 0,
+              "correctNavigateRate": 0,
+              "wrongNavigate": 0,
+              "wrongNavigateRate": 0,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": null,
+              "askRate": 0,
+              "notUnderstoodRate": 1,
+              "correctReject": 3,
+              "rejectNavigated": 0,
+              "guardHits": 0,
+              "outcomes": {
+                "not_understood": 20,
+                "correct_reject": 3
+              }
+            },
+            "mixed": {
+              "items": 29,
+              "navigateItems": 20,
+              "askItems": 5,
+              "rejectItems": 4,
+              "correctNavigate": 8,
+              "correctNavigateRate": 0.4,
+              "wrongNavigate": 2,
+              "wrongNavigateRate": 0.06896551724137931,
+              "correctAsk": 0,
+              "correctAskRate": 0,
+              "askPrecision": 1,
+              "askRate": 0.034482758620689655,
+              "notUnderstoodRate": 0.6206896551724138,
+              "correctReject": 4,
+              "rejectNavigated": 0,
+              "guardHits": 1,
+              "outcomes": {
+                "not_understood": 14,
+                "correct_navigate": 8,
+                "wrong_navigate": 2,
+                "ask_with_stray": 1,
+                "correct_reject": 4
+              }
+            }
+          },
+          "latencyMs": {
+            "p50": 2.8955,
+            "p95": 7.7022
+          },
+          "confusion": {
+            "home": {
+              "NOT_UNDERSTOOD": 2,
+              "home": 1
+            },
+            "sell.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "sell.bill": {
+              "NOT_UNDERSTOOD": 4
+            },
+            "sell.bills": {
+              "NOT_UNDERSTOOD": 1,
+              "stock.products": 1,
+              "sell.bills": 1
+            },
+            "sell.collect": {
+              "NOT_UNDERSTOOD": 3,
+              "sell.collect": 1
+            },
+            "sell.return": {
+              "NOT_UNDERSTOOD": 3,
+              "sell.return": 1
+            },
+            "buy.receive": {
+              "NOT_UNDERSTOOD": 3,
+              "buy.receive": 1
+            },
+            "buy.pay": {
+              "NOT_UNDERSTOOD": 4
+            },
+            "buy.history": {
+              "parties.suppliers": 1,
+              "NOT_UNDERSTOOD": 2
+            },
+            "buy.return": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.current": {
+              "NOT_UNDERSTOOD": 3,
+              "stock.current": 1
+            },
+            "stock.products": {
+              "stock.products": 1,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.opening": {
+              "NOT_UNDERSTOOD": 2,
+              "stock.alerts": 1
+            },
+            "stock.import": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.adjust": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.count": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.history": {
+              "ASK": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "stock.alerts": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "stock.units": {
+              "NOT_UNDERSTOOD": 1,
+              "settings": 1
+            },
+            "parties.customers": {
+              "NOT_UNDERSTOOD": 3
+            },
+            "parties.suppliers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "parties.purchases": {
+              "NOT_UNDERSTOOD": 1,
+              "ASK": 1,
+              "parties.customers": 1
+            },
+            "parties.dues": {
+              "parties.customers": 1,
+              "ASK": 1
+            },
+            "money.cash": {
+              "ASK": 1,
+              "NOT_UNDERSTOOD": 1,
+              "money.cash": 1
+            },
+            "money.expenses": {
+              "NOT_UNDERSTOOD": 2,
+              "ASK": 1
+            },
+            "money.owner": {
+              "NOT_UNDERSTOOD": 2,
+              "money.owner": 1
+            },
+            "money.closing": {
+              "NOT_UNDERSTOOD": 2,
+              "money.closing": 1
+            },
+            "more.menu": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reports": {
+              "more.reports": 2,
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.print": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.lock": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.audit": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.gst": {
+              "more.gst": 2
+            },
+            "more.staff": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.branches": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "more.transfers": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.orders": {
+              "NOT_UNDERSTOOD": 2
+            },
+            "more.reconcile": {
+              "more.reconcile": 1
+            },
+            "more.loans": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "settings": {
+              "NOT_UNDERSTOOD": 1
+            },
+            "ASK": {
+              "NOT_UNDERSTOOD": 26,
+              "ASK": 1
+            },
+            "REJECT": {
+              "NOT_UNDERSTOOD": 20
+            }
+          }
+        }
+      },
+      "gate": {
+        "rule": {
+          "minAdvantagePp": 5,
+          "maxWrongNavigate": 0.02,
+          "rejectItemsNavigated": 0,
+          "appliesTo": "every language bucket (en, hi-Deva, hi-Latn, mixed), test set, best A vs each C at the same level"
+        },
+        "byCandidate": {},
+        "evaluated": false
+      }
+    }
+  },
+  "conclusion": "consistent across all-items and debatable-excluded scopes",
+  "caveat": "v1 phrases are synthetic and exploratory; small language buckets (hi-Latn ~25 items) cannot resolve a 5-point difference.",
+  "skippedResolvers": {},
+  "preparedTestSha256": {
+    "L0": "5fbb1d9491c80372af567172505dd7696889495c9b09b6941930e21e62c39b8f",
+    "L1": "4162b576968ec6c4b86a0a3844b4c04040632358450f66bdcdad78a3474c73c4",
+    "L2": "ce6bce462a68fc5fae8f648b7549ef698e4a013ebe2b67f6efab741a940f0556"
+  },
+  "filesOpened": [
+    "MANIFEST.sha256",
+    "config.v1.json",
+    "data/anchors.v1.json",
+    "data/test.v1.frozen.jsonl",
+    "data/tuning.v1.jsonl",
+    "destinations.v1.json",
+    "lexicon.v1.json",
+    "results/baseline-a-r2/thresholds.json",
+    "results/baseline-a-r2/thresholds.json.sha256"
+  ],
+  "testReadCount": 2
+}

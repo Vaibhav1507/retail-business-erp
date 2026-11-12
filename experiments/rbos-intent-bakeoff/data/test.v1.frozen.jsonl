@@ -1,0 +1,160 @@
+{"id":"t001","text":"back to the start screen","lang":"en","expect":"navigate","target":"home"}
+{"id":"t002","text":"शुरू वाली स्क्रीन पर ले चलो","lang":"hi-Deva","expect":"navigate","target":"home"}
+{"id":"t003","text":"ghar wala page","lang":"hi-Latn","expect":"navigate","target":"home"}
+{"id":"t004","text":"what can I do in selling","lang":"en","expect":"navigate","target":"sell.menu"}
+{"id":"t005","text":"बिक्री वाले विकल्प","lang":"hi-Deva","expect":"navigate","target":"sell.menu"}
+{"id":"t006","text":"start a fresh bill for this customer","lang":"en","expect":"navigate","target":"sell.bill"}
+{"id":"t007","text":"ग्राहक का बिल काटो","lang":"hi-Deva","expect":"navigate","target":"sell.bill"}
+{"id":"t008","text":"jaldi se ek bill bana do","lang":"hi-Latn","expect":"navigate","target":"sell.bill"}
+{"id":"t009","text":"billing screen open karo","lang":"mixed","expect":"navigate","target":"sell.bill"}
+{"id":"t010","text":"find last week's invoices","lang":"en","expect":"navigate","target":"sell.bills"}
+{"id":"t011","text":"बेचे हुए बिलों की सूची","lang":"hi-Deva","expect":"navigate","target":"sell.bills"}
+{"id":"t012","text":"pichle sale bills","lang":"mixed","expect":"navigate","target":"sell.bills"}
+{"id":"t013","text":"take payment against a credit sale","lang":"en","expect":"navigate","target":"sell.collect"}
+{"id":"t014","text":"उधारी के पैसे जमा करो","lang":"hi-Deva","expect":"navigate","target":"sell.collect"}
+{"id":"t015","text":"gupta ji paisa de gaye entry karo","lang":"hi-Latn","expect":"navigate","target":"sell.collect"}
+{"id":"t016","text":"customer payment receive karna","lang":"mixed","expect":"navigate","target":"sell.collect"}
+{"id":"t017","text":"a buyer brought back a fan","lang":"en","expect":"navigate","target":"sell.return"}
+{"id":"t018","text":"बेचा हुआ सामान लौटाया गया","lang":"hi-Deva","expect":"navigate","target":"sell.return"}
+{"id":"t019","text":"grahak ne mixer lauta diya","lang":"hi-Latn","expect":"navigate","target":"sell.return"}
+{"id":"t020","text":"customer return entry","lang":"mixed","expect":"navigate","target":"sell.return"}
+{"id":"t021","text":"record goods received today","lang":"en","expect":"navigate","target":"buy.receive"}
+{"id":"t022","text":"खरीदारी दर्ज करो","lang":"hi-Deva","expect":"navigate","target":"buy.receive"}
+{"id":"t023","text":"gaadi se maal utra hai chadhao","lang":"hi-Latn","expect":"navigate","target":"buy.receive"}
+{"id":"t024","text":"purchase bill add karo","lang":"mixed","expect":"navigate","target":"buy.receive"}
+{"id":"t025","text":"settle the distributor's dues","lang":"en","expect":"navigate","target":"buy.pay"}
+{"id":"t026","text":"वितरक को भुगतान","lang":"hi-Deva","expect":"navigate","target":"buy.pay"}
+{"id":"t027","text":"company ka paisa chukana hai","lang":"hi-Latn","expect":"navigate","target":"buy.pay"}
+{"id":"t028","text":"dealer payment karo","lang":"mixed","expect":"navigate","target":"buy.pay"}
+{"id":"t029","text":"list of things I bought from suppliers","lang":"en","expect":"navigate","target":"buy.history"}
+{"id":"t030","text":"पिछली खरीद के बिल","lang":"hi-Deva","expect":"navigate","target":"buy.history"}
+{"id":"t031","text":"purchase ki purani entries","lang":"mixed","expect":"navigate","target":"buy.history"}
+{"id":"t032","text":"send damaged goods back to the distributor","lang":"en","expect":"navigate","target":"buy.return"}
+{"id":"t033","text":"खराब माल कंपनी को लौटाओ","lang":"hi-Deva","expect":"navigate","target":"buy.return"}
+{"id":"t034","text":"dealer ko return bhejna","lang":"mixed","expect":"navigate","target":"buy.return"}
+{"id":"t035","text":"what's on the shelves right now","lang":"en","expect":"navigate","target":"stock.current"}
+{"id":"t036","text":"गोदाम में क्या पड़ा है","lang":"hi-Deva","expect":"navigate","target":"stock.current"}
+{"id":"t037","text":"saman kitna hai dukaan mein","lang":"hi-Latn","expect":"navigate","target":"stock.current"}
+{"id":"t038","text":"stock position check karo","lang":"mixed","expect":"navigate","target":"stock.current"}
+{"id":"t039","text":"add a new item to the catalogue","lang":"en","expect":"navigate","target":"stock.products"}
+{"id":"t040","text":"नया आइटम जोड़ना","lang":"hi-Deva","expect":"navigate","target":"stock.products"}
+{"id":"t041","text":"item ka rate badalna hai","lang":"mixed","expect":"navigate","target":"stock.products"}
+{"id":"t042","text":"enter what I had when I started using the app","lang":"en","expect":"navigate","target":"stock.opening"}
+{"id":"t043","text":"पहले से पड़ा माल चढ़ाओ","lang":"hi-Deva","expect":"navigate","target":"stock.opening"}
+{"id":"t044","text":"opening quantity bharni hai","lang":"mixed","expect":"navigate","target":"stock.opening"}
+{"id":"t045","text":"bulk add items from a spreadsheet","lang":"en","expect":"navigate","target":"stock.import"}
+{"id":"t046","text":"एक्सेल फाइल से सामान डालो","lang":"hi-Deva","expect":"navigate","target":"stock.import"}
+{"id":"t047","text":"price list upload karo","lang":"mixed","expect":"navigate","target":"stock.import"}
+{"id":"t048","text":"write off a broken piece","lang":"en","expect":"navigate","target":"stock.adjust"}
+{"id":"t049","text":"टूटा हुआ सामान घटाओ","lang":"hi-Deva","expect":"navigate","target":"stock.adjust"}
+{"id":"t050","text":"stock galat hai sahi karo","lang":"mixed","expect":"navigate","target":"stock.adjust"}
+{"id":"t051","text":"do a physical count of the shop","lang":"en","expect":"navigate","target":"stock.count"}
+{"id":"t052","text":"माल गिनना है","lang":"hi-Deva","expect":"navigate","target":"stock.count"}
+{"id":"t053","text":"godown ki ginti","lang":"hi-Latn","expect":"navigate","target":"stock.count"}
+{"id":"t054","text":"show past stock corrections and who made them","lang":"en","expect":"navigate","target":"stock.history"}
+{"id":"t055","text":"स्टॉक घटाने-बढ़ाने का रिकॉर्ड","lang":"hi-Deva","expect":"navigate","target":"stock.history"}
+{"id":"t056","text":"adjustment ka purana record","lang":"mixed","expect":"navigate","target":"stock.history"}
+{"id":"t057","text":"items that need reordering","lang":"en","expect":"navigate","target":"stock.alerts"}
+{"id":"t058","text":"जो माल खत्म होने वाला है","lang":"hi-Deva","expect":"navigate","target":"stock.alerts"}
+{"id":"t059","text":"kaun sa maal mahino se nahi bika","lang":"hi-Latn","expect":"navigate","target":"stock.alerts"}
+{"id":"t060","text":"set how many pieces are in a carton","lang":"en","expect":"navigate","target":"stock.units"}
+{"id":"t061","text":"डिब्बे में कितने पीस","lang":"hi-Deva","expect":"navigate","target":"stock.units"}
+{"id":"t062","text":"unit setting karo kg aur gram","lang":"mixed","expect":"navigate","target":"stock.units"}
+{"id":"t063","text":"open the customer book","lang":"en","expect":"navigate","target":"parties.customers"}
+{"id":"t064","text":"नया ग्राहक जोड़ो","lang":"hi-Deva","expect":"navigate","target":"parties.customers"}
+{"id":"t065","text":"grahakon ke naam","lang":"hi-Latn","expect":"navigate","target":"parties.customers"}
+{"id":"t066","text":"distributor contacts","lang":"en","expect":"navigate","target":"parties.suppliers"}
+{"id":"t067","text":"कंपनी वालों की लिस्ट","lang":"hi-Deva","expect":"navigate","target":"parties.suppliers"}
+{"id":"t068","text":"supplier ka phone number","lang":"mixed","expect":"navigate","target":"parties.suppliers"}
+{"id":"t069","text":"what has this buyer purchased before","lang":"en","expect":"navigate","target":"parties.purchases"}
+{"id":"t070","text":"ग्राहक की पुरानी खरीद","lang":"hi-Deva","expect":"navigate","target":"parties.purchases"}
+{"id":"t071","text":"customer wise kharidari","lang":"mixed","expect":"navigate","target":"parties.purchases"}
+{"id":"t072","text":"overdue customers by age","lang":"en","expect":"navigate","target":"parties.dues"}
+{"id":"t073","text":"किसका उधार कितने दिन से बाकी","lang":"hi-Deva","expect":"navigate","target":"parties.dues"}
+{"id":"t074","text":"bahut din se paisa nahi aaya kiska","lang":"hi-Latn","expect":"navigate","target":"parties.dues"}
+{"id":"t075","text":"how much money is in the drawer and bank","lang":"en","expect":"navigate","target":"money.cash"}
+{"id":"t076","text":"गल्ले में कितना है","lang":"hi-Deva","expect":"navigate","target":"money.cash"}
+{"id":"t077","text":"cash balance batao screen","lang":"mixed","expect":"navigate","target":"money.cash"}
+{"id":"t078","text":"log shop rent","lang":"en","expect":"navigate","target":"money.expenses"}
+{"id":"t079","text":"चाय पानी का खर्च","lang":"hi-Deva","expect":"navigate","target":"money.expenses"}
+{"id":"t080","text":"kiraya aur bijli likhna","lang":"hi-Latn","expect":"navigate","target":"money.expenses"}
+{"id":"t081","text":"I put my own money into the shop","lang":"en","expect":"navigate","target":"money.owner"}
+{"id":"t082","text":"घर खर्च के लिए निकाला","lang":"hi-Deva","expect":"navigate","target":"money.owner"}
+{"id":"t083","text":"owner withdrawal entry","lang":"mixed","expect":"navigate","target":"money.owner"}
+{"id":"t084","text":"close today's cash","lang":"en","expect":"navigate","target":"money.closing"}
+{"id":"t085","text":"शाम का गल्ला मिलान","lang":"hi-Deva","expect":"navigate","target":"money.closing"}
+{"id":"t086","text":"din band karna hai","lang":"hi-Latn","expect":"navigate","target":"money.closing"}
+{"id":"t087","text":"show all other features","lang":"en","expect":"navigate","target":"more.menu"}
+{"id":"t088","text":"बाकी सब विकल्प","lang":"hi-Deva","expect":"navigate","target":"more.menu"}
+{"id":"t089","text":"monthly sales report","lang":"en","expect":"navigate","target":"more.reports"}
+{"id":"t090","text":"फायदा नुकसान देखना","lang":"hi-Deva","expect":"navigate","target":"more.reports"}
+{"id":"t091","text":"report section kholo","lang":"mixed","expect":"navigate","target":"more.reports"}
+{"id":"t092","text":"print an old receipt","lang":"en","expect":"navigate","target":"more.print"}
+{"id":"t093","text":"पर्ची छापनी है","lang":"hi-Deva","expect":"navigate","target":"more.print"}
+{"id":"t094","text":"freeze last year's entries","lang":"en","expect":"navigate","target":"more.lock"}
+{"id":"t095","text":"पिछले साल का हिसाब बंद","lang":"hi-Deva","expect":"navigate","target":"more.lock"}
+{"id":"t096","text":"track changes made by staff","lang":"en","expect":"navigate","target":"more.audit"}
+{"id":"t097","text":"किसने बिल बदला","lang":"hi-Deva","expect":"navigate","target":"more.audit"}
+{"id":"t098","text":"tax filing summary","lang":"en","expect":"navigate","target":"more.gst"}
+{"id":"t099","text":"जीएसटी का हिसाब दिखाओ","lang":"hi-Deva","expect":"navigate","target":"more.gst"}
+{"id":"t100","text":"give my employee access","lang":"en","expect":"navigate","target":"more.staff"}
+{"id":"t101","text":"ladke ka account banao app mein","lang":"hi-Latn","expect":"navigate","target":"more.staff"}
+{"id":"t102","text":"manage my other outlet","lang":"en","expect":"navigate","target":"more.branches"}
+{"id":"t103","text":"doosri shop ki setting","lang":"hi-Latn","expect":"navigate","target":"more.branches"}
+{"id":"t104","text":"move cartons from warehouse to counter","lang":"en","expect":"navigate","target":"more.transfers"}
+{"id":"t105","text":"माल एक जगह से दूसरी जगह","lang":"hi-Deva","expect":"navigate","target":"more.transfers"}
+{"id":"t106","text":"raise a PO to the distributor","lang":"en","expect":"navigate","target":"more.orders"}
+{"id":"t107","text":"maal mangane ki list banao","lang":"hi-Latn","expect":"navigate","target":"more.orders"}
+{"id":"t108","text":"match my passbook entries","lang":"en","expect":"navigate","target":"more.reconcile"}
+{"id":"t109","text":"bank loan ki kist","lang":"mixed","expect":"navigate","target":"more.loans"}
+{"id":"t110","text":"app ki language badlo","lang":"mixed","expect":"navigate","target":"settings"}
+{"id":"t111","text":"return","lang":"en","expect":"ask","candidates":["sell.return","buy.return"]}
+{"id":"t112","text":"wapas karna hai","lang":"hi-Latn","expect":"ask","candidates":["sell.return","buy.return"]}
+{"id":"t113","text":"माल वापस","lang":"hi-Deva","expect":"ask","candidates":["sell.return","buy.return"]}
+{"id":"t114","text":"return entry karo","lang":"mixed","expect":"ask","candidates":["sell.return","buy.return"]}
+{"id":"t115","text":"paisa","lang":"hi-Latn","expect":"ask","candidates":["sell.collect","buy.pay","money.cash"]}
+{"id":"t116","text":"भुगतान","lang":"hi-Deva","expect":"ask","candidates":["sell.collect","buy.pay"]}
+{"id":"t117","text":"payment entry","lang":"mixed","expect":"ask","candidates":["sell.collect","buy.pay"]}
+{"id":"t118","text":"purchase history","lang":"en","expect":"ask","candidates":["buy.history","parties.purchases"]}
+{"id":"t119","text":"kharidari dikhao","lang":"hi-Latn","expect":"ask","candidates":["buy.history","parties.purchases"]}
+{"id":"t120","text":"history","lang":"en","expect":"ask","candidates":["sell.bills","buy.history","stock.history","parties.purchases","more.audit"]}
+{"id":"t121","text":"पुराना रिकॉर्ड","lang":"hi-Deva","expect":"ask","candidates":["sell.bills","buy.history","stock.history","more.audit"]}
+{"id":"t122","text":"bill","lang":"en","expect":"ask","candidates":["sell.bill","sell.bills","buy.receive"]}
+{"id":"t123","text":"bill dikhao","lang":"mixed","expect":"ask","candidates":["sell.bills","buy.history"]}
+{"id":"t124","text":"बकाया","lang":"hi-Deva","expect":"ask","candidates":["sell.collect","parties.dues","buy.pay"]}
+{"id":"t125","text":"udhaar dekhna","lang":"hi-Latn","expect":"ask","candidates":["sell.collect","parties.dues"]}
+{"id":"t126","text":"stock kam karo","lang":"mixed","expect":"ask","candidates":["stock.adjust","buy.return","more.transfers"]}
+{"id":"t127","text":"order dekhna","lang":"mixed","expect":"ask","candidates":["more.orders","sell.bills"]}
+{"id":"t128","text":"print","lang":"en","expect":"ask","candidates":["more.print","sell.bills"]}
+{"id":"t129","text":"supplier","lang":"en","expect":"ask","candidates":["parties.suppliers","buy.pay","buy.receive"]}
+{"id":"t130","text":"customer","lang":"en","expect":"ask","candidates":["parties.customers","sell.collect","parties.purchases"]}
+{"id":"t131","text":"ग्राहक","lang":"hi-Deva","expect":"ask","candidates":["parties.customers","sell.collect","parties.purchases"]}
+{"id":"t132","text":"stock history","lang":"en","expect":"ask","candidates":["stock.history","stock.current"]}
+{"id":"t133","text":"bank","lang":"en","expect":"ask","candidates":["money.cash","more.reconcile","more.loans"]}
+{"id":"t134","text":"hisaab","lang":"hi-Latn","expect":"ask","candidates":["money.cash","more.reports","money.closing"]}
+{"id":"t135","text":"transfer","lang":"en","expect":"ask","candidates":["more.transfers","money.cash"]}
+{"id":"t136","text":"product","lang":"en","expect":"ask","candidates":["stock.products","stock.current","stock.import"]}
+{"id":"t137","text":"खर्चा और कमाई","lang":"hi-Deva","expect":"ask","candidates":["money.expenses","more.reports"]}
+{"id":"t138","text":"setting","lang":"en","expect":"ask","candidates":["settings","more.menu"]}
+{"id":"t139","text":"maal","lang":"hi-Latn","expect":"ask","candidates":["stock.current","buy.receive","stock.products"]}
+{"id":"t140","text":"report bhejo","lang":"mixed","expect":"ask","candidates":["more.reports","more.gst"]}
+{"id":"t141","text":"aaj ka total kitna hua","lang":"hi-Latn","expect":"reject","why":"business-data question"}
+{"id":"t142","text":"which customer owes the most","lang":"en","expect":"reject","why":"business-data question"}
+{"id":"t143","text":"सबसे ज्यादा क्या बिका","lang":"hi-Deva","expect":"reject","why":"business-data question"}
+{"id":"t144","text":"cancel invoice 245","lang":"en","expect":"reject","why":"transaction"}
+{"id":"t145","text":"verma ka udhaar maaf karo","lang":"hi-Latn","expect":"reject","why":"transaction"}
+{"id":"t146","text":"10 piece fan bill mein daalo","lang":"mixed","expect":"reject","why":"transaction"}
+{"id":"t147","text":"सारा डेटा मिटा दो","lang":"hi-Deva","expect":"reject","why":"destructive"}
+{"id":"t148","text":"pay 2000 to supplier now","lang":"en","expect":"reject","why":"transaction"}
+{"id":"t149","text":"whatsapp kholo","lang":"hi-Latn","expect":"reject","why":"external app"}
+{"id":"t150","text":"go to #/admin","lang":"en","expect":"reject","why":"unverified route injection"}
+{"id":"t151","text":"cricket score batao","lang":"mixed","expect":"reject","why":"out of domain"}
+{"id":"t152","text":"गाना बजाओ","lang":"hi-Deva","expect":"reject","why":"out of domain"}
+{"id":"t153","text":"write a message to my customer","lang":"en","expect":"reject","why":"chatbot"}
+{"id":"t154","text":"logout kar do","lang":"mixed","expect":"reject","why":"action, not navigation"}
+{"id":"t155","text":"price badha do sab items ka","lang":"mixed","expect":"reject","why":"transaction"}
+{"id":"t156","text":"hello","lang":"en","expect":"reject","why":"no intent"}
+{"id":"t157","text":"हम्म","lang":"hi-Deva","expect":"reject","why":"filler"}
+{"id":"t158","text":"","lang":"en","expect":"reject","why":"empty input"}
+{"id":"t159","text":"asdf qwer","lang":"en","expect":"reject","why":"noise"}
+{"id":"t160","text":"javascript:alert(1)","lang":"en","expect":"reject","why":"injection"}

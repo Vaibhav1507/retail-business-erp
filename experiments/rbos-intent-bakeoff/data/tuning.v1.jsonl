@@ -1,0 +1,54 @@
+{"id":"d001","text":"take me to the dashboard","lang":"en","expect":"navigate","target":"home","prov":"synthetic"}
+{"id":"d002","text":"मुख्य पेज खोलो","lang":"hi-Deva","expect":"navigate","target":"home","prov":"synthetic"}
+{"id":"d003","text":"bill banana hai abhi","lang":"hi-Latn","expect":"navigate","target":"sell.bill","prov":"synthetic"}
+{"id":"d004","text":"new invoice please","lang":"en","expect":"navigate","target":"sell.bill","prov":"synthetic"}
+{"id":"d005","text":"कल के बिल देखने हैं","lang":"hi-Deva","expect":"navigate","target":"sell.bills","prov":"synthetic"}
+{"id":"d006","text":"udhaar wapas lena hai customer se","lang":"hi-Latn","expect":"navigate","target":"sell.collect","prov":"synthetic"}
+{"id":"d007","text":"customer wapas laya item","lang":"mixed","expect":"navigate","target":"sell.return","prov":"synthetic"}
+{"id":"d008","text":"supplier ka maal aaya entry","lang":"mixed","expect":"navigate","target":"buy.receive","prov":"synthetic"}
+{"id":"d009","text":"सप्लायर का पेमेंट करना है","lang":"hi-Deva","expect":"navigate","target":"buy.pay","prov":"synthetic"}
+{"id":"d010","text":"show supplier invoices","lang":"en","expect":"navigate","target":"buy.history","prov":"synthetic"}
+{"id":"d011","text":"kharab maal supplier ko lautana","lang":"hi-Latn","expect":"navigate","target":"buy.return","prov":"synthetic"}
+{"id":"d012","text":"how much stock do I have","lang":"en","expect":"navigate","target":"stock.current","prov":"synthetic"}
+{"id":"d013","text":"इन्वेंटरी दिखाओ","lang":"hi-Deva","expect":"navigate","target":"stock.current","prov":"synthetic"}
+{"id":"d014","text":"product edit karna hai","lang":"mixed","expect":"navigate","target":"stock.products","prov":"synthetic"}
+{"id":"d015","text":"enter opening quantities","lang":"en","expect":"navigate","target":"stock.opening","prov":"synthetic"}
+{"id":"d016","text":"csv file upload karni hai products ki","lang":"mixed","expect":"navigate","target":"stock.import","prov":"synthetic"}
+{"id":"d017","text":"stock mein ghata badhi karo","lang":"hi-Latn","expect":"navigate","target":"stock.adjust","prov":"synthetic"}
+{"id":"d018","text":"स्टॉक की गिनती शुरू करो","lang":"hi-Deva","expect":"navigate","target":"stock.count","prov":"synthetic"}
+{"id":"d019","text":"which items are running low","lang":"en","expect":"navigate","target":"stock.alerts","prov":"synthetic"}
+{"id":"d020","text":"dozen aur piece set karo","lang":"mixed","expect":"navigate","target":"stock.units","prov":"synthetic"}
+{"id":"d021","text":"customer ka number dhundhna","lang":"mixed","expect":"navigate","target":"parties.customers","prov":"synthetic"}
+{"id":"d022","text":"सप्लायर जोड़ना है","lang":"hi-Deva","expect":"navigate","target":"parties.suppliers","prov":"synthetic"}
+{"id":"d023","text":"sharma ji ne pichle mahine kya liya","lang":"hi-Latn","expect":"navigate","target":"parties.purchases","prov":"synthetic"}
+{"id":"d024","text":"who owes me for over 30 days","lang":"en","expect":"navigate","target":"parties.dues","prov":"synthetic"}
+{"id":"d025","text":"bank balance dekhna","lang":"mixed","expect":"navigate","target":"money.cash","prov":"synthetic"}
+{"id":"d026","text":"बिजली का बिल खर्चे में डालो","lang":"hi-Deva","expect":"navigate","target":"money.expenses","prov":"synthetic"}
+{"id":"d027","text":"maine ghar ke liye paise nikale","lang":"hi-Latn","expect":"navigate","target":"money.owner","prov":"synthetic"}
+{"id":"d028","text":"end of day cash tally","lang":"en","expect":"navigate","target":"money.closing","prov":"synthetic"}
+{"id":"d029","text":"aur kya kya hai app mein","lang":"hi-Latn","expect":"navigate","target":"more.menu","prov":"synthetic"}
+{"id":"d030","text":"मुनाफे की रिपोर्ट","lang":"hi-Deva","expect":"navigate","target":"more.reports","prov":"synthetic"}
+{"id":"d031","text":"reprint a document","lang":"en","expect":"navigate","target":"more.print","prov":"synthetic"}
+{"id":"d032","text":"march tak entries lock karo","lang":"mixed","expect":"navigate","target":"more.lock","prov":"synthetic"}
+{"id":"d033","text":"who edited this entry","lang":"en","expect":"navigate","target":"more.audit","prov":"synthetic"}
+{"id":"d034","text":"gstr ke liye data","lang":"mixed","expect":"navigate","target":"more.gst","prov":"synthetic"}
+{"id":"d035","text":"helper ko login dena hai","lang":"mixed","expect":"navigate","target":"more.staff","prov":"synthetic"}
+{"id":"d036","text":"नई ब्रांच जोड़ो","lang":"hi-Deva","expect":"navigate","target":"more.branches","prov":"synthetic"}
+{"id":"d037","text":"send items to the other shop","lang":"en","expect":"navigate","target":"more.transfers","prov":"synthetic"}
+{"id":"d038","text":"company ko order bhejna hai","lang":"mixed","expect":"navigate","target":"more.orders","prov":"synthetic"}
+{"id":"d039","text":"बैंक स्टेटमेंट मिलाओ","lang":"hi-Deva","expect":"navigate","target":"more.reconcile","prov":"synthetic"}
+{"id":"d040","text":"emi wala hisaab","lang":"mixed","expect":"navigate","target":"more.loans","prov":"synthetic"}
+{"id":"d041","text":"change shop name and address","lang":"en","expect":"navigate","target":"settings","prov":"synthetic"}
+{"id":"d042","text":"bechne ke options","lang":"hi-Latn","expect":"navigate","target":"sell.menu","prov":"synthetic"}
+{"id":"d043","text":"वापसी","lang":"hi-Deva","expect":"ask","candidates":["sell.return","buy.return"],"prov":"synthetic"}
+{"id":"d044","text":"payment","lang":"en","expect":"ask","candidates":["sell.collect","buy.pay"],"prov":"synthetic"}
+{"id":"d045","text":"history dikhao","lang":"mixed","expect":"ask","candidates":["sell.bills","buy.history","stock.history","parties.purchases","more.audit"],"prov":"synthetic"}
+{"id":"d046","text":"udhaar","lang":"hi-Latn","expect":"ask","candidates":["sell.collect","parties.dues"],"prov":"synthetic"}
+{"id":"d047","text":"order","lang":"en","expect":"ask","candidates":["more.orders","sell.bill"],"prov":"synthetic"}
+{"id":"d048","text":"stock","lang":"en","expect":"ask","candidates":["stock.current","stock.adjust","stock.count"],"prov":"synthetic"}
+{"id":"d049","text":"aaj kitni bikri hui","lang":"hi-Latn","expect":"reject","prov":"synthetic","why":"business-data question"}
+{"id":"d050","text":"delete the last bill","lang":"en","expect":"reject","prov":"synthetic","why":"transaction"}
+{"id":"d051","text":"मौसम कैसा है","lang":"hi-Deva","expect":"reject","prov":"synthetic","why":"out of domain"}
+{"id":"d052","text":"ramesh ko 500 rupaye bhejo","lang":"hi-Latn","expect":"reject","prov":"synthetic","why":"transaction"}
+{"id":"d053","text":"tell me a joke","lang":"en","expect":"reject","prov":"synthetic","why":"chatbot"}
+{"id":"d054","text":"open google.com","lang":"en","expect":"reject","prov":"synthetic","why":"external URL"}
