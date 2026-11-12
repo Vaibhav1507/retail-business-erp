@@ -16,7 +16,7 @@ public sealed record ProductFileResult(
 
 /// <summary>
 /// Turns an uploaded product list into plain table rows (header row first).
-/// Excel and Word files are parsed locally; only photos are sent to Gemini.
+/// Excel, Word and CSV files are parsed locally. PDFs and photos use Gemini for visual, category-aware extraction.
 /// </summary>
 public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogger<ProductFileReader> log, LocalOcr ocr)
 {
