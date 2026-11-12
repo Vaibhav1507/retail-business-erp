@@ -182,7 +182,17 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 	{
 		var apiKey = cfg["Gemini:ApiKey"];
 		if (string.IsNullOrWhiteSpace(apiKey))
-			return ServiceResult<ProductFileResult>.Fail("AI catalogue extraction is not configured. Add the existing Gemini:ApiKey setting, then retry the PDF. Excel, Word and CSV imports do not require AI.");
+		{
+			// Preserve local text/OCR table import when AI is not configured. This is manual column mapping,
+			// not semantic catalogue understanding; automatic model/spec extraction requires Gemini.
+			var local = await ReadPdfWithOcrAsync(bytes, ct);
+			var localRows = local.Rows.Select(x => x.Cells).Where(x => x.Any(v => !string.IsNullOrWhiteSpace(v))).Take(MaxRows + 1).ToList();
+			if (localRows.Count >= 2)
+				return ServiceResult<ProductFileResult>.Ok(new(localRows, false, local.Rows.Select(x => x.Page).ToList(), "catalogue",
+					Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(), false,
+					"AI catalogue extraction is not configured. Text/OCR was extracted locally; map the columns manually. Configure Gemini to identify products and specifications automatically."));
+			return ServiceResult<ProductFileResult>.Fail("AI catalogue extraction is not configured and this PDF has no readable text. Configure Gemini for automatic catalogue understanding, or use a searchable PDF.");
+		}
 
 		var models = new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
 		JsonNode? parsed = null;
