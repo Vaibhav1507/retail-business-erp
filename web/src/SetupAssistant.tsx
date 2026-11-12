@@ -84,7 +84,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
   async function runPreview() {
     setError(''); setBusy(true)
     try {
-      const d = toImportRows(rows.slice(1), mapping).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
+      const d = toImportRows(rows.slice(1), mapping, headers).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
       setData(d)
       setPreview(await api<Preview>('POST', '/products/import/preview', { rows: d, source: sourceBody }))
       setStep(3)
