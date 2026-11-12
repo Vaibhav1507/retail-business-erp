@@ -97,7 +97,7 @@ export function toImportRows(data: string[][], m: Mapping, headers: string[] = [
     // Preserve additional AI-extracted or user-supplied specification columns.
     r.forEach((raw, index) => {
       if (mapped.has(index) || !raw?.trim()) return
-      const label = (headers[index] ?? '').replace(/^attribute:\\s*/i, '').trim()
+      const label = (headers[index] ?? '').replace(/^attribute:\s*/i, '').trim()
       const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
       if (key && !['name', 'category', 'unit', 'brand', 'model'].includes(key)) specs[key] = raw.trim()
     })
