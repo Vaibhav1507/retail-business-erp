@@ -187,8 +187,6 @@ const en = {
 } as const
 
 export type MessageKey = keyof typeof en
-
-  'navigation.leave': 'इस स्क्रीन पर आपका काम सेव नहीं हुआ हो सकता है। बिना सेव किए आगे बढ़ें?',
 const hi: Record<MessageKey, string> = {
   'navigation.leave': 'इस स्क्रीन पर आपका काम सेव नहीं हुआ हो सकता है। बिना सेव किए आगे बढ़ें?',
   'app.title': 'रिटेल बिज़नेस OS',
