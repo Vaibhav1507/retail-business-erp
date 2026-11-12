@@ -176,7 +176,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
                     return (
                       <tr key={r.row}>
                         <td>{r.row}</td><td>{d.name}</td><td>{d.categoryName}</td><td>{d.baseUnit}</td><td>{d.isGeneric ? 'Generic' : `${d.brand ?? ''} ${d.model ?? ''}`}</td>
-                        <td>{Object.entries(d.attributes ?? {}).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ') || 'No specifications extracted'}</td>
+                        <td>{Object.entries({ ...(d.attributes ?? {}), ...(d.specs ?? {}) }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ') || 'No specifications extracted'}</td>
                         <td>{label[r.status]}{r.message && r.status === 'invalid' ? `: ${r.message}` : ''}</td>
                       </tr>
                     )
