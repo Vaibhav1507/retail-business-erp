@@ -15,6 +15,7 @@ export type Product = {
 export type ProductSource = { documentId: string; documentName: string; brand: string | null; versionLabel: string | null; page: number | null }
 export const sourceLabel = (s: ProductSource) => `${s.documentName}${s.versionLabel ? ` (${s.versionLabel})` : ''}${s.page ? `, page ${s.page}` : ''}`
 export type Category = { id: string; name: string; productCount: number }
+export type CategoryAttribute = { key: string; label: string; dataType: string; unit: string | null; isRequired: boolean; isSearchable: boolean; isFilterable: boolean; displayOrder: number; options: string[] }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong')
 const UNITS = ['pcs', 'set', 'pack', 'm']
@@ -50,6 +51,12 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   const setAttr = (k: string, value: string) => setD(prev => ({ ...prev, attrs: { ...prev.attrs, [k]: value } }))
   const [otherCat, setOtherCat] = useState(false)
   const [brandNames, setBrandNames] = useState<string[]>([])
+  const [categoryAttributes, setCategoryAttributes] = useState<CategoryAttribute[]>([])
+  useEffect(() => {
+    const categoryId = categories.find(x => x.name === d.category)?.id
+    if (!categoryId) { setCategoryAttributes([]); return }
+    api<CategoryAttribute[]>('GET', `/categories/${categoryId}/attributes`).then(setCategoryAttributes).catch(() => setCategoryAttributes([]))
+  }, [d.category, categories])
   useEffect(() => { api<{ name: string; isActive: boolean }[]>('GET', '/brands').then(b => setBrandNames(b.filter(x => x.isActive).map(x => x.name))).catch(() => undefined) }, [])
   const pickCategory = (e: React.ChangeEvent<HTMLSelectElement>) => {
 	if (e.target.value === '__other') { setOtherCat(true); set({ category: '' }) } else { setOtherCat(false); set({ category: e.target.value }) }
@@ -95,7 +102,12 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
       </>}
       <fieldset>
         <legend>Product specifications (optional)</legend>
-        {Object.entries(d.attrs).map(([k, value]) => <label key={k}>{attributeLabel(k)} <input value={value} onChange={e => setAttr(k, e.target.value)} maxLength={160} /></label>)}
+        {categoryAttributes.map(def => <label key={def.key}>{def.label}{def.unit ? ` (${def.unit})` : ''}{def.isRequired ? ' *' : ''}
+          {def.dataType === 'select' ? <select required={def.isRequired} value={d.attrs[def.key] ?? ''} onChange={e => setAttr(def.key, e.target.value)}><option value="">Not set</option>{def.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
+            : def.dataType === 'boolean' ? <select required={def.isRequired} value={d.attrs[def.key] ?? ''} onChange={e => setAttr(def.key, e.target.value)}><option value="">Not set</option><option value="true">Yes</option><option value="false">No</option></select>
+            : <input required={def.isRequired} type={def.dataType === 'number' || def.dataType === 'decimal' ? 'number' : def.dataType === 'date' ? 'date' : 'text'} value={d.attrs[def.key] ?? ''} onChange={e => setAttr(def.key, e.target.value)} maxLength={160} />}
+        </label>)}
+        {Object.entries(d.attrs).filter(([k]) => !categoryAttributes.some(def => def.key === k)).map(([k, value]) => <label key={k}>{attributeLabel(k)} <input value={value} onChange={e => setAttr(k, e.target.value)} maxLength={160} /></label>)}
         <div className="form-actions">
           <input aria-label="Specification name" value={newAttrKey} onChange={e => setNewAttrKey(e.target.value)} placeholder="e.g. energy_rating, fabric, pack_size" maxLength={60} />
           <input aria-label="Specification value" value={newAttrValue} onChange={e => setNewAttrValue(e.target.value)} placeholder="Value" maxLength={160} />
