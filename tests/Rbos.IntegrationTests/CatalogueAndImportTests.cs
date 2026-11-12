@@ -202,4 +202,20 @@ public class CategoryAttributeTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(1, preview.GetProperty("ok").GetInt32());
         Assert.Contains("Capacity", preview.GetProperty("rows")[0].GetProperty("message").GetString());
     }
+    [Fact]
+    public async Task Imported_dynamic_specs_are_persisted_and_searchable()
+    {
+        var owner = await NewClient(f);
+        object[] rows =
+        {
+            new { name = "LG Washer 8kg", categoryName = "Washing Machines", isGeneric = false, baseUnit = "pcs", brand = "LG", model = "TX-8", attributes = new { colour = "Silver" }, specs = new Dictionary<string, string> { ["capacity_kg"] = "8", ["load_type"] = "Top Load" } }
+        };
+        var key = Guid.NewGuid().ToString();
+        var committed = await (await owner.Send(HttpMethod.Post, "/products/import/commit", new { rows }, key)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(1, committed.GetProperty("created").GetInt32());
+        var product = (await owner.GetJson("/products?q=Top%20Load")).EnumerateArray().Single();
+        Assert.Equal("8", product.GetProperty("specs").GetProperty("capacity_kg").GetString());
+        Assert.Equal("Silver", product.GetProperty("attributes").GetProperty("colour").GetString());
+    }
+
 }
