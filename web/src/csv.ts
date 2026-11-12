@@ -81,7 +81,7 @@ export function missingRequired(m: Mapping): string[] {
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
 
 /** Converts data rows (header excluded) to API rows. A product with no brand and no model is generic. */
-export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
+export function toImportRows(data: string[][], m: Mapping, headers: string[] = []): ImportRow[] {
   const get = (r: string[], k: FieldKey) => (m[k] === undefined ? '' : (r[m[k]!] ?? '').trim())
   const mapped = new Set(Object.values(m).filter((v): v is number => v !== undefined))
   return data.map(r => {
@@ -93,10 +93,12 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
       const v = get(r, k)
       if (v) attributes[k] = v
     }
-    // Preserve any additional AI-extracted or user-supplied specification columns.
-    r.forEach((value, index) => {
-      const header = (data.length >= 0 ? '' : '') // keep row conversion independent of a fixed schema
-      void header
+    // Preserve additional AI-extracted or user-supplied specification columns.
+    r.forEach((raw, index) => {
+      if (mapped.has(index) || !raw?.trim()) return
+      const label = (headers[index] ?? '').replace(/^attribute:\\s*/i, '').trim()
+      const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+      if (key && !['name', 'category', 'unit', 'brand', 'model'].includes(key)) attributes[key] = raw.trim()
     })
     return {
       name: get(r, 'name'),
