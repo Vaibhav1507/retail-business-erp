@@ -58,21 +58,6 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 			if ((name.EndsWith(".pdf") || contentType is "application/pdf") && CatalogueFileParsers.IsPdf(bytes))
 			{
 				return await ReadPdfCatalogueWithAiAsync(b64, bytes, ct);
-				var pdf = paged.Select(r => r.Cells).ToList();
-				if (pdf.Count >= 2)
-				{
-					var incomplete = paged.Count > MaxRows;
-					var kept = paged.Take(MaxRows).ToList();
-					return ServiceResult<ProductFileResult>.Ok(new(
-						kept.Select(r => r.Cells).ToList(),
-						false,
-						kept.Select(r => r.Page).ToList(),
-						CatalogueFileParsers.ClassifyDocument(pdf),
-						Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(),
-						incomplete,
-						incomplete ? $"Only the first {MaxRows} rows were read; the rest of this PDF was NOT extracted. Split the PDF by page range or onboard the remaining products by CSV/Excel." : null));
-				}
-				return ServiceResult<ProductFileResult>.Fail(skippedPages.Count > 0 ? $"This PDF has scanned pages ({string.Join(", ", skippedPages.Take(10))}) and local OCR (Tesseract) is not installed or configured (Ocr:TesseractPath). Install Tesseract or upload Excel/CSV." : "No readable text table was found in this PDF. Upload Excel/CSV or a photo instead.");
 			}
 			if (name.EndsWith(".xls") || name.EndsWith(".doc")) return ServiceResult<ProductFileResult>.Fail("Old .xls / .doc files are not supported. Open the file, choose Save As .xlsx / .docx (or CSV), then upload again.");
 			if (contentType is "image/jpeg" or "image/png" or "image/webp" && LooksLikeImage(bytes, contentType))
