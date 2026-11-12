@@ -9,7 +9,7 @@
     "validate": "node scripts/validate.mjs",
     "lexicon:check": "node scripts/build-lexicon.mjs --check",
     "lexicon:build": "node scripts/build-lexicon.mjs",
-    "baseline:tune": "node scripts/run.mjs --tune --resolvers A",
-    "baseline:test": "node scripts/run.mjs --test --run baseline-a-r2"
+    "baseline:tune": "node scripts/run.mjs --tune --resolvers A --run baseline-a-r3",
+    "baseline:test": "node scripts/run.mjs --test --run baseline-a-r3"
   }
 }
