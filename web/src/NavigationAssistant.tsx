@@ -8,7 +8,7 @@ const copy = {
   title:'Go to a screen', placeholder:'Try “new bill”, “stock”, “supplier payment”…', go:'Go', shortcuts:'Quick actions',
   unclear:'I could not identify a screen. Try a shortcut or a more specific command.',
   reject:'I can only navigate screens. I cannot answer business questions or perform transactions.',
-  choose:'Which screen do you mean?', leave:'You may have unsaved work on this screen. Leave without saving?',
+  choose:'Which screen do you mean?',
   enableVoice:'Enable voice · ~30 MB download', loading:'Preparing on-device voice…', ready:'Voice ready on this device',
   download:'Downloading speech model', start:'Start speaking', stop:'Stop and navigate', recording:'Listening · tap Stop when finished',
   micDenied:'Microphone access was blocked. Typed commands and shortcuts are still available.',
@@ -20,7 +20,7 @@ const copy = {
   title:'किसी स्क्रीन पर जाएँ', placeholder:'जैसे “नया बिल”, “स्टॉक”, “सप्लायर पेमेंट”…', go:'जाएँ', shortcuts:'जल्दी खोलें',
   unclear:'स्क्रीन समझ नहीं आई। कोई शॉर्टकट चुनें या थोड़ा स्पष्ट लिखें।',
   reject:'मैं केवल स्क्रीन खोल सकता हूँ। मैं कारोबार के सवालों का जवाब या लेन-देन नहीं कर सकता।',
-  choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?', leave:'इस स्क्रीन पर आपका काम सेव नहीं हुआ हो सकता है। बिना सेव किए आगे बढ़ें?',
+  choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?',
   enableVoice:'वॉइस चालू करें · लगभग 30 MB डाउनलोड', loading:'डिवाइस पर वॉइस तैयार हो रही है…', ready:'वॉइस इस डिवाइस पर तैयार है',
   download:'स्पीच मॉडल डाउनलोड हो रहा है', start:'बोलना शुरू करें', stop:'रोकें और स्क्रीन खोलें', recording:'सुन रहा है · पूरा होने पर रोकें',
   micDenied:'माइक्रोफोन की अनुमति नहीं मिली। टाइप और शॉर्टकट अभी भी काम करेंगे।',
@@ -34,7 +34,6 @@ const quick: NavigationTarget[] = [
  {id:'stock.current',hash:'#/stock/current',label:'Check stock'}, {id:'sell.collect',hash:'#/sell/collect',label:'Collect money'},
  {id:'money.expenses',hash:'#/money/expenses',label:'Record expense'}, {id:'parties.customers',hash:'#/parties/customers',label:'Customers'}
 ]
-const riskyRoutes = new Set(['sell.bill','buy.receive','stock.opening'])
 const SAMPLE_RATE = 16000
 
 const labelsHi: Record<string,string> = {
@@ -71,9 +70,6 @@ export function NavigationAssistant() {
  }, [])
 
  function go(target: NavigationTarget) {
-  const current = window.location.hash
-  const currentId = current.replace(/^#\//,'').replace('/','.')
-  if (riskyRoutes.has(currentId) && current !== target.hash && !window.confirm(text.leave)) return
   setChoices([]); setMessage(''); setQuery(''); window.location.hash = target.hash
  }
  function processText(value: string) {
