@@ -5,6 +5,7 @@ import { StockPage } from './Stock'
 import { HomePage, BusinessSettings } from './Home'
 import { AccountAccess } from './AccountAccess'
 import { ProfileMenu } from './ProfileMenu'
+import { NavigationAssistant } from './NavigationAssistant'
 import { BusinessSetup } from './BusinessSetup'
 import type { Product } from './Catalogue'
 import './styles.css'
@@ -127,12 +128,18 @@ export default function App() {
   }, [])
   useEffect(() => { if (me?.tenantId) loadData().catch(() => undefined) }, [me?.tenantId, loadData])
   useEffect(() => {
-	const on = () => { setRoute(parseRoute()); window.scrollTo(0, 0) }
-	window.addEventListener('hashchange', on)
-	return () => window.removeEventListener('hashchange', on)
+    let previousHash = window.location.hash
+    const protectedRoute = /^#\/(sell\/bill|buy\/receive|stock\/opening)$/
+    const on = () => {
+      const nextHash = window.location.hash
+      if (nextHash !== previousHash && protectedRoute.test(previousHash) && !window.confirm(t('navigation.leave'))) { window.location.hash = previousHash; return }
+      previousHash = nextHash; setRoute(parseRoute()); window.scrollTo(0, 0)
+    }
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
   }, [])
 
-  function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLang(l) }
+  function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLanguage(l); setLang(l) }
   async function logout() { await api('POST', '/auth/logout'); resetCsrf(); window.location.hash = ''; setMe(null) }
 
   if (me === undefined) return <p className="loading">{t('app.loading')}</p>
@@ -162,7 +169,7 @@ export default function App() {
 	  <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>
-	  <main className="content">{body}</main>
+	  <main className="content"><NavigationAssistant />{body}</main>
 	</div>
   )
 }

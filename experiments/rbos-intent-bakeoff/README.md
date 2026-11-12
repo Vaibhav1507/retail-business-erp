@@ -6,7 +6,7 @@ This experiment checks whether a local embedding model resolves Hindi, English, 
 | Stage | What | Status |
 |---|---|---|
 | 1 | Data, specs, config, README (this folder) | **Done** |
-| 2 | Lexicon generator, normalisation, validator, Baseline A, runner, reporting, tests (no npm packages yet; Transformers.js is added with stage 3) | **Done** |
+| 2 | Lexicon generator, normalisation, validator, Baseline A, runner, reporting, tests | **Implemented; CI verification pending** |
 | 3 | Download about 264 MB of models, then pin revisions and SHA-256 in `config.v1.json` | Waiting for approval |
 | 4 | Run tuning, freeze thresholds, then run the test set once | Waiting for approval |
 
@@ -34,7 +34,7 @@ node scripts/fetch-models.mjs  # stage 3: pin revision and record hashes
 node scripts/run.mjs --tune    # stage 4
 node scripts/run.mjs --test    # stage 4: refuses to run without frozen thresholds
 ```
-Stage 2 commands: `npm test`, `npm run validate`, `npm run lexicon:check`. `fetch-models.mjs` belongs to stage 3.
+Stage 2 commands: `npm test`, `npm run validate`, `npm run lexicon:check`. The pinned Transformers.js dependency is present for the later local-model adapter, but the deterministic Stage 2 tests do not download model weights. `fetch-models.mjs` belongs to stage 3 and is not present or run.
 
 ## Report (stage 4)
 For each resolver (A/C1/C2) × level (L0/L1/L2) × language bucket, the report gives:
@@ -45,6 +45,12 @@ For each resolver (A/C1/C2) × level (L0/L1/L2) × language bucket, the report g
 - model size.
 
 Pass gate: see `config.v1.json` → `gate`.
+
+## Current guardrails
+- Stage 2 is experiment code only; no RBOS UI, production route handling, microphone, speech recognition or app integration has been implemented.
+- Stage 3 model weights (~264 MB total) are not downloaded. C1/C2 remain skipped until a separate explicit approval and verified pinned artefacts.
+- Stage 4 model comparison has not been run. Baseline A results are exploratory and synthetic; they are not evidence of production accuracy.
+- The package scripts are defined in `package.json`; run them from this directory. GitHub Actions verifies these commands on the experiment branch.
 
 ## Known gaps
 - All v1 phrases are synthetic, written by the assistant, and still need the owner's review.

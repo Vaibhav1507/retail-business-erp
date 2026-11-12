@@ -1,0 +1,44 @@
+name: RBOS intent bake-off (Stage 2)
+
+on:
+  push:
+    branches:
+      - experiment/h2-stage2-repair
+    paths:
+      - 'experiments/rbos-intent-bakeoff/**'
+      - '.github/workflows/rbos-intent-bakeoff.yml'
+  pull_request:
+    paths:
+      - 'experiments/rbos-intent-bakeoff/**'
+      - '.github/workflows/rbos-intent-bakeoff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage2:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/rbos-intent-bakeoff
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: experiments/rbos-intent-bakeoff/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run validate
+      - run: npm run lexicon:check
+      - run: npm run baseline:tune
+      - run: npm run baseline:test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rbos-intent-bakeoff-baseline-a-r3
+          path: experiments/rbos-intent-bakeoff/results/baseline-a-r3/
+          if-no-files-found: warn
+          retention-days: 14

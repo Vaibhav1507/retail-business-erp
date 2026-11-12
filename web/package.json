@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/prepare-voice-runtime.mjs && vite",
+    "build": "node scripts/prepare-voice-runtime.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
     "test:e2e": "playwright test",

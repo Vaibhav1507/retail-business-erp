@@ -1,6 +1,6 @@
 # Voice and text navigation assistant: research and recommendation (H2)
 
-Status: research only. Nothing is implemented, installed or downloaded. Date of evidence: 2026-11-11.
+Status: H2 implementation is in progress on `experiment/h2-stage2-repair` (PR #1). The signed-in app now has typed navigation, quick actions, deterministic route allowlisting, ambiguity handling, out-of-scope rejection, and an opt-in local push-to-talk speech pipeline. The selected speech path is Shruti Hindi/English/Hinglish `.cact` weights with the Cactus Needle WebAssembly engine in a Web Worker; the browser downloads the ~29.5 MB model only after explicit opt-in and verifies SHA-256 before caching. The runtime assets are fetched at build time from a pinned upstream commit and checksum-verified. No model weights are committed to the repository. The feature is not merged or accepted yet; CI and browser/device validation remain outstanding. Status: 2026-11-12.
 
 ## 1. Scope
 
@@ -42,11 +42,11 @@ WER columns come from the Shruti card's comparison table (2026-10-18/19), unless
 
 ## 4. Recommendation
 
-1. **Best overall (provisional): text and shortcuts first, then Shruti through its ONNX export in a Web Worker (onnxruntime-web or sherpa-onnx WASM).** Shruti is the only candidate under 50 MB that claims usable Hinglish and runs in the browser under a permissive licence. This confirms the *model* preference only conditionally. It challenges the *runtime*: do not take a dependency on the Cactus Needle engine while its packaging is changing.
+1. **Selected for H2 implementation: text and shortcuts first, then Shruti's original `.cact` model through the Cactus Needle WebAssembly engine in a Web Worker.** The latest Shruti integration guide reports that the Hindi ONNX build does not match the original engine on its Hindi evaluation sets; therefore the original engine route is preferred over the ONNX export. Shruti and the engine are Apache-2.0. The vendor's device/browser measurements are not RBOS benchmarks and must be independently validated on the target phones.
 2. **Best accuracy (local, Hindi only):** IndicConformer Hindi ONNX (MIT). Koyal is better on read Hindi, but it is gated, needs CC-BY attribution and is weaker on accents. Neither handles Hinglish. Tara claims the best accuracy overall but cannot run free on the device.
 3. **Best lightweight and most robust for commands:** Vosk small Hindi with a **closed grammar** of RBOS phrases. Its open-dictation WER is worse, but a grammar limits output to valid commands, which can lower wrong navigation. This needs measuring against Shruti on the RBOS command set.
 
-**Decision rule:** keep both Shruti-ONNX and Vosk-grammar behind the same adapter. Pick by the section 7 results, not by the WER tables above.
+**Implementation decision:** use the Shruti original-engine WASM provider behind the shared resolver. Keep Vosk-grammar as a future fallback only if real RBOS voice testing shows a need; do not add a second provider before validating this one.
 
 ## 5. Verified RBOS context
 
@@ -214,7 +214,7 @@ There are 40 verified destinations (see section 9.6).
 4. Measure on the low-end phone: first-load time, peak memory, p50/p95 latency, network-off behaviour.
 5. Run Qwen2.5-0.5B with enum-constrained output **only if** experiment 1 shows embeddings under the gate.
 
-### 9.6 Experiment 1 plan (awaiting owner approval; nothing downloaded)
+### 9.6 Experiment 1 plan (Stage 2 implemented; model download still requires separate approval)
 
 - **Location:** `experiments/rbos-intent-bakeoff/`, outside RBOS, with its own lockfile. It does not touch `web/package.json`.
 - **Runtime:** Node 22 with `@huggingface/transformers@4.3.2` (Apache-2.0).
@@ -228,7 +228,7 @@ There are 40 verified destinations (see section 9.6).
 | C2: paraphrase-multilingual-MiniLM-L12-v2 | `Xenova/paraphrase-multilingual-MiniLM-L12-v2@2c4055b1` | `onnx/model_int8.onnx` 115,288 KB (`d6ea442f…bcf4c8`), `tokenizer.json` 16,683 KB (`b60b6b43…fa441`), plus the same three small JSON files | Upstream `sentence-transformers/…` is Apache-2.0 | ≈ 132 MB |
 
   - Total ≈ 264 MB of models, plus the npm packages (size measured at install).
-  - The revisions, hashes and package version above come from the earlier metadata check. `experiments/rbos-intent-bakeoff/config.v1.json` keeps placeholders until they are re-verified against the actual files at stages 2–3.
+  - The revisions and hashes above are research notes only. `experiments/rbos-intent-bakeoff/config.v1.json` keeps placeholders until the model artefacts are downloaded and independently verified. Stage 2 code and deterministic Baseline A do not require model weights.
   - The two int8 ONNX files have the same byte size but different hashes. That is plausible because both are 12-layer, 384-dim models with the XLM-R vocabulary.
   - The Xenova repos do not declare their own licence, so they inherit the upstream terms. Confirm this before any redistribution.
 - **Destinations:** 40 verified hashes, frozen in `destinations.v1.json`: `home`, `settings`, the More menu itself (`#/more`), and 37 page/tab pairs. The earlier count of 39 left out the More menu screen.
@@ -262,3 +262,13 @@ There are 40 verified destinations (see section 9.6).
 ## 10. Smallest next step
 
 Approve a **text-only slice**: the normaliser, intent table and resolver as pure TypeScript with unit tests over the verified routes, plus a typed "Go to…" box. It has no model, no package and no microphone. It delivers value on its own, and it becomes the resolver that every speech provider will later feed. In parallel, the owner collects the consented recording corpus for the provider bake-off.
+
+
+## 11. H2 implementation status
+
+- The feature is navigation-only. It never answers business-data questions, computes values, creates or posts transactions, or accepts arbitrary URLs. X1 remains deferred.
+- Typed commands and quick actions do not depend on microphone permission, model downloads, or network speech services.
+- Voice is opt-in and push-to-talk. Audio is captured in memory, resampled to 16 kHz mono, transcribed locally in a Web Worker, and transient PCM buffers are cleared after inference. No audio or transcript is sent to RBOS APIs or written to logs.
+- The model is cached in browser Cache Storage after checksum verification. Model downloads happen only after the user selects Enable voice. The existing RBOS app shell is not fully offline; cached recognition is intended to work locally after the app has loaded.
+- Navigation from billing, purchase receiving, and opening-stock routes is guarded with a confirmation before leaving. This currently uses route-level protection rather than field-level dirty-state tracking.
+- Remaining acceptance work: resolve all CI failures; verify the production build and runtime asset download; test mic permission denial, model cache/reload, Hindi/English/Hinglish commands, silence/noise rejection, and unsaved-form protection on desktop and low-end Android; then update this status after validation.
