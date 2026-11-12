@@ -23,7 +23,7 @@ RUN apt-get update \
        tesseract-ocr \
        tesseract-ocr-eng \
     && tesseract --version \
-    && tesseract --list-langs \
+    && tesseract --list-langs | grep -qx 'eng' \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=api /app ./
