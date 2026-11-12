@@ -60,7 +60,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         if (file.size > MAX_BYTES) throw new Error('File is larger than 12 MB. Split or compress it and try again.')
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: file.type, data: await toBase64(file) })
         accept(r.rows, r.usedAi ?? false)
-        if (r.incomplete && r.warning) setError(r.warning)
+        if (r.warning) setError(r.warning)
         if (name.endsWith('.pdf')) {
           setPages(r.pages ?? [])
           setSource({ ...NO_SOURCE, documentName: file.name, documentKind: r.documentKind ?? 'catalogue', contentHash: r.contentHash ?? '' })
