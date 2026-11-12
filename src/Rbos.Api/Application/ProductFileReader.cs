@@ -197,19 +197,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		if (parsed?["products"] is not JsonArray items)
 			return ServiceResult<ProductFileResult>.Fail("The PDF was received, but AI could not identify a structured product/model list. Try a clearer catalogue or split a large PDF into smaller parts.");
 
-		static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var value) ? value.Trim() : "";
-		var rows = new List<List<string>> { Header.ToList() };
-		var seenModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-		foreach (var n in items)
-		{
-			var model = Str(n?["model"]);
-			if (model.Length > 0 && !seenModels.Add(model)) continue;
-			var name = Str(n?["name"]);
-			var category = Str(n?["category"]);
-			if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category)) continue;
-			var unit = Str(n?["unit"]);
-			rows.Add([name, category, unit.Length > 0 ? unit : "pcs", Str(n?["brand"]), model, Str(n?["colour"]), Str(n?["capacity"]), Str(n?["connectorType"]), Str(n?["compatibleWith"])]);
-		}
+		var rows = BuildAiRows(items);
 		if (rows.Count < 2)
 			return ServiceResult<ProductFileResult>.Fail("No distinct sellable product models could be identified in this PDF. No products were imported.");
 
@@ -235,11 +223,48 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		}
 		if (parsed?["products"] is not JsonArray items) return ServiceResult<ProductFileResult>.Fail("Could not read the photo. Try a clearer, well-lit picture or upload a file.");
 
-		static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s.Trim() : "";
-		var rows = new List<List<string>> { Header.ToList() };
+		return Finish(BuildAiRows(items), true);
+	}
+
+	static List<List<string>> BuildAiRows(JsonArray items)
+	{
+		static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var value) ? value.Trim() : "";
+		static string Key(string value) => System.Text.RegularExpressions.Regex.Replace(value.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "_").Trim('_');
+		var products = new List<(JsonNode? Node, Dictionary<string, string> Attributes)>();
+		var extraKeys = new List<string>();
+		var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		foreach (var n in items)
-			rows.Add([Str(n?["name"]), Str(n?["category"]), Str(n?["unit"]), Str(n?["brand"]), Str(n?["model"]), Str(n?["colour"]), Str(n?["capacity"]), Str(n?["connectorType"]), Str(n?["compatibleWith"])]);
-		return Finish(rows, true);
+		{
+			var model = Str(n?["model"]);
+			var name = Str(n?["name"]);
+			var category = Str(n?["category"]);
+			if (name.Length == 0 || category.Length == 0) continue;
+			if (!seen.Add(model.Length > 0 ? model : name)) continue;
+			var attrs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+			if (n?["attributes"] is JsonObject obj)
+				foreach (var pair in obj)
+				{
+					var key = Key(pair.Key); var value = Str(pair.Value);
+					if (key.Length == 0 || value.Length == 0) continue;
+					attrs[key] = value;
+					if (!new[] { "colour", "color", "capacity", "connector_type", "compatible_with" }.Contains(key, StringComparer.OrdinalIgnoreCase) && !extraKeys.Contains(key, StringComparer.OrdinalIgnoreCase)) extraKeys.Add(key);
+				}
+			products.Add((n, attrs));
+		}
+		var headers = Header.ToList();
+		foreach (var key in extraKeys) headers.Add("Attribute: " + key.Replace('_', ' '));
+		var rows = new List<List<string>> { headers };
+		foreach (var product in products)
+		{
+			var n = product.Node; var attrs = product.Attributes;
+			string Attr(params string[] keys) => keys.Select(k => attrs.GetValueOrDefault(k, "")).FirstOrDefault(v => v.Length > 0) ?? "";
+			var unit = Str(n?["unit"]);
+			var row = new List<string> { Str(n?["name"]), Str(n?["category"]), unit.Length > 0 ? unit : "pcs",
+				Str(n?["brand"]), Str(n?["model"]), Attr("colour", "color"), Attr("capacity"), Attr("connector_type"), Attr("compatible_with") };
+			foreach (var key in extraKeys) row.Add(attrs.GetValueOrDefault(key, ""));
+			rows.Add(row);
+		}
+		return rows;
 	}
 
 	async Task<JsonNode?> CallAsync(string model, string apiKey, string mime, string b64, string prompt, CancellationToken ct)
@@ -248,7 +273,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		var item = new JsonObject
 		{
 			["type"] = "OBJECT",
-			["properties"] = new JsonObject { ["name"] = T(), ["category"] = T(), ["unit"] = T(), ["brand"] = T(), ["model"] = T(), ["colour"] = T(), ["capacity"] = T(), ["connectorType"] = T(), ["compatibleWith"] = T() }
+			["properties"] = new JsonObject { ["name"] = T(), ["category"] = T(), ["unit"] = T(), ["brand"] = T(), ["model"] = T(), ["attributes"] = new JsonObject { ["type"] = "OBJECT", ["additionalProperties"] = T() } }
 		};
 		var schema = new JsonObject { ["type"] = "OBJECT", ["properties"] = new JsonObject { ["products"] = new JsonObject { ["type"] = "ARRAY", ["items"] = item } } };
 		var body = new JsonObject
