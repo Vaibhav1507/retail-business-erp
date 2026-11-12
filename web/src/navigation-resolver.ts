@@ -74,7 +74,8 @@ function similarity(query: string[], phrase: string[]): number {
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
-  if (/(https?:\/\/|www\.|[a-z0-9-]+\.(com|in|org|net|io)\b)/i.test(input) || dataQuestion.test(q) || /कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री|मेरे पास|मेरी दुकान|मेरा बकाया/.test(q) || transaction.test(q) || /\d/.test(q)) return { kind: 'reject' }
+  const hindiDataTerms = ['कितना','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया']
+  if (/(https?:\\/\\/|www\\.|[a-z0-9-]+\\.(com|in|org|net|io)\\b)/i.test(input) || dataQuestion.test(q) || hindiDataTerms.some(term => input.includes(term)) || transaction.test(q) || /\\d/.test(q)) return { kind: 'reject' }
   const qTokens = tokens(q)
   if (qTokens.length === 1 && ambiguous.has(qTokens[0])) {
     const ids = ambiguous.get(qTokens[0])!
