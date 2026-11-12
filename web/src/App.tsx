@@ -109,9 +109,15 @@ export default function App() {
   useEffect(() => { document.documentElement.lang = lang; document.title = t('app.title') }, [lang])
   useEffect(() => { if (me?.tenantId) loadData().catch(() => undefined) }, [me?.tenantId, loadData])
   useEffect(() => {
-	const on = () => { setRoute(parseRoute()); window.scrollTo(0, 0) }
-	window.addEventListener('hashchange', on)
-	return () => window.removeEventListener('hashchange', on)
+    let previousHash = window.location.hash
+    const protectedRoute = /^#\/(sell\/bill|buy\/receive|stock\/opening)$/
+    const on = () => {
+      const nextHash = window.location.hash
+      if (nextHash !== previousHash && protectedRoute.test(previousHash) && !window.confirm(t('navigation.leave'))) { window.location.hash = previousHash; return }
+      previousHash = nextHash; setRoute(parseRoute()); window.scrollTo(0, 0)
+    }
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
   }, [])
 
   function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLanguage(l); setLang(l) }
