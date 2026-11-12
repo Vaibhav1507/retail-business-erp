@@ -43,7 +43,7 @@ public sealed class CatalogueService(TenantDb db)
             where (@act or p.is_active)
               and (@cat::uuid is null or p.category_id=@cat)
               and (@br::uuid is null or p.brand_id=@br)
-              and (@q::text is null or p.name ilike @q or p.brand ilike @q or p.model ilike @q or p.internal_sku ilike @q or p.attributes::text ilike @q
+              and (@q::text is null or p.name ilike @q or p.brand ilike @q or p.model ilike @q or p.internal_sku ilike @q or p.attributes::text ilike @q or p.specs::text ilike @q
                    or (@qn::text is not null and p.model_norm like @qn)
                    or exists (select 1 from catalog.product_barcode pb where pb.tenant_id=p.tenant_id and pb.product_id=p.id and pb.code=@qc))
             order by p.name limit 300");
