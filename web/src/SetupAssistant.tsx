@@ -84,7 +84,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
   async function runPreview() {
     setError(''); setBusy(true)
     try {
-      const d = toImportRows(rows.slice(1), mapping).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
+      const d = toImportRows(rows.slice(1), mapping, headers).map((x, i) => (pages.length > i + 1 ? { ...x, sourcePage: pages[i + 1] } : x))
       setData(d)
       setPreview(await api<Preview>('POST', '/products/import/preview', { rows: d, source: sourceBody }))
       setStep(3)
@@ -169,13 +169,14 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
           <Paged rows={preview.rows}>{page => (
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Row</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / Model</th><th>Result</th></tr></thead>
+                <thead><tr><th>Row</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / Model</th><th>Specifications</th><th>Result</th></tr></thead>
                 <tbody>
                   {page.map(r => {
                     const d = data[r.row - 1]
                     return (
                       <tr key={r.row}>
                         <td>{r.row}</td><td>{d.name}</td><td>{d.categoryName}</td><td>{d.baseUnit}</td><td>{d.isGeneric ? 'Generic' : `${d.brand ?? ''} ${d.model ?? ''}`}</td>
+                        <td>{Object.entries({ ...(d.attributes ?? {}), ...(d.specs ?? {}) }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ') || 'No specifications extracted'}</td>
                         <td>{label[r.status]}{r.message && r.status === 'invalid' ? `: ${r.message}` : ''}</td>
                       </tr>
                     )

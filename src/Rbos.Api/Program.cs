@@ -40,6 +40,7 @@ builder.Services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<Mic
 builder.Services.AddScoped<Rbos.Api.Persistence.TenantDb>();
 builder.Services.AddScoped<Rbos.Api.Application.OpeningStockService>();
 builder.Services.AddScoped<Rbos.Api.Application.CatalogueService>();
+	builder.Services.AddScoped<Rbos.Api.Application.CategoryAttributeService>();
 builder.Services.AddScoped<Rbos.Api.Application.BarcodeService>();
 builder.Services.AddScoped<Rbos.Api.Application.BrandService>();
 builder.Services.AddHttpClient<Rbos.Api.Application.IProductLookupProvider, Rbos.Api.Application.OpenFoodFactsProvider>(h => h.Timeout = TimeSpan.FromSeconds(6));
