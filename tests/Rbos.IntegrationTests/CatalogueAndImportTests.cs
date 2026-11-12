@@ -192,10 +192,10 @@ public class CategoryAttributeTests(ApiFactory f) : IClassFixture<ApiFactory>
         var id = (await owner.GetJson("/categories")).EnumerateArray().Single().GetProperty("id").GetGuid();
         var definitions = new[] { new { key = "capacity_kg", label = "Capacity", dataType = "decimal", unit = "kg", isRequired = true, isSearchable = false, isFilterable = false, displayOrder = 0, options = Array.Empty<string>() } };
         await owner.Send(HttpMethod.Put, $"/categories/{id}/attributes", definitions);
-        var rows = new[]
+        object[] rows =
         {
-            new { name = "Washer Model A", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs", attributes = new { }, specs = new { } },
-            new { name = "Washer Model B", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs", attributes = new { }, specs = new { capacity_kg = "8" } }
+            new { name = "Washer Model A", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs", attributes = new { }, specs = new Dictionary<string, string>() },
+            new { name = "Washer Model B", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs", attributes = new { }, specs = new Dictionary<string, string> { ["capacity_kg"] = "8" } }
         };
         var preview = await (await owner.Send(HttpMethod.Post, "/products/import/preview", new { rows })).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(1, preview.GetProperty("invalid").GetInt32());
