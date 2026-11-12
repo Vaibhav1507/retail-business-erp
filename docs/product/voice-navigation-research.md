@@ -1,6 +1,6 @@
 # Voice and text navigation assistant: research and recommendation (H2)
 
-Status: research only. Nothing is implemented, installed or downloaded. Date of evidence: 2026-11-11.
+Status: H2 product integration remains research-only. The isolated text-only intent bake-off in `experiments/rbos-intent-bakeoff/` now has Stage 2 experiment code (normalisation, deterministic resolver, validator, runner and tests). No H2 UI, microphone, speech model or production integration has been implemented. No model weights have been downloaded. Status reconciled: 2026-11-12.
 
 ## 1. Scope
 
@@ -214,7 +214,7 @@ There are 40 verified destinations (see section 9.6).
 4. Measure on the low-end phone: first-load time, peak memory, p50/p95 latency, network-off behaviour.
 5. Run Qwen2.5-0.5B with enum-constrained output **only if** experiment 1 shows embeddings under the gate.
 
-### 9.6 Experiment 1 plan (awaiting owner approval; nothing downloaded)
+### 9.6 Experiment 1 plan (Stage 2 implemented; model download still requires separate approval)
 
 - **Location:** `experiments/rbos-intent-bakeoff/`, outside RBOS, with its own lockfile. It does not touch `web/package.json`.
 - **Runtime:** Node 22 with `@huggingface/transformers@4.3.2` (Apache-2.0).
@@ -228,7 +228,7 @@ There are 40 verified destinations (see section 9.6).
 | C2: paraphrase-multilingual-MiniLM-L12-v2 | `Xenova/paraphrase-multilingual-MiniLM-L12-v2@2c4055b1` | `onnx/model_int8.onnx` 115,288 KB (`d6ea442f…bcf4c8`), `tokenizer.json` 16,683 KB (`b60b6b43…fa441`), plus the same three small JSON files | Upstream `sentence-transformers/…` is Apache-2.0 | ≈ 132 MB |
 
   - Total ≈ 264 MB of models, plus the npm packages (size measured at install).
-  - The revisions, hashes and package version above come from the earlier metadata check. `experiments/rbos-intent-bakeoff/config.v1.json` keeps placeholders until they are re-verified against the actual files at stages 2–3.
+  - The revisions and hashes above are research notes only. `experiments/rbos-intent-bakeoff/config.v1.json` keeps placeholders until the model artefacts are downloaded and independently verified. Stage 2 code and deterministic Baseline A do not require model weights.
   - The two int8 ONNX files have the same byte size but different hashes. That is plausible because both are 12-layer, 384-dim models with the XLM-R vocabulary.
   - The Xenova repos do not declare their own licence, so they inherit the upstream terms. Confirm this before any redistribution.
 - **Destinations:** 40 verified hashes, frozen in `destinations.v1.json`: `home`, `settings`, the More menu itself (`#/more`), and 37 page/tab pairs. The earlier count of 39 left out the More menu screen.
