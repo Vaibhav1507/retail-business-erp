@@ -156,3 +156,50 @@ public class ProductImportTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/products/import/preview", new { rows = many })).StatusCode);
     }
 }
+
+
+public class CategoryAttributeTests(ApiFactory f) : IClassFixture<ApiFactory>
+{
+    static async Task<Client> NewClient(ApiFactory f)
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        return c;
+    }
+
+    [Fact]
+    public async Task Category_attributes_are_tenant_scoped_and_configurable()
+    {
+        var owner = await NewClient(f);
+        await owner.Send(HttpMethod.Post, "/products", new { name = "Washer", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs" });
+        var category = (await owner.GetJson("/categories")).EnumerateArray().Single();
+        var id = category.GetProperty("id").GetGuid();
+        var definitions = new[] { new { key = "capacity_kg", label = "Capacity", dataType = "decimal", unit = "kg", isRequired = true, isSearchable = false, isFilterable = true, displayOrder = 1, options = Array.Empty<string>() } };
+        Assert.Equal(HttpStatusCode.OK, (await owner.Send(HttpMethod.Put, $"/categories/{id}/attributes", definitions)).StatusCode);
+        var saved = await owner.GetJson($"/categories/{id}/attributes");
+        Assert.Equal("capacity_kg", saved[0].GetProperty("key").GetString());
+
+        var other = await NewClient(f);
+        Assert.Empty((await other.GetJson($"/categories/{id}/attributes")).EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, (await other.Send(HttpMethod.Put, $"/categories/{id}/attributes", definitions)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Required_category_attributes_are_validated_during_import_preview()
+    {
+        var owner = await NewClient(f);
+        await owner.Send(HttpMethod.Post, "/products", new { name = "Washer", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs" });
+        var id = (await owner.GetJson("/categories")).EnumerateArray().Single().GetProperty("id").GetGuid();
+        var definitions = new[] { new { key = "capacity_kg", label = "Capacity", dataType = "decimal", unit = "kg", isRequired = true, isSearchable = false, isFilterable = false, displayOrder = 0, options = Array.Empty<string>() } };
+        await owner.Send(HttpMethod.Put, $"/categories/{id}/attributes", definitions);
+        var rows = new[]
+        {
+            new { name = "Washer Model A", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs", attributes = new { }, specs = new { } },
+            new { name = "Washer Model B", categoryName = "Washing Machines", isGeneric = true, baseUnit = "pcs", attributes = new { }, specs = new { capacity_kg = "8" } }
+        };
+        var preview = await (await owner.Send(HttpMethod.Post, "/products/import/preview", new { rows })).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(1, preview.GetProperty("invalid").GetInt32());
+        Assert.Equal(1, preview.GetProperty("ok").GetInt32());
+        Assert.Contains("Capacity", preview.GetProperty("rows")[0].GetProperty("message").GetString());
+    }
+}
