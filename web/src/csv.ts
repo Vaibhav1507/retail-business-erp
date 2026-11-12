@@ -6,6 +6,7 @@ export type ImportRow = {
   brand: string | null
   model: string | null
   attributes: Record<string, string>
+  specs: Record<string, string>
 }
 
 export const FIELDS = [
