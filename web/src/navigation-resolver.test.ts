@@ -13,6 +13,8 @@ describe('navigation resolver', () => {
  })
  it('rejects business-data questions and transaction requests', () => {
   expect(resolveNavigation('how much cash do I have').kind).toBe('reject')
+  expect(resolveNavigation('मेरे पास कितना पैसा है').kind).toBe('reject')
+  expect(resolveNavigation('create a new bill').kind).toBe('navigate')
   expect(resolveNavigation('delete the last bill').kind).toBe('reject')
   expect(resolveNavigation('ramesh ko 500 rupaye bhejo').kind).toBe('reject')
  })
