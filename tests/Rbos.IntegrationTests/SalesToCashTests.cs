@@ -17,10 +17,10 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         return (c, loc, p);
     }
-    static async Task<Guid> Customer(Client c, string name = "Ravi")
-        => (await (await c.Send(HttpMethod.Post, "/customers", new { name, phone = "9990001111" })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-    static object Sale(Guid? cust, Guid loc, Guid p, decimal qty, decimal price, string type, decimal? paid = null, decimal discount = 0m)
-        => new { customerId = cust, locationId = loc, saleDate = Today, saleType = type, amountPaid = paid, payMethod = type == "Credit" ? "Cash" : (string?)null, lines = new[] { new { productId = p, quantity = qty, unitPrice = price, discount } } };
+    static async Task<Guid> Customer(Client c, string name = "Ravi", string? notes = null)
+        => (await (await c.Send(HttpMethod.Post, "/customers", new { name, phone = "9990001111", notes })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+    static object Sale(Guid? cust, Guid loc, Guid p, decimal qty, decimal price, string type, decimal? paid = null, decimal discount = 0m, decimal? gstRate = null)
+        => new { customerId = cust, locationId = loc, saleDate = Today, saleType = type, amountPaid = paid, payMethod = type == "Credit" ? "Cash" : (string?)null, gstRate, lines = new[] { new { productId = p, quantity = qty, unitPrice = price, discount } } };
     static async Task<JsonElement> Stock(Client c) => (await c.GetJson("/stock")).EnumerateArray().Single();
     static async Task<decimal> Owed(Client c, Guid cust) => (await c.GetJson("/customers")).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == cust).GetProperty("owed").GetDecimal();
 
@@ -73,10 +73,12 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
     [Fact] public async Task Sale_detail_and_search_work()
     {
-        var (c, loc, p) = await Stocked(f); var cust = await Customer(c, "Meera Stores");
-        var id = (await (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 80m, "Credit", 30m), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var (c, loc, p) = await Stocked(f); var cust = await Customer(c, "Meera Stores", "12 Market Road | Bhagalpur | Bihar | 812001");
+        var id = (await (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 80m, "Credit", 30m, gstRate: 18m), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var d = await c.GetJson("/sales/" + id);
         Assert.Equal(50m, d.GetProperty("sale").GetProperty("balance").GetDecimal());
+        Assert.Equal(18m, d.GetProperty("sale").GetProperty("gstRate").GetDecimal());
+        Assert.Equal("12 Market Road | Bhagalpur | Bihar | 812001", d.GetProperty("sale").GetProperty("customerNotes").GetString());
         Assert.Single(d.GetProperty("lines").EnumerateArray());
         Assert.Single((await c.GetJson("/sales?q=meera")).EnumerateArray());
         Assert.Empty((await c.GetJson("/sales?q=nobody")).EnumerateArray());
