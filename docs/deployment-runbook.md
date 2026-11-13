@@ -65,6 +65,35 @@ Do not put the migrator connection string in Cloud Run.
 
 The application contains a single-shop Meta Cloud API integration. Do not configure production secrets, enable Meta billing, send live messages or deploy this feature until the owner explicitly approves the activation step.
 
+### Meta app and WhatsApp sender setup
+
+Complete these steps only after the owner explicitly approves pilot activation. Do not create a Meta app, connect a production sender, add a payment method, or enable billing as part of CI or code review.
+
+1. Sign in to Meta for Developers using the shop owner's/business-controlled Meta account and create a **Business** app. Keep ownership and recovery details with the shop; do not use a personal employee or company account.
+2. Add the **WhatsApp** product to the app. Start with Meta's test WABA/phone number and add only the approved test recipient while validating the integration.
+3. For the real pilot, select or connect the shop's own WhatsApp Business Account (WABA), register/attach the shop's approved WhatsApp Business phone number, and record the WABA ID and **Phone Number ID**. The application needs the Phone Number ID, not the visible phone number.
+4. Configure the access token for the intended environment. The token used to send messages needs `whatsapp_business_messaging`; WhatsApp Business Account/template management operations use `whatsapp_business_management`. For production, use a business-controlled system-user token with only the required asset access and permissions, and store it only in Secret Manager. Never use a short-lived test token in production.
+5. In WhatsApp Manager, create a message template and submit it for approval:
+   - Category: **Utility**.
+   - Name: the exact value configured as `WhatsApp__TemplateName` (for example, `invoice_utility`).
+   - Header: **Document**.
+   - Body: exactly one positional text parameter for the invoice number, for example: `Your invoice {{1}} is attached. Thank you for your purchase.`
+   - Language: use the exact language code shown for the approved template (for example, `en_US`) as `WhatsApp__TemplateLanguage`.
+   - Wait until the template status is **APPROVED**. The sender sends one document header parameter (the uploaded PDF media ID) and one body parameter (invoice number); templates with a different parameter layout will not work.
+6. Configure the app's WhatsApp Business Account webhook subscription:
+   - Callback URL: `https://<application-domain>/webhooks/meta/whatsapp`.
+   - Verify token: the same random value injected as `WhatsApp__VerifyToken`.
+   - Subscribe to the `messages` field so inbound opt-out messages and outbound delivery status events reach the application.
+   - Confirm the app is subscribed to the pilot WABA and the callback verification succeeds.
+7. Record the selected Graph API version in `WhatsApp__ApiVersion`. Recheck Meta's supported-version schedule at activation; the version is intentionally configuration, not hard-coded. Meta's current reference pages show Graph API v27.0 at the time this runbook was reviewed.
+8. Use the Meta test sender/recipient first. Verify PDF media upload, template send, webhook verification, sent/delivered/read/failed callbacks and opt-out handling before considering a production sender.
+
+Official references:
+- [WhatsApp Business Platform overview](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview)
+- [WhatsApp Business Account and phone-number assets](https://developers.facebook.com/docs/graph-api/reference/whats-app-business-account/)
+- [WhatsApp message templates](https://developers.facebook.com/docs/graph-api/reference/whats-app-business-account/message_templates/)
+- [Meta webhooks setup](https://developers.facebook.com/docs/graph-api/webhooks/)
+
 ### Required secret values
 
 Configure these only in Cloud Run Secret Manager / environment injection. Never commit them or place them in tenant tables:
