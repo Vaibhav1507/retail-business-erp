@@ -143,7 +143,7 @@ public sealed class SalesService(TenantDb db)
             status = r.GetString(3);
         }
         if (status is not ("Failed" or "WaitingForSetup" or "Retry" or "ConsentRequired" or "Suppressed" or "NoRecipient" or "NeedsReview"))
-            return ServiceResult<object>.Fail("Only a failed or pending-setup invoice can be retried.", 409);
+            return ServiceResult<object>.Fail("This invoice is not in a retryable state.", 409);
         if (string.IsNullOrWhiteSpace(recipient))
         {
             await Exec(s, ct, "update sales.invoice_delivery set status='NoRecipient', last_error=null, updated_at=now() where tenant_id=@t and id=@i",
