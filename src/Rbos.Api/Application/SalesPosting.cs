@@ -38,7 +38,6 @@ public sealed class SalesService(TenantDb db)
     public async Task<ServiceResult<object>> CreateCustomerAsync(Guid uid, CustomerCommand m, CancellationToken ct)
     {
         if (m.WhatsappConsentStatus is not null and not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
-        if (m.WhatsappConsentStatus is not null and not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
         if (!SalesRules.TryValidateCustomer(m.Name, m.Phone, m.Notes, out var err)) return ServiceResult<object>.Fail(err!);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -52,6 +51,7 @@ public sealed class SalesService(TenantDb db)
 
     public async Task<ServiceResult<object>> UpdateCustomerAsync(Guid uid, Guid id, CustomerCommand m, CancellationToken ct)
     {
+        if (m.WhatsappConsentStatus is not null and not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
         if (!SalesRules.TryValidateCustomer(m.Name, m.Phone, m.Notes, out var err)) return ServiceResult<object>.Fail(err!);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
