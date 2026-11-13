@@ -272,7 +272,7 @@ public sealed class SalesService(TenantDb db)
             // Freeze the invoice from committed business data and enqueue only with explicit customer consent.
             // Both writes share the sale transaction, so a failed sale cannot leave a deliverable invoice.
             var deliveryId = Guid.NewGuid();
-            await using (var snapshot = s.Command(@"
+            await using var snapshot = s.Command(@"
                 insert into sales.invoice_snapshot(tenant_id, sale_id, invoice_no, payload)
                 select @t, x.id, x.invoice_no,
                   jsonb_build_object(
@@ -309,7 +309,7 @@ public sealed class SalesService(TenantDb db)
                 join core.stock_location l on l.tenant_id=x.tenant_id and l.id=x.location_id
                 left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id
                 where x.tenant_id=@t and x.id=@s
-                "));
+                ");
             snapshot.Parameters.AddWithValue("t", tenantId);
             snapshot.Parameters.AddWithValue("s", id);
             if (await snapshot.ExecuteNonQueryAsync(ct) != 1)
