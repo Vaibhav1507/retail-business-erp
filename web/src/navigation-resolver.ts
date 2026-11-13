@@ -104,7 +104,7 @@ function similarity(query: string[], phrase: string[]): number {
   const queryCoverage = overlap / q.size
   const phraseCoverage = overlap / p.size
   const lengthPenalty = Math.abs(q.size - p.size) > 2 ? 0.04 : 0
-  return Math.max(0, queryCoverage * 0.72 + phraseCoverage * 0.28 - lengthPenalty
+  return Math.max(0, queryCoverage * 0.72 + phraseCoverage * 0.28 - lengthPenalty)
 }
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
