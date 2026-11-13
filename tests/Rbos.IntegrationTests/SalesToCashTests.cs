@@ -120,6 +120,13 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var unknownSale = (await (await c.Send(HttpMethod.Post, "/sales", Sale(unknown, loc, p, 1, 50m, "Cash"), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         Assert.Equal("ConsentRequired", (await c.GetJson("/sales/" + unknownSale)).GetProperty("sale").GetProperty("whatsappStatus").GetString());
 
+        // Later permission is explicit, and a changed phone becomes the retry recipient.
+        await c.Send(HttpMethod.Put, "/customers/" + unknown,
+            new { name = "Unknown Consent", phone = "9876543213", notes = (string?)null, isActive = true, whatsappConsentStatus = "OptedIn" });
+        var retry = await c.Send(HttpMethod.Post, "/sales/" + unknownSale + "/invoice/whatsapp/retry", new { });
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.Equal("Pending", (await c.GetJson("/sales/" + unknownSale)).GetProperty("sale").GetProperty("whatsappStatus").GetString());
+
         var optedOutResponse = await c.Send(HttpMethod.Post, "/customers", new { name = "Opted Out", phone = "9876543211", whatsappConsentStatus = "OptedOut" });
         var optedOut = (await optedOutResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var optedOutSale = (await (await c.Send(HttpMethod.Post, "/sales", Sale(optedOut, loc, p, 1, 50m, "Cash"), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
