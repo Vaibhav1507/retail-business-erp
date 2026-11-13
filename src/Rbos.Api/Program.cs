@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.StaticFiles;
 using Rbos.Api.Persistence;
 
 // Tooling modes (no web server). Normal startup is added in a later stage.
@@ -121,7 +122,9 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseMiddleware<Rbos.Api.Security.SecurityMiddleware>();
 app.UseDefaultFiles();
-app.UseStaticFiles();
+var staticContentTypes = new FileExtensionContentTypeProvider();
+staticContentTypes.Mappings[".cact"] = "application/octet-stream";
+app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = staticContentTypes });
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/api/health").AllowAnonymous();
