@@ -23,7 +23,8 @@ public static class WhatsAppInvoiceWorker
         var template = config["WhatsApp:TemplateName"];
         var language = config["WhatsApp:TemplateLanguage"] ?? "en";
         var apiVersion = config["WhatsApp:ApiVersion"];
-        var configured = !string.IsNullOrWhiteSpace(accessToken)
+        var pilotTenantConfigured = Guid.TryParse(config["WhatsApp:PilotTenantId"], out var pilotTenantId);
+        var configured = pilotTenantConfigured && !string.IsNullOrWhiteSpace(accessToken)
             && !string.IsNullOrWhiteSpace(phoneNumberId)
             && !string.IsNullOrWhiteSpace(template) && !string.IsNullOrWhiteSpace(apiVersion);
 
@@ -36,6 +37,12 @@ public static class WhatsAppInvoiceWorker
                 ct.ThrowIfCancellationRequested();
                 try
                 {
+                    if (!pilotTenantConfigured || item.TenantId != pilotTenantId)
+                    {
+                        await UpdateDeliveryAsync(db, item, "WaitingForSetup", null, "No WhatsApp sender is configured for this business.", ct);
+                        await FinishQueueAsync(dataSource, item, null, ct);
+                        continue;
+                    }
                     var job = await LoadJobAsync(db, item, ct);
                     if (job is null) { await FinishQueueAsync(dataSource, item, null, ct); continue; }
                     using (job.Snapshot)
