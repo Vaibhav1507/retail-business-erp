@@ -455,7 +455,7 @@ export function NavigationAssistant() {
      const value = event.target.value
      setQuery(value); setMessage('')
      setChoices(suggestNavigation(value))
-    }} placeholder={text.placeholder} autoComplete="off" />
+    }} placeholder={text.placeholder} autoComplete="off" readOnly={recording || transcribing} />
     <button type="button" className={recording ? 'assistant-mic is-recording' : 'assistant-mic'} aria-label={recording ? text.releaseToSend : text.holdToTalk} title={recording ? text.releaseToSend : text.holdToTalk}
      disabled={transcribing}
      onPointerDown={pressTalk} onPointerUp={releaseTalk} onPointerCancel={releaseTalk} onLostPointerCapture={releaseTalk}
@@ -468,7 +468,7 @@ export function NavigationAssistant() {
      onContextMenu={event => event.preventDefault()}>
      {recording ? <span className="voice-wave" aria-label="Recording audio">{Array.from({ length:24 }, (_, i) => <i key={i} style={{ '--wave-index':i } as React.CSSProperties} />)}</span> : '🎙'}
     </button>
-    <button type="submit" className="assistant-go">{text.go}</button>
+    <button type="submit" className="assistant-go" disabled={recording || transcribing}>{text.go}</button>
    </form>
    {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.loading}/><span>{text.loading} {voiceProgress}%</span></div>}
    {recording && <p className="navigation-voice-note">{text.recording}</p>}
