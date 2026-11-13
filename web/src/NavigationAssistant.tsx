@@ -248,10 +248,7 @@ export function NavigationAssistant() {
   }
  }
 
- async function beginCapture(stream: MediaStream) {
-  let context: AudioContext
-  try { context = new AudioContext({ sampleRate:SAMPLE_RATE }) }
-  catch { context = new AudioContext() }
+ async function beginCapture(stream: MediaStream, context: AudioContext) {
   try {
    await context.resume()
    await context.audioWorklet.addModule('/capture-worklet.js')
@@ -295,15 +292,34 @@ export function NavigationAssistant() {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
    setVoiceError(text.secure); holdingRef.current = false; return
   }
+  // Create/resume audio processing directly in the pointer gesture. Some mobile browsers
+  // will reject AudioContext.resume() when it is deferred until getUserMedia resolves.
+  let context: AudioContext
+  try { context = new AudioContext({ sampleRate:SAMPLE_RATE }) }
+  catch {
+   try { context = new AudioContext() }
+   catch (error) { setVoiceError(error instanceof Error ? error.message : text.failed); holdingRef.current = false; return }
+  }
+  contextRef.current = context
+  const contextActivation = context.resume().catch(() => undefined)
   // The first press-and-hold itself requests permission. There is no separate setup tap.
   void navigator.mediaDevices.getUserMedia({ audio:{ channelCount:1, echoCancellation:true, noiseSuppression:true, autoGainControl:true } })
    .then(async stream => {
-    if (!holdingRef.current) { stream.getTracks().forEach(track => track.stop()); return }
+    if (!holdingRef.current) {
+     stream.getTracks().forEach(track => track.stop())
+     if (contextRef.current === context) contextRef.current = null
+     await context.close().catch(() => undefined)
+     return
+    }
     streamRef.current = stream
     ensureWorker()
-    await beginCapture(stream)
+    if (!holdingRef.current) return
+    await contextActivation
+    await beginCapture(stream, context)
    })
-   .catch(error => {
+   .catch(async error => {
+    if (contextRef.current === context) contextRef.current = null
+    await context.close().catch(() => undefined)
     const name = (error as DOMException)?.name
     const detail = error instanceof Error ? error.message : ''
     setVoiceError(name === 'NotAllowedError' || name === 'PermissionDeniedError' ? text.micDenied
@@ -329,6 +345,9 @@ export function NavigationAssistant() {
   else {
    streamRef.current?.getTracks().forEach(track => track.stop())
    streamRef.current = null
+   const context = contextRef.current
+   contextRef.current = null
+   if (context && context.state !== 'closed') void context.close().catch(() => undefined)
   }
  }
 
@@ -425,7 +444,7 @@ export function NavigationAssistant() {
    {recording && <p className="navigation-voice-note">{text.recording}</p>}
    {transcribing && !recording && <p className="navigation-voice-note" role="status">{text.transcribing}</p>}
    <p className="navigation-privacy">{text.voiceNote}</p>
-   {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={() => { setVoiceError(''); ensureWorker() }}>{text.retry}</button></div>}
+   {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
    {message && <p className="navigation-feedback" role="status">{message}</p>}
    {choices.length > 0 && <div className="navigation-choices" aria-label={message || text.suggestions}>
     {choices.map(target => <button type="button" key={target.id} onClick={() => chooseSuggestion(target)}>{targetLabel(target, lang)}</button>)}
