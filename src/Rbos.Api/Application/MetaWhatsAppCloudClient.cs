@@ -12,8 +12,39 @@ public sealed class MetaWhatsAppCloudClient(
     string phoneNumberId,
     string accessToken,
     string templateName,
-    string templateLanguage)
+    string templateLanguage) : IInvoiceDeliveryProvider
 {
+    public string Channel => "WhatsApp";
+
+    public async Task<string> SendInvoiceAsync(string recipient, string invoiceNo, byte[] pdf, CancellationToken ct)
+    {
+        string mediaId;
+        try
+        {
+            mediaId = await UploadInvoicePdfAsync(pdf, invoiceNo, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw MetaWhatsAppApiException.FromTransport(messageSendStarted: false, ex);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw MetaWhatsAppApiException.FromTransport(messageSendStarted: false, ex);
+        }
+
+        try
+        {
+            return await SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw MetaWhatsAppApiException.FromTransport(messageSendStarted: true, ex);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw MetaWhatsAppApiException.FromTransport(messageSendStarted: true, ex);
+        }
+    }
     public async Task<string> UploadInvoicePdfAsync(byte[] pdf, string invoiceNo, CancellationToken ct)
     {
         if (pdf.Length == 0) throw new ArgumentException("Invoice PDF is empty.", nameof(pdf));
@@ -71,11 +102,19 @@ public sealed class MetaWhatsAppCloudClient(
     }
 }
 
-public sealed class MetaWhatsAppApiException(bool retryable, string safeMessage, bool needsReview = false) : Exception(safeMessage)
+public sealed class MetaWhatsAppApiException(bool retryable, string safeMessage, bool needsReview = false, Exception? innerException = null) : Exception(safeMessage, innerException)
 {
     public bool Retryable { get; } = retryable;
     public bool NeedsReview { get; } = needsReview;
     public string SafeMessage { get; } = safeMessage;
+
+    public static MetaWhatsAppApiException FromTransport(bool messageSendStarted, Exception exception)
+        => new(!messageSendStarted,
+            messageSendStarted
+                ? "The WhatsApp message request did not return a response. Check WhatsApp before retrying."
+                : "The invoice PDF upload request could not be completed.",
+            needsReview: messageSendStarted,
+            innerException: exception);
 
     public static MetaWhatsAppApiException FromResponse(HttpStatusCode status, string body, bool reviewOnServerError)
     {
