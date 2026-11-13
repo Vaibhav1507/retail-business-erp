@@ -10,6 +10,7 @@ import { classify, mcnemarExact, selectThresholds } from '../scripts/lib/evaluat
 import { validateData } from '../scripts/lib/validate.mjs'
 import { LEXICON_FILE, generateLexicon } from '../scripts/build-lexicon.mjs'
 import { runValidation } from '../scripts/validate.mjs'
+import { parseDecision as parseLlmDecision, chatMessages as llmChatMessages } from '../scripts/run-llm-bakeoff.mjs'
 import { gate, loadContext, prepareSet, test as runTest, tune } from '../scripts/run.mjs'
 
 const FROZEN_TEST_SHA = '068754fcc42b8fc40817911cfafeb508215a5a4bf8913a6a7989dbef27ea5818'
@@ -286,4 +287,36 @@ test('mcnemarExact sanity', () => {
   assert.equal(mcnemarExact(0, 0), 1)
   assert.ok(Math.abs(mcnemarExact(0, 5) - 0.0625) < 1e-12)
   assert.equal(mcnemarExact(3, 3), 1)
+})
+
+
+// ---------- Qwen classifier protocol and prompt contract ----------
+test('Qwen parser accepts only exact allowlisted single-line decisions', () => {
+  const allowed = new Set(['home', 'stock.current', 'sell.return', 'buy.return'])
+  assert.deepEqual(parseLlmDecision('NAVIGATE|stock.current', allowed), {
+    kind: 'navigate', ids: ['stock.current'], reason: 'model_navigate'
+  })
+  assert.deepEqual(parseLlmDecision('ASK|sell.return,buy.return', allowed), {
+    kind: 'ask', ids: ['sell.return', 'buy.return'], reason: 'model_ask'
+  })
+  assert.equal(parseLlmDecision('NOT_UNDERSTOOD', allowed).kind, 'not_understood')
+  assert.equal(parseLlmDecision('NAVIGATE|1', allowed).reason, 'invalid_model_protocol')
+  assert.equal(parseLlmDecision('NAVIGATE|admin.secret', allowed).kind, 'not_understood')
+  assert.equal(parseLlmDecision('ASK|sell.return', allowed).kind, 'not_understood')
+  assert.equal(parseLlmDecision('{"decision":"navigate","destination_id":1}', allowed).kind, 'not_understood')
+  assert.equal(parseLlmDecision('NAVIGATE|home\\nextra text', allowed).kind, 'not_understood')
+})
+
+test('Qwen policy is a system message and user utterance remains separate', () => {
+  const messages = llmChatMessages('stock position check karo', [
+    { id: 'stock.current', label: 'Check stock' },
+    { id: 'sell.return', label: 'Customer return' }
+  ])
+  assert.equal(messages.length, 2)
+  assert.equal(messages[0].role, 'system')
+  assert.match(messages[0].content, /how much stock do I have => NAVIGATE\\|stock.current/)
+  assert.match(messages[0].content, /NOT_UNDERSTOOD for greetings/)
+  assert.match(messages[0].content, /stock.current/)
+  assert.equal(messages[1].role, 'user')
+  assert.equal(messages[1].content, 'stock position check karo')
 })
