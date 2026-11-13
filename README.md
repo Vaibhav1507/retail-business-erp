@@ -17,7 +17,7 @@ Personal learning project. Free-first, local-first, synthetic-data-first.
 
 Implemented after Slice 4 (evidence: migrations, not yet accepted): customer collections, sales and purchase returns (009); expenses, cash/bank/UPI accounts, owner capital/drawings, stock adjustments, reports, period lock (011); business profile and GST status/GSTIN (012); stored sale GST rate, no GST engine (013); supplier invoice files and optional AI extraction (014-015); mobile OTP (016); product barcodes and optional serial/IMEI capture on sale lines (017-018).
 
-Optional external services exist in code and are OFF unless configured: Google Gemini (invoice/product-photo reading, `Gemini:ApiKey`) and MSG91 SMS (`Sms:Provider`). Do not enable them with real data; they conflict with the free/local-first guardrails.
+Optional external services are OFF unless explicitly configured: Google Gemini (`Gemini:ApiKey`) is the primary AI provider for invoice and catalogue photo/PDF reading; Groq vision (`Groq:ApiKey`, optional `Groq:Model`, default `qwen/qwen3.8-27b`) is attempted only when Gemini is unavailable or fails. Groq receives rendered PDF page images (maximum three per request) and uploaded photos. Both providers transmit document/image contents to their respective services; use only with data you are comfortable sharing. MSG91 SMS remains optional (`Sms:Provider`). Secrets must be supplied through .NET user secrets locally or a managed secret store in deployment; never commit API keys.
 
 All 24 ADRs remain **Proposed**;
 
