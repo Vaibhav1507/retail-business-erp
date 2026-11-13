@@ -100,21 +100,26 @@
 
 ## Latest verification findings (2026-11-13)
 
-- GitHub Actions run #188 on commit `ec913118` completed successfully:
+- GitHub Actions run #214 completed successfully on the feature branch:
   - Backend Release build passed.
   - Disposable PostgreSQL 17 database applied migrations 001–043 successfully.
-  - Backend tests: 92 unit tests and 134 integration tests passed (226 total).
-  - Frontend: TypeScript check, 74 Vitest tests and production build passed.
-  - `npm audit --audit-level=high` reported 0 vulnerabilities.
-- The earlier 2 integration-test failures (dispatch queue forced RLS and enqueue membership check) were fixed in migration 043 and are now covered by the successful run above.
-- Follow-up source-review fixes committed after run #188:
-  - HTTP client timeouts are classified separately from worker shutdown: PDF-upload timeouts can retry; ambiguous message-send timeouts move to manual review.
-  - Meta webhook request bodies are bounded to 1 MB while streaming, rather than checked only after buffering.
-  - Sale detail API now returns the saved GST rate and customer address/notes; Sales History uses the saved GST rate to render historical GST invoices. An integration assertion covers both fields.
+  - Backend tests: 98 unit tests and 135 integration tests passed (233 total).
+  - Frontend: TypeScript check, 75 Vitest tests and production build passed.
+  - Deployment Docker image build passed (build only; no push).
+  - Dependency audit reported 0 vulnerabilities.
+- Run #207 also passed the new queue lease/reschedule integration test and the frontend automatic-print independence test.
+- Latest commit `9e03779c` adds explicit Meta webhook HMAC signature tests. Run #217 has passed frontend checks, backend Release build, disposable database migrations and backend tests; the final container-build step is still running at the time of this tracker update.
+- Source-review fixes on the branch:
+  - HTTP client timeouts are classified separately from worker shutdown. PDF-upload timeouts are retryable; ambiguous template-send timeouts move to manual review. The worker now calls media upload and template send separately.
+  - Meta webhook request bodies are bounded to 1 MB while streaming.
+  - Inbound opt-out accepts only valid Indian 10-digit or +91 mobile numbers.
+  - Sale detail API returns the saved GST rate and customer address/notes; Sales History renders historical GST based on the saved rate.
   - Serial/IMEI values render on a separate invoice line.
-  - Deployment runbook now includes Meta Business app, WhatsApp sender, permissions, Utility document-template, webhook and test-sender setup.
-- These follow-up commits triggered newer CI runs. The latest branch commit is `1a8d8267`; run #198 is in progress at the time of this update. Do not treat run #188 as verification of the later follow-up commits.
-- No Meta credentials or production sender have been configured. No live WhatsApp send or production deployment has occurred.
-- No WhatsApp feature PR has been raised. Older conflicting manual-sharing PR #7 is closed without merging.
-- The branch is 10 commits behind `main`; the intervening main commits affect voice-navigation files, not the WhatsApp feature files. The final PR diff should still be checked against `main` before opening the PR.
-- Remaining verification gaps: a real Meta test-sender round trip (requires owner-approved Meta setup), worker lease/retry behaviour under injected transport failures, and browser-level proof that sale confirmation still opens the automatic print dialog while WhatsApp delivery remains independent.
+  - Frontend test proves sale confirmation still invokes browser printing when WhatsApp consent is missing.
+  - PostgreSQL integration test verifies exclusive queue claims, retry rescheduling and queue completion.
+  - Unit tests verify Meta webhook HMAC signatures, opt-out keywords and Indian mobile-number validation.
+- The deployment runbook now documents Meta Business app setup, WhatsApp sender and Utility document-template approval, API-vs-worker secret separation, webhook configuration, consent, Cloud Run Job/Scheduler deployment and activation gates.
+- No Meta credentials or production sender have been configured. No live WhatsApp message, production migration or deployment has occurred.
+- Older manual-sharing PR #7 is closed without merging. No new WhatsApp PR has been raised yet.
+- The feature branch is 10 commits behind `main`; the intervening main commits affect voice-navigation files and do not overlap the WhatsApp feature diff.
+- Remaining pre-activation/review items: real Meta test-sender round trip (requires owner approval), full webhook status lifecycle integration test for duplicate/out-of-order callbacks, Playwright browser E2E rerun, and separate split-payment business-rule review.
