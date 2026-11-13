@@ -34,7 +34,7 @@ create table sales.invoice_delivery (
   channel text not null check (channel in ('WhatsApp','Email')),
   status text not null check (status in (
     'Pending','Processing','Retry','Accepted','Sent','Delivered','Read','Failed',
-    'WaitingForSetup','NoRecipient','ConsentRequired','Suppressed'
+    'WaitingForSetup','NoRecipient','ConsentRequired','Suppressed','NeedsReview'
   )),
   recipient text null,
   provider_message_id text null,
