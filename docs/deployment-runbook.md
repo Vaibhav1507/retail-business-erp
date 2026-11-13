@@ -15,7 +15,7 @@ Every step that creates accounts, cloud resources or touches the production data
    - a migrator role: used only from a trusted machine.
 3. Run migrations with the migrator role (`ConnectionStrings:RbosProdMigrator`):
    `dotnet run --project src/Rbos.Api -- --migrate prod`
-   This applies 001 to 037, including `037_data_protection_keys.sql`.
+   This applies all ordered SQL files in `db/migrations/`, including the latest numbered migration. Keep the API runtime role separate from the migrator role.
 4. Confirm `rbos_app` can select and insert on `identity.data_protection_key`.
 
 ## 3. Secrets and settings (Cloud Run)
