@@ -118,7 +118,7 @@ public sealed class SalesService(TenantDb db)
         return ServiceResult<object>.Ok(new { sale = head, lines });
     }
 
-    public async Task<ServiceResult<object>> RetryWhatsAppInvoiceAsync(Guid uid, Guid saleId, CancellationToken ct)
+    public async Task<ServiceResult<object>> RetryWhatsAppInvoiceAsync(Guid uid, Guid saleId, bool confirmPossibleDuplicate, CancellationToken ct)
     {
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -144,6 +144,8 @@ public sealed class SalesService(TenantDb db)
         }
         if (status is not ("Failed" or "WaitingForSetup" or "Retry" or "ConsentRequired" or "Suppressed" or "NoRecipient" or "NeedsReview"))
             return ServiceResult<object>.Fail("This invoice is not in a retryable state.", 409);
+        if (status == "NeedsReview" && !confirmPossibleDuplicate)
+            return ServiceResult<object>.Fail("The previous send may have succeeded. Check WhatsApp and explicitly confirm before retrying.", 409);
         if (string.IsNullOrWhiteSpace(recipient))
         {
             await Exec(s, ct, "update sales.invoice_delivery set status='NoRecipient', last_error=null, updated_at=now() where tenant_id=@t and id=@i",
