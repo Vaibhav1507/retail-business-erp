@@ -84,7 +84,7 @@ The template must be approved by Meta before production messages can be sent. Th
 
 1. Create a Cloud Run Job from the same container image as the API.
 2. Override the command to `dotnet Rbos.Api.dll --whatsapp-worker`.
-3. Set `Rbos__Database=prod` and inject only `ConnectionStrings__RbosProdApp` plus the WhatsApp secrets listed above. Do not provide any migrator connection string.
+3. Set `Rbos__Database=prod` and inject `ConnectionStrings__RbosProdApp` (tenant data, rbos_app) and `ConnectionStrings__RbosProdWhatsAppWorker` (queue-only, rbos_worker), plus the WhatsApp secrets listed above. Do not provide any migrator connection string.
 4. Configure a separate PostgreSQL role `rbos_worker` for the Cloud Run Job. It can only call the queue claim/finish functions; it has no direct queue-table access and no tenant business-data permissions. Inject `ConnectionStrings__RbosProdWhatsAppWorker` for this role. The API's `rbos_app` connection remains separate and cannot claim or finish queue records.
 5. Use a service account with access only to the required Secret Manager secrets and Cloud Run Job execution.
 6. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). The worker drains currently available queue items and exits.
@@ -93,7 +93,7 @@ The template must be approved by Meta before production messages can be sent. Th
 
 ### Customer permission
 
-The Customers screen records `Not confirmed`, `Customer agreed to receive invoices`, or `Customer opted out`. Only mark a customer as agreed after the shop has obtained valid permission. Unknown or opted-out customers are not automatically queued. Checkout does not ask for consent on every invoice.
+The Customers screen records `Not confirmed`, `Customer agreed to receive invoices`, or `Customer opted out`. Only mark a customer as agreed after the shop has obtained valid permission. Unknown or opted-out customers are not automatically queued. Checkout does not ask for consent on every invoice. An inbound `STOP`, `STOP ALL`, `UNSUBSCRIBE`, `CANCEL`, `END` or `QUIT` text message from a customer's WhatsApp number marks matching customer records as opted out for this pilot tenant.
 
 ### PDF dependency
 
