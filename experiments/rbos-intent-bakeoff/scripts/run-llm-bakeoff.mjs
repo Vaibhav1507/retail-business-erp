@@ -58,6 +58,12 @@ function contentOf(result) {
   return ''
 }
 
+function chatMessages(text, destinations) {
+  return [{ role: 'user', content: promptFor(text, destinations) }]
+}
+
+const SMOKE_CASES = ['t003', 't037', 't111', 't141', 't156']
+
 async function main() {
   const runId = process.env.RBOS_LLM_RUN_ID || 'qwen-' + (process.env.GITHUB_RUN_ID || 'local') + '-' + (process.env.GITHUB_RUN_ATTEMPT || '1')
   const modelDir = join(ROOT, 'models', ...MODEL.repo.split('/'))
@@ -67,18 +73,23 @@ async function main() {
   env.allowRemoteModels = false
   env.allowLocalModels = true
   env.localModelPath = join(ROOT, 'models')
+  const modelLoadStarted = process.hrtime.bigint()
   const generator = await makePipeline('text-generation', MODEL.repo, { dtype: 'q4f16', local_files_only: true })
+  const modelLoadMs = Number(process.hrtime.bigint() - modelLoadStarted) / 1e6
 
   const fa = new FileAccess()
   const ctx = loadContext(fa, { phase: 'test' })
-  const testItems = fa.jsonl(ctx.cfg.files.test)
+  const allItems = fa.jsonl(ctx.cfg.files.test)
+  const smoke = process.argv.includes('--smoke')
+  const testItems = smoke ? SMOKE_CASES.map((id) => allItems.find((item) => item.id === id)).filter(Boolean) : allItems
+  if (smoke && testItems.length !== SMOKE_CASES.length) throw new Error('Smoke fixture IDs are missing from the frozen test set')
   const allowed = new Set(ctx.destinations.destinations.map((d) => d.id))
   const rows = []
   for (const item of testItems) {
     const started = process.hrtime.bigint()
     let decision, raw = '', failure = null
     try {
-      const result = await generator(promptFor(item.text, ctx.destinations.destinations), { max_new_tokens: 72, do_sample: false })
+      const result = await generator(chatMessages(item.text, ctx.destinations.destinations), { max_new_tokens: smoke ? 48 : 72, do_sample: false })
       raw = contentOf(result)
       decision = parseDecision(raw, allowed)
     } catch (error) {
@@ -86,7 +97,7 @@ async function main() {
       decision = { kind: 'not_understood', ids: [], reason: 'inference_error' }
     }
     const ms = Number(process.hrtime.bigint() - started) / 1e6
-    rows.push({ id:item.id, lang:item.lang, expect:item.expect, target:item.target??null, candidates:item.candidates??null, kind:decision.kind, ids:decision.ids, outcome:classify(item,decision), reason:decision.reason, ms, debatable:['t041','t061','t068','t074','t103','t132','t138','t140'].includes(item.id), raw:raw.slice(-1200), failure })
+    rows.push({ id:item.id, lang:item.lang, expect:item.expect, target:item.target??null, candidates:item.candidates??null, kind:decision.kind, ids:decision.ids, outcome:classify(item,decision), reason:decision.reason, ms, debatable:['t041','t061','t068','t074','t103','t132','t138','t140'].includes(item.id), raw, failure })
     console.log(item.id + ': ' + decision.kind + ' ' + decision.ids.join(',') + ' -> ' + rows.at(-1).outcome + ' (' + ms.toFixed(0) + 'ms)')
   }
 
@@ -100,8 +111,8 @@ async function main() {
     }
   }
   const report = {
-    runId, model:MODEL, promptVersion:'qwen-router-v1',
-    dataset:{version:'v1 frozen synthetic',items:rows.length,sha256:sha256(fa.bytes(ctx.cfg.files.test)),testReadCount:fa.log.filter((p)=>p===ctx.cfg.files.test).length},
+    runId, model:MODEL, promptVersion:'qwen-router-chat-v2', mode: smoke ? 'smoke' : 'full', modelLoadMs,
+    dataset:{version:'v1 frozen synthetic',items:rows.length,totalItems:allItems.length,sha256:sha256(fa.bytes(ctx.cfg.files.test)),testReadCount:fa.log.filter((p)=>p===ctx.cfg.files.test).length},
     modelFiles:files, scope:byScope,
     failures:rows.filter((r)=>r.failure).length, rows,
     caveat:'Synthetic assistant-authored text-only test set. Not real shopkeeper accuracy, ASR accuracy, Android latency, or production evidence.'
@@ -109,8 +120,9 @@ async function main() {
   const out=join(ROOT,'results',runId)
   mkdirSync(out,{recursive:true})
   writeFileSync(join(out,'report.json'),JSON.stringify(report,null,2)+'\n')
-  const lines=['# '+runId,'','Model: '+MODEL.repo+' ('+MODEL.revision+')','Dataset: '+rows.length+' frozen synthetic utterances; read '+report.dataset.testReadCount+' time(s).','','| Scope | Correct nav | Wrong nav | Correct ask | Reject navigated | Not understood | p50 ms | p95 ms |','|---|---:|---:|---:|---:|---:|---:|---:|',...Object.entries(byScope).map(([k,v])=>'| '+k+' | '+(v.overall.correctNavigateRate*100).toFixed(1)+'% | '+(v.overall.wrongNavigateRate*100).toFixed(1)+'% | '+(v.overall.correctAskRate*100).toFixed(1)+'% | '+v.overall.rejectNavigated+' | '+(v.overall.notUnderstoodRate*100).toFixed(1)+'% | '+v.latencyMs.p50.toFixed(0)+' | '+v.latencyMs.p95.toFixed(0)+' |'),'','## Language safety','','| Language | Correct nav | Wrong nav | Reject navigated |','|---|---:|---:|---:|',...Object.entries(byScope.all.byLang).map(([k,v])=>'| '+k+' | '+(v.correctNavigateRate*100).toFixed(1)+'% | '+(v.wrongNavigateRate*100).toFixed(1)+'% | '+v.rejectNavigated+' |'),'','Gate: wrong navigation <=2% overall and in every language bucket; zero rejected items navigated; and >=5pp correct-navigation uplift over deterministic baseline in every language bucket.','',report.caveat,'']
+  const lines=['# '+runId,'','Mode: '+report.mode,'Model: '+MODEL.repo+' ('+MODEL.revision+')','Model load: '+modelLoadMs.toFixed(0)+' ms','Dataset: '+rows.length+' of '+allItems.length+' frozen synthetic utterances; read '+report.dataset.testReadCount+' time(s).','','| Scope | Correct nav | Wrong nav | Correct ask | Reject navigated | Not understood | p50 ms | p95 ms |','|---|---:|---:|---:|---:|---:|---:|---:|',...Object.entries(byScope).map(([k,v])=>'| '+k+' | '+(v.overall.correctNavigateRate*100).toFixed(1)+'% | '+(v.overall.wrongNavigateRate*100).toFixed(1)+'% | '+(v.overall.correctAskRate*100).toFixed(1)+'% | '+v.overall.rejectNavigated+' | '+(v.overall.notUnderstoodRate*100).toFixed(1)+'% | '+v.latencyMs.p50.toFixed(0)+' | '+v.latencyMs.p95.toFixed(0)+' |'),'','## Language safety','','| Language | Correct nav | Wrong nav | Reject navigated |','|---|---:|---:|---:|',...Object.entries(byScope.all.byLang).map(([k,v])=>'| '+k+' | '+(v.correctNavigateRate*100).toFixed(1)+'% | '+(v.wrongNavigateRate*100).toFixed(1)+'% | '+v.rejectNavigated+' |'),'','Gate: wrong navigation <=2% overall and in every language bucket; zero rejected items navigated; and >=5pp correct-navigation uplift over deterministic baseline in every language bucket.','',report.caveat,'']
   writeFileSync(join(out,'summary.md'),lines.join('\n'))
   console.log(lines.join('\n'))
+  if (smoke && rows.some((r) => r.failure || !r.raw.trim())) throw new Error('Smoke test failed: inference error or empty raw model output')
 }
 main().catch((error)=>{console.error(error instanceof Error?error.stack||error.message:String(error));process.exitCode=1})
