@@ -8,7 +8,7 @@ using Rbos.Domain;
 
 namespace Rbos.Api.Application;
 
-public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string WhatsappConsentStatus = "Unknown");
+public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string? WhatsappConsentStatus = null);
 public sealed record SalePaymentInput(string Method, decimal Amount);
 public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null);
 
@@ -37,14 +37,15 @@ public sealed class SalesService(TenantDb db)
 
     public async Task<ServiceResult<object>> CreateCustomerAsync(Guid uid, CustomerCommand m, CancellationToken ct)
     {
-        if (m.WhatsappConsentStatus is not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
+        if (m.WhatsappConsentStatus is not null and not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
+        if (m.WhatsappConsentStatus is not null and not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
         if (!SalesRules.TryValidateCustomer(m.Name, m.Phone, m.Notes, out var err)) return ServiceResult<object>.Fail(err!);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
         var id = Guid.NewGuid();
         await Exec(s, ct, "insert into sales.customer(tenant_id,id,name,phone,notes,whatsapp_invoice_consent_status,whatsapp_invoice_consent_updated_at) values (@t,@i,@n,@p,@o,@cs,case when @cs='Unknown' then null else now() end)",
-            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)), ("cs", m.WhatsappConsentStatus));
+            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)), ("cs", m.WhatsappConsentStatus ?? "Unknown"));
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id });
     }
@@ -55,9 +56,9 @@ public sealed class SalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a, whatsapp_invoice_consent_status=@cs, whatsapp_invoice_consent_updated_at=case when @cs='Unknown' then null else now() end where id=@i");
+        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a, whatsapp_invoice_consent_status=coalesce(@cs, whatsapp_invoice_consent_status), whatsapp_invoice_consent_updated_at=case when @cs is null then whatsapp_invoice_consent_updated_at when @cs='Unknown' then null else now() end where id=@i");
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("p", (object?)Blank(m.Phone) ?? DBNull.Value);
-        c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("cs", m.WhatsappConsentStatus); c.Parameters.AddWithValue("i", id);
+        c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("cs", (object?)m.WhatsappConsentStatus ?? DBNull.Value); c.Parameters.AddWithValue("i", id);
         if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Customer not found.", 404);
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id });
