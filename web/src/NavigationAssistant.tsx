@@ -97,7 +97,7 @@ export function NavigationAssistant() {
     }
     if (data.type === 'error') {
      setVoiceLoading(false)
-     if (data.stage !== 'transcribe') { setVoiceError(data.message || text.failed); worker.terminate(); workerRef.current = null; setVoiceReady(false) }
+     if (data.stage !== 'transcribe') { setVoiceError(data.message || text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; worker.terminate(); workerRef.current = null; setVoiceReady(false) }
      else setVoiceError(data.message || text.failed)
     }
     if (data.type === 'result') {
@@ -106,9 +106,9 @@ export function NavigationAssistant() {
      setQuery(transcript); setVoiceError(''); processText(transcript)
     }
    }
-   worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); worker.terminate(); workerRef.current = null }
+   worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; worker.terminate(); workerRef.current = null }
    worker.postMessage({type:'init'})
-  } catch { setVoiceLoading(false); setVoiceError(text.failed); workerRef.current = null }
+  } catch (error) { setVoiceLoading(false); setVoiceError(error instanceof Error ? error.message : text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; workerRef.current = null }
  }
 
  async function beginCapture(stream: MediaStream) {
