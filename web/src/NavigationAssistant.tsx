@@ -53,7 +53,7 @@ type ChatMessage = {id:number; role:'user'|'assistant'; content:string}
 export function NavigationAssistant() {
  const [open,setOpen] = useState(false)
  const [query,setQuery] = useState('')
- const [message,setMessage] = useState('')
+ const [,setMessage] = useState('')
  const [choices,setChoices] = useState<NavigationTarget[]>([])
  const [history,setHistory] = useState<ChatMessage[]>([])
  const [voiceLoading,setVoiceLoading] = useState(false)
