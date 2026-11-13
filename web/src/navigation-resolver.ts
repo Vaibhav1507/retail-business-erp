@@ -151,7 +151,7 @@ export function resolveNavigation(input: string): NavigationResolution {
   if (!q) return { kind: 'not-understood' }
   if (input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') ||
       input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) ||
-      dataQuestion.test(q) || transaction.test(q) || /\d/.test(q)) return { kind: 'reject' }
+      dataQuestion.test(q) || ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => q.includes(term)) || transaction.test(q) || ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) || /\d/.test(q)) return { kind: 'reject' }
 
   const qTokens = tokens(q)
   if (!qTokens.length) return { kind: 'not-understood' }
