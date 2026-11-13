@@ -45,7 +45,7 @@ jobs:
       - name: Run local Qwen model on frozen test set (or five-case smoke test)
         env:
           RBOS_LLM_RUN_ID: qwen-${{ github.run_id }}-${{ github.run_attempt }}
-        run: node scripts/run-llm-bakeoff.mjs ${{ inputs.smoke && '--smoke' || '' }}
+        run: node scripts/run-llm-bakeoff.mjs ${{ (github.event_name == 'push' || inputs.smoke) && '--smoke' || '' }}
       - name: Publish summary
         if: always()
         run: |
