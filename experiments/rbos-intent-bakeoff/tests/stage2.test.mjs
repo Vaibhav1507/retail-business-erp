@@ -10,7 +10,7 @@ import { classify, mcnemarExact, selectThresholds } from '../scripts/lib/evaluat
 import { validateData } from '../scripts/lib/validate.mjs'
 import { LEXICON_FILE, generateLexicon } from '../scripts/build-lexicon.mjs'
 import { runValidation } from '../scripts/validate.mjs'
-import { loadContext, prepareSet, test as runTest, tune } from '../scripts/run.mjs'
+import { gate, loadContext, prepareSet, test as runTest, tune } from '../scripts/run.mjs'
 
 const FROZEN_TEST_SHA = '068754fcc42b8fc40817911cfafeb508215a5a4bf8913a6a7989dbef27ea5818'
 const TEST_FILE = 'data/test.v1.frozen.jsonl'
@@ -201,6 +201,23 @@ test('P2 / unknown: gibberish and digit-bearing data questions are not navigated
   assert.equal(run('what was sales on 12 march').kind, 'not_understood')
 })
 
+test('semantic gate enforces the wrong-navigation ceiling in every language bucket', () => {
+  const langs = ['en', 'hi-Deva', 'hi-Latn', 'mixed']
+  const baselineLang = Object.fromEntries(langs.map((lang) => [lang, { correctNavigateRate: 0.5, wrongNavigateRate: 0 }]))
+  const candidateLang = Object.fromEntries(langs.map((lang) => [lang, {
+    correctNavigateRate: 0.56,
+    wrongNavigateRate: lang === 'hi-Latn' ? 0.03 : 0.01,
+  }]))
+  const summary = {
+    'A/L0': { byLang: baselineLang, overall: { wrongNavigateRate: 0, rejectNavigated: 0 } },
+    'C1/L0': { byLang: candidateLang, overall: { wrongNavigateRate: 0.015, rejectNavigated: 0 } },
+  }
+  const result = gate(summary, [], { gate: { minAdvantagePp: 5, maxWrongNavigate: 0.02, rejectItemsNavigated: 0 } })
+  assert.ok(Math.abs(result.byCandidate['C1/L0'].perLang['hi-Latn'].advantagePp - 6) < 1e-9)
+  assert.equal(result.byCandidate['C1/L0'].perLang['hi-Latn'].wrongNavigateOk, false)
+  assert.equal(result.byCandidate['C1/L0'].pass, false)
+})
+
 test('classify follows P1-P3 policy', () => {
   assert.equal(classify({ expect: 'navigate', target: 'home' }, { kind: 'navigate', ids: ['home'] }), 'correct_navigate')
   assert.equal(classify({ expect: 'navigate', target: 'home' }, { kind: 'navigate', ids: ['settings'] }), 'wrong_navigate')
@@ -242,6 +259,17 @@ test('test phase refuses without frozen thresholds or with tampered thresholds',
     const p = join(dir, 'results/tamper/thresholds.json')
     writeFileSync(p, readFileSync(p, 'utf8').replace('"tau": ', '"tau": 0.1, "x": '))
     await assert.rejects(runTest(new FileAccess({ root: dir }), { runId: 'tamper' }), /recorded hash/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('test phase verifies and scores the frozen test file from one cached read', async () => {
+  const dir = sandbox()
+  try {
+    await tune(new FileAccess({ root: dir }), { resolvers: ['A'], runId: 'single-read' })
+    const fa = new FileAccess({ root: dir })
+    const report = await runTest(fa, { runId: 'single-read' })
+    assert.equal(report.testReadCount, 1)
+    assert.equal(fa.log.filter((p) => p === TEST_FILE).length, 1)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 

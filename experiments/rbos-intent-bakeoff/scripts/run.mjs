@@ -172,7 +172,7 @@ export function buildReport(predictions, cfg, frozen) {
   return out
 }
 
-function gate(summary, rows, cfg) {
+export function gate(summary, rows, cfg) {
   const g = cfg.gate
   const byCandidate = {}
   for (const level of LEVELS) {
@@ -186,8 +186,9 @@ function gate(summary, rows, cfg) {
       for (const l of LANGS) {
         const a = summary[aKey].byLang[l]; const cc = summary[cKey].byLang[l]
         const adv = cc.correctNavigateRate === null || a.correctNavigateRate === null ? null : (cc.correctNavigateRate - a.correctNavigateRate) * 100
-        const ok = adv !== null && adv >= g.minAdvantagePp
-        perLang[l] = { advantagePp: adv, ok }
+        const wrongNavigateOk = cc.wrongNavigateRate !== null && cc.wrongNavigateRate <= g.maxWrongNavigate
+        const ok = adv !== null && adv >= g.minAdvantagePp && wrongNavigateOk
+        perLang[l] = { advantagePp: adv, wrongNavigateRate: cc.wrongNavigateRate, wrongNavigateOk, ok }
         pass &&= ok
       }
       const o = summary[cKey].overall

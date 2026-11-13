@@ -15,6 +15,7 @@ export class FileAccess {
     this.root = resolve(root)
     this.forbidden = new Set()
     this.log = []
+    this.readCache = new Map()
     for (const p of forbid) this.forbid(p)
   }
   rel(p) { return relative(this.root, isAbsolute(p) ? p : resolve(this.root, p)).split(sep).join('/') }
@@ -24,8 +25,11 @@ export class FileAccess {
   bytes(p) {
     const r = this.rel(p)
     if (this.forbidden.has(r)) throw new Error(`Access to ${r} is forbidden in this phase`)
+    if (this.readCache.has(r)) return this.readCache.get(r)
+    const content = readFileSync(this.abs(p))
+    this.readCache.set(r, content)
     this.log.push(r)
-    return readFileSync(this.abs(p))
+    return content
   }
   text(p) { return this.bytes(p).toString('utf8').replace(/^\uFEFF/, '') }
   json(p) { return JSON.parse(this.text(p)) }

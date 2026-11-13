@@ -1,0 +1,68 @@
+name: RBOS semantic intent model bake-off (Stages 3-4)
+
+on:
+  push:
+    branches:
+      - experiment/semantic-intent-model-bakeoff
+    paths:
+      - 'experiments/rbos-intent-bakeoff/**'
+      - '.github/workflows/rbos-intent-model-bakeoff.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'experiments/rbos-intent-bakeoff/**'
+      - '.github/workflows/rbos-intent-model-bakeoff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rbos-semantic-intent-bakeoff-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  semantic-bakeoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: experiments/rbos-intent-bakeoff
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: experiments/rbos-intent-bakeoff/package-lock.json
+      - name: Install pinned experiment dependencies (CPU runtime; skip optional CUDA EP)
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+        run: npm ci
+      - name: Verify Stage 2 tests and frozen data
+        run: |
+          npm test
+          npm run validate
+          npm run lexicon:check
+      - name: Download, verify, tune and evaluate semantic models locally
+        env:
+          RBOS_BAKEOFF_RUN_ID: semantic-${{ github.run_id }}-${{ github.run_attempt }}
+        run: npm run models:bakeoff
+      - name: Add benchmark summary
+        if: always()
+        run: |
+          report="results/semantic-${{ github.run_id }}-${{ github.run_attempt }}/summary.md"
+          if [ -f "$report" ]; then
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No benchmark summary was produced. See the failed step logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload result files only (never model weights)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-semantic-intent-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: experiments/rbos-intent-bakeoff/results/semantic-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
