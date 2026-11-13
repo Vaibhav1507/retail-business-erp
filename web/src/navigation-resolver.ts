@@ -50,7 +50,7 @@ export const navigationTargets: NavigationTarget[] = [
   { id: 'settings', hash: '#/settings', label: 'Business settings' },
 ]
 
-const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko','mera','meri','mere','banao','dikhao','dikha','dikhana','banana','bana','karna','karo','chahiye','mujhe'])
+const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','kar','kijiye','kholo','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko','mera','meri','mere','chahiye'])
 const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
 const transaction = /\b(delete|remove|cancel|make payment|pay \d|send|transfer \d|post|save|submit|bhejo|bhej do|jama karo|darj karo|हटा दो|भेजो|जमा करो|पोस्ट करो)\b/i
 const ambiguous = new Map<string, string[]>([
