@@ -232,7 +232,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 	{
 		var apiKey = cfg["Gemini:ApiKey"];
 		if (string.IsNullOrWhiteSpace(apiKey) && !groq.Available) return ServiceResult<ProductFileResult>.Fail("Photo reading is not configured. Ask the owner to configure Gemini or Groq, or upload an Excel, Word or CSV file.");
-		var models = new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
+		var models = string.IsNullOrWhiteSpace(apiKey) ? Array.Empty<string>() : new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
 		JsonNode? parsed = null;
 		foreach (var model in models)
 		{
