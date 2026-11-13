@@ -48,6 +48,12 @@ public static class WhatsAppInvoiceWorker
                             continue;
                         }
                         var recipient = NormalizeIndianPhone(job.Recipient);
+                        if (string.IsNullOrWhiteSpace(job.Recipient))
+                        {
+                            await UpdateDeliveryAsync(db, item, "NoRecipient", null, null, ct);
+                            await FinishQueueAsync(dataSource, item, null, ct);
+                            continue;
+                        }
                         if (recipient is null)
                         {
                             await UpdateDeliveryAsync(db, item, "Failed", null, "Customer phone number is not a valid Indian mobile number.", ct);
@@ -115,7 +121,7 @@ public static class WhatsAppInvoiceWorker
     static async Task<InvoiceJob?> LoadJobAsync(TenantDb db, Claimed item, CancellationToken ct)
     {
         await using var session = await db.BeginAsync(item.ActorUserId, item.TenantId, ct);
-        await using var cmd = session.Command(@"select s.payload, d.recipient, coalesce(c.whatsapp_invoice_consent_status,'Unknown')
+        await using var cmd = session.Command(@"select s.payload, c.phone, coalesce(c.whatsapp_invoice_consent_status,'Unknown')
             from sales.invoice_delivery d
             join sales.invoice_snapshot s on s.tenant_id=d.tenant_id and s.sale_id=d.sale_id
             join sales.sale x on x.tenant_id=d.tenant_id and x.id=d.sale_id
