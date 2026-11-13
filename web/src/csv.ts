@@ -6,6 +6,7 @@ export type ImportRow = {
   brand: string | null
   model: string | null
   attributes: Record<string, string>
+  mrp: number | null
 }
 
 export const FIELDS = [
@@ -102,6 +103,7 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
       brand: brand || null,
       model: model || null,
       attributes,
+      mrp: (() => { const raw = get(r, 'mrp').replace(/[₹$\s]/g, '').replace(/,/g, ''); if (!raw) return null; const value = Number(raw); return Number.isFinite(value) && value >= 0 ? value : null })(),
     }
   })
 }
