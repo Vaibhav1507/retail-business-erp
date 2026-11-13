@@ -5,7 +5,7 @@ import './navigation-assistant.css'
 
 const copy = {
  en: {
-  title:'Ask your business assistant', placeholder:'Type a screen name or command…', go:'Go', shortcuts:'Quick actions',
+  title:'Ask your business assistant', placeholder:'Type a screen name or command…', go:'Go', shortcuts:'Quick actions', reviewTranscript:'Check the words above, correct them if needed, then tap Go.',
   unclear:'I could not identify that screen. Try a shortcut or a clearer command.',
   reject:'I can only navigate screens. I cannot answer business questions or perform transactions.',
   choose:'Which screen do you mean?', open:'Open assistant', close:'Close assistant',
@@ -18,7 +18,7 @@ const copy = {
   retry:'Retry microphone and voice', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
  },
  hi: {
-  title:'बिज़नेस असिस्टेंट', placeholder:'स्क्रीन या कमांड लिखें…', go:'जाएँ', shortcuts:'जल्दी खोलें',
+  title:'बिज़नेस असिस्टेंट', placeholder:'स्क्रीन या कमांड लिखें…', go:'जाएँ', shortcuts:'जल्दी खोलें', reviewTranscript:'ऊपर लिखे शब्द जाँचें। ज़रूरत हो तो सुधारें, फिर जाएँ दबाएँ।',
   unclear:'स्क्रीन समझ नहीं आई। शॉर्टकट चुनें या स्पष्ट कमांड लिखें।',
   reject:'मैं केवल स्क्रीन खोल सकता हूँ। कारोबार के सवालों या लेन-देन में मदद नहीं कर सकता।',
   choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?', open:'असिस्टेंट खोलें', close:'असिस्टेंट बंद करें',
@@ -105,7 +105,7 @@ export function NavigationAssistant() {
     if (data.type === 'result') {
      const transcript = (data.text || '').trim()
      if (!transcript) { setVoiceError(text.tooShort); return }
-     setQuery(transcript); setVoiceError(''); processText(transcript)
+     setQuery(transcript); setVoiceError(''); setChoices([]); setMessage(text.reviewTranscript)
     }
    }
    worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; worker.terminate(); workerRef.current = null }
@@ -225,6 +225,7 @@ export function NavigationAssistant() {
       onContextMenu={event=>event.preventDefault()}>
       {recording ? <span className="voice-wave" aria-label="Recording audio">{Array.from({length:24},(_,i)=><i key={i} style={{'--wave-index':i} as React.CSSProperties}/>)}</span> : '🎙'}
      </button>}
+    <button type="submit" className="assistant-go">{text.go}</button>
    </form>
    {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.download}/><span>{text.loading} {voiceProgress}%</span></div>}
    {recording && <p className="navigation-voice-note">{text.recording}</p>}
