@@ -10,6 +10,12 @@ describe('navigation resolver', () => {
   expect(resolveNavigation('मेरा स्टॉक दिखाओ').kind).toBe('navigate')
   expect(resolveNavigation('मुझे स्टॉक दिखाना है').kind).toBe('navigate')
   expect(resolveNavigation('supplier ko payment karna hai').kind).toBe('navigate')
+  expect(resolveNavigation('मुझे नया customer add करना है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('नया ग्राहक जोड़ना है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('customer add')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('खर्चा दर्ज करना है')).toMatchObject({ kind: 'navigate', target: { id: 'money.expenses' } })
+  expect(resolveNavigation('naya maal aaya hai')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
+  expect(resolveNavigation('custmer add')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
  })
  it('asks instead of guessing on ambiguous commands', () => {
   expect(resolveNavigation('return').kind).toBe('ask')
