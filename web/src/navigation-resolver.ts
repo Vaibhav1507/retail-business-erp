@@ -177,3 +177,59 @@ export function resolveNavigation(input: string): NavigationResolution {
   const target = navigationTargets.find(item => item.id === top.id)
   return target ? { kind: 'navigate', target } : { kind: 'not-understood' }
 }
+
+
+// Suggestions are deliberately more permissive than execution. They may use
+// incomplete word prefixes, but callers must never navigate from this function.
+function suggestionTokenMatches(queryToken: string, phraseToken: string): boolean {
+  if (tokenMatches(queryToken, phraseToken)) return true
+  const shorter = queryToken.length <= phraseToken.length ? queryToken : phraseToken
+  const longer = queryToken.length > phraseToken.length ? queryToken : phraseToken
+  return shorter.length >= 3 && longer.startsWith(shorter)
+}
+
+function partialPhraseScore(query: string[], phrase: string[]): number {
+  if (!query.length || !phrase.length) return 0
+  const matchedQuery = new Set<number>()
+  const matchedPhrase = new Set<number>()
+  query.forEach((word, qi) => {
+    const candidates = phrase.map((candidate, pi) => ({
+      pi,
+      distance: word === candidate ? 0 : Math.abs(word.length - candidate.length),
+    })).filter(({ pi }) => !matchedPhrase.has(pi) && suggestionTokenMatches(word, phrase[pi]))
+      .sort((a, b) => a.distance - b.distance)
+    if (candidates[0]) {
+      matchedQuery.add(qi)
+      matchedPhrase.add(candidates[0].pi)
+    }
+  })
+  const queryCoverage = matchedQuery.size / query.length
+  const phraseCoverage = matchedPhrase.size / phrase.length
+  const extraPenalty = Math.max(0, query.length - matchedQuery.size) / query.length
+  return queryCoverage * 0.72 + phraseCoverage * 0.28 - extraPenalty * 0.12
+}
+
+export function suggestNavigation(input: string): NavigationTarget[] {
+  const q = normalise(input)
+  if (!q || q.length < 3 ||
+      input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') ||
+      input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) ||
+      dataQuestion.test(q) || transaction.test(q) ||
+      ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => input.includes(term)) ||
+      ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) ||
+      /\d/.test(q)) return []
+
+  const queryTokens = tokens(q)
+  if (!queryTokens.length) return []
+  const ranked = Object.entries(navigationAnchors).map(([id, phrases]) => ({
+    id,
+    score: Math.max(...phrases.map(phrase => partialPhraseScore(queryTokens, tokens(phrase)))),
+  })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+  const top = ranked[0]
+  if (!top || top.score < 0.34) return []
+  const floor = Math.max(0.28, top.score - 0.18)
+  return ranked.filter(item => item.score >= floor)
+    .slice(0, 3)
+    .map(item => navigationTargets.find(target => target.id === item.id))
+    .filter((target): target is NavigationTarget => Boolean(target))
+}
