@@ -96,3 +96,12 @@
 | 2026-11-13 | Sale integration | Sale transaction creates snapshot + WhatsApp delivery row; only explicitly opted-in customers with a phone number are queued. Customer management records consent; checkout updates preserve existing consent. Added status and retry APIs/UI. | Source review only; tests not run. |
 | 2026-11-13 | PDF/worker/webhook | Added QuestPDF renderer, Unicode fallback, scheduled worker mode, Meta media/template sender, bounded retries/manual-review state, signed webhook and pilot runbook. | Source review only; Meta credentials/test sender not configured; build and tests not run. |
 | 2026-11-13 | UI and tests | Added consent management, delivery status labels, retry flow, PDF renderer tests and integration tests for explicit consent / consent preservation. | Test code added but not executed; CI not run. |
+
+
+## Latest verification findings (2026-11-13)
+
+- First full build exposed and then cleared a C# command-lifetime compile error.
+- Latest frontend job passed TypeScript, unit tests and production build.
+- Backend build passed, and all migrations 001–043 applied successfully to disposable PostgreSQL 17.
+- Backend test run: 79 unit tests passed; 131 integration tests passed and 2 failed. Failures identified the dispatch queue's missing forced RLS and an overly strict enqueue membership helper check. Both have been corrected in migration 043; a fresh CI run is pending.
+- No production database was touched. Migration 043 has only been exercised on disposable CI PostgreSQL.
