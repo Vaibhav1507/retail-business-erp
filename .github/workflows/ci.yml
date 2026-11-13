@@ -25,6 +25,8 @@ jobs:
       ConnectionStrings__RbosTestApp: Host=localhost;Database=rbos_test;Username=rbos_app;Password=ci-app-pass
     steps:
       - uses: actions/checkout@v4
+      - name: Install Noto fonts for Unicode PDF tests
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-core
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
