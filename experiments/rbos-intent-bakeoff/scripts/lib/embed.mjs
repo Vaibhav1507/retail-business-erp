@@ -26,7 +26,7 @@ export async function loadEmbedder(root, resolver, runtime) {
   tf.env.allowRemoteModels = false
   tf.env.allowLocalModels = true
   tf.env.localModelPath = join(root, 'models')
-  const extractor = await tf.pipeline('feature-extraction', resolver.repo, { dtype: 'q8', local_files_only: true })
+  const extractor = await tf.pipeline('feature-extraction', resolver.repo, { dtype: 'int8', local_files_only: true })
   const prefix = resolver.queryPrefix ?? ''
   return {
     meta: { repo: resolver.repo, revision: resolver.revision, sha256: check.sha256, tokenizerSha256: check.tokenizerSha256, transformersVersion: tf.env.version },
