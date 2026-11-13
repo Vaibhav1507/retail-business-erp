@@ -174,6 +174,32 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
  }
 })
 
+
+it('does not execute a voice command if the assistant is closed during final transcription', async () => {
+ const track = {stop:vi.fn()}
+ const stream = {getTracks:() => [track]} as unknown as MediaStream
+ const getUserMedia = vi.fn().mockResolvedValue(stream)
+ const restore = installVoiceMocks(getUserMedia)
+ try {
+  render(<NavigationAssistant />)
+  await userEvent.click(screen.getByRole('button', {name:'Open assistant'}))
+  const mic = screen.getByRole('button', {name:'Hold to talk'})
+  fireEvent.pointerDown(mic, {pointerId:9, button:0})
+  await screen.findByText('Listening… release to send')
+  MockAudioWorkletNode.instance?.emitAudio(new Float32Array(16000).fill(0.05))
+  await new Promise(resolve => setTimeout(resolve, 450))
+  fireEvent.pointerUp(mic, {pointerId:9, button:0})
+  await waitFor(() => expect(MockSpeechWorker.instance?.messages.some(item => item.type === 'transcribe')).toBe(true))
+
+  await userEvent.click(screen.getAllByRole('button', {name:'Close assistant'})[0])
+  MockSpeechWorker.instance?.emit({type:'result', text:'make a new bill'})
+  await waitFor(() => expect(screen.getByRole('button', {name:'Open assistant'})).toBeInTheDocument())
+  expect(window.location.hash).toBe('')
+ } finally {
+  restore()
+ }
+})
+
 it('reports a denied microphone permission from the first press-and-hold', async () => {
  const getUserMedia = vi.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError'))
  const restore = installVoiceMocks(getUserMedia)
