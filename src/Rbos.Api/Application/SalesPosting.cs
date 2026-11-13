@@ -43,8 +43,14 @@ public sealed class SalesService(TenantDb db)
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
         var id = Guid.NewGuid();
+        var initialConsent = m.WhatsappConsentStatus ?? "Unknown";
         await Exec(s, ct, "insert into sales.customer(tenant_id,id,name,phone,notes,whatsapp_invoice_consent_status,whatsapp_invoice_consent_updated_at) values (@t,@i,@n,@p,@o,@cs,case when @cs='Unknown' then null else now() end)",
-            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)), ("cs", m.WhatsappConsentStatus ?? "Unknown"));
+            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)), ("cs", initialConsent));
+        if (initialConsent != "Unknown")
+            await Exec(s, ct, @"insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary)
+                values (@t,@a,@u,'CustomerWhatsAppConsentChanged','Customer',@d,@summary)",
+                ("t", tid), ("a", Guid.NewGuid()), ("u", uid), ("d", id),
+                ("summary", "WhatsApp invoice consent initially recorded as " + initialConsent + "."));
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id });
     }
@@ -56,10 +62,28 @@ public sealed class SalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
+        string previousConsent;
+        string? previousPhone;
+        await using (var current = s.Command("select whatsapp_invoice_consent_status, phone from sales.customer where id=@i for update"))
+        {
+            current.Parameters.AddWithValue("i", id);
+            await using var reader = await current.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct)) return ServiceResult<object>.Fail("Customer not found.", 404);
+            previousConsent = reader.GetString(0);
+            previousPhone = reader.IsDBNull(1) ? null : reader.GetString(1);
+        }
+        var requestedPhone = Blank(m.Phone);
+        var nextConsent = m.WhatsappConsentStatus
+            ?? (string.Equals(previousPhone, requestedPhone, StringComparison.Ordinal) ? previousConsent : "Unknown");
         await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a, whatsapp_invoice_consent_status=case when @cs::text is not null then @cs::text when phone is distinct from @p then 'Unknown' else whatsapp_invoice_consent_status end, whatsapp_invoice_consent_updated_at=case when @cs::text is not null then case when @cs::text='Unknown' then null else now() end when phone is distinct from @p then null else whatsapp_invoice_consent_updated_at end where id=@i");
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("p", (object?)Blank(m.Phone) ?? DBNull.Value);
         c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("cs", (object?)m.WhatsappConsentStatus ?? DBNull.Value); c.Parameters.AddWithValue("i", id);
         if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Customer not found.", 404);
+        if (nextConsent != previousConsent)
+            await Exec(s, ct, @"insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary)
+                values (@t,@a,@u,'CustomerWhatsAppConsentChanged','Customer',@d,@summary)",
+                ("t", tid), ("a", Guid.NewGuid()), ("u", uid), ("d", id),
+                ("summary", "WhatsApp invoice consent changed from " + previousConsent + " to " + nextConsent + "."));
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id });
     }
