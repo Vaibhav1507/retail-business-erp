@@ -7,6 +7,18 @@ const MODEL_SHA256 = 'b189e954aaed4a9fd41acbad3ac05e486381e96325b22a4c695b9ea515
 const MODEL_BYTES = 29546527
 const MAGIC = [0x84, 0x2a, 0xe1, 0x05]
 const SR = 16000
+// Keep this vocabulary small and specific. These are screen concepts, not user/customer names.
+const KEYWORDS = [
+ 'customer', 'grahak', 'ग्राहक',
+ 'supplier', 'सप्लायर',
+ 'purchase', 'kharid', 'खरीद',
+ 'stock', 'स्टॉक', 'maal', 'माल',
+ 'bill', 'बिल', 'invoice',
+ 'expense', 'kharcha', 'खर्चा',
+ 'payment', 'भुगतान', 'पेमेंट',
+ 'collection', 'vasooli', 'वसूली',
+ 'inventory', 'supplier payment'
+]
 let M = null
 let loaded = false
 const encoder = new TextEncoder()
@@ -66,17 +78,30 @@ async function init() {
 function transcribe(message) {
  const pcm = message.pcm
  const seconds = pcm.length / SR
- const audioPointer = copyIn(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength))
- const languagePointer = message.language ? copyIn(encoder.encode(message.language + '\0')) : 0
- const capacity = Math.max(1 << 16, Math.ceil(seconds) * 4096 + (1 << 14))
- const outputPointer = alloc(capacity)
+ let audioPointer = 0, languagePointer = 0, keywordsPointer = 0, outputPointer = 0
  try {
+  audioPointer = copyIn(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength))
+  languagePointer = message.language ? copyIn(encoder.encode(message.language + '\0')) : 0
+  keywordsPointer = copyIn(encoder.encode(KEYWORDS.join('\n') + '\0'))
+  const capacity = Math.max(1 << 16, Math.ceil(seconds) * 4096 + (1 << 14))
+  outputPointer = alloc(capacity)
   const started = performance.now()
-  const length = M._needle_transcribe(audioPointer, pcm.length, languagePointer, 0, 0, outputPointer, capacity)
+  // Needle's WASM API accepts newline-separated keyword hints and optional word timestamps.
+  const length = M._needle_transcribe(audioPointer, pcm.length, languagePointer, keywordsPointer, 1, outputPointer, capacity)
   if (length < 0) throw new Error(lastError())
   const result = JSON.parse(M.UTF8ToString(outputPointer))
-  send({ type: 'result', id: message.id, text: result.text || '', language: result.language || null, ms: performance.now() - started })
- } finally { pcm.fill(0); M.HEAPU8.fill(0, audioPointer, audioPointer + pcm.byteLength); M._free(outputPointer); M._free(audioPointer); if (languagePointer) M._free(languagePointer) }
+  send({
+   type: 'result', id: message.id, text: result.text || '', language: result.language || null,
+   words: Array.isArray(result.words) ? result.words : undefined,
+   ms: performance.now() - started
+  })
+ } finally {
+  pcm.fill(0)
+  if (audioPointer) { M.HEAPU8.fill(0, audioPointer, audioPointer + pcm.byteLength); M._free(audioPointer) }
+  if (languagePointer) { M.HEAPU8.fill(0, languagePointer, languagePointer + encoder.encode(message.language + '\0').length); M._free(languagePointer) }
+  if (keywordsPointer) { M.HEAPU8.fill(0, keywordsPointer, keywordsPointer + encoder.encode(KEYWORDS.join('\n') + '\0').length); M._free(keywordsPointer) }
+  if (outputPointer) M._free(outputPointer)
+ }
 }
 self.onmessage = event => {
  const message = event.data || {}
