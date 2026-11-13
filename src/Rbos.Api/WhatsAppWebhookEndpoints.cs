@@ -75,7 +75,7 @@ public static class WhatsAppWebhookEndpoints
                                     ? GetString(textNode, "body") : null;
                                 if (!IsOptOutKeyword(bodyText) || string.IsNullOrWhiteSpace(from)) continue;
                                 var digits = new string(from.Where(char.IsDigit).ToArray());
-                                if (!(digits.Length == 10 || (digits.Length == 12 && digits.StartsWith("91", StringComparison.Ordinal)))) continue;
+                                if (!IsIndianMobileNumber(digits)) continue;
                                 await using var optOut = session.Command(@"with opted_out as (
                                     update sales.customer
                                        set whatsapp_invoice_consent_status='OptedOut',
@@ -145,6 +145,14 @@ public static class WhatsAppWebhookEndpoints
                 return Results.BadRequest();
             }
         }).AllowAnonymous();
+    }
+
+    public static bool IsIndianMobileNumber(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var digits = new string(input.Where(char.IsDigit).ToArray());
+        return (digits.Length == 10 && digits[0] is >= '6' and <= '9')
+            || (digits.Length == 12 && digits.StartsWith("91", StringComparison.Ordinal) && digits[2] is >= '6' and <= '9');
     }
 
     public static bool IsOptOutKeyword(string? message)
