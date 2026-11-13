@@ -43,33 +43,33 @@ public static class WhatsAppInvoiceWorker
                         continue;
                     }
                     var job = await LoadJobAsync(db, item, ct);
-                    if (job is null) { await FinishQueueAsync(dataSource, item, null, ct); continue; }
+                    if (job is null) { await FinishQueueAsync(queueDataSource, item, null, ct); continue; }
                     using (job.Snapshot)
                     {
                         if (job.ConsentStatus != "OptedIn")
                         {
                             var blocked = job.ConsentStatus == "OptedOut" ? "Suppressed" : "ConsentRequired";
                             await UpdateDeliveryAsync(db, item, blocked, null, "Customer permission is not active.", ct);
-                            await FinishQueueAsync(dataSource, item, null, ct);
+                            await FinishQueueAsync(queueDataSource, item, null, ct);
                             continue;
                         }
                         var recipient = NormalizeIndianPhone(job.Recipient);
                         if (string.IsNullOrWhiteSpace(job.Recipient))
                         {
                             await UpdateDeliveryAsync(db, item, "NoRecipient", null, null, ct);
-                            await FinishQueueAsync(dataSource, item, null, ct);
+                            await FinishQueueAsync(queueDataSource, item, null, ct);
                             continue;
                         }
                         if (recipient is null)
                         {
                             await UpdateDeliveryAsync(db, item, "Failed", null, "Customer phone number is not a valid Indian mobile number.", ct);
-                            await FinishQueueAsync(dataSource, item, null, ct);
+                            await FinishQueueAsync(queueDataSource, item, null, ct);
                             continue;
                         }
                         if (!configured)
                         {
                             await UpdateDeliveryAsync(db, item, "WaitingForSetup", null, "WhatsApp Cloud API is not configured.", ct);
-                            await FinishQueueAsync(dataSource, item, null, ct);
+                            await FinishQueueAsync(queueDataSource, item, null, ct);
                             continue;
                         }
 
@@ -80,7 +80,7 @@ public static class WhatsAppInvoiceWorker
                             var mediaId = await meta!.UploadInvoicePdfAsync(pdf, invoiceNo, ct);
                             var messageId = await meta.SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
-                            await FinishQueueAsync(dataSource, item, null, ct);
+                            await FinishQueueAsync(queueDataSource, item, null, ct);
                             logger.LogInformation("WhatsApp invoice accepted for delivery {DeliveryId}, provider message {MessageId}", item.DeliveryId, messageId);
                         }
                         catch (MetaWhatsAppApiException ex)
@@ -90,7 +90,7 @@ public static class WhatsAppInvoiceWorker
                                 ? DateTimeOffset.UtcNow.AddSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Max(0, item.AttemptCount - 1))))
                                 : (DateTimeOffset?)null;
                             await UpdateDeliveryAsync(db, item, ex.NeedsReview ? "NeedsReview" : retryable ? "Retry" : "Failed", null, ex.SafeMessage, ct);
-                            await FinishQueueAsync(dataSource, item, retryAt, ct);
+                            await FinishQueueAsync(queueDataSource, item, retryAt, ct);
                             logger.LogWarning("WhatsApp delivery {DeliveryId} failed (retryable={Retryable}, attempt={Attempt})", item.DeliveryId, retryable, item.AttemptCount);
                         }
                     }
@@ -99,7 +99,7 @@ public static class WhatsAppInvoiceWorker
                 {
                     logger.LogWarning(ex, "WhatsApp delivery outcome is uncertain for {DeliveryId}", item.DeliveryId);
                     await UpdateDeliveryAsync(db, item, "NeedsReview", null, "The provider response was not received. Check WhatsApp before retrying.", ct);
-                    await FinishQueueAsync(dataSource, item, null, ct);
+                    await FinishQueueAsync(queueDataSource, item, null, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -108,7 +108,7 @@ public static class WhatsAppInvoiceWorker
                     try
                     {
                         await UpdateDeliveryAsync(db, item, retryAt is null ? "Failed" : "Retry", null, "Unexpected delivery processing error.", ct);
-                        await FinishQueueAsync(dataSource, item, retryAt, ct);
+                        await FinishQueueAsync(queueDataSource, item, retryAt, ct);
                     }
                     catch (Exception completionError)
                     {
