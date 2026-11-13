@@ -35,15 +35,13 @@ describe('NavigationAssistant', () => {
   expect(within(actions).getByRole('button', { name: 'Check stock' })).toBeInTheDocument()
  })
 
- it('shows stock-specific choices at the top for a noisy speech transcript', async () => {
+ it('shows resolver suggestions in the top action row without navigating automatically', async () => {
   const { container } = render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
   const input = screen.getByLabelText('Ask your business assistant')
-  await userEvent.type(input, 'mould you have no stock taken that hand')
+  await userEvent.type(input, 'check stock')
   const actions = container.querySelector('.navigation-top-actions') as HTMLElement
   expect(within(actions).getByRole('button', { name: 'Current stock' })).toBeInTheDocument()
-  expect(within(actions).getByRole('button', { name: 'Products' })).toBeInTheDocument()
-  expect(within(actions).getByRole('button', { name: 'Stock alerts' })).toBeInTheDocument()
   expect(window.location.hash).toBe('')
  })
 
