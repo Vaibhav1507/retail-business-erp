@@ -18,7 +18,7 @@ public sealed record ProductFileResult(
 /// Turns an uploaded product list into plain table rows (header row first).
 /// Excel and Word files are parsed locally; only photos are sent to Gemini.
 /// </summary>
-public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogger<ProductFileReader> log, LocalOcr ocr)
+public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogger<ProductFileReader> log, LocalOcr ocr, GroqVisionClient groq)
 {
 	public const int MaxFileBytes = 12 * 1024 * 1024;
 	const long MaxEntryBytes = 20L * 1024 * 1024;
@@ -180,7 +180,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 	async Task<ServiceResult<ProductFileResult>> ReadPdfCatalogueWithAiAsync(string b64, byte[] bytes, CancellationToken ct)
 	{
 		var apiKey = cfg["Gemini:ApiKey"];
-		if (string.IsNullOrWhiteSpace(apiKey))
+		if (string.IsNullOrWhiteSpace(apiKey) && !groq.Available)
 		{
 			// Preserve local text/OCR table import when AI is not configured. This is manual column mapping,
 			// not semantic catalogue understanding; automatic model/spec extraction requires Gemini.
@@ -193,18 +193,24 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 			return ServiceResult<ProductFileResult>.Fail("AI catalogue extraction is not configured and this PDF has no readable text. Configure Gemini for automatic catalogue understanding, or use a searchable PDF.");
 		}
 
-		var models = new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
+		var models = string.IsNullOrWhiteSpace(apiKey) ? Array.Empty<string>() : new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
 		JsonNode? parsed = null;
 		foreach (var model in models)
 		{
 			try { parsed = await CallAsync(model, apiKey, "application/pdf", b64, PdfCataloguePrompt, ct); break; }
 			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-			{ return ServiceResult<ProductFileResult>.Fail("The free AI reading limit was reached. Try again later, or use an Excel/CSV product list."); }
+			{ log.LogWarning("Gemini PDF catalogue extraction rate limited; trying configured fallback providers"); break; }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
 			{ log.LogWarning(e, "PDF catalogue extraction failed on {Model}", model); }
 		}
+		if (parsed?["products"] is not JsonArray && groq.Available)
+		{
+			try { parsed = await groq.ExtractPdfAsync(bytes, PdfCataloguePrompt, ct); }
+			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+			{ log.LogWarning(e, "Groq PDF catalogue fallback failed"); }
+		}
 		if (parsed?["products"] is not JsonArray items)
-			return ServiceResult<ProductFileResult>.Fail("The PDF was received, but AI could not identify a structured product/model list. Try a clearer catalogue or split a large PDF into smaller parts.");
+			return ServiceResult<ProductFileResult>.Fail("The PDF was received, but Gemini and Groq could not identify a structured product/model list. Try a clearer catalogue or split a large PDF into smaller parts.");
 
 		static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var value) ? value.Trim() : "";
 		var rows = new List<List<string>> { Header.ToList() };
@@ -231,18 +237,24 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 	async Task<ServiceResult<ProductFileResult>> ReadImageAsync(string mime, string b64, CancellationToken ct)
 	{
 		var apiKey = cfg["Gemini:ApiKey"];
-		if (string.IsNullOrWhiteSpace(apiKey)) return ServiceResult<ProductFileResult>.Fail("Photo reading is not set up yet. Ask the owner to add the Gemini key, or upload an Excel, Word or CSV file.");
-		var models = new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
+		if (string.IsNullOrWhiteSpace(apiKey) && !groq.Available) return ServiceResult<ProductFileResult>.Fail("Photo reading is not configured. Ask the owner to configure Gemini or Groq, or upload an Excel, Word or CSV file.");
+		var models = string.IsNullOrWhiteSpace(apiKey) ? Array.Empty<string>() : new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
 		JsonNode? parsed = null;
 		foreach (var model in models)
 		{
 			try { parsed = await CallAsync(model, apiKey, mime, b64, Prompt, ct); break; }
 			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-			{ return ServiceResult<ProductFileResult>.Fail("Free photo reading limit reached. Try again later or upload an Excel / CSV file."); }
+			{ log.LogWarning("Gemini photo extraction rate limited; trying configured fallback providers"); break; }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
 			{ log.LogWarning(e, "Product photo extraction failed on {Model}", model); }
 		}
-		if (parsed?["products"] is not JsonArray items) return ServiceResult<ProductFileResult>.Fail("Could not read the photo. Try a clearer, well-lit picture or upload a file.");
+		if (parsed?["products"] is not JsonArray && groq.Available)
+		{
+			try { parsed = await groq.ExtractImageAsync(mime, b64, Prompt, ct); }
+			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+			{ log.LogWarning(e, "Groq photo extraction fallback failed"); }
+		}
+		if (parsed?["products"] is not JsonArray items) return ServiceResult<ProductFileResult>.Fail("Could not read the photo with Gemini or Groq. Try a clearer, well-lit picture or upload a file.");
 
 		static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s.Trim() : "";
 		var rows = new List<List<string>> { Header.ToList() };

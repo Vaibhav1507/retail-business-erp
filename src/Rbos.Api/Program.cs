@@ -48,6 +48,7 @@ builder.Services.AddScoped<Rbos.Api.Application.ProductLookupCoordinator>();
 builder.Services.AddScoped<Rbos.Api.Application.ProcurementService>();
 builder.Services.AddHttpClient<Rbos.Api.Application.InvoiceExtractionService>(h => h.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<Rbos.Api.Application.LocalOcr>();
+builder.Services.AddHttpClient<Rbos.Api.Application.GroqVisionClient>(h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddHttpClient<Rbos.Api.Application.ProductFileReader>(h => h.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddScoped<Rbos.Api.Application.OtpService>();
 if (builder.Configuration["Sms:Provider"] == "msg91") builder.Services.AddHttpClient<Rbos.Api.Application.ISmsSender, Rbos.Api.Application.Msg91SmsSender>(h => h.Timeout = TimeSpan.FromSeconds(15));
