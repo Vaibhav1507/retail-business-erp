@@ -75,9 +75,9 @@ Configure these only in Cloud Run Secret Manager / environment injection. Never 
 - `WhatsApp__TemplateName` — approved Utility template name with a document header and one body parameter for the invoice number.
 - `WhatsApp__TemplateLanguage` — approved template language code, for example `en`.
 - `WhatsApp__ApiVersion` — explicitly selected supported Graph API version.
-- `WhatsApp__PilotTenantId` — tenant UUID for this one-shop pilot.
+- `WhatsApp__PilotTenantId` — tenant UUID for this one-shop pilot.\n- `WhatsApp__PilotActorUserId` — active owner/member user UUID in that tenant; webhook updates run under this user's normal tenant RLS context.
 
-The template must be approved by Meta before production messages can be sent. The application uploads a PDF to the Cloud API media endpoint and sends it using the approved document-header template.
+The template must be approved by Meta before production messages can be sent. The application uploads a PDF to the Cloud API media endpoint and sends it using the approved document-header template. The delivery webhook uses the configured pilot tenant and actor to update delivery rows under ordinary tenant RLS; it does not use a cross-tenant database bypass.
 
 ### Worker and scheduler
 
