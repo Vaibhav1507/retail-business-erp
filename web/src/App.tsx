@@ -169,7 +169,8 @@ export default function App() {
 	  <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>
-	  <main className="content"><NavigationAssistant />{body}</main>
+	  <main className="content">{body}</main>
+      <NavigationAssistant />
 	</div>
   )
 }
