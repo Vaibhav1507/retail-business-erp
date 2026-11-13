@@ -8,7 +8,7 @@ using Rbos.Domain;
 
 namespace Rbos.Api.Application;
 
-public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true);
+public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string WhatsappConsentStatus = "Unknown");
 public sealed record SalePaymentInput(string Method, decimal Amount);
 public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null);
 
@@ -31,7 +31,7 @@ public sealed class SalesService(TenantDb db)
         var list = new List<object>();
         await using var r = await c.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
-            list.Add(new { id = r.GetGuid(0), name = r.GetString(1), phone = r.IsDBNull(2) ? null : r.GetString(2), notes = r.IsDBNull(3) ? null : r.GetString(3), isActive = r.GetBoolean(4), owed = r.GetDecimal(5) });
+            list.Add(new { id = r.GetGuid(0), name = r.GetString(1), phone = r.IsDBNull(2) ? null : r.GetString(2), notes = r.IsDBNull(3) ? null : r.GetString(3), isActive = r.GetBoolean(4), whatsappConsentStatus = r.GetString(5), owed = r.GetDecimal(6) });
         return ServiceResult<object>.Ok(list);
     }
 
@@ -42,8 +42,8 @@ public sealed class SalesService(TenantDb db)
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
         var id = Guid.NewGuid();
-        await Exec(s, ct, "insert into sales.customer(tenant_id,id,name,phone,notes) values (@t,@i,@n,@p,@o)",
-            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)));
+        await Exec(s, ct, "insert into sales.customer(tenant_id,id,name,phone,notes,whatsapp_invoice_consent_status,whatsapp_invoice_consent_updated_at) values (@t,@i,@n,@p,@o,@cs,case when @cs='Unknown' then null else now() end)",
+            ("t", tid), ("i", id), ("n", m.Name!.Trim()), ("p", Blank(m.Phone)), ("o", Blank(m.Notes)), ("cs", m.WhatsappConsentStatus));
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id });
     }
@@ -54,9 +54,9 @@ public sealed class SalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a where id=@i");
+        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a, whatsapp_invoice_consent_status=@cs, whatsapp_invoice_consent_updated_at=case when @cs='Unknown' then null else now() end where id=@i");
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("p", (object?)Blank(m.Phone) ?? DBNull.Value);
-        c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("i", id);
+        c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("cs", m.WhatsappConsentStatus); c.Parameters.AddWithValue("i", id);
         if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Customer not found.", 404);
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id });
@@ -81,7 +81,7 @@ public sealed class SalesService(TenantDb db)
         await using var r = await c.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
             list.Add(new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), customer = r.IsDBNull(5) ? "Walk-in" : r.GetString(5),
-                number = r.GetInt64(6), cancelled = r.GetBoolean(7), invoiceNo = r.IsDBNull(8) ? null : r.GetString(8) });
+                number = r.GetInt64(6), cancelled = r.GetBoolean(7), invoiceNo = r.IsDBNull(8) ? null : r.GetString(8), whatsappStatus = r.IsDBNull(9) ? "NotAvailable" : r.GetString(9) });
         return ServiceResult<object>.Ok(list);
     }
 
@@ -99,7 +99,7 @@ public sealed class SalesService(TenantDb db)
             await using var r = await c.ExecuteReaderAsync(ct);
             if (await r.ReadAsync(ct))
                 head = new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), payMethod = r.IsDBNull(5) ? null : r.GetString(5), customer = r.IsDBNull(6) ? "Walk-in" : r.GetString(6), location = r.GetString(7), number = r.GetInt64(8), customerPhone = r.IsDBNull(9) ? null : r.GetString(9),
-                cancelled = r.GetBoolean(12), invoiceNo = r.IsDBNull(13) ? null : r.GetString(13) };
+                cancelled = r.GetBoolean(12), invoiceNo = r.IsDBNull(13) ? null : r.GetString(13), whatsappStatus = r.IsDBNull(14) ? "NotAvailable" : r.GetString(14) };
                         }
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
@@ -253,8 +253,8 @@ public sealed class SalesService(TenantDb db)
                 returning invoice_no"));
             snapshot.Parameters.AddWithValue("t", tenantId);
             snapshot.Parameters.AddWithValue("s", id);
-            var invoiceNo = (string?)await snapshot.ExecuteScalarAsync(ct)
-                ?? throw new InvalidOperationException("Could not create the saved invoice snapshot.");
+            if (await snapshot.ExecuteNonQueryAsync(ct) != 1)
+                throw new InvalidOperationException("Could not create the saved invoice snapshot.");
 
             var consent = await Scalar<string>(s,
                 "select coalesce(c.whatsapp_invoice_consent_status, 'Unknown') from sales.sale x left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id where x.tenant_id=@t and x.id=@s",
