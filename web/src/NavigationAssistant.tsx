@@ -10,7 +10,7 @@ const copy = {
   reject:'I can only navigate screens. I cannot answer business questions or perform transactions.',
   choose:'Which screen do you mean?', open:'Open assistant', close:'Close assistant',
   enableVoice:'Allow microphone & start', loading:'Preparing voice…', ready:'Voice is ready',
-  download:'Downloading speech model', start:'Start speaking', stop:'Stop and navigate', recording:'Listening… tap Stop when finished',
+  download:'Downloading speech model', setupVoice:'Set up voice', holdToTalk:'Hold to talk', releaseToSend:'Release to send', recording:'Listening… release to send',
   micDenied:'Microphone is blocked for this website. In Chrome, tap the site controls beside the address bar → Permissions → Microphone → Allow, then reload this page. You can still type.', micMissing:'No microphone was found.',
   secure:'Voice requires HTTPS. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
@@ -23,7 +23,7 @@ const copy = {
   reject:'मैं केवल स्क्रीन खोल सकता हूँ। कारोबार के सवालों या लेन-देन में मदद नहीं कर सकता।',
   choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?', open:'असिस्टेंट खोलें', close:'असिस्टेंट बंद करें',
   enableVoice:'माइक्रोफोन की अनुमति दें और शुरू करें', loading:'वॉइस तैयार हो रही है…', ready:'वॉइस तैयार है',
-  download:'स्पीच मॉडल डाउनलोड हो रहा है', start:'बोलना शुरू करें', stop:'रोकें और स्क्रीन खोलें', recording:'सुन रहा है… पूरा होने पर रोकें',
+  download:'स्पीच मॉडल डाउनलोड हो रहा है', setupVoice:'वॉइस सेट करें', holdToTalk:'बोलने के लिए दबाकर रखें', releaseToSend:'भेजने के लिए छोड़ें', recording:'सुन रहा है… भेजने के लिए छोड़ें',
   micDenied:'इस वेबसाइट के लिए माइक्रोफोन ब्लॉक है। Chrome में एड्रेस बार के पास साइट सेटिंग → Permissions → Microphone → Allow चुनें, फिर पेज रीलोड करें। आप टाइप कर सकते हैं।', micMissing:'माइक्रोफोन नहीं मिला।',
   secure:'वॉइस के लिए HTTPS चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
@@ -63,6 +63,8 @@ export function NavigationAssistant() {
  const nodeRef = useRef<AudioWorkletNode|null>(null)
  const blocksRef = useRef<Float32Array[]>([])
  const startedRef = useRef(0)
+ const holdingRef = useRef(false)
+ const pointerIdRef = useRef<number|null>(null)
  const lang = getLanguage(), text = copy[lang]
 
  useEffect(() => () => {
@@ -93,7 +95,7 @@ export function NavigationAssistant() {
     if (data.type === 'progress') setVoiceProgress(data.total ? Math.min(100,Math.round((data.loaded||0)/data.total*100)) : 0)
     if (data.type === 'ready') {
      setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100); setVoiceError('')
-     if (streamRef.current) void beginCapture(streamRef.current)
+     // Model is prepared once; microphone opens only while the user holds the talk control.
     }
     if (data.type === 'error') {
      setVoiceLoading(false)
@@ -131,14 +133,15 @@ export function NavigationAssistant() {
   }
  }
 
- async function startRecording() {
+ async function prepareVoice() {
   setVoiceError('')
+  if (voiceReady || voiceLoading) return
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { setVoiceError(text.secure); return }
   try {
-   // Request permission directly from the user's microphone-button tap, before downloading the model.
-   const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}})
-   streamRef.current = stream
-   if (voiceReady && workerRef.current) { await beginCapture(stream); return }
+   // First explicit setup tap asks Chrome for permission. Release the stream immediately;
+   // the microphone is opened only during a later press-and-hold gesture.
+   const permissionStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}})
+   permissionStream.getTracks().forEach(track=>track.stop())
    enableVoice()
   } catch (error) {
    const name = (error as DOMException)?.name
@@ -156,7 +159,36 @@ export function NavigationAssistant() {
   for (let i=0;i<length;i++) { const position=i*ratio, left=Math.floor(position), fraction=position-left; output[i]=(input[left]||0)*(1-fraction)+(input[Math.min(left+1,input.length-1)]||0)*fraction }
   return output
  }
+ async function beginHoldToTalk() {
+  if (!voiceReady || !workerRef.current || !holdingRef.current || streamRef.current) return
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { setVoiceError(text.secure); holdingRef.current=false; return }
+  try {
+   const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}})
+   if (!holdingRef.current) { stream.getTracks().forEach(track=>track.stop()); return }
+   streamRef.current = stream
+   await beginCapture(stream)
+  } catch (error) {
+   const name=(error as DOMException)?.name
+   setVoiceError(name==='NotAllowedError' ? text.micDenied : name==='NotFoundError' ? text.micMissing : (error instanceof Error ? error.message : text.failed))
+   holdingRef.current=false
+  }
+ }
+ function pressTalk(event: React.PointerEvent<HTMLButtonElement>) {
+  if (!voiceReady || voiceLoading || recording) return
+  event.preventDefault()
+  holdingRef.current=true
+  pointerIdRef.current=event.pointerId
+  try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* capture may be unavailable in test/browser */ }
+  void beginHoldToTalk()
+ }
+ function releaseTalk() {
+  if (!holdingRef.current) return
+  holdingRef.current=false
+  if (recording) void stopRecording()
+  else { streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null }
+ }
  async function stopRecording() {
+  if (!recording) { streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; return }
   const elapsed = (Date.now()-startedRef.current)/1000
   nodeRef.current?.port.postMessage('stop')
   await new Promise(resolve=>window.setTimeout(resolve,60))
@@ -187,11 +219,18 @@ export function NavigationAssistant() {
     {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
    </div>
    <div className="navigation-voice">
-    <button type="button" className={recording?'is-recording':'voice-action'} onClick={recording?stopRecording:startRecording} disabled={voiceLoading || recording}>
-     <span aria-hidden="true">{recording?'■':'🎙'}</span> {recording?text.stop:voiceReady?text.start:text.enableVoice}
-    </button>
+    {!voiceReady ? <button type="button" className="voice-action" onClick={prepareVoice} disabled={voiceLoading}>
+     <span aria-hidden="true">🎙</span> {voiceLoading?text.loading:text.setupVoice}
+    </button> : <button type="button" className={recording?'is-recording':'voice-action'} aria-label={recording?text.releaseToSend:text.holdToTalk}
+      onPointerDown={pressTalk} onPointerUp={releaseTalk} onPointerCancel={releaseTalk} onLostPointerCapture={releaseTalk}
+      onKeyDown={event=>{if((event.key===' '||event.key==='Enter')&&!event.repeat){event.preventDefault();holdingRef.current=true;void beginHoldToTalk()}}}
+      onKeyUp={event=>{if(event.key===' '||event.key==='Enter'){event.preventDefault();releaseTalk()}}}
+      onContextMenu={event=>event.preventDefault()}>
+     {recording ? <span className="voice-wave" aria-label="Recording audio">{Array.from({length: 24},(_,i)=><i key={i} style={{'--wave-index':i} as React.CSSProperties}/>)}</span> : <span aria-hidden="true">🎙</span>}
+     {recording?text.releaseToSend:text.holdToTalk}
+    </button>}
     {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.download}/><span>{text.loading} {voiceProgress}%</span></div>}
-    {voiceReady && !recording && <span className="navigation-voice-note">{text.ready}</span>}
+    {voiceReady && !recording && <span className="navigation-voice-note">{text.ready} · {text.holdToTalk}</span>}
     {recording && <span className="navigation-voice-note">{text.recording}</span>}
    </div>
    <p className="navigation-privacy">{text.voiceNote}</p>
