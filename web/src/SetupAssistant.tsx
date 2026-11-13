@@ -55,11 +55,11 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
       const name = file.name.toLowerCase()
       if (name.endsWith('.csv') || file.type === 'text/csv') {
         if (file.size > 40_000) throw new Error('File is too large. Keep it under 40 KB (about 200 products).')
-        accept(parseCsv(await file.text()), false)
+        accept(parseCsv(await file.text()), true)
       } else if (name.endsWith('.xlsx') || name.endsWith('.docx') || name.endsWith('.pdf')) {
         if (file.size > MAX_BYTES) throw new Error('File is larger than 12 MB. Split or compress it and try again.')
         const r = await api<FileRead>('POST', '/products/import/read', { fileName: file.name, contentType: file.type, data: await toBase64(file) })
-        accept(r.rows, r.usedAi ?? false)
+        accept(r.rows, name.endsWith('.xlsx') ? true : (r.usedAi ?? false))
         if (r.warning) setError(r.warning)
         if (name.endsWith('.pdf')) {
           setPages(r.pages ?? [])
@@ -122,7 +122,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
         <div className="invoice-upload">
           {fromAi ? (
             <>
-              <p className="invoice-upload-meta">We identified these products from your document using AI. Check the model, brand, category and specifications, correct anything needed, then preview the import.</p>
+              <p className="invoice-upload-meta">We identified the product columns automatically. Check the details below, correct anything needed, then preview the import.</p>
               <div className="table-scroll">
                 <table>
                   <thead><tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
@@ -136,7 +136,7 @@ export function SetupAssistant({ reload }: { reload: () => void }) {
             </>
           ) : (
             <>
-              <p>Tell us which column holds each field. Name and Category are required. A product with no brand and no model is treated as generic.</p>
+              <p>We couldn't confidently identify all the columns. Review the column mapping below before continuing.</p>
               <table>
                 <tbody>
                   {FIELDS.map(f => (
