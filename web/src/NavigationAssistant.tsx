@@ -243,10 +243,13 @@ export function NavigationAssistant() {
       cancelledFinalRef.current = false
       return
      }
-     setQuery(''); setChoices([]); setMessage('')
-     const transcript = (data.text || '').trim()
+     const finalTranscript = (data.text || '').trim()
+     // If the final pass returns empty but a rolling preview heard speech,
+     // retain that preview instead of discarding the user's command.
+     const transcript = finalTranscript || query.trim()
      if (!transcript) { setVoiceError(text.tooShort); return }
      setVoiceError('')
+     setQuery(transcript)
      handleCommand(transcript)
      return
     }
@@ -454,13 +457,17 @@ export function NavigationAssistant() {
   </button>
   {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={closeAssistant}>×</button></header>
-   {history.length > 0 && <div className="navigation-history" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text">
+   <div className="navigation-top-actions" aria-label={choices.length ? text.suggestions : text.shortcuts}>
+    {(choices.length ? choices : quick).map(target => <button type="button" key={target.id}
+     disabled={recording || transcribing} onClick={() => choices.length ? chooseSuggestion(target) : go(target)}>
+     {targetLabel(target, lang)}
+    </button>)}
+   </div>
+   <div className="navigation-history" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text">
     {history.map(item => <div key={item.id} className={`navigation-message ${item.role}`}><span>{item.content}</span></div>)}
+    {history.length === 0 && <p className="assistant-empty-hint">Try a shortcut above, or say what you want to open.</p>}
     <div ref={historyEndRef} />
-   </div>}
-   {history.length === 0 && !query.trim() && <div className="navigation-shortcuts" aria-label={text.shortcuts}>
-    {quick.map(target => <button type="button" key={target.id} onClick={() => go(target)}>{targetLabel(target, lang)}</button>)}
-   </div>}
+   </div>
    <form onSubmit={submit} className="navigation-assistant-form">
     <input id="rbos-go-to" aria-label={text.title} value={query} onChange={event => {
      const value = event.target.value
@@ -481,14 +488,13 @@ export function NavigationAssistant() {
     </button>
     <button type="submit" className="assistant-go" disabled={recording || transcribing}>{text.go}</button>
    </form>
-   {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.loading}/><span>{text.loading} {voiceProgress}%</span></div>}
-   {recording && <p className="navigation-voice-note">{text.recording}</p>}
-   {transcribing && !recording && <p className="navigation-voice-note" role="status">{text.transcribing}</p>}
-   <p className="navigation-privacy">{text.voiceNote}</p>
-   {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
-   {choices.length > 0 && <div className="navigation-choices" aria-label={message || text.suggestions} aria-live="polite">
-    {choices.map(target => <button type="button" key={target.id} disabled={recording || transcribing} onClick={() => chooseSuggestion(target)}>{targetLabel(target, lang)}</button>)}
-   </div>}
+   <div className="assistant-status" aria-live="polite">
+    {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.loading}/><span>{text.loading} {voiceProgress}%</span></div>}
+    {recording && <p className="navigation-voice-note">{text.recording}</p>}
+    {transcribing && !recording && <p className="navigation-voice-note">{text.transcribing}</p>}
+    {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
+    {!voiceError && <p className="navigation-privacy">{text.voiceNote}</p>}
+   </div>
   </section>}
  </>
 }
