@@ -127,6 +127,7 @@ public sealed class SalesService(TenantDb db)
             await using var r = await c.ExecuteReaderAsync(ct);
             if (await r.ReadAsync(ct))
                 head = new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), payMethod = r.IsDBNull(5) ? null : r.GetString(5), customer = r.IsDBNull(6) ? "Walk-in" : r.GetString(6), location = r.GetString(7), number = r.GetInt64(8), customerPhone = r.IsDBNull(9) ? null : r.GetString(9),
+                customerNotes = r.IsDBNull(10) ? null : r.GetString(10), gstRate = r.IsDBNull(11) ? (decimal?)null : r.GetDecimal(11),
                 cancelled = r.GetBoolean(12), invoiceNo = r.IsDBNull(13) ? null : r.GetString(13), whatsappStatus = r.IsDBNull(14) ? "NotAvailable" : r.GetString(14) };
                         }
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
