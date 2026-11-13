@@ -56,3 +56,4 @@ describe('partial navigation suggestions', () => {
   expect(suggestNavigation('open https://example.com')).toEqual([])
  })
 })
+
