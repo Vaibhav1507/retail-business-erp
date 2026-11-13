@@ -152,11 +152,12 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var workerConnectionString = config["ConnectionStrings:RbosTestWhatsAppWorker"]!;
         await using var worker = new NpgsqlConnection(workerConnectionString);
         await worker.OpenAsync();
+        await using var transaction = await worker.BeginTransactionAsync();
 
         async Task<(Guid DeliveryId, Guid LeaseToken, int AttemptCount)?> Claim()
         {
             await using var command = new NpgsqlCommand(
-                "select delivery_id, lease_token, attempt_count from integrations.claim_invoice_deliveries(5,30)", worker);
+                "select delivery_id, lease_token, attempt_count from integrations.claim_invoice_deliveries(25,30)", worker, transaction);
             await using var reader = await command.ExecuteReaderAsync();
             if (!await reader.ReadAsync()) return null;
             return (reader.GetGuid(0), reader.GetGuid(1), reader.GetInt32(2));
@@ -168,7 +169,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Null(await Claim()); // A live lease prevents a second worker from claiming the same delivery.
 
         await using (var reschedule = new NpgsqlCommand(
-            "select integrations.finish_invoice_delivery(@delivery,@lease,@retry)", worker))
+            "select integrations.finish_invoice_delivery(@delivery,@lease,@retry)", worker, transaction))
         {
             reschedule.Parameters.AddWithValue("delivery", first.Value.DeliveryId);
             reschedule.Parameters.AddWithValue("lease", first.Value.LeaseToken);
@@ -182,13 +183,14 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(first.Value.DeliveryId, second.Value.DeliveryId);
 
         await using (var finish = new NpgsqlCommand(
-            "select integrations.finish_invoice_delivery(@delivery,@lease,null)", worker))
+            "select integrations.finish_invoice_delivery(@delivery,@lease,null)", worker, transaction))
         {
             finish.Parameters.AddWithValue("delivery", second.Value.DeliveryId);
             finish.Parameters.AddWithValue("lease", second.Value.LeaseToken);
             Assert.True((bool)(await finish.ExecuteScalarAsync())!);
         }
         Assert.Null(await Claim());
+        await transaction.RollbackAsync(); // Keep the shared CI queue unchanged for other tests.
     }
 
 }
