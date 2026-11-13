@@ -259,9 +259,24 @@ There are 40 verified destinations (see section 9.6).
 - **Pass gate:** C must beat the best A configuration by ≥ 5 percentage points of correct navigation on the test set, with wrong navigation ≤ 2%, in **every** language bucket. Out-of-scope items must never navigate.
 - **v1 interpretation:** v1 is exploratory (synthetic authored data), not a production accuracy benchmark. Publish both all-items and debatable-items-excluded reports. Romanised Hindi (`hi-Latn`) has a small sample in v1, so bucket-level conclusions are directional.
 
-## 10. Smallest next step
+## 9.7 Approved Stage 3/4 execution (2026-11-13)
 
-Approve a **text-only slice**: the normaliser, intent table and resolver as pure TypeScript with unit tests over the verified routes, plus a typed "Go to…" box. It has no model, no package and no microphone. It delivers value on its own, and it becomes the resolver that every speech provider will later feed. In parallel, the owner collects the consented recording corpus for the provider bake-off.
+The owner approved the previously gated local model comparison. The implementation is isolated in the experiment folder and a dedicated workflow:
+
+- Workflow: `.github/workflows/rbos-intent-model-bakeoff.yml`; runner script: `experiments/rbos-intent-bakeoff/scripts/run-model-bakeoff-ci.mjs`.
+- Before inference, the runner resolves the current model metadata but accepts only the reviewed C1/C2 revision prefixes. It downloads the int8 ONNX file and tokenizer, verifies their SHA-256 values against the reviewed artefacts, and records the full resolved commit SHA plus hashes in `results/<runId>/model-pins.json`.
+- The runner updates the model revision/hash fields and config manifest hash only inside the ephemeral CI workspace. It does not commit model weights or send text to a model provider. The two embedding models execute locally on the runner.
+- The native ONNX Runtime package bundles its CPU runtime; the workflow sets `ONNXRUNTIME_NODE_INSTALL=skip` to avoid downloading the unused optional CUDA execution provider on Linux. This is not an inference-runtime skip.
+- The adapter selects `dtype: int8` because the configured artefact is `onnx/model_int8.onnx`; `q8` would select the different `model_quantized.onnx` file.
+- E5 uses its `query: ` prefix for both intent anchors and user queries because this experiment is symmetric semantic similarity. MiniLM has no task prefix.
+- Stage 2 tests, validator and lexicon check run before any model download. The runner tunes thresholds on the 54-item tuning set, freezes them, then scores the 160-item v1 test set once for A/C1/C2 at L0/L1/L2.
+- CI artifacts contain only small reports, predictions and model-pin metadata; they never contain model weights.
+
+The v1 data is still synthetic and assistant-authored. A result can reject a weak model or justify further study, but cannot establish real shopkeeper accuracy. Even a passing text-only result is not permission to integrate the model in the app: real, consented owner phrases and low-end Android memory/latency checks remain Stage 5.
+
+## 10. What happens after the bake-off
+
+Do not integrate either embedder just because the workflow completes. First review the full and per-language metrics, wrong-navigation and reject leakage, ask precision, p50/p95 latency, and the pinned model files. If the gate fails or the result is inconclusive, keep the current navigation-only experience and improve the data/evaluation protocol instead of adding phrase-specific fallbacks. If a candidate passes, conduct a separate Stage 5 with consented shop-owner phrases and Android-device memory, latency and offline tests before making an app-integration decision.
 
 
 ## 11. H2 implementation status
