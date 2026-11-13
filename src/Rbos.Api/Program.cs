@@ -1,8 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.StaticFiles;
 using Rbos.Api.Persistence;
+using Rbos.Api.Application;
 
 // Tooling modes (no web server). Normal startup is added in a later stage.
+if (args.Contains("--whatsapp-worker"))
+{
+    var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
+    var database = config["Rbos:Database"] ?? "dev";
+    var key = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
+    var connectionString = config[key] ?? throw new InvalidOperationException($"Missing secret {key}");
+    await using var dataSource = Npgsql.NpgsqlDataSource.Create(connectionString);
+    await using var probe = await dataSource.OpenConnectionAsync();
+    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
+        if ((string?)await who.ExecuteScalarAsync() != "rbos_app")
+            throw new InvalidOperationException("WhatsApp worker must connect as rbos_app.");
+    using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+    var logger = loggerFactory.CreateLogger("WhatsAppInvoiceWorker");
+    QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+    await WhatsAppInvoiceWorker.RunAsync(dataSource, config, logger, CancellationToken.None);
+    return;
+}
+
 if (args.Contains("--emit-identity-sql"))
 {
 	var options = new DbContextOptionsBuilder<RbosIdentityDbContext>()
@@ -25,6 +44,7 @@ if (args.Contains("--migrate"))
 	return;
 }
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 var builder = WebApplication.CreateBuilder(args);
 var dbKey = (builder.Configuration["Rbos:Database"] ?? "dev") switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
 var appCs = builder.Configuration[dbKey] ?? throw new InvalidOperationException($"Missing secret {dbKey}");
