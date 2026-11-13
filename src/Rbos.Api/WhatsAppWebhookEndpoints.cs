@@ -120,7 +120,8 @@ public static class WhatsAppWebhookEndpoints
                                   and (provider_status_at is null or @at >= provider_status_at)
                                   and (case @status when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else 0 end)
                                       >=
-                                      (case status when 'Accepted' then 0 when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else -1 end)");
+                                      (case status when 'Accepted' then 0 when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else -1 end)
+                                  and not (@status='Failed' and status in ('Delivered','Read'))");
                             command.Parameters.AddWithValue("tenant", tenantId);
                             command.Parameters.AddWithValue("message", messageId);
                             command.Parameters.AddWithValue("status", mapped);
