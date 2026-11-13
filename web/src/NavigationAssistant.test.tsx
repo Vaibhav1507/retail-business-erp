@@ -29,7 +29,7 @@ describe('NavigationAssistant', () => {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), 'make a new bill')
-  await userEvent.click(screen.getByRole('button', { name: 'Go' }))
+  await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
   await waitFor(() => expect(window.location.hash).toBe('#/sell/bill'))
  })
  it('asks the user to choose when a command is ambiguous', async () => {
