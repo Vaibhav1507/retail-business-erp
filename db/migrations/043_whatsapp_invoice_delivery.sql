@@ -183,7 +183,16 @@ begin
    where tenant_id = p_tenant_id
      and channel = 'WhatsApp'
      and provider_message_id = p_provider_message_id
-     and (provider_status_at is null or p_status_at >= provider_status_at);
+     and (
+       provider_status_at is null
+       or p_status_at > provider_status_at
+       or (
+         p_status_at = provider_status_at
+         and (case p_status when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else 0 end)
+             >=
+             (case status when 'Accepted' then 0 when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else -1 end)
+       )
+     );
   return found;
 end;
 $$;
