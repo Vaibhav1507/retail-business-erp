@@ -5,8 +5,8 @@ import { t as tr } from './i18n'
 import './billing-forms.css'
 import { InvoiceDocument } from './InvoiceDocument'
 
-type SaleRow = { id: string; number: number; invoiceNo: string | null; date: string; saleType: string; total: number; amountPaid: number; balance: number; customer: string }
-type SaleDetail = { sale: SaleRow & { payMethod: string | null; location: string; customerPhone: string | null; customerNotes: string | null; gstRate: number | null }; lines: { product: string; sku: string; quantity: number; unitPrice: number; discount: number; lineTotal: number; serials?: string[] }[] }
+type SaleRow = { id: string; number: number; invoiceNo: string | null; date: string; saleType: string; total: number; amountPaid: number; balance: number; customer: string; whatsappStatus: string }
+type SaleDetail = { sale: SaleRow & { payMethod: string | null; location: string; customerPhone: string | null; customerNotes: string | null; gstRate: number | null; whatsappStatus: string }; lines: { product: string; sku: string; quantity: number; unitPrice: number; discount: number; lineTotal: number; serials?: string[] }[] }
 type Opt = { id: string; name: string }
 type BizProfile = { businessName: string; address: string; city: string; state: string; pinCode: string; mobile: string; gstStatus: string; gstin: string | null }
 
@@ -37,13 +37,13 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       {loaded && shownSales.length === 0 && <p>{tr('sales.none')}</p>}
       <Paged rows={shownSales}>{page => (
       <table aria-label="Sales history">
-        <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Type</th><th>Total (INR)</th><th>Paid (INR)</th><th>Balance (INR)</th><th></th></tr></thead>
-        <tbody>{page.map(s => <tr key={s.id}><td>{s.invoiceNo ?? s.number}</td><td>{s.date}</td><td>{s.customer}</td><td>{s.saleType}</td><td>{s.total.toFixed(2)}</td><td>{s.amountPaid.toFixed(2)}</td><td>{s.balance.toFixed(2)}</td><td><button type="button" onClick={() => open(s.id)}>View</button></td></tr>)}</tbody>
+        <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Type</th><th>Total (INR)</th><th>Paid (INR)</th><th>Balance (INR)</th><th>WhatsApp</th><th></th></tr></thead>
+        <tbody>{page.map(s => <tr key={s.id}><td>{s.invoiceNo ?? s.number}</td><td>{s.date}</td><td>{s.customer}</td><td>{s.saleType}</td><td>{s.total.toFixed(2)}</td><td>{s.amountPaid.toFixed(2)}</td><td>{s.balance.toFixed(2)}</td><td>{s.whatsappStatus === 'Pending' ? 'Queued' : s.whatsappStatus === 'ConsentRequired' ? 'Permission needed' : s.whatsappStatus === 'NoRecipient' ? 'No phone' : s.whatsappStatus === 'NotAvailable' ? '—' : s.whatsappStatus}</td><td><button type="button" onClick={() => open(s.id)}>View</button></td></tr>)}</tbody>
       </table>
       )}</Paged>
 	  {detail && <div className="invoice-modal" role="dialog" aria-modal="true" aria-label="Sale detail" onClick={e => { if (e.target === e.currentTarget) setDetail(null) }}>
 		<div className="invoice-modal-box">
-		  <div className="invoice-tools no-print">
+		  <div className="invoice-tools no-print"><span role="status">WhatsApp: {detail.sale.whatsappStatus}</span>
 			<select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === "thermal" ? "@page{size:80mm auto;margin:3mm} @media print{.invoice-modal-box{width:74mm} .invoice{font-size:11px}}" : "@page{size:A4;margin:10mm}"}</style><button type="button" onClick={() => window.print()}>Print bill</button>
 			<button type="button" className="secondary" onClick={() => setDetail(null)}>Close</button>
 		  </div>
