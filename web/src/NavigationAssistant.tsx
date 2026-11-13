@@ -61,6 +61,8 @@ export function NavigationAssistant() {
  const [recording,setRecording] = useState(false)
  const [transcribing,setTranscribing] = useState(false)
  const [voiceError,setVoiceError] = useState('')
+ const panelOpenRef = useRef(false)
+ const cancelledFinalRef = useRef(false)
  const workerRef = useRef<Worker|null>(null)
  const streamRef = useRef<MediaStream|null>(null)
  const contextRef = useRef<AudioContext|null>(null)
@@ -92,7 +94,7 @@ export function NavigationAssistant() {
 
  function go(target: NavigationTarget, closePanel = true) {
   setChoices([]); setMessage(''); setQuery('')
-  if (closePanel) setOpen(false)
+  if (closePanel) { panelOpenRef.current = false; setOpen(false) }
   window.location.hash = target.hash
  }
 
@@ -104,8 +106,7 @@ export function NavigationAssistant() {
   const result = resolveNavigation(command)
   if (result.kind === 'navigate') {
    addHistory('assistant', `${text.opening} ${targetLabel(result.target, lang)}.`)
-   setOpen(true)
-   window.location.hash = result.target.hash
+    window.location.hash = result.target.hash
    return
   }
   if (result.kind === 'ask') {
@@ -129,7 +130,7 @@ export function NavigationAssistant() {
   const command = query.trim()
   if (command) addHistory('user', command)
   addHistory('assistant', `${text.opening} ${targetLabel(target, lang)}.`)
-  setQuery(''); setChoices([]); setMessage(''); setOpen(true)
+  setQuery(''); setChoices([]); setMessage('')
   window.location.hash = target.hash
  }
 
@@ -304,6 +305,7 @@ export function NavigationAssistant() {
  function beginHoldInteraction() {
   if (holdingRef.current || recordingRef.current || transcribingRef.current) return
   holdingRef.current = true
+  cancelledFinalRef.current = false
   setVoiceError('')
   setQuery(''); setChoices([]); setMessage('')
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -410,7 +412,9 @@ export function NavigationAssistant() {
  }
 
  function closeAssistant() {
-  releaseTalk()
+  panelOpenRef.current = false
+  if (holdingRef.current || recordingRef.current) abortCapture()
+  else if (transcribingRef.current) cancelledFinalRef.current = true
   setOpen(false)
  }
 
@@ -426,7 +430,10 @@ export function NavigationAssistant() {
  }, [])
 
  return <>
-  <button className="assistant-launcher" type="button" aria-label={open ? text.close : text.open} aria-expanded={open} aria-controls="rbos-assistant-panel" onClick={() => open ? closeAssistant() : setOpen(true)}>
+  <button className="assistant-launcher" type="button" aria-label={open ? text.close : text.open} aria-expanded={open} aria-controls="rbos-assistant-panel" onClick={() => {
+   if (open) closeAssistant()
+   else { panelOpenRef.current = true; setOpen(true) }
+  }}>
    <span aria-hidden="true">✦</span><span>{open ? text.close : 'Assistant'}</span>
   </button>
   {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
