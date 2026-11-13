@@ -23,6 +23,9 @@ public static class WhatsAppInvoiceWorker
         var configured = pilotTenantConfigured && !string.IsNullOrWhiteSpace(accessToken)
             && !string.IsNullOrWhiteSpace(phoneNumberId)
             && !string.IsNullOrWhiteSpace(template) && !string.IsNullOrWhiteSpace(apiVersion);
+        var meta = configured
+            ? new MetaWhatsAppCloudClient(http, apiVersion!, phoneNumberId!, accessToken!, template!, language)
+            : null;
 
         while (!ct.IsCancellationRequested)
         {
@@ -74,8 +77,8 @@ public static class WhatsAppInvoiceWorker
                         {
                             var pdf = InvoicePdfRenderer.Render(job.Snapshot.RootElement);
                             var invoiceNo = job.Snapshot.RootElement.GetProperty("sale").GetProperty("invoiceNo").GetString() ?? "invoice";
-                            var mediaId = await UploadPdfAsync(http, apiVersion!, phoneNumberId!, accessToken!, pdf, invoiceNo, ct);
-                            var messageId = await SendTemplateAsync(http, apiVersion, phoneNumberId!, accessToken!, template!, language, recipient, mediaId, invoiceNo, ct);
+                            var mediaId = await meta!.UploadInvoicePdfAsync(pdf, invoiceNo, ct);
+                            var messageId = await meta.SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
                             await FinishQueueAsync(dataSource, item, null, ct);
                             logger.LogInformation("WhatsApp invoice accepted for delivery {DeliveryId}, provider message {MessageId}", item.DeliveryId, messageId);
@@ -148,6 +151,7 @@ public static class WhatsAppInvoiceWorker
         await reader.CloseAsync();
         if (currentStatus == "Processing")
         {
+            snapshot.Dispose();
             await using var review = session.Command(@"update sales.invoice_delivery
                 set status='NeedsReview', last_error='Previous attempt outcome is unknown. Check WhatsApp before retrying.', updated_at=now()
                 where tenant_id=@t and id=@d");
@@ -157,7 +161,7 @@ public static class WhatsAppInvoiceWorker
             await session.CommitAsync(ct);
             return null;
         }
-        if (currentStatus is not ("Pending" or "Retry")) return null;
+        if (currentStatus is not ("Pending" or "Retry")) { snapshot.Dispose(); return null; }
         await using var update = session.Command("update sales.invoice_delivery set status='Processing', attempt_count=attempt_count+1, updated_at=now() where tenant_id=@t and id=@d");
         update.Parameters.AddWithValue("t", item.TenantId);
         update.Parameters.AddWithValue("d", item.DeliveryId);
