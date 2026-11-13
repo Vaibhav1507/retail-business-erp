@@ -22,6 +22,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        tesseract-ocr \
        tesseract-ocr-eng \
+       fonts-noto-core \
+       libfontconfig1 \
     && tesseract --version \
     && tesseract --list-langs | grep -qx 'eng' \
     && rm -rf /var/lib/apt/lists/*
