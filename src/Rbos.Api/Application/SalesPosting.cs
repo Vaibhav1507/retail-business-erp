@@ -117,6 +117,61 @@ public sealed class SalesService(TenantDb db)
         return ServiceResult<object>.Ok(new { sale = head, lines });
     }
 
+    public async Task<ServiceResult<object>> RetryWhatsAppInvoiceAsync(Guid uid, Guid saleId, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid, ct);
+        Guid deliveryId;
+        string? recipient;
+        string consent;
+        string status;
+        await using (var q = s.Command(@"select d.id, d.recipient, coalesce(c.whatsapp_invoice_consent_status,'Unknown'), d.status
+            from sales.invoice_delivery d
+            join sales.sale x on x.tenant_id=d.tenant_id and x.id=d.sale_id
+            left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id
+            where d.tenant_id=@t and d.sale_id=@s and d.channel='WhatsApp' for update of d"))
+        {
+            q.Parameters.AddWithValue("t", tid.Value);
+            q.Parameters.AddWithValue("s", saleId);
+            await using var r = await q.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return ServiceResult<object>.Fail("WhatsApp invoice record not found.", 404);
+            deliveryId = r.GetGuid(0);
+            recipient = r.IsDBNull(1) ? null : r.GetString(1);
+            consent = r.GetString(2);
+            status = r.GetString(3);
+        }
+        if (status is not ("Failed" or "WaitingForSetup" or "Retry"))
+            return ServiceResult<object>.Fail("Only a failed or pending-setup invoice can be retried.", 409);
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            await Exec(s, ct, "update sales.invoice_delivery set status='NoRecipient', last_error=null, updated_at=now() where tenant_id=@t and id=@i",
+                ("t", tid.Value), ("i", deliveryId));
+            await s.CommitAsync(ct);
+            return ServiceResult<object>.Ok(new { status = "NoRecipient" });
+        }
+        if (consent != "OptedIn")
+        {
+            var blocked = consent == "OptedOut" ? "Suppressed" : "ConsentRequired";
+            await Exec(s, ct, "update sales.invoice_delivery set status=@st, last_error=null, updated_at=now() where tenant_id=@t and id=@i",
+                ("st", blocked), ("t", tid.Value), ("i", deliveryId));
+            await s.CommitAsync(ct);
+            return ServiceResult<object>.Ok(new { status = blocked });
+        }
+        await Exec(s, ct, "update sales.invoice_delivery set status='Pending', last_error=null, updated_at=now() where tenant_id=@t and id=@i",
+            ("t", tid.Value), ("i", deliveryId));
+        await using (var enqueue = s.Command("select integrations.enqueue_invoice_delivery(@t,@d,@s,@u)"))
+        {
+            enqueue.Parameters.AddWithValue("t", tid.Value);
+            enqueue.Parameters.AddWithValue("d", deliveryId);
+            enqueue.Parameters.AddWithValue("s", saleId);
+            enqueue.Parameters.AddWithValue("u", uid);
+            await enqueue.ExecuteNonQueryAsync(ct);
+        }
+        await s.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { status = "Pending" });
+    }
+
     static bool TrySplitPayments(List<SalePaymentInput> input, out List<(string Method, decimal Amount)> split, out string? error)
     {
         split = [];
