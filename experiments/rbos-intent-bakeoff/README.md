@@ -54,6 +54,19 @@ npm run models:bakeoff
 
 models:bakeoff pins the current approved model revisions (guarded by expected revision prefixes), downloads and verifies files, updates the config hash in the temporary workspace, tunes A/C1/C2, freezes thresholds, and scores the test set once. CI stores only result summaries, predictions and model-pin metadata as a small report artefact.
 
+## v1 benchmark result (2026-11-13)
+
+The first complete local run is recorded in [reviews/semantic-v1-results-20261113.md](reviews/semantic-v1-results-20261113.md) and workflow [43418998859](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859).
+
+**Decision: neither C1 nor C2 passes the acceptance gate. Do not integrate either model.**
+
+- E5 is too conservative and misses most requests (2.7–4.5% correct navigation).
+- MiniLM L0 reaches 14.5% correct navigation but has 11.3% wrong navigation; L2 reduces the pooled error to 2.5% but does not meet per-language improvement or the 2% safety gate.
+- The deterministic baseline itself is weak and must not be presented as production-ready.
+- The v1 corpus is synthetic and assistant-authored, so this is a negative model-selection result, not a measure of real shopkeeper accuracy.
+
+The evaluation gate now checks the wrong-navigation ceiling for every language bucket as well as the pooled result. FileAccess also caches checksum-verified inputs so the frozen test file can be hashed and scored from one physical read after thresholds are frozen.
+
 ## Known limitations
 
 - v1 is synthetic and assistant-authored; it is a method comparison, not production accuracy.
