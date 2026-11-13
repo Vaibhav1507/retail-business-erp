@@ -15,7 +15,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
         h["X-Frame-Options"] = "DENY";
         h["Referrer-Policy"] = "no-referrer";
         h["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()";
-        h["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+        h["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
         if (ctx.Request.Path.StartsWithSegments("/api"))
         {
