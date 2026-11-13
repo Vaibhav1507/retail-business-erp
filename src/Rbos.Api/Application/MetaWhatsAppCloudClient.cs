@@ -23,11 +23,12 @@ public sealed class MetaWhatsAppCloudClient(
         {
             mediaId = await UploadInvoicePdfAsync(pdf, invoiceNo, ct);
         }
-        catch (HttpRequestException ex)
+        catch (MetaWhatsAppApiException) { throw; }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             throw MetaWhatsAppApiException.FromTransport(messageSendStarted: false, ex);
         }
-        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw MetaWhatsAppApiException.FromTransport(messageSendStarted: false, ex);
         }
@@ -36,15 +37,17 @@ public sealed class MetaWhatsAppCloudClient(
         {
             return await SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
         }
-        catch (HttpRequestException ex)
-        {
-            throw MetaWhatsAppApiException.FromTransport(messageSendStarted: true, ex);
-        }
+        catch (MetaWhatsAppApiException) { throw; }
         catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             throw MetaWhatsAppApiException.FromTransport(messageSendStarted: true, ex);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw MetaWhatsAppApiException.FromTransport(messageSendStarted: true, ex);
+        }
     }
+
     public async Task<string> UploadInvoicePdfAsync(byte[] pdf, string invoiceNo, CancellationToken ct)
     {
         if (pdf.Length == 0) throw new ArgumentException("Invoice PDF is empty.", nameof(pdf));
