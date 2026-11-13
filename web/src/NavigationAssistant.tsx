@@ -233,7 +233,12 @@ export function NavigationAssistant() {
     }
     if (data.type === 'result') {
      transcribingRef.current = false
-     setTranscribing(false); setQuery(''); setChoices([]); setMessage('')
+     setTranscribing(false)
+     if (cancelledFinalRef.current || !panelOpenRef.current) {
+      cancelledFinalRef.current = false
+      return
+     }
+     setQuery(''); setChoices([]); setMessage('')
      const transcript = (data.text || '').trim()
      if (!transcript) { setVoiceError(text.tooShort); return }
      setVoiceError('')
