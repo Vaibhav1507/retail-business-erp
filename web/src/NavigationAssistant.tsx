@@ -454,7 +454,7 @@ export function NavigationAssistant() {
    {transcribing && !recording && <p className="navigation-voice-note" role="status">{text.transcribing}</p>}
    <p className="navigation-privacy">{text.voiceNote}</p>
    {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
-   {message && <p className="navigation-feedback" role="status">{message}</p>}
+   {message && choices.length === 0 && <p className="navigation-feedback" role="status">{message}</p>}
    {choices.length > 0 && <div className="navigation-choices" aria-label={message || text.suggestions}>
     {choices.map(target => <button type="button" key={target.id} onClick={() => chooseSuggestion(target)}>{targetLabel(target, lang)}</button>)}
    </div>}
