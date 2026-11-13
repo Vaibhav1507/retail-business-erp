@@ -15,7 +15,7 @@ const copy = {
   secure:'Voice requires HTTPS. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
   failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.',
-  retry:'Retry microphone and voice', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
+  retry:'Retry microphone and voice', reviewVoice:'Check the words I heard, edit if needed, then press Enter to open the screen.', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
  },
  hi: {
   title:'बिज़नेस असिस्टेंट', placeholder:'स्क्रीन या कमांड लिखें…', go:'जाएँ', shortcuts:'जल्दी खोलें',
@@ -28,7 +28,7 @@ const copy = {
   secure:'वॉइस के लिए HTTPS चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
   failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
-  retry:'माइक्रोफोन और वॉइस फिर से आज़माएँ', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
+  retry:'माइक्रोफोन और वॉइस फिर से आज़माएँ', reviewVoice:'पहचाने गए शब्द जाँचें। ज़रूरत हो तो सुधारें और स्क्रीन खोलने के लिए Enter दबाएँ।', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
  }
 }
 const quick: NavigationTarget[] = [
@@ -105,7 +105,7 @@ export function NavigationAssistant() {
     if (data.type === 'result') {
      const transcript = (data.text || '').trim()
      if (!transcript) { setVoiceError(text.tooShort); return }
-     setQuery(transcript); setVoiceError(''); processText(transcript)
+     setQuery(transcript); setChoices([]); setVoiceError(''); setMessage(text.reviewVoice)
     }
    }
    worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; worker.terminate(); workerRef.current = null }
