@@ -56,7 +56,7 @@ public sealed class SalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a, whatsapp_invoice_consent_status=case when @cs is not null then @cs when phone is distinct from @p then 'Unknown' else whatsapp_invoice_consent_status end, whatsapp_invoice_consent_updated_at=case when @cs is not null then case when @cs='Unknown' then null else now() end when phone is distinct from @p then null else whatsapp_invoice_consent_updated_at end where id=@i");
+        await using var c = s.Command("update sales.customer set name=@n, phone=@p, notes=@o, is_active=@a, whatsapp_invoice_consent_status=case when @cs::text is not null then @cs::text when phone is distinct from @p then 'Unknown' else whatsapp_invoice_consent_status end, whatsapp_invoice_consent_updated_at=case when @cs::text is not null then case when @cs::text='Unknown' then null else now() end when phone is distinct from @p then null else whatsapp_invoice_consent_updated_at end where id=@i");
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("p", (object?)Blank(m.Phone) ?? DBNull.Value);
         c.Parameters.AddWithValue("o", (object?)Blank(m.Notes) ?? DBNull.Value); c.Parameters.AddWithValue("a", m.IsActive); c.Parameters.AddWithValue("cs", (object?)m.WhatsappConsentStatus ?? DBNull.Value); c.Parameters.AddWithValue("i", id);
         if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Customer not found.", 404);
