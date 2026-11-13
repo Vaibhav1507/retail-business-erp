@@ -63,6 +63,7 @@ export function NavigationAssistant() {
  const [voiceError,setVoiceError] = useState('')
  const panelOpenRef = useRef(false)
  const cancelledFinalRef = useRef(false)
+ const partialTranscriptRef = useRef('')
  const workerRef = useRef<Worker|null>(null)
  const streamRef = useRef<MediaStream|null>(null)
  const contextRef = useRef<AudioContext|null>(null)
@@ -229,6 +230,7 @@ export function NavigationAssistant() {
      if (!recordingRef.current) return
      const transcript = (data.text || '').trim()
      if (transcript) {
+      partialTranscriptRef.current = transcript
       setQuery(transcript)
       const suggestions = suggestNavigation(transcript)
       setChoices(suggestions)
@@ -246,7 +248,8 @@ export function NavigationAssistant() {
      const finalTranscript = (data.text || '').trim()
      // If the final pass returns empty but a rolling preview heard speech,
      // retain that preview instead of discarding the user's command.
-     const transcript = finalTranscript || query.trim()
+     const transcript = finalTranscript || partialTranscriptRef.current
+     partialTranscriptRef.current = ''
      if (!transcript) { setVoiceError(text.tooShort); return }
      setVoiceError('')
      setQuery(transcript)
@@ -322,6 +325,7 @@ export function NavigationAssistant() {
   if (holdingRef.current || recordingRef.current || transcribingRef.current) return
   holdingRef.current = true
   cancelledFinalRef.current = false
+  partialTranscriptRef.current = ''
   setVoiceError('')
   setQuery(''); setChoices([]); setMessage('')
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -441,6 +445,7 @@ export function NavigationAssistant() {
   holdingRef.current = false
   pendingPcmRef.current?.fill(0)
   pendingPcmRef.current = null
+  partialTranscriptRef.current = ''
   workerRef.current?.terminate()
   streamRef.current?.getTracks().forEach(track => track.stop())
   nodeRef.current?.disconnect()
