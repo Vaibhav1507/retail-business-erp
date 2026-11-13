@@ -63,7 +63,7 @@ const ALIASES: Record<FieldKey, string[]> = {
   capacity: ['capacity', 'size', 'weight', 'dimensions'],
   connector_type: ['connectortype', 'connector', 'port'],
   compatible_with: ['compatiblewith', 'compatible', 'fits'],
-  mrp: ['mrp', 'maximumretailprice', 'retailprice', 'listprice', 'sellingprice'],
+  mrp: ['mrp', 'maximumretailprice', 'retailprice', 'listprice'],
 }
 
 /** Guess a column for each field from header names. */
@@ -78,7 +78,7 @@ export function autoMap(headers: string[]): Mapping {
 }
 
 export function missingRequired(m: Mapping): string[] {
-  return [...(m.name === undefined ? ['Name'] : []), ...(m.category === undefined && m.mrp === undefined ? ['Category'] : [])]
+  return [...(m.name === undefined ? ['Name'] : []), ...(m.category === undefined && m.name === undefined ? ['Category'] : [])]
 }
 
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
