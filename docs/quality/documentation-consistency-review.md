@@ -1,3 +1,5 @@
+> **Historical review:** The checks below describe the Phase 0 documentation baseline and are not a current implementation audit. See `docs/quality/documentation-freshness-review.md` for the latest targeted review against the merged repository.
+
 # Documentation consistency review
 
 Review date: Phase 0 finalisation. Method: read-through plus text searches across `projects/retail-business-os/**/*.md` for "Accepted", "allow with warning", "gapless", "installed", "passed" and zero-cost wording.
