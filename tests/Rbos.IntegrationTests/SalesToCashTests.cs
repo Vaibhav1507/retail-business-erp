@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
 
 namespace Rbos.IntegrationTests;
 
@@ -135,6 +137,58 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var optedOut = (await optedOutResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var optedOutSale = (await (await c.Send(HttpMethod.Post, "/sales", Sale(optedOut, loc, p, 1, 50m, "Cash"), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         Assert.Equal("Suppressed", (await c.GetJson("/sales/" + optedOutSale)).GetProperty("sale").GetProperty("whatsappStatus").GetString());
+    }
+
+    [Fact] public async Task WhatsApp_dispatch_queue_lease_is_exclusive_and_can_be_rescheduled()
+    {
+        var (c, loc, p) = await Stocked(f);
+        var customerResponse = await c.Send(HttpMethod.Post, "/customers",
+            new { name = "Queue Test", phone = "9876543210", whatsappConsentStatus = "OptedIn" });
+        var customer = (await customerResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var saleResponse = await c.Send(HttpMethod.Post, "/sales", Sale(customer, loc, p, 1, 100m, "Cash"), K());
+        Assert.Equal(HttpStatusCode.OK, saleResponse.StatusCode);
+
+        var config = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
+        var workerConnectionString = config["ConnectionStrings:RbosTestWhatsAppWorker"]!;
+        await using var worker = new NpgsqlConnection(workerConnectionString);
+        await worker.OpenAsync();
+
+        async Task<(Guid DeliveryId, Guid LeaseToken, int AttemptCount)?> Claim()
+        {
+            await using var command = new NpgsqlCommand(
+                "select delivery_id, lease_token, attempt_count from integrations.claim_invoice_deliveries(5,30)", worker);
+            await using var reader = await command.ExecuteReaderAsync();
+            if (!await reader.ReadAsync()) return null;
+            return (reader.GetGuid(0), reader.GetGuid(1), reader.GetInt32(2));
+        }
+
+        var first = await Claim();
+        Assert.NotNull(first);
+        Assert.Equal(1, first.Value.AttemptCount);
+        Assert.Null(await Claim()); // A live lease prevents a second worker from claiming the same delivery.
+
+        await using (var reschedule = new NpgsqlCommand(
+            "select integrations.finish_invoice_delivery(@delivery,@lease,@retry)", worker))
+        {
+            reschedule.Parameters.AddWithValue("delivery", first.Value.DeliveryId);
+            reschedule.Parameters.AddWithValue("lease", first.Value.LeaseToken);
+            reschedule.Parameters.AddWithValue("retry", DateTimeOffset.UtcNow.AddSeconds(-1));
+            Assert.True((bool)(await reschedule.ExecuteScalarAsync())!);
+        }
+
+        var second = await Claim();
+        Assert.NotNull(second);
+        Assert.Equal(2, second.Value.AttemptCount);
+        Assert.Equal(first.Value.DeliveryId, second.Value.DeliveryId);
+
+        await using (var finish = new NpgsqlCommand(
+            "select integrations.finish_invoice_delivery(@delivery,@lease,null)", worker))
+        {
+            finish.Parameters.AddWithValue("delivery", second.Value.DeliveryId);
+            finish.Parameters.AddWithValue("lease", second.Value.LeaseToken);
+            Assert.True((bool)(await finish.ExecuteScalarAsync())!);
+        }
+        Assert.Null(await Claim());
     }
 
 }
