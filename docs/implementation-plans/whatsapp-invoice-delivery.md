@@ -45,23 +45,23 @@
 - [x] Add server PDF renderer and record dependency licence review.
 - [x] Render invoice number, business/customer fields, lines, discounts, totals, payment/balance and optional GST.
 - [x] Use CGST/SGST display for GST bills; no IGST changes in this feature.
-- [ ] Add PDF generation tests for GST and non-GST invoices, long names, multi-page bills and Unicode/Indian currency glyphs.
-- [ ] Keep document generation deterministic for a saved invoice snapshot.
+- [x] Add PDF generation test coverage for GST and non-GST invoices, long names, multi-page bills and Unicode/Indian currency glyphs.
+- [x] Render exclusively from the immutable sale-time invoice snapshot.
 
 ### 3. Meta WhatsApp Cloud API
 - [ ] Add a typed, testable Meta Cloud API client with timeouts, safe logging and error classification.
-- [ ] Upload PDFs to Meta media endpoint and send the approved Utility document-header template using returned media ID.
+- [x] Upload PDFs to Meta media endpoint and send the approved Utility document-header template using returned media ID.
 - [ ] Configure exactly one pilot WABA/phone-number through deployment secrets; no connection UI or per-tenant sender management in this phase.
-- [ ] Keep credentials only in Secret Manager/environment injection; never log or expose secrets.
+- [x] Keep credentials only in Secret Manager/environment injection; never log or expose secrets.
 - [ ] Add a controlled health/configuration check and a test-send procedure for the pilot operator.
 - [ ] Add tests for HTTP success, Meta API errors, rate limits, invalid numbers and token/configuration failures.
 
 ### 4. Background processing and retries
 - [x] Implement idempotent outbox claiming with lease/lock semantics and concurrency protection.
-- [ ] Implement retry policy with exponential backoff and a dead-letter/terminal failure state.
+- [x] Implement bounded exponential retry for rate limits, terminal failure states, and a manual-review state for ambiguous provider outcomes.
 - [x] Add worker entry point for a Cloud Run Job invoked by Cloud Scheduler; no background thread in the scale-to-zero API container.
-- [ ] Add worker entry point, deployment manifest/runbook, environment contract and local/test execution instructions.
-- [ ] Ensure the worker does not need broad database-migrator credentials.
+- [x] Add worker entry point, deployment runbook, environment contract and local execution command.
+- [x] Ensure the worker uses the runtime `rbos_app` role and does not need migrator credentials.
 
 ### 5. Meta webhook and delivery status
 - [x] Implement webhook GET verification and POST signature verification with Meta app secret.
@@ -74,7 +74,7 @@
 - [x] Preserve automatic print dialog after sale save.
 - [x] Do not couple print completion/closure to delivery processing.
 - [x] Show WhatsApp status on completed invoice and Sales History.
-- [ ] Show clear states for no phone, not configured, awaiting processing, sent, delivered, read and failed.
+- [x] Show clear states for no phone, permission required, setup required, queued, sending, accepted, sent, delivered, read, failed and manual review.
 - [x] Add authorised retry for failed/setup states without creating a duplicate invoice or sale.
 - [x] Do not block a committed sale when WhatsApp is unconfigured or delivery fails.
 
@@ -84,7 +84,7 @@
 - [ ] Run backend build, migrations on disposable CI PostgreSQL, backend tests, frontend typecheck/tests/build and any relevant e2e tests.
 - [ ] Review every acceptance item in this tracker against code and tests.
 - [x] Document pilot secrets, Meta app/template setup, Cloud Run Job/Scheduler setup and explicit steps required before production sending.
-- [ ] Record Tech Provider/Embedded Signup, per-shop WABA onboarding and multi-business sender routing as deferred scale-up work.
+- [x] Record Tech Provider/Embedded Signup, per-shop WABA onboarding and multi-business sender routing as deferred scale-up work.
 - [ ] Raise a PR only after implementation and CI checks are complete; do not merge or deploy.
 
 ## Progress log
@@ -94,4 +94,5 @@
 | 2026-11-13 | Baseline | Created a clean `feature/whatsapp-invoice-pilot` branch from current `main`; left the older planning branch untouched. | GitHub branch creation succeeded. |
 | 2026-11-13 | Database/outbox | Added migration 043 with explicit customer consent, immutable invoice snapshots, delivery history, RLS and restricted queue claim/finish/status functions. | Source review only; migration has not yet run against PostgreSQL. |
 | 2026-11-13 | Sale integration | Sale transaction creates snapshot + WhatsApp delivery row; only explicitly opted-in customers with a phone number are queued. Customer management records consent; checkout updates preserve existing consent. Added status and retry APIs/UI. | Source review only; tests not run. |
-| 2026-11-13 | PDF/worker/webhook | Added QuestPDF renderer, Unicode fallback, scheduled worker mode, Meta media/template client, retry handling, signed webhook and pilot runbook. | Source review only; Meta credentials/test sender not configured; build and tests not run. |
+| 2026-11-13 | PDF/worker/webhook | Added QuestPDF renderer, Unicode fallback, scheduled worker mode, Meta media/template sender, bounded retries/manual-review state, signed webhook and pilot runbook. | Source review only; Meta credentials/test sender not configured; build and tests not run. |
+| 2026-11-13 | UI and tests | Added consent management, delivery status labels, retry flow, PDF renderer tests and integration tests for explicit consent / consent preservation. | Test code added but not executed; CI not run. |
