@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationAssistant } from './NavigationAssistant'
@@ -15,7 +15,7 @@ describe('NavigationAssistant', () => {
  it('opens a panel with a visible voice action and typed navigation', async () => {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
-  expect(screen.getByRole('button', { name: /Set up voice/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Allow microphone & start/ })).toBeInTheDocument()
   expect(screen.getByLabelText('Ask your business assistant')).toBeInTheDocument()
  })
  it('closes the panel when a quick action navigates', async () => {
@@ -56,4 +56,15 @@ describe('NavigationAssistant', () => {
   expect(screen.getByLabelText('बिज़नेस असिस्टेंट')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'स्टॉक देखें' })).toBeInTheDocument()
  })
+})
+
+it('requests microphone permission immediately when voice is tapped', async () => {
+ const getUserMedia = vi.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError'))
+ Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
+ Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
+ render(<NavigationAssistant />)
+ await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
+ await userEvent.click(screen.getByRole('button', { name: /Allow microphone & start/ }))
+ expect(getUserMedia).toHaveBeenCalledOnce()
+ expect(await screen.findByRole('alert')).toHaveTextContent('Microphone permission was denied')
 })
