@@ -41,10 +41,10 @@ public class MetaWhatsAppCloudClientTests
         }));
 
         var client = new MetaWhatsAppCloudClient(http, "v25.0", "123456789", "test-token", "invoice_utility", "en");
-        var mediaId = await client.UploadInvoicePdfAsync(Encoding.ASCII.GetBytes("%PDF-test"), "INV/2026-001", CancellationToken.None);
-        var messageId = await client.SendInvoiceTemplateAsync("919876543210", mediaId, "INV/2026-001", CancellationToken.None);
+        Assert.Equal("WhatsApp", client.Channel);
+        var messageId = await client.SendInvoiceAsync("919876543210", "INV/2026-001", Encoding.ASCII.GetBytes("%PDF-test"), CancellationToken.None);
 
-        Assert.Equal("media-123", mediaId);
+
         Assert.Equal("wamid.test-123", messageId);
         Assert.NotNull(uploadedBody);
         Assert.Contains("messaging_product", uploadedBody);
