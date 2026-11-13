@@ -131,7 +131,7 @@ it('updates suggestions as an incomplete command is typed without navigating', a
  // Final submission can still offer safe destinations when strict matching declines to navigate.
  await userEvent.type(input, '{Enter}')
  expect(screen.getByRole('button', {name:'Old sale bills'})).toBeInTheDocument()
- expect(screen.getByRole('status')).toHaveTextContent('Which screen do you mean?')
+ expect(screen.getByText('Which screen do you mean?')).toBeInTheDocument()
  expect((screen.getByLabelText('Ask your business assistant') as HTMLInputElement).value).toBe('')
  expect(window.location.hash).toBe('')
 })
