@@ -54,7 +54,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
 	  {detail && <div className="invoice-modal" role="dialog" aria-modal="true" aria-label="Sale detail" onClick={e => { if (e.target === e.currentTarget) setDetail(null) }}>
 		<div className="invoice-modal-box">
 		  <div className="invoice-tools no-print"><span role="status">WhatsApp: {detail.sale.whatsappStatus}</span>
-            {(detail.sale.whatsappStatus === 'Failed' || detail.sale.whatsappStatus === 'WaitingForSetup') && <button type="button" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : 'Retry WhatsApp'}</button>}
+            {(['Failed', 'WaitingForSetup', 'ConsentRequired', 'Suppressed', 'NoRecipient'].includes(detail.sale.whatsappStatus)) && <button type="button" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : 'Retry WhatsApp'}</button>}
 			<select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === "thermal" ? "@page{size:80mm auto;margin:3mm} @media print{.invoice-modal-box{width:74mm} .invoice{font-size:11px}}" : "@page{size:A4;margin:10mm}"}</style><button type="button" onClick={() => window.print()}>Print bill</button>
 			<button type="button" className="secondary" onClick={() => setDetail(null)}>Close</button>
 		  </div>
