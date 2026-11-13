@@ -164,7 +164,7 @@ public static class WhatsAppWebhookEndpoints
     static string? GetString(JsonElement value, string name)
         => value.TryGetProperty(name, out var item) ? item.ToString() : null;
 
-    static bool VerifySignature(string secret, string header, byte[] body)
+    public static bool VerifySignature(string secret, string header, byte[] body)
     {
         if (!header.StartsWith("sha256=", StringComparison.Ordinal)) return false;
         byte[] supplied;
