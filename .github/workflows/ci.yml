@@ -38,6 +38,8 @@ jobs:
       - run: dotnet build RetailBusinessOs.slnx --nologo -c Release
       - run: dotnet run --project src/Rbos.Api -c Release --no-build -- --migrate test
       - run: dotnet test RetailBusinessOs.slnx --nologo -c Release --no-build
+      - name: Build deployment container (no push)
+        run: docker build --pull -t retail-business-os:ci .
 
   frontend:
     runs-on: ubuntu-latest
