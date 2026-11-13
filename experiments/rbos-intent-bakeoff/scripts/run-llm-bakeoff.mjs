@@ -36,7 +36,8 @@ function promptFor(text, destinations) {
 }
 
 function parseDecision(output, allowed) {
-  const match = (typeof output === 'string' ? output : '').match(/\{[\s\S]*\}/)
+  const matches = [...(typeof output === 'string' ? output : '').matchAll(/\{[^{}]*\}/g)]
+  const match = matches.at(-1)
   if (!match) return { kind: 'not_understood', ids: [], reason: 'malformed_json' }
   let value
   try { value = JSON.parse(match[0]) } catch { return { kind: 'not_understood', ids: [], reason: 'invalid_json' } }
@@ -85,7 +86,7 @@ async function main() {
       decision = { kind: 'not_understood', ids: [], reason: 'inference_error' }
     }
     const ms = Number(process.hrtime.bigint() - started) / 1e6
-    rows.push({ id:item.id, lang:item.lang, expect:item.expect, target:item.target??null, candidates:item.candidates??null, kind:decision.kind, ids:decision.ids, outcome:classify(item,decision), reason:decision.reason, ms, debatable:['t041','t061','t068','t074','t103','t132','t138','t140'].includes(item.id), raw:raw.slice(0,1200), failure })
+    rows.push({ id:item.id, lang:item.lang, expect:item.expect, target:item.target??null, candidates:item.candidates??null, kind:decision.kind, ids:decision.ids, outcome:classify(item,decision), reason:decision.reason, ms, debatable:['t041','t061','t068','t074','t103','t132','t138','t140'].includes(item.id), raw:raw.slice(-1200), failure })
     console.log(item.id + ': ' + decision.kind + ' ' + decision.ids.join(',') + ' -> ' + rows.at(-1).outcome + ' (' + ms.toFixed(0) + 'ms)')
   }
 
