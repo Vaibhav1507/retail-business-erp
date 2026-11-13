@@ -38,7 +38,7 @@ public static class InvoicePdfRenderer
             {
                 page.Size(PageSizes.A4);
                 page.Margin(32);
-                page.DefaultTextStyle(style => style.FontFamily("Lato").FontSize(9));
+                page.DefaultTextStyle(style => style.FontFamily("Lato", "Noto Sans Devanagari").FontSize(9));
                 page.Header().Row(row =>
                 {
                     row.RelativeItem().Column(col =>
