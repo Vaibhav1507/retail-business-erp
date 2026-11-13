@@ -124,7 +124,11 @@ export function NavigationAssistant() {
   setMessage(feedback); addHistory('assistant', feedback)
  }
 
- function submit(e: React.FormEvent) { e.preventDefault(); handleCommand(query) }
+ function submit(e: React.FormEvent) {
+  e.preventDefault()
+  if (recordingRef.current || transcribingRef.current) return
+  handleCommand(query)
+ }
 
  function chooseSuggestion(target: NavigationTarget) {
   const command = query.trim()
