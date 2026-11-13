@@ -18,6 +18,7 @@ if (args.Contains("--whatsapp-worker"))
     using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
     var logger = loggerFactory.CreateLogger("WhatsAppInvoiceWorker");
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+    QuestPDF.Settings.UseSystemFonts = true;
     await WhatsAppInvoiceWorker.RunAsync(dataSource, config, logger, CancellationToken.None);
     return;
 }
@@ -45,6 +46,7 @@ if (args.Contains("--migrate"))
 }
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+QuestPDF.Settings.UseSystemFonts = true;
 var builder = WebApplication.CreateBuilder(args);
 var dbKey = (builder.Configuration["Rbos:Database"] ?? "dev") switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
 var appCs = builder.Configuration[dbKey] ?? throw new InvalidOperationException($"Missing secret {dbKey}");
