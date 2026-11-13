@@ -69,7 +69,7 @@ public static class WhatsAppWebhookEndpoints
                                     ? GetString(textNode, "body") : null;
                                 if (!IsOptOutKeyword(bodyText) || string.IsNullOrWhiteSpace(from)) continue;
                                 var digits = new string(from.Where(char.IsDigit).ToArray());
-                                if (digits.Length < 10) continue;
+                                if (!(digits.Length == 10 || (digits.Length == 12 && digits.StartsWith("91", StringComparison.Ordinal)))) continue;
                                 await using var optOut = session.Command(@"with opted_out as (
                                     update sales.customer
                                        set whatsapp_invoice_consent_status='OptedOut',
