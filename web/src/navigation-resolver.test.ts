@@ -5,6 +5,10 @@ describe('navigation resolver', () => {
  it('resolves direct English, Hindi and Hinglish screen requests', () => {
   expect(resolveNavigation('make a new bill').kind).toBe('navigate')
   expect(resolveNavigation('नया बिल बनाओ').kind).toBe('navigate')
+  expect(resolveNavigation('मुझे बिल बनाना है').kind).toBe('navigate')
+  expect(resolveNavigation('bill banana hai').kind).toBe('navigate')
+  expect(resolveNavigation('मेरा स्टॉक दिखाओ').kind).toBe('navigate')
+  expect(resolveNavigation('मुझे स्टॉक दिखाना है').kind).toBe('navigate')
   expect(resolveNavigation('supplier ko payment karna hai').kind).toBe('navigate')
  })
  it('asks instead of guessing on ambiguous commands', () => {

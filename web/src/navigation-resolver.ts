@@ -50,7 +50,7 @@ export const navigationTargets: NavigationTarget[] = [
   { id: 'settings', hash: '#/settings', label: 'Business settings' },
 ]
 
-const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke'])
+const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko','mera','meri','mere','banao','dikhao','dikha','dikhana','banana','bana','karna','karo','chahiye','mujhe'])
 const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
 const transaction = /\b(delete|remove|cancel|make payment|pay \d|send|transfer \d|post|save|submit|bhejo|bhej do|jama karo|darj karo|हटा दो|भेजो|जमा करो|पोस्ट करो)\b/i
 const ambiguous = new Map<string, string[]>([
@@ -60,7 +60,7 @@ const ambiguous = new Map<string, string[]>([
 ])
 function normalise(value: string): string {
   return value.normalize('NFC').toLocaleLowerCase().replace(/[’']/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
-    .replace(/उधार/g, 'udhar').replace(/बिल/g, 'bill').replace(/माल/g, 'maal').replace(/सामान/g, 'saman').replace(/खरीद/g, 'kharid').replace(/वापस/g, 'wapas').replace(/खर्च/g, 'kharch').replace(/स्टॉक/g, 'stock')
+    .replace(/उधार/g, 'udhar').replace(/बिल/g, 'bill').replace(/माल/g, 'maal').replace(/सामान/g, 'saman').replace(/खरीद/g, 'kharid').replace(/वापस/g, 'wapas').replace(/खर्च/g, 'kharch').replace(/स्टॉक/g, 'stock').replace(/बनाना|बनानी|बनाए|बनाइए/g, 'बनाओ').replace(/बनाओ/g, 'बनाओ').replace(/दिखाना|दिखाओ|दिखाइए|दिखा/g, 'देखो').replace(/बनाना/g, 'बनाओ')
 }
 function tokens(value: string): string[] { return normalise(value).split(' ').filter(t => t && !stopWords.has(t)) }
 function similarity(query: string[], phrase: string[]): number {

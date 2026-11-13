@@ -18,7 +18,12 @@ export const navigationAnchors = {
     "नया बिल बनाओ",
     "naya bill banao",
     "new sale invoice",
-    "bill katna hai"
+    "bill katna hai",
+    "mujhe bill banana hai",
+    "bill banana hai",
+    "bill banao",
+    "मुझे बिल बनाना है",
+    "बिल बनाना है"
   ],
   "sell.bills": [
     "old sale bills",
@@ -73,6 +78,10 @@ export const navigationAnchors = {
     "check stock",
     "स्टॉक देखो",
     "stock kitna hai dekho",
+    "mujhe stock dikhana hai",
+    "mera stock dikhao",
+    "मेरा स्टॉक दिखाओ",
+    "मुझे स्टॉक दिखाना है",
     "current inventory",
     "maal kitna bacha hai"
   ],
