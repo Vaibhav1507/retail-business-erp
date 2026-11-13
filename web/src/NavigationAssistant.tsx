@@ -212,28 +212,22 @@ export function NavigationAssistant() {
   </button>
   {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={()=>setOpen(false)}>×</button></header>
-   <form onSubmit={submit} className="navigation-assistant-form">
-    <input id="rbos-go-to" aria-label={text.title} value={query} onChange={e=>{setQuery(e.target.value);setMessage('');setChoices([])}} placeholder={text.placeholder} autoComplete="off" />
-    <button type="submit" disabled={!query.trim()}>{text.go}</button>
-   </form>
    <div className="navigation-shortcuts" aria-label={text.shortcuts}>
     {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
    </div>
-   <div className="navigation-voice">
-    {!voiceReady ? <button type="button" className="voice-action" onClick={prepareVoice} disabled={voiceLoading}>
-     <span aria-hidden="true">🎙</span> {voiceLoading?text.loading:text.setupVoice}
-    </button> : <button type="button" className={recording?'is-recording':'voice-action'} aria-label={recording?text.releaseToSend:text.holdToTalk}
+   <form onSubmit={submit} className="navigation-assistant-form">
+    <input id="rbos-go-to" aria-label={text.title} value={query} onChange={e=>{setQuery(e.target.value);setMessage('');setChoices([])}} placeholder={text.placeholder} autoComplete="off" />
+    {!voiceReady ? <button type="button" className="assistant-mic-setup" aria-label={text.setupVoice} title={text.setupVoice} onClick={prepareVoice} disabled={voiceLoading}>🎙</button> :
+     <button type="button" className={recording?'assistant-mic is-recording':'assistant-mic'} aria-label={recording?text.releaseToSend:text.holdToTalk} title={recording?text.releaseToSend:text.holdToTalk}
       onPointerDown={pressTalk} onPointerUp={releaseTalk} onPointerCancel={releaseTalk} onLostPointerCapture={releaseTalk}
       onKeyDown={event=>{if((event.key===' '||event.key==='Enter')&&!event.repeat){event.preventDefault();holdingRef.current=true;void beginHoldToTalk()}}}
       onKeyUp={event=>{if(event.key===' '||event.key==='Enter'){event.preventDefault();releaseTalk()}}}
       onContextMenu={event=>event.preventDefault()}>
-     {recording ? <span className="voice-wave" aria-label="Recording audio">{Array.from({length: 24},(_,i)=><i key={i} style={{'--wave-index':i} as React.CSSProperties}/>)}</span> : <span aria-hidden="true">🎙</span>}
-     {recording?text.releaseToSend:text.holdToTalk}
-    </button>}
-    {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.download}/><span>{text.loading} {voiceProgress}%</span></div>}
-    {voiceReady && !recording && <span className="navigation-voice-note">{text.ready} · {text.holdToTalk}</span>}
-    {recording && <span className="navigation-voice-note">{text.recording}</span>}
-   </div>
+      {recording ? <span className="voice-wave" aria-label="Recording audio">{Array.from({length:24},(_,i)=><i key={i} style={{'--wave-index':i} as React.CSSProperties}/>)}</span> : '🎙'}
+     </button>}
+   </form>
+   {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.download}/><span>{text.loading} {voiceProgress}%</span></div>}
+   {recording && <p className="navigation-voice-note">{text.recording}</p>}
    <p className="navigation-privacy">{text.voiceNote}</p>
    {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={prepareVoice}>{text.retry}</button></div>}
    {message && <p className="navigation-feedback" role="status">{message}</p>}
