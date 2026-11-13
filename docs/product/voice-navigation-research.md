@@ -276,7 +276,7 @@ The v1 data is still synthetic and assistant-authored. A result can reject a wea
 
 ## 9.8 v1 semantic model result (2026-11-13)
 
-The first complete Stage 3/4 workflow finished successfully: [run 43418998859](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859). Both approved ONNX int8 models were checksum-verified and run locally on the ephemeral CPU runner. Stage 2 tests, frozen-data validation and lexicon check also passed.
+The first complete Stage 3/4 workflow finished successfully: [run 43419876997](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859). Both approved ONNX int8 models were checksum-verified and run locally on the ephemeral CPU runner. Stage 2 tests, frozen-data validation and lexicon check also passed.
 
 **Decision: do not integrate either candidate.** All model/preprocessing configurations failed the declared gate. E5 achieved only 2.7–4.5% correct navigation and was too conservative. MiniLM L0 achieved 14.5% correct navigation but had 11.3% wrong navigation; L2 reduced pooled wrong navigation to 2.5% but failed the per-language improvement and 2% safety limits. The deterministic baseline also performed poorly, so this does not make the current phrase resolver acceptable.
 
