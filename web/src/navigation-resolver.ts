@@ -50,46 +50,130 @@ export const navigationTargets: NavigationTarget[] = [
   { id: 'settings', hash: '#/settings', label: 'Business settings' },
 ]
 
-const stopWords = new Set(['please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko','mera','meri','mere','banao','dikhao','dikha','dikhana','banana','bana','karna','karo','chahiye','mujhe'])
+const stopWords = new Set([
+  'please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','screen','page',
+  'karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko',
+  'mera','meri','mere','banao','banana','banani','banaye','banaiye','karna','chahiye','wala','wali','wale',
+  'please','ji','ab','ek','aur','se','ko','करनी','करना','करते','करती','हुआ','हुई','है','हैं'
+])
+
 const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
 const transaction = /\b(delete|remove|cancel|make payment|pay \d|send|transfer \d|post|save|submit|bhejo|bhej do|jama karo|darj karo|हटा दो|भेजो|जमा करो|पोस्ट करो)\b/i
-const ambiguous = new Map<string, string[]>([
-  ['return', ['sell.return','buy.return']], ['returns', ['sell.return','buy.return']], ['wapasi', ['sell.return','buy.return']], ['वापसी', ['sell.return','buy.return']],
-  ['payment', ['sell.collect','buy.pay']], ['pay', ['sell.collect','buy.pay']], ['history', ['sell.bills','buy.history','stock.history','parties.purchases','more.audit']],
-  ['stock', ['stock.current','stock.adjust','stock.count']], ['udhaar', ['sell.collect','parties.dues']], ['order', ['more.orders','sell.bill']],
-])
+
+const canonicalWords: Record<string, string> = {
+  'ग्राहक':'customer','ग्राहकों':'customer','ग्रहक':'customer','कस्टमर':'customer','grahak':'customer','graahak':'customer','custmer':'customer','costumer':'customer',
+  'सप्लायर':'supplier','विक्रेता':'supplier','supplier':'supplier','suplier':'supplier','saplayer':'supplier',
+  'बिल':'bill','बिलिंग':'bill','चालान':'bill','इनवॉइस':'bill','invoice':'bill','bll':'bill',
+  'स्टॉक':'stock','माल':'stock','सामान':'stock','इन्वेंटरी':'stock','inventory':'stock','stok':'stock','stokh':'stock',
+  'खरीद':'purchase','खरीदारी':'purchase','खरीदी':'purchase','परचेज':'purchase','purchase':'purchase','purches':'purchase',
+  'खर्च':'expense','खर्चा':'expense','व्यय':'expense','expense':'expense','expence':'expense',
+  'वापसी':'return','रिटर्न':'return','वापस':'return','return':'return',
+  'पुराना':'past','पुराने':'past','पिछला':'past','पिछली':'past','history':'history','इतिहास':'history',
+  'पैसा':'payment','पैसे':'payment','भुगतान':'payment','पेमेंट':'payment','payment':'payment',
+  'जोड़':'add','जोड़ो':'add','जोड़ना':'add','बनाओ':'create','बनाना':'create','बनानी':'create','बनाइए':'create','बनाए':'create','create':'create','add':'add',
+  'देखो':'view','दिखाओ':'view','दिखाना':'view','दिखाइए':'view','खोलो':'view','खोलना':'view','देखना':'view','show':'view','check':'view','view':'view',
+  'सूची':'list','लिस्ट':'list','list':'list','खाता':'ledger','बही':'ledger','उधार':'dues','बकाया':'dues',
+  'एंट्री':'entry','प्रविष्टि':'entry','entry':'entry','नया':'new','नई':'new','new':'new','मौजूदा':'current','current':'current',
+  'से':'','का':'','की':'','के':'','को':'','है':'','हैं':'','मुझे':'','मेरे':'','मेरी':'','मेरा':''
+}
+
 function normalise(value: string): string {
-  return value.normalize('NFC').toLocaleLowerCase().replace(/[’']/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
-    .replace(/उधार/g, 'udhar').replace(/बिल/g, 'bill').replace(/माल/g, 'maal').replace(/सामान/g, 'saman').replace(/खरीद/g, 'kharid').replace(/वापस/g, 'wapas').replace(/खर्च/g, 'kharch').replace(/स्टॉक/g, 'stock').replace(/बनाना|बनानी|बनाए|बनाइए/g, 'बनाओ').replace(/बनाओ/g, 'बनाओ').replace(/दिखाना|दिखाओ|दिखाइए|दिखा/g, 'देखो').replace(/बनाना/g, 'बनाओ')
+  return value.normalize('NFC').toLocaleLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ').trim()
 }
-function tokens(value: string): string[] { return normalise(value).split(' ').filter(t => t && !stopWords.has(t)) }
-function similarity(query: string[], phrase: string[]): number {
+
+function canonicalToken(token: string): string {
+  const direct = canonicalWords[token]
+  if (direct !== undefined) return direct
+  // Common ASR spellings: normalize elongated vowels without changing short words.
+  return token.length > 5 ? token.replace(/([aeiou])\1+/g, '$1') : token
+}
+
+function tokens(value: string): string[] {
+  return normalise(value).split(' ')
+    .map(canonicalToken)
+    .filter(token => token && !stopWords.has(token))
+}
+
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0
+  if (Math.abs(a.length - b.length) > 2) return 3
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i]
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    }
+    previous = current
+  }
+  return previous[b.length]
+}
+
+function tokenMatches(a: string, b: string): boolean {
+  if (a === b) return true
+  if (a.length < 4 || b.length < 4) return false
+  const limit = Math.max(a.length, b.length) >= 8 ? 2 : 1
+  return editDistance(a, b) <= limit
+}
+
+function phraseScore(query: string[], phrase: string[]): number {
   if (!query.length || !phrase.length) return 0
-  const q = new Set(query), p = new Set(phrase)
-  const overlap = [...q].filter(x => p.has(x)).length
-  const queryCoverage = overlap / q.size
-  const phraseCoverage = overlap / p.size
-  return queryCoverage * 0.65 + phraseCoverage * 0.35
+  const matchedQuery = new Set<number>()
+  const matchedPhrase = new Set<number>()
+  query.forEach((word, qi) => {
+    const candidates = phrase.map((candidate, pi) => ({ pi, distance: editDistance(word, candidate) }))
+      .filter(({ pi, distance }) => !matchedPhrase.has(pi) && tokenMatches(word, phrase[pi]) && distance <= 2)
+      .sort((a, b) => a.distance - b.distance)
+    if (candidates[0]) {
+      matchedQuery.add(qi)
+      matchedPhrase.add(candidates[0].pi)
+    }
+  })
+  const queryCoverage = matchedQuery.size / query.length
+  const phraseCoverage = matchedPhrase.size / phrase.length
+  const extraPenalty = Math.max(0, query.length - matchedQuery.size) / query.length
+  return queryCoverage * 0.72 + phraseCoverage * 0.28 - extraPenalty * 0.12
 }
+
+const ambiguous = new Map<string, string[]>([
+  ['return', ['sell.return','buy.return']],
+  ['payment', ['sell.collect','buy.pay']],
+  ['history', ['sell.bills','buy.history','stock.history','parties.purchases','more.audit']],
+  ['stock', ['stock.current','stock.adjust','stock.count']],
+  ['dues', ['sell.collect','parties.dues']],
+  ['order', ['more.orders','sell.bill']],
+])
+
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
-  const hindiDataTerms = ['कितना','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया']
-  if (input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') || input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) || dataQuestion.test(q) || hindiDataTerms.some(term => input.includes(term)) || transaction.test(q) || /\d/.test(q)) return { kind: 'reject' }
+  if (input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') ||
+      input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) ||
+      dataQuestion.test(q) || ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => input.includes(term)) || transaction.test(q) || ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) || /\d/.test(q)) return { kind: 'reject' }
+
   const qTokens = tokens(q)
+  if (!qTokens.length) return { kind: 'not-understood' }
   if (qTokens.length === 1 && ambiguous.has(qTokens[0])) {
-    const ids = ambiguous.get(qTokens[0])!
-    return { kind: 'ask', targets: ids.map(id => navigationTargets.find(t => t.id === id)!).filter(Boolean) }
+    return { kind: 'ask', targets: ambiguous.get(qTokens[0])!.map(id => navigationTargets.find(t => t.id === id)!).filter(Boolean) }
   }
+
   const ranked = Object.entries(navigationAnchors).map(([id, phrases]) => ({
-    id, score: Math.max(...phrases.map(p => similarity(qTokens, tokens(p)))),
-  })).sort((a,b) => b.score - a.score || a.id.localeCompare(b.id))
-  const top = ranked[0], second = ranked[1]
-  if (!top || top.score < 0.58) return { kind: 'not-understood' }
-  const candidates = ranked.filter(x => top.score - x.score < 0.12 && x.score >= 0.48).slice(0,3)
-  if (candidates.length > 1 || (second && top.score - second.score < 0.12)) {
-    return { kind: 'ask', targets: candidates.map(x => navigationTargets.find(t => t.id === x.id)!).filter(Boolean) }
+    id,
+    score: Math.max(...phrases.map(phrase => phraseScore(qTokens, tokens(phrase)))),
+  })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+
+  const top = ranked[0]
+  const second = ranked[1]
+  if (!top || top.score < 0.54) return { kind: 'not-understood' }
+
+  // Require both a useful match and a margin. If the words point to multiple
+  // screens, ask rather than silently sending the shopkeeper to the wrong place.
+  const candidates = ranked.filter(item => top.score - item.score < 0.09 && item.score >= 0.48).slice(0, 3)
+  if (candidates.length > 1 || (second && top.score - second.score < 0.09)) {
+    return { kind: 'ask', targets: candidates.map(item => navigationTargets.find(t => t.id === item.id)!).filter(Boolean) }
   }
-  const target = navigationTargets.find(t => t.id === top.id)
+  const target = navigationTargets.find(item => item.id === top.id)
   return target ? { kind: 'navigate', target } : { kind: 'not-understood' }
 }
