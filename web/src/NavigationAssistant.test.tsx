@@ -15,7 +15,7 @@ describe('NavigationAssistant', () => {
  it('opens a panel with a visible voice action and typed navigation', async () => {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
-  expect(screen.getByRole('button', { name: /Allow microphone & start/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Set up voice/ })).toBeInTheDocument()
   expect(screen.getByLabelText('Ask your business assistant')).toBeInTheDocument()
  })
  it('closes the panel when a quick action navigates', async () => {
@@ -58,13 +58,13 @@ describe('NavigationAssistant', () => {
  })
 })
 
-it('requests microphone permission immediately when voice is tapped', async () => {
+it('requests microphone permission when voice setup is tapped', async () => {
  const getUserMedia = vi.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError'))
  Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
  render(<NavigationAssistant />)
  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
- await userEvent.click(screen.getByRole('button', { name: /Allow microphone & start/ }))
+ await userEvent.click(screen.getByRole('button', { name: /Set up voice/ }))
  expect(getUserMedia).toHaveBeenCalledOnce()
  expect(await screen.findByRole('alert')).toHaveTextContent('Microphone is blocked for this website')
 })
