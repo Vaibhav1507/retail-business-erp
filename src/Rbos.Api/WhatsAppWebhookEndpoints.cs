@@ -56,6 +56,32 @@ public static class WhatsAppWebhookEndpoints
                             || !metadata.TryGetProperty("phone_number_id", out var configuredId)
                             || !string.Equals(configuredId.GetString(), phoneNumberId, StringComparison.Ordinal))
                             continue;
+                        // Inbound opt-out keywords are handled before delivery receipts.
+                        // A STOP from a phone number suppresses all customer records with that number
+                        // in this pilot tenant, and future retry attempts re-check the same consent.
+                        if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var message in messages.EnumerateArray())
+                            {
+                                var from = GetString(message, "from");
+                                var messageType = GetString(message, "type");
+                                var bodyText = messageType == "text" && message.TryGetProperty("text", out var textNode)
+                                    ? GetString(textNode, "body") : null;
+                                if (!IsOptOutKeyword(bodyText) || string.IsNullOrWhiteSpace(from)) continue;
+                                var digits = new string(from.Where(char.IsDigit).ToArray());
+                                if (digits.Length < 10) continue;
+                                await using var optOut = session.Command(@"update sales.customer
+                                    set whatsapp_invoice_consent_status='OptedOut',
+                                        whatsapp_invoice_consent_updated_at=now()
+                                    where tenant_id=@tenant
+                                      and length(regexp_replace(coalesce(phone,''), '[^0-9]', '', 'g')) >= 10
+                                      and right(regexp_replace(coalesce(phone,''), '[^0-9]', '', 'g'),10)=right(@phone,10)");
+                                optOut.Parameters.AddWithValue("tenant", tenantId);
+                                optOut.Parameters.AddWithValue("phone", digits);
+                                await optOut.ExecuteNonQueryAsync(ct);
+                            }
+                        }
+
                         if (!value.TryGetProperty("statuses", out var statuses) || statuses.ValueKind != JsonValueKind.Array) continue;
                         foreach (var status in statuses.EnumerateArray())
                         {
@@ -103,6 +129,12 @@ public static class WhatsAppWebhookEndpoints
                 return Results.BadRequest();
             }
         }).AllowAnonymous();
+    }
+
+    public static bool IsOptOutKeyword(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        return message.Trim().ToUpperInvariant() is "STOP" or "UNSUBSCRIBE" or "CANCEL" or "END" or "QUIT" or "STOP ALL";
     }
 
     static string? GetString(JsonElement value, string name)
