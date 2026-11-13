@@ -127,7 +127,7 @@ public sealed class SalesService(TenantDb db)
         string? recipient;
         string consent;
         string status;
-        await using (var q = s.Command(@"select d.id, d.recipient, coalesce(c.whatsapp_invoice_consent_status,'Unknown'), d.status
+        await using (var q = s.Command(@"select d.id, c.phone, coalesce(c.whatsapp_invoice_consent_status,'Unknown'), d.status
             from sales.invoice_delivery d
             join sales.sale x on x.tenant_id=d.tenant_id and x.id=d.sale_id
             left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id
@@ -142,7 +142,7 @@ public sealed class SalesService(TenantDb db)
             consent = r.GetString(2);
             status = r.GetString(3);
         }
-        if (status is not ("Failed" or "WaitingForSetup" or "Retry"))
+        if (status is not ("Failed" or "WaitingForSetup" or "Retry" or "ConsentRequired" or "Suppressed" or "NoRecipient"))
             return ServiceResult<object>.Fail("Only a failed or pending-setup invoice can be retried.", 409);
         if (string.IsNullOrWhiteSpace(recipient))
         {
@@ -159,8 +159,8 @@ public sealed class SalesService(TenantDb db)
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { status = blocked });
         }
-        await Exec(s, ct, "update sales.invoice_delivery set status='Pending', last_error=null, updated_at=now() where tenant_id=@t and id=@i",
-            ("t", tid.Value), ("i", deliveryId));
+        await Exec(s, ct, "update sales.invoice_delivery set status='Pending', recipient=@r, last_error=null, updated_at=now() where tenant_id=@t and id=@i",
+            ("r", recipient), ("t", tid.Value), ("i", deliveryId));
         await using (var enqueue = s.Command("select integrations.enqueue_invoice_delivery(@t,@d,@s,@u)"))
         {
             enqueue.Parameters.AddWithValue("t", tid.Value);
