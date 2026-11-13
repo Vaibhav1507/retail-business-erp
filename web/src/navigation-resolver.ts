@@ -222,14 +222,6 @@ export function suggestNavigation(input: string): NavigationTarget[] {
   const queryTokens = tokens(q)
   if (!queryTokens.length) return []
 
-  // A noisy ASR transcript can still contain one reliable retail-domain word.
-  // Surface safe destinations for that domain rather than returning no help.
-  const stockWords = ['stock','inventory','maal','saman','स्टॉक','माल','सामान','इन्वेंटरी']
-  if (stockWords.some(word => q.includes(word))) {
-    const stockTargets = ['stock.current','stock.products','stock.alerts']
-    return stockTargets.map(id => navigationTargets.find(target => target.id === id))
-      .filter((target): target is NavigationTarget => Boolean(target))
-  }
   const ranked = Object.entries(navigationAnchors).map(([id, phrases]) => ({
     id,
     score: Math.max(...phrases.map(phrase => partialPhraseScore(queryTokens, tokens(phrase)))),
