@@ -5,7 +5,7 @@ Personal learning project. Free-first, local-first, synthetic-data-first.
 
 ## Status
 
-**Implementation in progress (local, synthetic data only).** Slices 1, 1.1, 2, 3 and 4 are complete and accepted. Work beyond Slice 4 exists in the code (migrations 009-018, listed below) but has no recorded acceptance and no fresh full test run; see `docs/knowledge-transfer/RETAIL_BUSINESS_OS_COMPLETE_SYSTEM_REFERENCE.txt` for the verified current state.
+**Pilot implementation in progress.** The repository now contains the broader retail workflows through purchases, sales, returns, finance/reporting, staff/location capabilities, product tax metadata, supplier invoice extraction, barcode/serial tracking, and WhatsApp invoice delivery. Do not treat the presence of code as product-owner acceptance or production readiness. The current deployment and verification state is tracked in `docs/deployment-runbook.md`; WhatsApp implementation and activation gates are tracked in `docs/implementation-plans/whatsapp-invoice-delivery.md`. The older knowledge-transfer snapshots are historical and must not be used as the source of truth.
 
 | Slice | Delivered |
 |---|---|
