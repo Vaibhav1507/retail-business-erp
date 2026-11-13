@@ -98,7 +98,7 @@ Official references:
 
 ### Required secret values
 
-Configure these only in Cloud Run Secret Manager / environment injection. Never commit them or place them in tenant tables:
+Create these as Secret Manager secrets or environment injection. Never commit them, place them in tenant tables, or put secret values in the runbook.
 
 - `WhatsApp__AccessToken` — Meta Cloud API access token.
 - `WhatsApp__PhoneNumberId` — the single pilot WhatsApp Business phone-number ID.
@@ -108,20 +108,24 @@ Configure these only in Cloud Run Secret Manager / environment injection. Never 
 - `WhatsApp__TemplateLanguage` — approved template language code, for example `en`.
 - `WhatsApp__ApiVersion` — explicitly selected supported Graph API version.
 - `WhatsApp__PilotTenantId` — tenant UUID for this one-shop pilot.
-- `WhatsApp__PilotActorUserId` — active owner/member user UUID in that tenant; webhook updates run under this user's normal tenant RLS context.
+- `WhatsApp__PilotActorUserId` — active owner/member user UUID in that tenant; used only by the API webhook to apply status changes under ordinary tenant RLS.
 
-The template must be approved by Meta before production messages can be sent. The application uploads a PDF to the Cloud API media endpoint and sends it using the approved document-header template. The delivery webhook uses the configured pilot tenant and actor to update delivery rows under ordinary tenant RLS; it does not use a cross-tenant database bypass.
+### API Cloud Run service
 
-### Worker and scheduler
+Configure the API service with `Rbos__Database=prod`, `ConnectionStrings__RbosProdApp`, and only the webhook secrets it needs: `WhatsApp__AppSecret`, `WhatsApp__VerifyToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__PilotTenantId` and `WhatsApp__PilotActorUserId`. The API does not need the Meta access token or template configuration.
+
+The Meta webhook callback URL is `https://<application-domain>/webhooks/meta/whatsapp`. Subscribe to message status events and use the configured app secret, verify token and phone-number ID. Webhook status and opt-out updates run under the pilot user's normal tenant RLS context; there is no cross-tenant database bypass.
+
+### Worker Cloud Run Job
 
 1. Create a Cloud Run Job from the same container image as the API.
 2. Override the command to `dotnet Rbos.Api.dll --whatsapp-worker`.
-3. Set `Rbos__Database=prod` and inject `ConnectionStrings__RbosProdApp` (tenant data, rbos_app) and `ConnectionStrings__RbosProdWhatsAppWorker` (queue-only, rbos_worker), plus the WhatsApp secrets listed above. Do not provide any migrator connection string.
-4. Configure a separate PostgreSQL role `rbos_worker` for the Cloud Run Job. It can only call the queue claim/finish functions; it has no direct queue-table access and no tenant business-data permissions. Inject `ConnectionStrings__RbosProdWhatsAppWorker` for this role. The API's `rbos_app` connection remains separate and cannot claim or finish queue records.
-5. Use a service account with access only to the required Secret Manager secrets and Cloud Run Job execution.
-6. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). The worker drains currently available queue items and exits.
-7. Configure the Meta webhook callback URL as `https://<application-domain>/webhooks/meta/whatsapp`, subscribe to message status events, and use the same app secret, verify token and phone-number ID as the API configuration.
-8. Before live use, test using Meta's test sender/recipient and verify sent, delivered, read, failed and retry paths.
+3. Set `Rbos__Database=prod` and inject `ConnectionStrings__RbosProdApp` (tenant data, `rbos_app`) and `ConnectionStrings__RbosProdWhatsAppWorker` (queue-only, `rbos_worker`).
+4. Inject only the worker's Meta secrets: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__TemplateName`, `WhatsApp__TemplateLanguage`, `WhatsApp__ApiVersion` and `WhatsApp__PilotTenantId`. The job does not need the Meta app secret, webhook verify token or pilot actor ID.
+5. The worker role can only call the queue claim/finish functions; it has no direct queue-table access or tenant business-data permissions. The worker uses the separate `rbos_app` connection for tenant-scoped invoice/customer access.
+6. Use a service account with access only to the required worker Secret Manager secrets and Cloud Run Job execution. Do not provide any migrator connection string.
+7. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). Configure a single task with no parallel tasks; database queue leases protect against overlapping executions. The worker drains currently available queue items and exits.
+8. Before live use, test using Meta's test sender/recipient and verify media upload, template send, sent/delivered/read/failed statuses, inbound opt-out, retry and uncertain-send handling.
 
 ### Customer permission
 
