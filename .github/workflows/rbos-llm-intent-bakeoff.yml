@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - experiment/rbos-llm-intent-comparison
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      smoke:
+        description: 'Run five diagnostic controls instead of the full 160-case benchmark'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -39,10 +42,10 @@ jobs:
           npm test
           npm run validate
           npm run lexicon:check
-      - name: Run local Qwen model on frozen test set
+      - name: Run local Qwen model on frozen test set (or five-case smoke test)
         env:
           RBOS_LLM_RUN_ID: qwen-${{ github.run_id }}-${{ github.run_attempt }}
-        run: node scripts/run-llm-bakeoff.mjs
+        run: node scripts/run-llm-bakeoff.mjs ${{ inputs.smoke && '--smoke' || '' }}
       - name: Publish summary
         if: always()
         run: |
