@@ -112,6 +112,13 @@ export function NavigationAssistant() {
    setChoices(result.targets); setMessage(text.choose); addHistory('assistant', text.choose)
    return
   }
+  if (result.kind === 'not-understood') {
+   const suggestions = suggestNavigation(command)
+   if (suggestions.length > 0) {
+    setChoices(suggestions); setMessage(text.choose); addHistory('assistant', text.choose)
+    return
+   }
+  }
   const feedback = result.kind === 'reject' ? text.reject : text.unclear
   setMessage(feedback); addHistory('assistant', feedback)
  }
@@ -298,6 +305,7 @@ export function NavigationAssistant() {
   if (holdingRef.current || recordingRef.current || transcribingRef.current) return
   holdingRef.current = true
   setVoiceError('')
+  setQuery(''); setChoices([]); setMessage('')
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
    setVoiceError(text.secure); holdingRef.current = false; return
   }
@@ -396,7 +404,8 @@ export function NavigationAssistant() {
   const pcm = resampleAudio(joined, rate, SAMPLE_RATE)
   joined.fill(0)
   if (!pcm.length) { setVoiceError(text.tooShort); return }
-  setQuery(''); setChoices([]); setMessage('')
+  // Keep the latest partial transcript and its suggestions visible until
+  // the final, full-utterance transcript is returned by the worker.
   dispatchFinal(pcm)
  }
 
