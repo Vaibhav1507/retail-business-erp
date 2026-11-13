@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationAssistant } from './NavigationAssistant'
 import { setLanguage } from './i18n'
@@ -19,6 +19,34 @@ describe('NavigationAssistant', () => {
   expect(screen.queryByRole('button', { name: /Set up voice/ })).not.toBeInTheDocument()
   expect(screen.getByLabelText('Ask your business assistant')).toBeInTheDocument()
  })
+ it('keeps quick actions directly below the header and the microphone outside the scrolling chat', async () => {
+  const { container } = render(<NavigationAssistant />)
+  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
+  const panel = container.querySelector('.navigation-assistant')!
+  const header = panel.querySelector('.assistant-heading')!
+  const actions = panel.querySelector('.navigation-top-actions')!
+  const history = panel.querySelector('.navigation-history')!
+  const form = panel.querySelector('.navigation-assistant-form')!
+  const mic = screen.getByRole('button', { name: 'Hold to talk' })
+  expect(header.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(actions.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(history.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(history.contains(mic)).toBe(false)
+  expect(within(actions).getByRole('button', { name: 'Check stock' })).toBeInTheDocument()
+ })
+
+ it('shows stock-specific choices at the top for a noisy speech transcript', async () => {
+  const { container } = render(<NavigationAssistant />)
+  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
+  const input = screen.getByLabelText('Ask your business assistant')
+  await userEvent.type(input, 'mould you have no stock taken that hand')
+  const actions = container.querySelector('.navigation-top-actions')!
+  expect(within(actions).getByRole('button', { name: 'Current stock' })).toBeInTheDocument()
+  expect(within(actions).getByRole('button', { name: 'Products' })).toBeInTheDocument()
+  expect(within(actions).getByRole('button', { name: 'Low stock alerts' })).toBeInTheDocument()
+  expect(window.location.hash).toBe('')
+ })
+
  it('closes the panel when a quick action navigates', async () => {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
