@@ -9,6 +9,7 @@ const revision = '68a8d77e88e58ed1201cc20a9c4adc5d9750723f'
 const assets = [
   { name: 'needle.js', url: `https://raw.githubusercontent.com/udgamlabs/shruti/${revision}/examples/browser/needle/needle.js`, sha256: 'a675c66f506a1b6f922d852c0cc0b82a843ce9d0fab6a80a408106f516df126f' },
   { name: 'needle.wasm', url: `https://raw.githubusercontent.com/udgamlabs/shruti/${revision}/examples/browser/needle/needle.wasm`, sha256: 'a6f87da3e7a9e83c13982979f115cf0afa4b1a63641e58f31aa87dec8afd13d2' },
+  { name: 'shruti.cact', url: 'https://huggingface.co/udgamlabs/Shruti/resolve/main/shruti.cact?download=true', sha256: 'b189e954aaed4a9fd41acbad3ac05e486381e96325b22a4c695b9ea5153d7065' },
 ]
 await mkdir(target, { recursive: true })
 for (const asset of assets) {

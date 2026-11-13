@@ -2,7 +2,7 @@
 'use strict'
 importScripts('/voice-runtime/needle.js')
 const CACHE_NAME = 'rbos-shruti-hi-v1'
-const MODEL_URL = 'https://huggingface.co/udgamlabs/Shruti/resolve/main/shruti.cact'
+const MODEL_URL = '/voice-runtime/shruti.cact'
 const MODEL_SHA256 = 'b189e954aaed4a9fd41acbad3ac05e486381e96325b22a4c695b9ea5153d7065'
 const MODEL_BYTES = 29546527
 const MAGIC = [0x84, 0x2a, 0xe1, 0x05]

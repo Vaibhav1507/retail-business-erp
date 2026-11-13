@@ -9,26 +9,26 @@ const copy = {
   unclear:'I could not identify that screen. Try a shortcut or a clearer command.',
   reject:'I can only navigate screens. I cannot answer business questions or perform transactions.',
   choose:'Which screen do you mean?', open:'Open assistant', close:'Close assistant',
-  enableVoice:'Set up voice', loading:'Preparing voice…', ready:'Voice is ready',
+  enableVoice:'Allow microphone & start', loading:'Preparing voice…', ready:'Voice is ready',
   download:'Downloading speech model', start:'Start speaking', stop:'Stop and navigate', recording:'Listening… tap Stop when finished',
   micDenied:'Microphone permission was denied. You can still type.', micMissing:'No microphone was found.',
   secure:'Voice requires HTTPS. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
-  failed:'Voice setup could not connect. Check your connection and tap Retry. Typed navigation still works.',
-  retry:'Retry voice setup', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
+  failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.',
+  retry:'Retry microphone and voice', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
  },
  hi: {
   title:'बिज़नेस असिस्टेंट', placeholder:'स्क्रीन या कमांड लिखें…', go:'जाएँ', shortcuts:'जल्दी खोलें',
   unclear:'स्क्रीन समझ नहीं आई। शॉर्टकट चुनें या स्पष्ट कमांड लिखें।',
   reject:'मैं केवल स्क्रीन खोल सकता हूँ। कारोबार के सवालों या लेन-देन में मदद नहीं कर सकता।',
   choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?', open:'असिस्टेंट खोलें', close:'असिस्टेंट बंद करें',
-  enableVoice:'वॉइस सेटअप करें', loading:'वॉइस तैयार हो रही है…', ready:'वॉइस तैयार है',
+  enableVoice:'माइक्रोफोन की अनुमति दें और शुरू करें', loading:'वॉइस तैयार हो रही है…', ready:'वॉइस तैयार है',
   download:'स्पीच मॉडल डाउनलोड हो रहा है', start:'बोलना शुरू करें', stop:'रोकें और स्क्रीन खोलें', recording:'सुन रहा है… पूरा होने पर रोकें',
   micDenied:'माइक्रोफोन की अनुमति नहीं मिली। आप टाइप कर सकते हैं।', micMissing:'माइक्रोफोन नहीं मिला।',
   secure:'वॉइस के लिए HTTPS चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
-  failed:'वॉइस सेटअप कनेक्ट नहीं हो सका। इंटरनेट जाँचें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
-  retry:'वॉइस फिर से सेटअप करें', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
+  failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
+  retry:'माइक्रोफोन और वॉइस फिर से आज़माएँ', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
  }
 }
 const quick: NavigationTarget[] = [
@@ -91,10 +91,13 @@ export function NavigationAssistant() {
    worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
     const data = event.data
     if (data.type === 'progress') setVoiceProgress(data.total ? Math.min(100,Math.round((data.loaded||0)/data.total*100)) : 0)
-    if (data.type === 'ready') { setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100); setVoiceError('') }
+    if (data.type === 'ready') {
+     setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100); setVoiceError('')
+     if (streamRef.current) void beginCapture(streamRef.current)
+    }
     if (data.type === 'error') {
      setVoiceLoading(false)
-     if (data.stage !== 'transcribe') { setVoiceError(data.message || text.failed); worker.terminate(); workerRef.current = null; setVoiceReady(false) }
+     if (data.stage !== 'transcribe') { setVoiceError(data.message || text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; worker.terminate(); workerRef.current = null; setVoiceReady(false) }
      else setVoiceError(data.message || text.failed)
     }
     if (data.type === 'result') {
@@ -103,17 +106,13 @@ export function NavigationAssistant() {
      setQuery(transcript); setVoiceError(''); processText(transcript)
     }
    }
-   worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); worker.terminate(); workerRef.current = null }
+   worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; worker.terminate(); workerRef.current = null }
    worker.postMessage({type:'init'})
-  } catch { setVoiceLoading(false); setVoiceError(text.failed); workerRef.current = null }
+  } catch (error) { setVoiceLoading(false); setVoiceError(error instanceof Error ? error.message : text.failed); streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; workerRef.current = null }
  }
 
- async function startRecording() {
-  setVoiceError('')
-  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { setVoiceError(text.secure); return }
-  if (!voiceReady) { enableVoice(); return }
+ async function beginCapture(stream: MediaStream) {
   try {
-   const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}})
    const context = new AudioContext()
    await context.resume()
    await context.audioWorklet.addModule('/capture-worklet.js')
@@ -123,11 +122,30 @@ export function NavigationAssistant() {
    const source = context.createMediaStreamSource(stream)
    const mute = context.createGain(); mute.gain.value = 0
    source.connect(node); node.connect(mute); mute.connect(context.destination)
-   streamRef.current = stream; contextRef.current = context; nodeRef.current = node; blocksRef.current = blocks
-   startedRef.current = Date.now(); setRecording(true)
+   contextRef.current = context; nodeRef.current = node; blocksRef.current = blocks
+   startedRef.current = Date.now(); setRecording(true); setVoiceError('')
+  } catch (error) {
+   stream.getTracks().forEach(track=>track.stop()); streamRef.current=null
+   const detail = error instanceof Error ? error.message : String(error)
+   setVoiceError(`Could not start microphone capture: ${detail}`)
+  }
+ }
+
+ async function startRecording() {
+  setVoiceError('')
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { setVoiceError(text.secure); return }
+  try {
+   // Request permission directly from the user's microphone-button tap, before downloading the model.
+   const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}})
+   streamRef.current = stream
+   if (voiceReady && workerRef.current) { await beginCapture(stream); return }
+   enableVoice()
   } catch (error) {
    const name = (error as DOMException)?.name
-   setVoiceError(name === 'NotAllowedError' ? text.micDenied : name === 'NotFoundError' ? text.micMissing : text.failed)
+   const detail = error instanceof Error ? error.message : ''
+   setVoiceError(name === 'NotAllowedError' || name === 'PermissionDeniedError' ? text.micDenied
+    : name === 'NotFoundError' || name === 'DevicesNotFoundError' ? text.micMissing
+    : detail || text.failed)
   }
  }
  function resample(input: Float32Array, sourceRate: number): Float32Array {
@@ -166,7 +184,7 @@ export function NavigationAssistant() {
     {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
    </div>
    <div className="navigation-voice">
-    <button type="button" className={recording?'is-recording':'voice-action'} onClick={recording?stopRecording:startRecording} disabled={voiceLoading}>
+    <button type="button" className={recording?'is-recording':'voice-action'} onClick={recording?stopRecording:startRecording} disabled={voiceLoading || recording}>
      <span aria-hidden="true">{recording?'■':'🎙'}</span> {recording?text.stop:voiceReady?text.start:text.enableVoice}
     </button>
     {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.download}/><span>{text.loading} {voiceProgress}%</span></div>}
@@ -174,7 +192,7 @@ export function NavigationAssistant() {
     {recording && <span className="navigation-voice-note">{text.recording}</span>}
    </div>
    <p className="navigation-privacy">{text.voiceNote}</p>
-   {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={enableVoice}>{text.retry}</button></div>}
+   {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={startRecording}>{text.retry}</button></div>}
    {message && <p className="navigation-feedback" role="status">{message}</p>}
    {choices.length>0 && <div className="navigation-choices" aria-label={text.choose}>{choices.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}</div>}
   </section>}
