@@ -6,6 +6,7 @@ export type ImportRow = {
   brand: string | null
   model: string | null
   attributes: Record<string, string>
+  mrp: number | null
 }
 
 export const FIELDS = [
@@ -53,7 +54,7 @@ export function parseCsv(text: string): string[][] {
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 const ALIASES: Record<FieldKey, string[]> = {
-  name: ['name', 'productname', 'product', 'item', 'itemname', 'description', 'particulars', 'productdescription', 'materialname'],
+  name: ['name', 'productname', 'product', 'item', 'itemname', 'description', 'particulars', 'productdescription', 'materialname', 'stockdetails'],
   category: ['category', 'group', 'type', 'productcategory', 'itemcategory', 'department', 'division'],
   unit: ['unit', 'uom', 'baseunit', 'unitofmeasure', 'quantityunit', 'qtyunit'],
   brand: ['brand', 'make', 'manufacturer', 'company', 'brandname'],
@@ -77,7 +78,7 @@ export function autoMap(headers: string[]): Mapping {
 }
 
 export function missingRequired(m: Mapping): string[] {
-  return m.name === undefined ? ['Name'] : []
+  return [...(m.name === undefined ? ['Name'] : []), ...(m.category === undefined && m.name === undefined ? ['Category'] : [])]
 }
 
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
@@ -102,6 +103,7 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
       brand: brand || null,
       model: model || null,
       attributes,
+      mrp: (() => { const raw = get(r, 'mrp').replace(/[₹$\s]/g, '').replace(/,/g, ''); if (!raw) return null; const value = Number(raw); return Number.isFinite(value) && value >= 0 ? value : null })(),
     }
   })
 }

@@ -66,5 +66,5 @@ it('requests microphone permission immediately when voice is tapped', async () =
  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
  await userEvent.click(screen.getByRole('button', { name: /Allow microphone & start/ }))
  expect(getUserMedia).toHaveBeenCalledOnce()
- expect(await screen.findByRole('alert')).toHaveTextContent('Microphone permission was denied')
+ expect(await screen.findByRole('alert')).toHaveTextContent('Microphone is blocked for this website')
 })

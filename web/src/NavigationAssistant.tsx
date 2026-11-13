@@ -11,7 +11,7 @@ const copy = {
   choose:'Which screen do you mean?', open:'Open assistant', close:'Close assistant',
   enableVoice:'Allow microphone & start', loading:'Preparing voice…', ready:'Voice is ready',
   download:'Downloading speech model', start:'Start speaking', stop:'Stop and navigate', recording:'Listening… tap Stop when finished',
-  micDenied:'Microphone permission was denied. You can still type.', micMissing:'No microphone was found.',
+  micDenied:'Microphone is blocked for this website. In Chrome, tap the site controls beside the address bar → Permissions → Microphone → Allow, then reload this page. You can still type.', micMissing:'No microphone was found.',
   secure:'Voice requires HTTPS. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
   failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.',
@@ -24,7 +24,7 @@ const copy = {
   choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?', open:'असिस्टेंट खोलें', close:'असिस्टेंट बंद करें',
   enableVoice:'माइक्रोफोन की अनुमति दें और शुरू करें', loading:'वॉइस तैयार हो रही है…', ready:'वॉइस तैयार है',
   download:'स्पीच मॉडल डाउनलोड हो रहा है', start:'बोलना शुरू करें', stop:'रोकें और स्क्रीन खोलें', recording:'सुन रहा है… पूरा होने पर रोकें',
-  micDenied:'माइक्रोफोन की अनुमति नहीं मिली। आप टाइप कर सकते हैं।', micMissing:'माइक्रोफोन नहीं मिला।',
+  micDenied:'इस वेबसाइट के लिए माइक्रोफोन ब्लॉक है। Chrome में एड्रेस बार के पास साइट सेटिंग → Permissions → Microphone → Allow चुनें, फिर पेज रीलोड करें। आप टाइप कर सकते हैं।', micMissing:'माइक्रोफोन नहीं मिला।',
   secure:'वॉइस के लिए HTTPS चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
   failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
@@ -143,7 +143,10 @@ export function NavigationAssistant() {
   } catch (error) {
    const name = (error as DOMException)?.name
    const detail = error instanceof Error ? error.message : ''
-   setVoiceError(name === 'NotAllowedError' || name === 'PermissionDeniedError' ? text.micDenied
+   let permission: PermissionState | 'unknown' = 'unknown'
+   try { permission = (await navigator.permissions?.query({name:'microphone' as PermissionName}))?.state ?? 'unknown' } catch { /* Permissions API is optional */ }
+   setVoiceError(name === 'NotAllowedError' || name === 'PermissionDeniedError'
+    ? (permission === 'denied' ? text.micDenied : `${text.micDenied} If it still fails, check Android Settings → Apps → Chrome → Permissions → Microphone.`)
     : name === 'NotFoundError' || name === 'DevicesNotFoundError' ? text.micMissing
     : detail || text.failed)
   }
