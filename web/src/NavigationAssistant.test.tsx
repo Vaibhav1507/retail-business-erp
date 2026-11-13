@@ -157,6 +157,7 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
    text:'mujhe Ramesh ji ka purana bil'
   })
   await waitFor(() => expect(screen.getByRole('button', {name:'Old sale bills'})).toBeInTheDocument())
+  expect(screen.getByRole('button', {name:'Old sale bills'})).toBeDisabled()
   expect(window.location.hash).toBe('')
 
   MockAudioWorkletNode.instance?.emitAudio(new Float32Array(16000).fill(0.05))
