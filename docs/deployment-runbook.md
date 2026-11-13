@@ -59,3 +59,41 @@ Do not put the migrator connection string in Cloud Run.
 - Unknown `/api/*` paths return the React page instead of 404.
 - Split-payment restriction not yet reviewed.
 - Playwright suite not re-run after the OTP changes.
+
+## 10. WhatsApp invoice delivery pilot (not activated)
+
+The application contains a single-shop Meta Cloud API integration. Do not configure production secrets, enable Meta billing, send live messages or deploy this feature until the owner explicitly approves the activation step.
+
+### Required secret values
+
+Configure these only in Cloud Run Secret Manager / environment injection. Never commit them or place them in tenant tables:
+
+- `WhatsApp__AccessToken` — Meta Cloud API access token.
+- `WhatsApp__PhoneNumberId` — the single pilot WhatsApp Business phone-number ID.
+- `WhatsApp__AppSecret` — Meta app secret used to verify webhook signatures.
+- `WhatsApp__VerifyToken` — random webhook verification token.
+- `WhatsApp__TemplateName` — approved Utility template name with a document header and one body parameter for the invoice number.
+- `WhatsApp__TemplateLanguage` — approved template language code, for example `en`.
+- `WhatsApp__ApiVersion` — explicitly selected supported Graph API version.
+- `WhatsApp__PilotTenantId` — tenant UUID for this one-shop pilot.
+
+The template must be approved by Meta before production messages can be sent. The application uploads a PDF to the Cloud API media endpoint and sends it using the approved document-header template.
+
+### Worker and scheduler
+
+1. Create a Cloud Run Job from the same container image as the API.
+2. Override the command to `dotnet Rbos.Api.dll --whatsapp-worker`.
+3. Set `Rbos__Database=prod` and inject only `ConnectionStrings__RbosProdApp` plus the WhatsApp secrets listed above. Do not provide any migrator connection string.
+4. Use a service account with access only to the required Secret Manager secrets and Cloud Run Job execution.
+5. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). The worker drains currently available queue items and exits.
+6. Configure the Meta webhook callback URL as `https://<application-domain>/webhooks/meta/whatsapp`, subscribe to message status events, and use the same app secret, verify token and phone-number ID as the API configuration.
+7. Before live use, test using Meta's test sender/recipient and verify sent, delivered, read, failed and retry paths.
+
+### Customer permission
+
+The Customers screen records `Not confirmed`, `Customer agreed to receive invoices`, or `Customer opted out`. Only mark a customer as agreed after the shop has obtained valid permission. Unknown or opted-out customers are not automatically queued. Checkout does not ask for consent on every invoice.
+
+### PDF dependency
+
+Invoice PDF generation uses QuestPDF `2026.9.1` with its Community License configuration. The official Community License is free for eligible individual/small-business use under the stated USD 1,000,000 annual gross-revenue threshold; eligibility must be self-checked before production use. The package is source-available under this license, not OSI-approved open source. See [QuestPDF Community License](https://www.questpdf.com/license/community.html) and [font management](https://www.questpdf.com/api-reference/text/font-management.html). The container installs Noto fonts for Devanagari fallback.
+
