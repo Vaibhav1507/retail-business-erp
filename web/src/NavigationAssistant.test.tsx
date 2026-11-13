@@ -64,7 +64,7 @@ it('requests microphone permission when voice setup is tapped', async () => {
  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } })
  render(<NavigationAssistant />)
  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
- await userEvent.click(screen.getByRole('button', { name: /Allow microphone & start/ }))
+ await userEvent.click(screen.getByRole('button', { name: /Set up voice/ }))
  expect(getUserMedia).toHaveBeenCalledOnce()
  expect(await screen.findByRole('alert')).toHaveTextContent('Microphone is blocked for this website')
 })
