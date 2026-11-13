@@ -60,7 +60,8 @@ Do not put the migrator connection string in Cloud Run.
 - Unknown `/api/*` paths are explicitly returned as 404 by the API fallback.
 - Split-payment restriction has not yet received a separate business-rule review.
 - The Playwright end-to-end suite has not been re-run after the OTP changes. The CI React component test verifies that sale confirmation still invokes the browser print function when WhatsApp consent is missing; it is not a substitute for a real-browser E2E run.
-- The WhatsApp worker queue lease/retry rescheduling integration test is being added and must pass in CI before PR creation.
+- A PostgreSQL integration test now covers exclusive WhatsApp queue claims, lease rescheduling and queue completion; it passed in CI run #214.
+- Unit tests cover Meta webhook HMAC verification, explicit opt-out keywords and valid Indian mobile-number formats. A full signed webhook status-lifecycle integration test (including duplicate/out-of-order status callbacks) remains outstanding.
 - No Meta test sender has been configured and no real provider round trip has been performed. This requires the owner's explicit Meta setup/activation approval.
 
 ## 10. WhatsApp invoice delivery pilot (not activated)
