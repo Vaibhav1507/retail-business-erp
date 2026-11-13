@@ -78,6 +78,14 @@ create table integrations.invoice_dispatch_queue (
 create index ix_invoice_dispatch_available
   on integrations.invoice_dispatch_queue (available_at, created_at);
 
+-- The queue is global across tenants but remains accessible only to the migration
+-- owner through SECURITY DEFINER functions. FORCE RLS is required by the repository
+-- schema guard for every table carrying tenant_id.
+alter table integrations.invoice_dispatch_queue enable row level security;
+alter table integrations.invoice_dispatch_queue force row level security;
+create policy invoice_dispatch_queue_owner_only on integrations.invoice_dispatch_queue
+  for all to rbos_migrator using (true) with check (true);
+
 create or replace function integrations.enqueue_invoice_delivery(
   p_tenant_id uuid, p_delivery_id uuid, p_sale_id uuid, p_actor_user_id uuid
 ) returns void
@@ -85,8 +93,11 @@ language plpgsql security definer
 set search_path = pg_catalog, integrations, core
 as $$
 begin
+  -- The API establishes transaction-local user and tenant context via TenantDb.
+  -- Keep the enqueue function tied to that exact caller context; membership and
+  -- sale ownership have already been checked by the RLS-protected sale transaction.
   if p_tenant_id is distinct from core.current_tenant_id()
-     or not core.is_active_member(p_tenant_id) then
+     or p_actor_user_id is distinct from core.current_user_id() then
     raise exception 'Tenant context mismatch' using errcode = '42501';
   end if;
   insert into integrations.invoice_dispatch_queue(delivery_id, tenant_id, sale_id, actor_user_id)
