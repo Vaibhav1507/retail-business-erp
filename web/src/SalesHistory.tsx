@@ -2,6 +2,7 @@ import { Paged } from './Paged'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
 import { t as tr } from './i18n'
+import { whatsappStatusLabel } from './whatsappStatus'
 import './billing-forms.css'
 import { InvoiceDocument } from './InvoiceDocument'
 
@@ -49,12 +50,12 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       <Paged rows={shownSales}>{page => (
       <table aria-label="Sales history">
         <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Type</th><th>Total (INR)</th><th>Paid (INR)</th><th>Balance (INR)</th><th>WhatsApp</th><th></th></tr></thead>
-        <tbody>{page.map(s => <tr key={s.id}><td>{s.invoiceNo ?? s.number}</td><td>{s.date}</td><td>{s.customer}</td><td>{s.saleType}</td><td>{s.total.toFixed(2)}</td><td>{s.amountPaid.toFixed(2)}</td><td>{s.balance.toFixed(2)}</td><td>{s.whatsappStatus === 'Pending' ? 'Queued' : s.whatsappStatus === 'ConsentRequired' ? 'Permission needed' : s.whatsappStatus === 'NoRecipient' ? 'No phone' : s.whatsappStatus === 'NotAvailable' ? '—' : s.whatsappStatus}</td><td><button type="button" onClick={() => open(s.id)}>View</button></td></tr>)}</tbody>
+        <tbody>{page.map(s => <tr key={s.id}><td>{s.invoiceNo ?? s.number}</td><td>{s.date}</td><td>{s.customer}</td><td>{s.saleType}</td><td>{s.total.toFixed(2)}</td><td>{s.amountPaid.toFixed(2)}</td><td>{s.balance.toFixed(2)}</td><td>{whatsappStatusLabel(s.whatsappStatus)}</td><td><button type="button" onClick={() => open(s.id)}>View</button></td></tr>)}</tbody>
       </table>
       )}</Paged>
 	  {detail && <div className="invoice-modal" role="dialog" aria-modal="true" aria-label="Sale detail" onClick={e => { if (e.target === e.currentTarget) setDetail(null) }}>
 		<div className="invoice-modal-box">
-		  <div className="invoice-tools no-print"><span role="status">WhatsApp: {detail.sale.whatsappStatus}</span>
+		  <div className="invoice-tools no-print"><span role="status">WhatsApp: {whatsappStatusLabel(detail.sale.whatsappStatus)}</span>
             {(['Failed', 'WaitingForSetup', 'ConsentRequired', 'Suppressed', 'NoRecipient', 'NeedsReview'].includes(detail.sale.whatsappStatus)) && <button type="button" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : detail.sale.whatsappStatus === 'NeedsReview' ? 'Check & retry WhatsApp' : 'Retry WhatsApp'}</button>}
 			<select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === "thermal" ? "@page{size:80mm auto;margin:3mm} @media print{.invoice-modal-box{width:74mm} .invoice{font-size:11px}}" : "@page{size:A4;margin:10mm}"}</style><button type="button" onClick={() => window.print()}>Print bill</button>
 			<button type="button" className="secondary" onClick={() => setDetail(null)}>Close</button>
