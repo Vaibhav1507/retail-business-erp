@@ -446,7 +446,7 @@ export function NavigationAssistant() {
   </button>
   {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={closeAssistant}>×</button></header>
-   {history.length > 0 && <div className="navigation-history" aria-label="Conversation history">
+   {history.length > 0 && <div className="navigation-history" aria-label="Conversation history" aria-live="polite" aria-relevant="additions text">
     {history.map(item => <div key={item.id} className={`navigation-message ${item.role}`}><span>{item.content}</span></div>)}
     <div ref={historyEndRef} />
    </div>}
@@ -478,8 +478,7 @@ export function NavigationAssistant() {
    {transcribing && !recording && <p className="navigation-voice-note" role="status">{text.transcribing}</p>}
    <p className="navigation-privacy">{text.voiceNote}</p>
    {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
-   {message && choices.length === 0 && <p className="navigation-feedback" role="status">{message}</p>}
-   {choices.length > 0 && <div className="navigation-choices" aria-label={message || text.suggestions}>
+   {choices.length > 0 && <div className="navigation-choices" aria-label={message || text.suggestions} aria-live="polite">
     {choices.map(target => <button type="button" key={target.id} disabled={recording || transcribing} onClick={() => chooseSuggestion(target)}>{targetLabel(target, lang)}</button>)}
    </div>}
   </section>}
