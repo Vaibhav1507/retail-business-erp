@@ -53,7 +53,6 @@ export function NavigationAssistant() {
  const [query,setQuery] = useState('')
  const [message,setMessage] = useState('')
  const [choices,setChoices] = useState<NavigationTarget[]>([])
- const [voiceReady,setVoiceReady] = useState(false)
  const [voiceLoading,setVoiceLoading] = useState(false)
  const [voiceProgress,setVoiceProgress] = useState(0)
  const [recording,setRecording] = useState(false)
@@ -97,7 +96,7 @@ export function NavigationAssistant() {
     const data = event.data
     if (data.type === 'progress') setVoiceProgress(data.total ? Math.min(100,Math.round((data.loaded||0)/data.total*100)) : 0)
     if (data.type === 'ready') {
-     setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100); setVoiceError('')
+     setVoiceLoading(false); setVoiceProgress(100); setVoiceError('')
      // Model is prepared once; microphone opens only while the user holds the talk control.
     }
     if (data.type === 'error') {
