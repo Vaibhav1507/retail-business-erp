@@ -56,9 +56,9 @@ models:bakeoff pins the current approved model revisions (guarded by expected re
 
 ## v1 benchmark result (2026-11-13)
 
-The first complete local run is recorded in [reviews/semantic-v1-results-20261113.md](reviews/semantic-v1-results-20261113.md) and workflow [43418998859](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859).
+The first complete local run is recorded in [reviews/semantic-v1-results-20261113.md](reviews/semantic-v1-results-20261113.md) and workflow [43419876997](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859).
 
-**Decision: neither C1 nor C2 passes the acceptance gate. Do not integrate either model.**
+**Decision: neither C1 nor C2 passes the acceptance gate. Do not integrate either model.** The final workflow passed 28/28 experiment tests, the frozen-data validator and lexicon check, and read the frozen test set once after threshold freeze.
 
 - E5 is too conservative and misses most requests (2.7–4.5% correct navigation).
 - MiniLM L0 reaches 14.5% correct navigation but has 11.3% wrong navigation; L2 reduces the pooled error to 2.5% but does not meet per-language improvement or the 2% safety gate.
