@@ -7,5 +7,7 @@ namespace Rbos.Api.Application;
 public interface IInvoiceDeliveryProvider
 {
     string Channel { get; }
+    Task<string> UploadInvoicePdfAsync(byte[] pdf, string invoiceNo, CancellationToken ct);
+    Task<string> SendInvoiceTemplateAsync(string recipient, string mediaId, string invoiceNo, CancellationToken ct);
     Task<string> SendInvoiceAsync(string recipient, string invoiceNo, byte[] pdf, CancellationToken ct);
 }
