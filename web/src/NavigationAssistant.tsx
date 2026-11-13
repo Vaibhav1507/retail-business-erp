@@ -94,7 +94,7 @@ export function NavigationAssistant() {
     if (data.type === 'ready') { setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100); setVoiceError('') }
     if (data.type === 'error') {
      setVoiceLoading(false)
-     if (data.stage !== 'transcribe') { setVoiceError(text.failed); worker.terminate(); workerRef.current = null; setVoiceReady(false) }
+     if (data.stage !== 'transcribe') { setVoiceError(data.message || text.failed); worker.terminate(); workerRef.current = null; setVoiceReady(false) }
      else setVoiceError(data.message || text.failed)
     }
     if (data.type === 'result') {
@@ -103,7 +103,7 @@ export function NavigationAssistant() {
      setQuery(transcript); setVoiceError(''); processText(transcript)
     }
    }
-   worker.onerror = () => { setVoiceLoading(false); setVoiceError(text.failed); worker.terminate(); workerRef.current = null }
+   worker.onerror = (event) => { setVoiceLoading(false); setVoiceError(event.message || text.failed); worker.terminate(); workerRef.current = null }
    worker.postMessage({type:'init'})
   } catch { setVoiceLoading(false); setVoiceError(text.failed); workerRef.current = null }
  }
