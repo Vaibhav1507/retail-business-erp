@@ -96,6 +96,8 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var (c, loc, p) = await Stocked(f);
         var created = await c.Send(HttpMethod.Post, "/customers", new { name = "Opted In", phone = "9876543210", whatsappConsentStatus = "OptedIn" });
         var customer = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var consentAudit = await c.GetJson("/audit?q=" + Uri.EscapeDataString("WhatsApp invoice consent"));
+        Assert.Contains(consentAudit.EnumerateArray(), entry => entry.GetProperty("action").GetString() == "CustomerWhatsAppConsentChanged" && entry.GetProperty("entityId").GetGuid() == customer);
         var response = await c.Send(HttpMethod.Post, "/sales", Sale(customer, loc, p, 1, 100m, "Cash"), K());
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
