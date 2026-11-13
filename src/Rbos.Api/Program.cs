@@ -10,16 +10,23 @@ if (args.Contains("--whatsapp-worker"))
     var database = config["Rbos:Database"] ?? "dev";
     var key = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
     var connectionString = config[key] ?? throw new InvalidOperationException($"Missing secret {key}");
+    var workerKey = database switch { "test" => "ConnectionStrings:RbosTestWhatsAppWorker", "prod" => "ConnectionStrings:RbosProdWhatsAppWorker", _ => "ConnectionStrings:RbosDevWhatsAppWorker" };
+    var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
     await using var dataSource = Npgsql.NpgsqlDataSource.Create(connectionString);
-    await using var probe = await dataSource.OpenConnectionAsync();
+    await using var queueDataSource = Npgsql.NpgsqlDataSource.Create(workerConnectionString);
+    await using (var probe = await dataSource.OpenConnectionAsync())
     await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
         if ((string?)await who.ExecuteScalarAsync() != "rbos_app")
-            throw new InvalidOperationException("WhatsApp worker must connect as rbos_app.");
+            throw new InvalidOperationException("WhatsApp tenant data connection must use rbos_app.");
+    await using (var probe = await queueDataSource.OpenConnectionAsync())
+    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
+        if ((string?)await who.ExecuteScalarAsync() != "rbos_worker")
+            throw new InvalidOperationException("WhatsApp queue connection must use rbos_worker.");
     using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
     var logger = loggerFactory.CreateLogger("WhatsAppInvoiceWorker");
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
     QuestPDF.Settings.UseSystemFonts = true;
-    await WhatsAppInvoiceWorker.RunAsync(dataSource, config, logger, CancellationToken.None);
+    await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config, logger, CancellationToken.None);
     return;
 }
 
