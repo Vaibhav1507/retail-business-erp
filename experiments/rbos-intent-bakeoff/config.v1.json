@@ -1,6 +1,6 @@
 {
   "experiment": "rbos-intent-bakeoff",
-  "status": "stage 1 only (data and specs). Stages 2-4 NOT approved.",
+  "status": "Stage 3 model pinning and Stage 4 text-only comparison approved for an isolated public-runner experiment; model weights are never committed or uploaded.",
   "seed": 20261111,
   "files": {
     "destinations": "destinations.v1.json",
@@ -11,11 +11,38 @@
     "manifest": "MANIFEST.sha256"
   },
   "resolvers": {
-    "A": { "type": "deterministic", "spec": "specs/baseline-A.md" },
-    "C1": { "type": "embedding", "repo": "Xenova/multilingual-e5-small", "revision": "TO_PIN_AT_STAGE_3", "file": "onnx/model_int8.onnx", "sha256": "TO_RECORD_AT_STAGE_3", "tokenizerSha256": "TO_RECORD_AT_STAGE_3", "queryPrefix": "query: ", "upstreamLicence": "MIT (intfloat/multilingual-e5-small)" },
-    "C2": { "type": "embedding", "repo": "Xenova/paraphrase-multilingual-MiniLM-L12-v2", "revision": "TO_PIN_AT_STAGE_3", "file": "onnx/model_int8.onnx", "sha256": "TO_RECORD_AT_STAGE_3", "tokenizerSha256": "TO_RECORD_AT_STAGE_3", "queryPrefix": "", "upstreamLicence": "Apache-2.0 (sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2)" }
+    "A": {
+      "type": "deterministic",
+      "spec": "specs/baseline-A.md"
+    },
+    "C1": {
+      "type": "embedding",
+      "repo": "Xenova/multilingual-e5-small",
+      "revision": "TO_PIN_AT_STAGE_3",
+      "file": "onnx/model_int8.onnx",
+      "sha256": "TO_RECORD_AT_STAGE_3",
+      "tokenizerSha256": "TO_RECORD_AT_STAGE_3",
+      "queryPrefix": "query: ",
+      "upstreamLicence": "MIT (intfloat/multilingual-e5-small)"
+    },
+    "C2": {
+      "type": "embedding",
+      "repo": "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+      "revision": "TO_PIN_AT_STAGE_3",
+      "file": "onnx/model_int8.onnx",
+      "sha256": "TO_RECORD_AT_STAGE_3",
+      "tokenizerSha256": "TO_RECORD_AT_STAGE_3",
+      "queryPrefix": "",
+      "upstreamLicence": "Apache-2.0 (sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2)"
+    }
   },
-  "runtime": { "node": ">=22", "package": "@huggingface/transformers (exact version TO_PIN_AT_STAGE_2)", "allowRemoteModels": false, "pooling": "mean", "normalize": true },
+  "runtime": {
+    "node": ">=22",
+    "package": "@huggingface/transformers@4.3.2",
+    "allowRemoteModels": false,
+    "pooling": "mean",
+    "normalize": true
+  },
   "preprocessing": {
     "L0": "NFC, lowercase, strip punctuation, collapse whitespace",
     "L1": "L0 + rule-based transliteration and key folding (specs/normalisation.v1.1.md section 3)",
@@ -24,8 +51,27 @@
   "decision": {
     "scoreC": "max cosine between query and the intent's anchor embeddings",
     "rule": "navigate if top1 >= tau AND top1 - top2 >= delta; ask (intents within delta of top1, max 3) if top1 >= tau AND margin < delta; otherwise not-understood",
-    "tauGrid": [0.70, 0.72, 0.74, 0.76, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90],
-    "deltaGrid": [0.02, 0.04, 0.06, 0.08, 0.10, 0.12],
+    "tauGrid": [
+      0.7,
+      0.72,
+      0.74,
+      0.76,
+      0.78,
+      0.8,
+      0.82,
+      0.84,
+      0.86,
+      0.88,
+      0.9
+    ],
+    "deltaGrid": [
+      0.02,
+      0.04,
+      0.06,
+      0.08,
+      0.1,
+      0.12
+    ],
     "selection": "on TUNING only: maximise correct-navigate subject to wrong-navigate <= 2% and reject-items navigated = 0; tie-break larger delta then larger tau",
     "freeze": "chosen (tau, delta) per resolver x level written to results/<runId>/thresholds.json BEFORE the test file is opened"
   },
