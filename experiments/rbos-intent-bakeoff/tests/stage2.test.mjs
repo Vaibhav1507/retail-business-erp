@@ -245,6 +245,17 @@ test('test phase refuses without frozen thresholds or with tampered thresholds',
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
+test('test phase verifies and scores the frozen test file from one cached read', async () => {
+  const dir = sandbox()
+  try {
+    await tune(new FileAccess({ root: dir }), { resolvers: ['A'], runId: 'single-read' })
+    const fa = new FileAccess({ root: dir })
+    const report = await runTest(fa, { runId: 'single-read' })
+    assert.equal(report.testReadCount, 1)
+    assert.equal(fa.log.filter((p) => p === TEST_FILE).length, 1)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
 test('repeatability: two tuning runs give identical thresholds', async () => {
   const dir = sandbox()
   try {
