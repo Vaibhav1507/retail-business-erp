@@ -31,10 +31,11 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
   const open = async (id: string) => { setError(''); try { setDetail(await api<SaleDetail>('GET', '/sales/' + id)) } catch (e) { setError(msg(e)) } }
   const retryWhatsApp = async () => {
     if (!detail) return
-    if (detail.sale.whatsappStatus === 'NeedsReview' && !window.confirm('The previous send may already have reached the customer. Check WhatsApp first. Retry anyway? This could send a duplicate invoice.')) return
+    const confirmPossibleDuplicate = detail.sale.whatsappStatus === 'NeedsReview'
+    if (confirmPossibleDuplicate && !window.confirm('The previous send may already have reached the customer. Check WhatsApp first. Retry anyway? This could send a duplicate invoice.')) return
     setRetrying(true); setError('')
     try {
-      await api('POST', '/sales/' + detail.sale.id + '/invoice/whatsapp/retry', {})
+      await api('POST', '/sales/' + detail.sale.id + '/invoice/whatsapp/retry', { confirmPossibleDuplicate })
       await loadSales()
       setDetail(await api<SaleDetail>('GET', '/sales/' + detail.sale.id))
     } catch (e) { setError(msg(e)) } finally { setRetrying(false) }
