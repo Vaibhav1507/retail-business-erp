@@ -220,8 +220,9 @@ export function NavigationAssistant() {
      return
     }
     if (data.type === 'partial-result') {
+     if (data.captureId !== captureIdRef.current) return
      partialInFlightRef.current = false
-     if (data.captureId !== captureIdRef.current || !recordingRef.current) return
+     if (!recordingRef.current) return
      const transcript = (data.text || '').trim()
      if (transcript) {
       setQuery(transcript)
@@ -247,7 +248,10 @@ export function NavigationAssistant() {
     }
     if (data.type === 'error') {
      if (data.stage !== 'transcribe') { failWorker(data.message || text.failed); return }
-     if (data.partial) { partialInFlightRef.current = false; return }
+     if (data.partial) {
+      if (data.captureId === captureIdRef.current) partialInFlightRef.current = false
+      return
+     }
      transcribingRef.current = false
      setTranscribing(false)
      setVoiceError(data.message || text.failed)
