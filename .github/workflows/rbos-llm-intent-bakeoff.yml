@@ -1,0 +1,62 @@
+name: RBOS local Qwen intent comparison
+
+on:
+  push:
+    branches:
+      - experiment/rbos-llm-intent-comparison
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rbos-qwen-intent-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qwen-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: experiments/rbos-intent-bakeoff
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: experiments/rbos-intent-bakeoff/package-lock.json
+      - name: Install pinned runtime (CPU)
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+        run: npm ci
+      - name: Verify benchmark fixtures
+        run: |
+          npm test
+          npm run validate
+          npm run lexicon:check
+      - name: Run local Qwen model on frozen test set
+        env:
+          RBOS_LLM_RUN_ID: qwen-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/run-llm-bakeoff.mjs
+      - name: Publish summary
+        if: always()
+        run: |
+          report="results/qwen-${{ github.run_id }}-${{ github.run_attempt }}/summary.md"
+          if [ -f "$report" ]; then
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Qwen benchmark did not produce a report. Inspect logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload results only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-qwen-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: experiments/rbos-intent-bakeoff/results/qwen-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: warn
+          retention-days: 14
