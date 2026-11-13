@@ -70,13 +70,22 @@ public static class WhatsAppWebhookEndpoints
                                 if (!IsOptOutKeyword(bodyText) || string.IsNullOrWhiteSpace(from)) continue;
                                 var digits = new string(from.Where(char.IsDigit).ToArray());
                                 if (digits.Length < 10) continue;
-                                await using var optOut = session.Command(@"update sales.customer
-                                    set whatsapp_invoice_consent_status='OptedOut',
-                                        whatsapp_invoice_consent_updated_at=now()
-                                    where tenant_id=@tenant
-                                      and length(regexp_replace(coalesce(phone,''), '[^0-9]', '', 'g')) >= 10
-                                      and right(regexp_replace(coalesce(phone,''), '[^0-9]', '', 'g'),10)=right(@phone,10)");
+                                await using var optOut = session.Command(@"with opted_out as (
+                                    update sales.customer
+                                       set whatsapp_invoice_consent_status='OptedOut',
+                                           whatsapp_invoice_consent_updated_at=now()
+                                     where tenant_id=@tenant
+                                       and whatsapp_invoice_consent_status is distinct from 'OptedOut'
+                                       and length(regexp_replace(coalesce(phone,''), '[^0-9]', '', 'g')) >= 10
+                                       and right(regexp_replace(coalesce(phone,''), '[^0-9]', '', 'g'),10)=right(@phone,10)
+                                    returning tenant_id, id
+                                )
+                                insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary)
+                                select tenant_id, gen_random_uuid(), @actor, 'WhatsAppOptOutReceived',
+                                       'Customer', id, 'Customer opted out by inbound WhatsApp message.'
+                                  from opted_out");
                                 optOut.Parameters.AddWithValue("tenant", tenantId);
+                                optOut.Parameters.AddWithValue("actor", actorUserId);
                                 optOut.Parameters.AddWithValue("phone", digits);
                                 await optOut.ExecuteNonQueryAsync(ct);
                             }
