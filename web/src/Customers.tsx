@@ -35,13 +35,14 @@ export function Customers({ reload }: { reload: () => void }) {
         <label>WhatsApp invoice permission <select value={consent} onChange={e => setConsent(e.target.value as 'Unknown' | 'OptedIn' | 'OptedOut')}><option value="Unknown">Not confirmed</option><option value="OptedIn">Customer agreed to receive invoices</option><option value="OptedOut">Customer opted out</option></select></label>
         <p className="billing-hint">Choose agreed only after the customer has given permission. This setting is not asked at every checkout.</p>
 		<button type="button" onClick={addCustomer} disabled={!cname.trim()}>{custEditId ? 'Save changes' : 'Add customer'}</button>
-		{custEditId && <button type="button" className="secondary" onClick={() => { setCustEditId(null); setCname(''); setCphone(''); setCnotes('') }}>Cancel</button>}
+		{custEditId && <button type="button" className="secondary" onClick={() => { setCustEditId(null); setCname(''); setCphone(''); setCnotes(''); setConsent('Unknown') }}>Cancel</button>}
       </div>
       <label>Search customers <input value={custSearch} onChange={e => setCustSearch(e.target.value)} /></label>
-      {!loaded && !error && <p role="status">{tr('app.loading')}</p>}`r`n      <Paged rows={customers} empty={loaded ? tr('cust.none') : undefined}>{page => (
+      {!loaded && !error && <p role="status">{tr('app.loading')}</p>}
+      <Paged rows={customers} empty={loaded ? tr('cust.none') : undefined}>{page => (
       <table aria-label="Customers">
-        <thead><tr><th>Customer</th><th>Phone</th><th>Notes</th><th>Outstanding (INR)</th><th>Actions</th></tr></thead>
-        <tbody>{page.map(c => <tr key={c.id}><td>{c.name}</td><td>{c.phone}</td><td>{c.notes}</td><td>{c.owed.toFixed(2)}</td><td><button type="button" className="secondary" onClick={() => { setCustEditId(c.id); setCname(c.name); setCphone(c.phone ?? ''); setCnotes(c.notes ?? ''); setConsent(c.whatsappConsentStatus ?? 'Unknown'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Edit</button></td></tr>)}</tbody>
+        <thead><tr><th>Customer</th><th>Phone</th><th>Notes</th><th>WhatsApp permission</th><th>Outstanding (INR)</th><th>Actions</th></tr></thead>
+        <tbody>{page.map(c => <tr key={c.id}><td>{c.name}</td><td>{c.phone}</td><td>{c.notes}</td><td>{c.whatsappConsentStatus === 'OptedIn' ? 'Agreed' : c.whatsappConsentStatus === 'OptedOut' ? 'Opted out' : 'Not confirmed'}</td><td>{c.owed.toFixed(2)}</td><td><button type="button" className="secondary" onClick={() => { setCustEditId(c.id); setCname(c.name); setCphone(c.phone ?? ''); setCnotes(c.notes ?? ''); setConsent(c.whatsappConsentStatus ?? 'Unknown'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Edit</button></td></tr>)}</tbody>
       </table>
       )}</Paged>
     </section>
