@@ -149,6 +149,8 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
   await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce())
   expect(await screen.findByText('Listening… release to send')).toBeInTheDocument()
   expect(screen.queryByRole('button', {name:/Set up voice/})).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Ask your business assistant')).toHaveAttribute('readonly')
+  expect(screen.getByRole('button', {name:'Go'})).toBeDisabled()
 
   // A partial Shruti result is allowed to surface a likely screen, but must never navigate.
   MockSpeechWorker.instance?.emit({
