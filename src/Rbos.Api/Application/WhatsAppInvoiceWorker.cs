@@ -89,6 +89,12 @@ public static class WhatsAppInvoiceWorker
                         }
                     }
                 }
+                catch (HttpRequestException ex)
+                {
+                    logger.LogWarning(ex, "WhatsApp delivery outcome is uncertain for {DeliveryId}", item.DeliveryId);
+                    await UpdateDeliveryAsync(db, item, "NeedsReview", null, "The provider response was not received. Check WhatsApp before retrying.", ct);
+                    await FinishQueueAsync(dataSource, item, null, ct);
+                }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogError(ex, "Unexpected invoice delivery worker error for {DeliveryId}", item.DeliveryId);
@@ -121,7 +127,7 @@ public static class WhatsAppInvoiceWorker
     static async Task<InvoiceJob?> LoadJobAsync(TenantDb db, Claimed item, CancellationToken ct)
     {
         await using var session = await db.BeginAsync(item.ActorUserId, item.TenantId, ct);
-        await using var cmd = session.Command(@"select s.payload, c.phone, coalesce(c.whatsapp_invoice_consent_status,'Unknown')
+        await using var cmd = session.Command(@"select s.payload, c.phone, coalesce(c.whatsapp_invoice_consent_status,'Unknown'), d.status
             from sales.invoice_delivery d
             join sales.invoice_snapshot s on s.tenant_id=d.tenant_id and s.sale_id=d.sale_id
             join sales.sale x on x.tenant_id=d.tenant_id and x.id=d.sale_id
@@ -135,7 +141,20 @@ public static class WhatsAppInvoiceWorker
         var snapshot = JsonDocument.Parse(reader.GetString(0));
         var recipient = reader.IsDBNull(1) ? null : reader.GetString(1);
         var consent = reader.GetString(2);
+        var currentStatus = reader.GetString(3);
         await reader.CloseAsync();
+        if (currentStatus == "Processing")
+        {
+            await using var review = session.Command(@"update sales.invoice_delivery
+                set status='NeedsReview', last_error='Previous attempt outcome is unknown. Check WhatsApp before retrying.', updated_at=now()
+                where tenant_id=@t and id=@d");
+            review.Parameters.AddWithValue("t", item.TenantId);
+            review.Parameters.AddWithValue("d", item.DeliveryId);
+            await review.ExecuteNonQueryAsync(ct);
+            await session.CommitAsync(ct);
+            return null;
+        }
+        if (currentStatus is not ("Pending" or "Retry")) return null;
         await using var update = session.Command("update sales.invoice_delivery set status='Processing', attempt_count=attempt_count+1, updated_at=now() where tenant_id=@t and id=@d");
         update.Parameters.AddWithValue("t", item.TenantId);
         update.Parameters.AddWithValue("d", item.DeliveryId);
