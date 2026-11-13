@@ -11,10 +11,14 @@ public sealed class GroqVisionClientTests
     [Fact]
     public async Task ExtractImageAsync_ReturnsStructuredJson_AndUsesConfiguredModel()
     {
-        HttpRequestMessage? captured = null;
+        string? capturedScheme = null;
+        string? capturedToken = null;
+        string? capturedBody = null;
         var handler = new StubHandler(async request =>
         {
-            captured = request;
+            capturedScheme = request.Headers.Authorization?.Scheme;
+            capturedToken = request.Headers.Authorization?.Parameter;
+            capturedBody = await request.Content!.ReadAsStringAsync();
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
@@ -34,11 +38,10 @@ public sealed class GroqVisionClientTests
         var result = await client.ExtractImageAsync("image/png", Convert.ToBase64String([1, 2, 3]), "Extract products", CancellationToken.None);
 
         Assert.Equal("USB-C Cable", result?["products"]?[0]?["name"]?.GetValue<string>());
-        Assert.Equal("Bearer", captured?.Headers.Authorization?.Scheme);
-        Assert.Equal("test-key", captured?.Headers.Authorization?.Parameter);
-        var body = await captured!.Content!.ReadAsStringAsync();
-        Assert.Contains("qwen/qwen3.8-27b", body);
-        Assert.Contains("data:image/png;base64,", body);
+        Assert.Equal("Bearer", capturedScheme);
+        Assert.Equal("test-key", capturedToken);
+        Assert.Contains("qwen/qwen3.8-27b", capturedBody);
+        Assert.Contains("data:image/png;base64,", capturedBody);
     }
 
     [Fact]
