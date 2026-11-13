@@ -55,11 +55,13 @@ Do not put the migrator connection string in Cloud Run.
 - Redeploy the previous Cloud Run revision.
 - Migrations are forward-only; take a dump before applying a new one.
 
-## 9. Known gaps
-- Docker image not build-tested on the build machine.
-- Unknown `/api/*` paths return the React page instead of 404.
-- Split-payment restriction not yet reviewed.
-- Playwright suite not re-run after the OTP changes.
+## 9. Known gaps and verification status
+- The deployment Docker image now builds successfully in GitHub Actions (build only; no image push or deployment).
+- Unknown `/api/*` paths are explicitly returned as 404 by the API fallback.
+- Split-payment restriction has not yet received a separate business-rule review.
+- The Playwright end-to-end suite has not been re-run after the OTP changes. The CI React component test verifies that sale confirmation still invokes the browser print function when WhatsApp consent is missing; it is not a substitute for a real-browser E2E run.
+- The WhatsApp worker queue lease/retry rescheduling integration test is being added and must pass in CI before PR creation.
+- No Meta test sender has been configured and no real provider round trip has been performed. This requires the owner's explicit Meta setup/activation approval.
 
 ## 10. WhatsApp invoice delivery pilot (not activated)
 
