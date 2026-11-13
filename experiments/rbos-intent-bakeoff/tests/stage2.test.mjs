@@ -10,7 +10,7 @@ import { classify, mcnemarExact, selectThresholds } from '../scripts/lib/evaluat
 import { validateData } from '../scripts/lib/validate.mjs'
 import { LEXICON_FILE, generateLexicon } from '../scripts/build-lexicon.mjs'
 import { runValidation } from '../scripts/validate.mjs'
-import { loadContext, prepareSet, test as runTest, tune } from '../scripts/run.mjs'
+import { gate, loadContext, prepareSet, test as runTest, tune } from '../scripts/run.mjs'
 
 const FROZEN_TEST_SHA = '068754fcc42b8fc40817911cfafeb508215a5a4bf8913a6a7989dbef27ea5818'
 const TEST_FILE = 'data/test.v1.frozen.jsonl'
@@ -199,6 +199,23 @@ test('P2 / unknown: gibberish and digit-bearing data questions are not navigated
   const { run } = aResolver('L2')
   assert.equal(run('xyzzy plugh').kind, 'not_understood')
   assert.equal(run('what was sales on 12 march').kind, 'not_understood')
+})
+
+test('semantic gate enforces the wrong-navigation ceiling in every language bucket', () => {
+  const langs = ['en', 'hi-Deva', 'hi-Latn', 'mixed']
+  const baselineLang = Object.fromEntries(langs.map((lang) => [lang, { correctNavigateRate: 0.5, wrongNavigateRate: 0 }]))
+  const candidateLang = Object.fromEntries(langs.map((lang) => [lang, {
+    correctNavigateRate: 0.56,
+    wrongNavigateRate: lang === 'hi-Latn' ? 0.03 : 0.01,
+  }]))
+  const summary = {
+    'A/L0': { byLang: baselineLang, overall: { wrongNavigateRate: 0, rejectNavigated: 0 } },
+    'C1/L0': { byLang: candidateLang, overall: { wrongNavigateRate: 0.015, rejectNavigated: 0 } },
+  }
+  const result = gate(summary, [], { gate: { minAdvantagePp: 5, maxWrongNavigate: 0.02, rejectItemsNavigated: 0 } })
+  expect(result.byCandidate['C1/L0'].perLang['hi-Latn'].advantagePp).toBeCloseTo(6)
+  expect(result.byCandidate['C1/L0'].perLang['hi-Latn'].wrongNavigateOk).toBe(false)
+  expect(result.byCandidate['C1/L0'].pass).toBe(false)
 })
 
 test('classify follows P1-P3 policy', () => {
