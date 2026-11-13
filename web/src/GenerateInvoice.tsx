@@ -63,6 +63,7 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
   const [busy, setBusy] = useState(false)
   const [key, setKey] = useState(() => crypto.randomUUID())
   const [invNo, setInvNo] = useState('')
+  const [whatsappStatus, setWhatsappStatus] = useState('NotAvailable')
   const [serialText, setSerialText] = useState('')
   const [scanning, setScanning] = useState(false)
   const [warn, setWarn] = useState('')
@@ -169,14 +170,14 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
       const payments = credit && part2 > 0 ? [{ method: payMethod, amount: part }, { method: payMethod2, amount: part2 }].filter(x => x.amount > 0) : undefined
       const body = { customerId: cid || null, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null }
       const r = await api<{ id: string; serialWarnings?: string[] }>('POST', '/sales', body, key)
-      const d = await api<{ sale: { number: number } }>('GET', '/sales/' + r.id)
-      setWarn(r.serialWarnings?.length ? 'Warning: serial/IMEI ' + r.serialWarnings.join(', ') + ' was sold before.' : ''); setInvNo('INV-' + String(d.sale.number).padStart(6, '0')); setKey(crypto.randomUUID()); setStep('done'); reload()
+      const d = await api<{ sale: { number: number; whatsappStatus: string } }>('GET', '/sales/' + r.id)
+      setWarn(r.serialWarnings?.length ? 'Warning: serial/IMEI ' + r.serialWarnings.join(', ') + ' was sold before.' : ''); setInvNo('INV-' + String(d.sale.number).padStart(6, '0')); setWhatsappStatus(d.sale.whatsappStatus); setKey(crypto.randomUUID()); setStep('done'); reload()
       setTimeout(() => window.print(), 300)
     } catch (e) { setError(msg(e)) } finally { setBusy(false) }
   }
 
   function clearForm() {
-    setItems([]); setBillDisc(''); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
+    setItems([]); setBillDisc(''); setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
   function hold() {
@@ -211,7 +212,7 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
       <section aria-label="Invoice overview" className="invoice-wrap">
         <div className="invoice-tools no-print">
           {step === 'review' && <><button type="button" disabled={busy} onClick={confirm}>{busy ? 'Saving\u2026' : 'Confirm & print'}</button><button type="button" className="secondary" disabled={busy} onClick={() => setStep('form')}>Back to edit</button></>}
-          {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
+          {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatus === 'Pending' ? 'Queued' : whatsappStatus === 'ConsentRequired' ? 'Permission not confirmed' : whatsappStatus === 'NoRecipient' ? 'No customer phone number' : whatsappStatus === 'Suppressed' ? 'Customer opted out' : whatsappStatus}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}
         <InvoiceDocument biz={biz} showGst={showGst} rate={rate} invoiceNo={invNo || 'Pending'} date={date} payment={mode} location={locations.length > 1 ? locName : undefined} customerName={name} customerPhone={phone} customerAddress={[address, city, state, pin].filter(Boolean).join(', ')} items={effItems} paid={mode === 'Credit' ? Number(paid || 0) + Number(paid2 || 0) : total} credit={mode === 'Credit'} />
