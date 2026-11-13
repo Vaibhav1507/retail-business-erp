@@ -23,10 +23,10 @@ describe('NavigationAssistant', () => {
   const { container } = render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
   const panel = container.querySelector('.navigation-assistant') as HTMLElement
-  const header = panel.querySelector('.assistant-heading')!
-  const actions = panel.querySelector('.navigation-top-actions')!
-  const history = panel.querySelector('.navigation-history')!
-  const form = panel.querySelector('.navigation-assistant-form')!
+  const header = panel.querySelector('.assistant-heading') as HTMLElement
+  const actions = panel.querySelector('.navigation-top-actions') as HTMLElement
+  const history = panel.querySelector('.navigation-history') as HTMLElement
+  const form = panel.querySelector('.navigation-assistant-form') as HTMLElement
   const mic = screen.getByRole('button', { name: 'Hold to talk' })
   expect(header.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(actions.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
