@@ -9,6 +9,7 @@ describe('navigation resolver', () => {
   expect(resolveNavigation('bill banana hai').kind).toBe('navigate')
   expect(resolveNavigation('मेरा स्टॉक दिखाओ').kind).toBe('navigate')
   expect(resolveNavigation('मुझे स्टॉक दिखाना है').kind).toBe('navigate')
+  expect(resolveNavigation('mujhe apna stock check krna hai')).toMatchObject({ kind: 'navigate', target: { id: 'stock.current' } })
   expect(resolveNavigation('supplier ko payment karna hai').kind).toBe('navigate')
   expect(resolveNavigation('मुझे नया customer add करना है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
   expect(resolveNavigation('naya customer banana hai')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
@@ -54,5 +55,19 @@ describe('partial navigation suggestions', () => {
   expect(suggestNavigation('how much cash do I have')).toEqual([])
   expect(suggestNavigation('delete the last bill')).toEqual([])
   expect(suggestNavigation('open https://example.com')).toEqual([])
+ })
+})
+
+
+describe('stock suggestions for noisy speech', () => {
+ it('suggests stock destinations from the words that survive Hindi/Hinglish ASR errors', () => {
+  const suggestions = suggestNavigation('mould you have no stock taken that hand')
+  expect(suggestions.map(target => target.id)).toEqual(['stock.current','stock.products','stock.alerts'])
+  expect(resolveNavigation('mould you have no stock taken that hand').kind).not.toBe('navigate')
+ })
+
+ it('offers the stock screen and related options for a natural Hinglish request', () => {
+  const suggestions = suggestNavigation('mujhe apna stock check krna hai')
+  expect(suggestions.map(target => target.id)).toEqual(['stock.current','stock.products','stock.alerts'])
  })
 })
