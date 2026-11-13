@@ -1,3 +1,7 @@
+> **Freshness warning — reviewed 2026-11-13:** This register contains historical item notes and test counts, many last updated on 2026-11-08. It has not yet been reconciled item-by-item against the current `main` code, latest CI, production database or pilot deployment. Treat individual `Done` labels and phase totals below as historical claims until revalidated. Current WhatsApp implementation and activation state is recorded in `docs/implementation-plans/whatsapp-invoice-delivery.md`; deployment state is in `docs/deployment-runbook.md`. Do not use this register alone to decide what is implemented or ready for production.
+>
+> **Scope of this refresh:** the WhatsApp invoice-delivery item and freshness warning below were added. The remaining improvement IDs have deliberately not been bulk-marked Done/Not started without checking each against code and tests.
+>
 # RBOS improvement register
 
 Living document. Every improvement idea is listed here, whether or not we build it, so we always know what is planned, in progress, done or deliberately skipped.
@@ -160,6 +164,15 @@ Proposed as "do not do now". Change the status here only if the reasoning change
 | X8 | Architectural rewrite | Do not do | Modular monolith fits the project scale | Undecided | Skipped |
 | X9 | Enterprise-style analytics dashboard for the billing screen | Do not do | Billing must optimise for speed and clarity | Undecided | Skipped |
 
+
+## Current reconciliation — 2026-11-13
+
+| ID | Improvement | Category | Priority | Cost | Evidence | Classification | Decision | Status | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| W1 | Consent-based WhatsApp invoice PDF delivery through Meta Cloud API | Sales / Product | High | M | Seen | Quality improvement / new capability | Approved | Implemented; pilot activation in progress | Merged through PR #18 (`1d56e15`). Includes immutable invoice snapshot, PDF rendering, consent/opt-out, transactional outbox, scheduled worker, Meta media/template client, signed webhook and Sales History status/retry UI. Meta test `hello_world` send and webhook callback verification succeeded. Invoice PDF round-trip, full status/opt-out E2E, production migration confirmation and shop sender activation remain open. Existing WhatsApp Business App number must not be disconnected without explicit approval. See `docs/implementation-plans/whatsapp-invoice-delivery.md`. |
+
+**Important:** implementation completion is not the same as production activation. W1 remains operationally gated until the production migration is confirmed, invoice-template round-trip and opt-out are tested, and the owner explicitly approves the production sender route.
+
 ## Review checks performed on this register
 
 - Every item from the improvement list has exactly one ID and one phase (or the Not planned table).
@@ -196,4 +209,5 @@ For each approved item, record:
 | 2026-11-05 | Register created with all items, phases 1-5 and Not planned. All decisions Undecided. |
 | 2026-11-07 | Phase 1 worked: E3, D13, A11, E5 done; E1, E2, E4, D4, D3, D11, E7 partly done; D12 blocked; E6 needs owner input. Open items listed above. |
 | 2026-11-08 | Catalogue provenance work (local dev/test databases only; nothing deployed, no production migration). Migration 041 (catalog.product_source_reference, tenant RLS, backfill from 040, rollback in db/rollback) applied to rbos_dev and rbos_test after pre-migration dumps with rbos_backup. Products keep multiple source references (document, version, actual PDF page) shown in the Catalogue Source column. PDF import now reads actual pages with PdfPig; scanned pages are rendered with PDFtoImage and OCR-ed by local Tesseract 5.4 (default Windows path detected); legacy content-stream parser kept only as fallback for unparseable PDFs. Category attributes (AttributeDefinitions) applied on create/update/import into generic specs JSON. Same brand + normalized model is flagged possibleDuplicate for review, never merged. Tests: unit 86, integration 142, frontend 62, all passing. Limitations: no dedicated product details screen (sources shown in list); ProductFileReader mixed-PDF flow not tested end to end (components are); PDFtoImage is Windows/Skia-platform dependent (CA1416 warning); Tesseract must be installed on any host doing OCR; migration 041 not yet applied to production. |
+| 2026-11-13 | Added W1 for merged Meta WhatsApp invoice delivery; marked this register's older item statuses and phase totals as historical pending item-by-item revalidation. |
 | 2026-11-08 | Final local-pilot verification: suites pass (86/142/62), migrations 039-041 consistent in rbos_dev and rbos_test, seven LG PDFs parsed with real pages and scheme separated, CA1416 reviewed, Tesseract setup documented. See catalogue-scanning-and-master-list-status.md. |
