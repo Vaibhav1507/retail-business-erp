@@ -87,12 +87,11 @@ function transcribe(message) {
   outputPointer = alloc(capacity)
   const started = performance.now()
   // Needle's WASM API accepts newline-separated keyword hints and optional word timestamps.
-  const length = M._needle_transcribe(audioPointer, pcm.length, languagePointer, keywordsPointer, 1, outputPointer, capacity)
+  const length = M._needle_transcribe(audioPointer, pcm.length, languagePointer, keywordsPointer, 0, outputPointer, capacity)
   if (length < 0) throw new Error(lastError())
   const result = JSON.parse(M.UTF8ToString(outputPointer))
   send({
    type: 'result', id: message.id, text: result.text || '', language: result.language || null,
-   words: Array.isArray(result.words) ? result.words : undefined,
    ms: performance.now() - started
   })
  } finally {
