@@ -10,6 +10,13 @@ describe('navigation resolver', () => {
   expect(resolveNavigation('मेरा स्टॉक दिखाओ').kind).toBe('navigate')
   expect(resolveNavigation('मुझे स्टॉक दिखाना है').kind).toBe('navigate')
   expect(resolveNavigation('supplier ko payment karna hai').kind).toBe('navigate')
+  expect(resolveNavigation('मुझे नया customer add करना है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('naya customer banana hai')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('ग्राहक की एंट्री करनी है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('customer ka naam likhna hai')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
+  expect(resolveNavigation('आज खरीद की एंट्री करनी है')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
+  expect(resolveNavigation('दुकान का स्टॉक दिखाओ')).toMatchObject({ kind: 'navigate', target: { id: 'stock.current' } })
+  expect(resolveNavigation('customer se udhar lena hai')).toMatchObject({ kind: 'navigate', target: { id: 'sell.collect' } })
  })
  it('asks instead of guessing on ambiguous commands', () => {
   expect(resolveNavigation('return').kind).toBe('ask')
@@ -18,6 +25,8 @@ describe('navigation resolver', () => {
  it('rejects business-data questions and transaction requests', () => {
   expect(resolveNavigation('how much cash do I have').kind).toBe('reject')
   expect(resolveNavigation('मेरे पास कितना पैसा है').kind).toBe('reject')
+  expect(resolveNavigation('आजकल खाता कितना हुआ').kind).toBe('reject')
+  expect(resolveNavigation('किस ग्राहक का कितना उधार बाकी है').kind).toBe('reject')
   expect(resolveNavigation('create a new bill').kind).toBe('navigate')
   expect(resolveNavigation('delete the last bill').kind).toBe('reject')
   expect(resolveNavigation('ramesh ko 500 rupaye bhejo').kind).toBe('reject')
