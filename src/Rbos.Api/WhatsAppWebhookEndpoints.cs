@@ -82,15 +82,10 @@ public static class WhatsAppWebhookEndpoints
                                     last_error=case when @status='Failed' then left(@error,300) else null end,
                                     updated_at=now()
                                 where tenant_id=@tenant and channel='WhatsApp' and provider_message_id=@message
-                                  and (
-                                    provider_status_at is null or @at > provider_status_at
-                                    or (
-                                      @at = provider_status_at
-                                      and (case @status when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else 0 end)
-                                          >=
-                                          (case status when 'Accepted' then 0 when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else -1 end)
-                                    )
-                                  )");
+                                  and (provider_status_at is null or @at >= provider_status_at)
+                                  and (case @status when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else 0 end)
+                                      >=
+                                      (case status when 'Accepted' then 0 when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else -1 end)");
                             command.Parameters.AddWithValue("tenant", tenantId);
                             command.Parameters.AddWithValue("message", messageId);
                             command.Parameters.AddWithValue("status", mapped);
