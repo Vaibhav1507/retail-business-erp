@@ -159,8 +159,10 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
             await using var command = new NpgsqlCommand(
                 "select delivery_id, lease_token, attempt_count from integrations.claim_invoice_deliveries(25,30)", worker, transaction);
             await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) return null;
-            return (reader.GetGuid(0), reader.GetGuid(1), reader.GetInt32(2));
+            var claimed = new List<(Guid DeliveryId, Guid LeaseToken, int AttemptCount)>();
+            while (await reader.ReadAsync())
+                claimed.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetInt32(2)));
+            return claimed.Count == 0 ? null : claimed[0];
         }
 
         var first = await Claim();
