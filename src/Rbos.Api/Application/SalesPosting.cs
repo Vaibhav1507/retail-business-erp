@@ -142,7 +142,7 @@ public sealed class SalesService(TenantDb db)
             consent = r.GetString(2);
             status = r.GetString(3);
         }
-        if (status is not ("Failed" or "WaitingForSetup" or "Retry" or "ConsentRequired" or "Suppressed" or "NoRecipient"))
+        if (status is not ("Failed" or "WaitingForSetup" or "Retry" or "ConsentRequired" or "Suppressed" or "NoRecipient" or "NeedsReview"))
             return ServiceResult<object>.Fail("Only a failed or pending-setup invoice can be retried.", 409);
         if (string.IsNullOrWhiteSpace(recipient))
         {
