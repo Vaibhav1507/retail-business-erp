@@ -118,6 +118,7 @@ export function NavigationAssistant() {
    const context = new AudioContext()
    await context.resume()
    await context.audioWorklet.addModule('/capture-worklet.js')
+   if (!holdingRef.current) { stream.getTracks().forEach(track=>track.stop()); await context.close(); return }
    const node = new AudioWorkletNode(context,'rbos-capture')
    const blocks: Float32Array[] = []
    node.port.onmessage = event => { blocks.push(event.data as Float32Array) }
