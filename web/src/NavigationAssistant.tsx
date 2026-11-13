@@ -477,7 +477,7 @@ export function NavigationAssistant() {
    {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
    {message && choices.length === 0 && <p className="navigation-feedback" role="status">{message}</p>}
    {choices.length > 0 && <div className="navigation-choices" aria-label={message || text.suggestions}>
-    {choices.map(target => <button type="button" key={target.id} onClick={() => chooseSuggestion(target)}>{targetLabel(target, lang)}</button>)}
+    {choices.map(target => <button type="button" key={target.id} disabled={recording || transcribing} onClick={() => chooseSuggestion(target)}>{targetLabel(target, lang)}</button>)}
    </div>}
   </section>}
  </>
