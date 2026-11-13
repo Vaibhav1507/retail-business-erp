@@ -1,3 +1,20 @@
+CURRENT-STATE NOTICE — 2026-11-13
+================================
+This is a historical, read-only repository investigation snapshot. It predates
+the merged WhatsApp invoice-delivery implementation (PR #18 / merge commit
+1d56e15) and later repository/deployment changes. Its file counts, route list,
+migration inventory, test inventory, implementation status and limitations
+must not be treated as current.
+
+For the current state, read README.md, docs/deployment-runbook.md and
+docs/implementation-plans/whatsapp-invoice-delivery.md. Verify claims against
+the current source tree, migrations and latest CI/workflow runs. In particular,
+migration 043 adds WhatsApp invoice delivery, and production migration status
+must be confirmed from the latest "Migrate production database" workflow before
+claiming it is applied.
+
+The original investigation below is preserved as historical evidence only.
+
 RETAIL BUSINESS OS (RBOS) - COMPLETE SYSTEM REFERENCE
 =====================================================================
 Document version : 1 (evidence-based, read-only investigation)
