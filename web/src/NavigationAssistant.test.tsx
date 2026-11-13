@@ -114,9 +114,9 @@ function installVoiceMocks(getUserMedia: ReturnType<typeof vi.fn>) {
  vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode)
  return () => {
   if (mediaDescriptor) Object.defineProperty(navigator, 'mediaDevices', mediaDescriptor)
-  else delete (navigator as Navigator & {mediaDevices?: MediaDevices}).mediaDevices
+  else delete (navigator as {mediaDevices?: MediaDevices}).mediaDevices
   if (secureDescriptor) Object.defineProperty(window, 'isSecureContext', secureDescriptor)
-  else delete (window as Window & {isSecureContext?: boolean}).isSecureContext
+  else delete (window as {isSecureContext?: boolean}).isSecureContext
  }
 }
 
