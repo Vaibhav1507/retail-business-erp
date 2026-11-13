@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveNavigation } from './navigation-resolver'
+import { resolveNavigation, suggestNavigation } from './navigation-resolver'
 
 describe('navigation resolver', () => {
  it('resolves direct English, Hindi and Hinglish screen requests', () => {
@@ -34,5 +34,25 @@ describe('navigation resolver', () => {
  it('does not generate arbitrary routes for unknown requests', () => {
   expect(resolveNavigation('open google.com').kind).toBe('reject')
   expect(resolveNavigation('xyzabc qwerty').kind).toBe('not-understood')
+ })
+})
+
+
+describe('partial navigation suggestions', () => {
+ it('suggests a destination from an incomplete Hinglish phrase without executing navigation', () => {
+  const suggestions = suggestNavigation('mujhe Ramesh ji ka purana bil')
+  expect(suggestions.some(target => target.id === 'sell.bills')).toBe(true)
+  expect(resolveNavigation('mujhe Ramesh ji ka purana bil').kind).not.toBe('navigate')
+ })
+
+ it('uses word prefixes for live suggestions but does not loosen final command execution', () => {
+  expect(suggestNavigation('new bil').some(target => target.id === 'sell.bill')).toBe(true)
+  expect(resolveNavigation('new bil').kind).not.toBe('navigate')
+ })
+
+ it('does not suggest navigation for business questions, transactions, or external URLs', () => {
+  expect(suggestNavigation('how much cash do I have')).toEqual([])
+  expect(suggestNavigation('delete the last bill')).toEqual([])
+  expect(suggestNavigation('open https://example.com')).toEqual([])
  })
 })
