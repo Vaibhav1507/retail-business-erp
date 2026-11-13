@@ -127,6 +127,13 @@ it('updates suggestions as an incomplete command is typed without navigating', a
  await userEvent.type(input, 'mujhe Ramesh ji ka purana bil')
  expect(screen.getByRole('button', {name:'Old sale bills'})).toBeInTheDocument()
  expect(window.location.hash).toBe('')
+
+ // Final submission can still offer safe destinations when strict matching declines to navigate.
+ await userEvent.type(input, '{Enter}')
+ expect(screen.getByRole('button', {name:'Old sale bills'})).toBeInTheDocument()
+ expect(screen.getByRole('status')).toHaveTextContent('Which screen do you mean?')
+ expect((screen.getByLabelText('Ask your business assistant') as HTMLInputElement).value).toBe('')
+ expect(window.location.hash).toBe('')
 })
 
 it('starts microphone capture on the first press-and-hold and auto-submits the final transcript', async () => {
