@@ -63,13 +63,48 @@ function normalise(value: string): string {
     .replace(/उधार/g, 'udhar').replace(/बिल/g, 'bill').replace(/माल/g, 'maal').replace(/सामान/g, 'saman').replace(/खरीद/g, 'kharid').replace(/वापस/g, 'wapas').replace(/खर्च/g, 'kharch').replace(/स्टॉक/g, 'stock').replace(/बनाना|बनानी|बनाए|बनाइए/g, 'बनाओ').replace(/बनाओ/g, 'बनाओ').replace(/दिखाना|दिखाओ|दिखाइए|दिखा/g, 'देखो').replace(/बनाना/g, 'बनाओ')
 }
 function tokens(value: string): string[] { return normalise(value).split(' ').filter(t => t && !stopWords.has(t)) }
+const intentAliases: Record<string, string[]> = {
+ 'home': ['main page kholo','ghar wala page','मुख्य पेज खोलो','मुख्य स्क्रीन दिखाओ'],
+ 'sell.bill': ['new bill','create bill','make bill','bill banana','bill banao','naya bill','नया बिल बनाना है','मुझे नया बिल चाहिए','बिल काटना है','ग्राहक का बिल बनाओ','नया invoice','invoice banao'],
+ 'sell.bills': ['show bills','bill list','bills dikhao','पुराने बिल','बिलों की सूची','पहले वाले बिल दिखाओ'],
+ 'sell.collect': ['customer payment lena','customer se udhar lena','paise collect karo','ग्राहक से पैसा लेना','ग्राहक से पेमेंट लेना','वसूली करनी है'],
+ 'buy.receive': ['purchase add','add goods','maal kharidna','maal ki entry','purchase entry','नया सामान आया है','खरीद दर्ज करो','माल की एंट्री करो','सामान खरीदना है'],
+ 'buy.pay': ['supplier payment','vendor payment','supplier ko paise dene','supplier ka bill pay','सप्लायर का पैसा देना है','दुकानदार को भुगतान'],
+ 'stock.current': ['show inventory','stock dekhna','kitna maal hai','available items','माल दिखाओ','कितना सामान बचा है','स्टॉक चेक करना है','सामान कितना बचा है'],
+ 'stock.products': ['add product','new item','item list','product add karna','नया सामान जोड़ना','नया प्रोडक्ट डालना','सामान जोड़ना है'],
+ 'parties.customers': ['customer add','add customer','new customer','customer list','grahak jodo','naya grahak','ग्राहक जोड़ना है','नया ग्राहक जोड़ना है','मुझे नया customer add करना है','ग्राहक का नाम लिखना है','नया ग्राहक बनाना है','ग्राहकों की सूची','कस्टमर जोड़ो'],
+ 'parties.suppliers': ['add supplier','new supplier','supplier list','vendor add','नया सप्लायर जोड़ना','सप्लायर जोड़ना है','विक्रेता सूची'],
+ 'money.expenses': ['add expense','expense entry','kharcha likho','खर्चा दर्ज करना है','दुकान का खर्च लिखो','खर्च की एंट्री करो'],
+ 'more.reports': ['open reports','report dikhao','रिपोर्ट खोलो','हिसाब की रिपोर्ट'],
+ 'settings': ['open settings','dukaan ki setting','दुकान की सेटिंग खोलो','बिजनेस की जानकारी बदलो'],
+}
+function editDistance(a: string, b: string): number {
+ const previous = Array.from({ length: b.length + 1 }, (_, i) => i)
+ for (let i = 1; i <= a.length; i++) {
+  let diagonal = previous[0]
+  previous[0] = i
+  for (let j = 1; j <= b.length; j++) {
+   const above = previous[j]
+   previous[j] = Math.min(previous[j] + 1, previous[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1))
+   diagonal = above
+  }
+ }
+ return previous[b.length]
+}
+function tokenMatches(a: string, b: string): boolean {
+ if (a === b) return true
+ if (Math.min(a.length, b.length) < 4) return false
+ const allowed = Math.max(a.length, b.length) >= 8 ? 2 : 1
+ return editDistance(a, b) <= allowed
+}
 function similarity(query: string[], phrase: string[]): number {
   if (!query.length || !phrase.length) return 0
   const q = new Set(query), p = new Set(phrase)
-  const overlap = [...q].filter(x => p.has(x)).length
+  const overlap = [...q].filter(x => [...p].some(y => tokenMatches(x, y))).length
   const queryCoverage = overlap / q.size
   const phraseCoverage = overlap / p.size
-  return queryCoverage * 0.65 + phraseCoverage * 0.35
+  const lengthPenalty = Math.abs(q.size - p.size) > 2 ? 0.04 : 0
+  return Math.max(0, queryCoverage * 0.72 + phraseCoverage * 0.28 - lengthPenalty
 }
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
@@ -82,7 +117,7 @@ export function resolveNavigation(input: string): NavigationResolution {
     return { kind: 'ask', targets: ids.map(id => navigationTargets.find(t => t.id === id)!).filter(Boolean) }
   }
   const ranked = Object.entries(navigationAnchors).map(([id, phrases]) => ({
-    id, score: Math.max(...phrases.map(p => similarity(qTokens, tokens(p)))),
+    id, score: Math.max(...[...phrases, ...(intentAliases[id] || [])].map(p => similarity(qTokens, tokens(p)))),
   })).sort((a,b) => b.score - a.score || a.id.localeCompare(b.id))
   const top = ranked[0], second = ranked[1]
   if (!top || top.score < 0.58) return { kind: 'not-understood' }
