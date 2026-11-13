@@ -1,58 +1,63 @@
 # RBOS intent bake-off (offline, text-only)
 
-This experiment checks whether a local embedding model resolves Hindi, English, Romanised Hindi and Hinglish navigation phrases to RBOS screens better than a deterministic resolver. It is isolated from RBOS. Nothing here is imported by the `projects/retail-business-os` code.
+This experiment checks whether local multilingual embedding models resolve Hindi, English, Romanised Hindi and Hinglish navigation requests to verified RBOS screens better than the deterministic resolver. It is isolated from the production web app. Nothing here is imported by RBOS.
 
-## Approval status
+## Approval and execution status
+
 | Stage | What | Status |
 |---|---|---|
-| 1 | Data, specs, config, README (this folder) | **Done** |
-| 2 | Lexicon generator, normalisation, validator, Baseline A, runner, reporting, tests | **Implemented; CI verification pending** |
-| 3 | Download about 264 MB of models, then pin revisions and SHA-256 in `config.v1.json` | Waiting for approval |
-| 4 | Run tuning, freeze thresholds, then run the test set once | Waiting for approval |
+| 1 | Frozen destinations, synthetic anchors, tuning set, test set and evaluation policy | **Done** |
+| 2 | Normalisation, deterministic baseline, evaluator, leakage controls and tests | **Implemented** |
+| 3 | Download and checksum-verify two pinned ONNX int8 models in a temporary CI workspace | **Approved; run by the dedicated public-repository workflow** |
+| 4 | Tune thresholds on tuning data, freeze them, then score the frozen test set once | **Approved; run by the same workflow** |
+| 5 | Validate with real shop-owner phrases and low-end Android measurements | **Not started; requires a separately consented owner corpus and device tests** |
 
-## Layout
-- `destinations.v1.json`: frozen route inventory with **40** destinations, reconciled against `web/src/App.tsx` and `Pages.tsx`. The earlier figure of 39 left out the More menu (`#/more`).
-- `data/anchors.v1.json`: 5 reference phrases × 40 destinations. Only reference embeddings and the A phrase index are built from this file.
-- `data/tuning.v1.jsonl`: 54 items (`d001`–`d054`), used **only** to choose tau/delta.
-- `data/test.v1.frozen.jsonl`: 160 items (`t001`–`t160`): 110 navigate, 30 ask, 20 reject. Opened once, after thresholds are frozen.
-- `data/owner-phrases/`: versioned intake for real shop-owner phrases. These go into v2 sets and never into v1.
-- `specs/baseline-A.md`, `specs/normalisation.v1.1.md` (shared guard, L0/L1/L2, anchor-only lexicon generation), `specs/fairness.md` (equivalence and leakage checklist, limitations).
-- `reviews/test-v1-review.md`: quality review of the frozen test set, with questionable items and the sensitivity-scoring rule. v1 is indicative only.
-- `config.v1.json`: resolvers, grids, decision rule, pass gate.
+## Models under comparison
 
-## Leakage controls
-1. The three phrase sets do not overlap: no shared text after L1 normalisation. This is checked by the stage 2 validator, and a duplicate fails the run.
-2. Order of a run: build anchors, tune on the tuning set, write `thresholds.json`, hash the thresholds file, and only then score the test set.
-3. `MANIFEST.sha256` records the hash of every data file at freeze time. A run aborts if any hash differs.
-4. Any change to the data creates a new version (`*.v2.*`). Results from different versions are never mixed.
+- **A — deterministic baseline:** token/anchor matching with the same L0/L1/L2 preprocessing.
+- **C1 — multilingual-e5-small:** MIT, int8 ONNX, with the required query prefix for this semantic-similarity task.
+- **C2 — paraphrase-multilingual-MiniLM-L12-v2:** Apache-2.0, int8 ONNX.
 
-## Later stages (for reference only; do not run yet)
-```
-npm ci                         # stage 2
-node scripts/validate.mjs      # stage 2: schema, coverage, overlap, manifest
-node scripts/fetch-models.mjs  # stage 3: pin revision and record hashes
-node scripts/run.mjs --tune    # stage 4
-node scripts/run.mjs --test    # stage 4: refuses to run without frozen thresholds
-```
-Stage 2 commands: `npm test`, `npm run validate`, `npm run lexicon:check`. The pinned Transformers.js dependency is present for the later local-model adapter, but the deterministic Stage 2 tests do not download model weights. `fetch-models.mjs` belongs to stage 3 and is not present or run.
+Model repositories and their approved commits are checked by the Stage 3 runner. The ONNX model and tokenizer files are SHA-256 verified before inference. The workflow uses @huggingface/transformers 4.3.2 with remote model loading disabled; all inference runs locally on the ephemeral runner.
 
-## Report (stage 4)
-For each resolver (A/C1/C2) × level (L0/L1/L2) × language bucket, the report gives:
-- correct-navigate, wrong-navigate, ask, and not-understood rates;
-- ask-precision on ambiguous items;
-- reject leakage;
-- p50/p95 latency;
-- model size.
+Approximate downloaded artefacts are 118 MB per ONNX model plus tokenizer/support files. The combined download is roughly 290 MB. Weights live only in the temporary GitHub Actions runner workspace: they are **not committed, cached as project artefacts, included in the CI result artefact, or used by the production app**.
 
-Pass gate: see `config.v1.json` → `gate`.
+## Dataset and leakage controls
 
-## Current guardrails
-- Stage 2 is experiment code only; no RBOS UI, production route handling, microphone, speech recognition or app integration has been implemented.
-- Stage 3 model weights (~264 MB total) are not downloaded. C1/C2 remain skipped until a separate explicit approval and verified pinned artefacts.
-- Stage 4 model comparison has not been run. Baseline A results are exploratory and synthetic; they are not evidence of production accuracy.
-- The package scripts are defined in `package.json`; run them from this directory. GitHub Actions verifies these commands on the experiment branch.
+- destinations.v1.json: 40 verified routes, including the More menu.
+- data/anchors.v1.json: 5 reference phrases per destination (200 total).
+- data/tuning.v1.jsonl: 54 items used only to select thresholds.
+- data/test.v1.frozen.jsonl: 160 items (110 navigate, 30 ask, 20 reject) scored only after thresholds are frozen.
+- Language buckets: en, hi-Deva, hi-Latn, and mixed.
+- MANIFEST.sha256 pins frozen data. The runner changes the model pins and config hash only in its ephemeral workspace; committed test and tuning data remain untouched.
+- data/owner-phrases/ is the intake for future consented shop-owner examples. Those must become a separate v2 dataset; v1 is never edited.
 
-## Known gaps
-- All v1 phrases are synthetic, written by the assistant, and still need the owner's review.
-- `lexicon.v1.json` is generated from the anchors only and hashed in the manifest. The template-slot rule found 0 synonym pairs in v1 anchors, so L2 currently adds only screen-group tags.
-- Some language buckets are small (about 25–45 items each), so differences under about 5 percentage points are not meaningful.
+## Decision rule and safety gate
+
+For each destination, the embedding score is the maximum cosine similarity against that destination's anchor embeddings. Navigate only when top-1 exceeds the tuning-selected threshold and its margin over top-2 is sufficient. Close candidates produce an ask result; weak candidates produce not_understood.
+
+The model can emit only a destination ID from the verified inventory. The route is looked up from that inventory; model output cannot create URLs or arbitrary actions.
+
+The gate requires each candidate to beat A by at least 5 percentage points in every language bucket, while keeping wrong navigation at or below 2% and reject-item navigation at zero. A failed or inconclusive result means **do not replace the deterministic resolver**.
+
+## Commands
+
+From this directory:
+
+~~~sh
+npm ci
+npm test
+npm run validate
+npm run lexicon:check
+npm run models:bakeoff
+~~~
+
+models:bakeoff pins the current approved model revisions (guarded by expected revision prefixes), downloads and verifies files, updates the config hash in the temporary workspace, tunes A/C1/C2, freezes thresholds, and scores the test set once. CI stores only result summaries, predictions and model-pin metadata as a small report artefact.
+
+## Known limitations
+
+- v1 is synthetic and assistant-authored; it is a method comparison, not production accuracy.
+- The Romanised Hindi bucket is small. Its results are directional and cannot establish a 5-point difference with high confidence.
+- Model quality for real shopkeeper speech, noisy ASR transcripts and regional accents remains unverified.
+- This text-only experiment does not measure Shruti transcription accuracy, Android memory, battery, first-load time or on-device latency.
+- Do not add phrase-specific fallbacks to the production resolver based on one observed example. New examples belong in versioned evaluation data, not runtime special cases.
