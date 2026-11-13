@@ -30,6 +30,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
   const open = async (id: string) => { setError(''); try { setDetail(await api<SaleDetail>('GET', '/sales/' + id)) } catch (e) { setError(msg(e)) } }
   const retryWhatsApp = async () => {
     if (!detail) return
+    if (detail.sale.whatsappStatus === 'NeedsReview' && !window.confirm('The previous send may already have reached the customer. Check WhatsApp first. Retry anyway? This could send a duplicate invoice.')) return
     setRetrying(true); setError('')
     try {
       await api('POST', '/sales/' + detail.sale.id + '/invoice/whatsapp/retry', {})
@@ -54,7 +55,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
 	  {detail && <div className="invoice-modal" role="dialog" aria-modal="true" aria-label="Sale detail" onClick={e => { if (e.target === e.currentTarget) setDetail(null) }}>
 		<div className="invoice-modal-box">
 		  <div className="invoice-tools no-print"><span role="status">WhatsApp: {detail.sale.whatsappStatus}</span>
-            {(['Failed', 'WaitingForSetup', 'ConsentRequired', 'Suppressed', 'NoRecipient'].includes(detail.sale.whatsappStatus)) && <button type="button" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : 'Retry WhatsApp'}</button>}
+            {(['Failed', 'WaitingForSetup', 'ConsentRequired', 'Suppressed', 'NoRecipient', 'NeedsReview'].includes(detail.sale.whatsappStatus)) && <button type="button" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : detail.sale.whatsappStatus === 'NeedsReview' ? 'Check & retry WhatsApp' : 'Retry WhatsApp'}</button>}
 			<select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === "thermal" ? "@page{size:80mm auto;margin:3mm} @media print{.invoice-modal-box{width:74mm} .invoice{font-size:11px}}" : "@page{size:A4;margin:10mm}"}</style><button type="button" onClick={() => window.print()}>Print bill</button>
 			<button type="button" className="secondary" onClick={() => setDetail(null)}>Close</button>
 		  </div>
