@@ -251,11 +251,19 @@ export function NavigationAssistant() {
  async function beginCapture(stream: MediaStream, context: AudioContext) {
   try {
    await context.resume()
+   if (!holdingRef.current) {
+    stream.getTracks().forEach(track => track.stop())
+    if (streamRef.current === stream) streamRef.current = null
+    if (contextRef.current === context) contextRef.current = null
+    if (context.state !== 'closed') await context.close()
+    return
+   }
    await context.audioWorklet.addModule('/capture-worklet.js')
    if (!holdingRef.current) {
     stream.getTracks().forEach(track => track.stop())
-    await context.close()
     if (streamRef.current === stream) streamRef.current = null
+    if (contextRef.current === context) contextRef.current = null
+    if (context.state !== 'closed') await context.close()
     return
    }
    const node = new AudioWorkletNode(context, 'rbos-capture')
@@ -278,6 +286,7 @@ export function NavigationAssistant() {
   } catch (error) {
    stream.getTracks().forEach(track => track.stop())
    await context.close().catch(() => undefined)
+   if (contextRef.current === context) contextRef.current = null
    if (streamRef.current === stream) streamRef.current = null
    holdingRef.current = false
    const detail = error instanceof Error ? error.message : String(error)
