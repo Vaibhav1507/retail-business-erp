@@ -213,9 +213,9 @@ test('semantic gate enforces the wrong-navigation ceiling in every language buck
     'C1/L0': { byLang: candidateLang, overall: { wrongNavigateRate: 0.015, rejectNavigated: 0 } },
   }
   const result = gate(summary, [], { gate: { minAdvantagePp: 5, maxWrongNavigate: 0.02, rejectItemsNavigated: 0 } })
-  expect(result.byCandidate['C1/L0'].perLang['hi-Latn'].advantagePp).toBeCloseTo(6)
-  expect(result.byCandidate['C1/L0'].perLang['hi-Latn'].wrongNavigateOk).toBe(false)
-  expect(result.byCandidate['C1/L0'].pass).toBe(false)
+  assert.ok(Math.abs(result.byCandidate['C1/L0'].perLang['hi-Latn'].advantagePp - 6) < 1e-9)
+  assert.equal(result.byCandidate['C1/L0'].perLang['hi-Latn'].wrongNavigateOk, false)
+  assert.equal(result.byCandidate['C1/L0'].pass, false)
 })
 
 test('classify follows P1-P3 policy', () => {
