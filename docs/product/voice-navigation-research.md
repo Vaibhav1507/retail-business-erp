@@ -274,6 +274,16 @@ The owner approved the previously gated local model comparison. The implementati
 
 The v1 data is still synthetic and assistant-authored. A result can reject a weak model or justify further study, but cannot establish real shopkeeper accuracy. Even a passing text-only result is not permission to integrate the model in the app: real, consented owner phrases and low-end Android memory/latency checks remain Stage 5.
 
+## 9.8 v1 semantic model result (2026-11-13)
+
+The first complete Stage 3/4 workflow finished successfully: [run 43418998859](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859). Both approved ONNX int8 models were checksum-verified and run locally on the ephemeral CPU runner. Stage 2 tests, frozen-data validation and lexicon check also passed.
+
+**Decision: do not integrate either candidate.** All model/preprocessing configurations failed the declared gate. E5 achieved only 2.7–4.5% correct navigation and was too conservative. MiniLM L0 achieved 14.5% correct navigation but had 11.3% wrong navigation; L2 reduced pooled wrong navigation to 2.5% but failed the per-language improvement and 2% safety limits. The deterministic baseline also performed poorly, so this does not make the current phrase resolver acceptable.
+
+Full metrics and caveats: `experiments/rbos-intent-bakeoff/reviews/semantic-v1-results-20261113.md`. v1 is synthetic and assistant-authored, with only 25 hi-Latn examples. It is a method comparison and negative candidate-selection result, not production accuracy evidence. Inference timings are from a GitHub Linux CPU runner, not Android.
+
+Next step is a separate consented v2 corpus of real shopkeeper phrases and ASR-corrupted transcripts. No phrase-specific fallback should be added to the production resolver. No model integration, deployment or change to the production navigation path is approved by this benchmark.
+
 ## 10. What happens after the bake-off
 
 Do not integrate either embedder just because the workflow completes. First review the full and per-language metrics, wrong-navigation and reject leakage, ask precision, p50/p95 latency, and the pinned model files. If the gate fails or the result is inconclusive, keep the current navigation-only experience and improve the data/evaluation protocol instead of adding phrase-specific fallbacks. If a candidate passes, conduct a separate Stage 5 with consented shop-owner phrases and Android-device memory, latency and offline tests before making an app-integration decision.
