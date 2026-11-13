@@ -210,6 +210,76 @@ public sealed class SalesService(TenantDb db)
                 await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", l.ProductId), ("l", m.LocationId));
                 await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac), ("p", l.ProductId));
             }
+            // Freeze the invoice from committed business data and enqueue only with explicit customer consent.
+            // Both writes share the sale transaction, so a failed sale cannot leave a deliverable invoice.
+            var deliveryId = Guid.NewGuid();
+            await using (var snapshot = s.Command(@"
+                insert into sales.invoice_snapshot(tenant_id, sale_id, invoice_no, payload)
+                select @t, x.id, x.invoice_no,
+                  jsonb_build_object(
+                    'sale', jsonb_build_object(
+                      'id', x.id, 'invoiceNo', x.invoice_no, 'date', x.sale_date,
+                      'saleType', x.sale_type, 'total', x.total, 'amountPaid', x.amount_paid,
+                      'payMethod', x.pay_method, 'gstRate', x.gst_rate
+                    ),
+                    'business', jsonb_build_object(
+                      'businessName', b.display_name, 'address', b.address, 'city', b.city,
+                      'state', b.state, 'pinCode', b.pin_code, 'mobile', b.mobile, 'gstin', b.gstin
+                    ),
+                    'customer', jsonb_build_object(
+                      'name', coalesce(c.name, 'Walk-in customer'), 'phone', c.phone, 'notes', c.notes
+                    ),
+                    'location', l.name,
+                    'lines', coalesce((
+                      select jsonb_agg(jsonb_build_object(
+                        'name', p.name, 'sku', p.internal_sku, 'quantity', sl.quantity,
+                        'unitPrice', sl.unit_price, 'discount', sl.discount,
+                        'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials)
+                      ) order by p.name)
+                      from sales.sale_line sl
+                      join catalog.product p on p.tenant_id=sl.tenant_id and p.id=sl.product_id
+                      where sl.tenant_id=x.tenant_id and sl.sale_id=x.id
+                    ), '[]'::jsonb),
+                    'payments', coalesce((
+                      select jsonb_agg(jsonb_build_object('method', sp.method, 'amount', sp.amount) order by sp.method)
+                      from sales.sale_payment sp where sp.tenant_id=x.tenant_id and sp.sale_id=x.id
+                    ), '[]'::jsonb)
+                  )
+                from sales.sale x
+                join core.business_profile b on b.tenant_id=x.tenant_id
+                join core.stock_location l on l.tenant_id=x.tenant_id and l.id=x.location_id
+                left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id
+                where x.tenant_id=@t and x.id=@s
+                returning invoice_no"));
+            snapshot.Parameters.AddWithValue("t", tenantId);
+            snapshot.Parameters.AddWithValue("s", id);
+            var invoiceNo = (string?)await snapshot.ExecuteScalarAsync(ct)
+                ?? throw new InvalidOperationException("Could not create the saved invoice snapshot.");
+
+            var consent = await Scalar<string>(s,
+                "select coalesce(c.whatsapp_invoice_consent_status, 'Unknown') from sales.sale x left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id where x.tenant_id=@t and x.id=@s",
+                ct, ("t", tenantId), ("s", id)) ?? "Unknown";
+            var recipient = await Scalar<string?>(s,
+                "select c.phone from sales.sale x left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id where x.tenant_id=@t and x.id=@s",
+                ct, ("t", tenantId), ("s", id));
+            var deliveryStatus = string.IsNullOrWhiteSpace(recipient) ? "NoRecipient"
+                : consent == "OptedOut" ? "Suppressed"
+                : consent != "OptedIn" ? "ConsentRequired"
+                : "Pending";
+            await Exec(s, ct, @"insert into sales.invoice_delivery
+                (tenant_id,id,sale_id,channel,status,recipient)
+                values (@t,@i,@s,'WhatsApp',@st,@r)",
+                ("t", tenantId), ("i", deliveryId), ("s", id), ("st", deliveryStatus), ("r", (object?)recipient ?? DBNull.Value));
+            if (deliveryStatus == "Pending")
+            {
+                await using var enqueue = s.Command("select integrations.enqueue_invoice_delivery(@t,@d,@s,@u)");
+                enqueue.Parameters.AddWithValue("t", tenantId);
+                enqueue.Parameters.AddWithValue("d", deliveryId);
+                enqueue.Parameters.AddWithValue("s", id);
+                enqueue.Parameters.AddWithValue("u", uid);
+                await enqueue.ExecuteNonQueryAsync(ct);
+            }
+
             var allSerials = lines.Where(l => l.Serials is not null).SelectMany(l => l.Serials!).ToArray();
             var soldBefore = new List<string>();
             if (allSerials.Length > 0)
