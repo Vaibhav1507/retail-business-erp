@@ -53,7 +53,7 @@ export const navigationTargets: NavigationTarget[] = [
 const stopWords = new Set([
   'please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','screen','page',
   'karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko',
-  'mera','meri','mere','banao','banana','banani','banaye','banaiye','karna','chahiye','wala','wali','wale',
+  'mera','meri','mere','apna','apne','apni','banao','banana','banani','banaye','banaiye','karna','krna','chahiye','wala','wali','wale',
   'please','ji','ab','ek','aur','se','ko','करनी','करना','करते','करती','हुआ','हुई','है','हैं'
 ])
 
