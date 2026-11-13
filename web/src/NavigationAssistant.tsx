@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getLanguage } from './i18n'
+import { resampleAudio } from './audio-utils'
 import { resolveNavigation, type NavigationTarget } from './navigation-resolver'
 import './navigation-assistant.css'
 
@@ -45,7 +46,7 @@ const labelsHi: Record<string,string> = {
  'money.cash':'नकद और बैंक','money.owner':'मालिक का पैसा','money.closing':'दिन बंद करें','more.menu':'और विकल्प','more.reports':'रिपोर्ट','more.print':'प्रिंट','more.lock':'पुरानी तारीखें लॉक','more.gst':'GST','more.staff':'स्टाफ','more.branches':'शाखाएँ','more.transfers':'स्टॉक ट्रांसफर','more.reconcile':'बैंक मिलान','more.loans':'लोन'
 }
 function targetLabel(target: NavigationTarget, language: 'en'|'hi') { return language === 'hi' ? labelsHi[target.id] || target.label : target.label }
-type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; text?:string; message?:string}
+type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; text?:string; message?:string; language?:string|null; ms?:number}
 
 export function NavigationAssistant() {
  const [open,setOpen] = useState(false)
@@ -62,12 +63,14 @@ export function NavigationAssistant() {
  const contextRef = useRef<AudioContext|null>(null)
  const nodeRef = useRef<AudioWorkletNode|null>(null)
  const blocksRef = useRef<Float32Array[]>([])
+ const flushResolveRef = useRef<(() => void)|null>(null)
  const startedRef = useRef(0)
  const holdingRef = useRef(false)
  const pointerIdRef = useRef<number|null>(null)
  const lang = getLanguage(), text = copy[lang]
 
  useEffect(() => () => {
+  flushResolveRef.current?.()
   workerRef.current?.terminate()
   streamRef.current?.getTracks().forEach(track=>track.stop())
   void contextRef.current?.close()
@@ -114,21 +117,30 @@ export function NavigationAssistant() {
  }
 
  async function beginCapture(stream: MediaStream) {
+  let context: AudioContext
+  try { context = new AudioContext({ sampleRate: SAMPLE_RATE }) }
+  catch { context = new AudioContext() }
   try {
-   const context = new AudioContext()
    await context.resume()
    await context.audioWorklet.addModule('/capture-worklet.js')
    if (!holdingRef.current) { stream.getTracks().forEach(track=>track.stop()); await context.close(); return }
    const node = new AudioWorkletNode(context,'rbos-capture')
    const blocks: Float32Array[] = []
-   node.port.onmessage = event => { blocks.push(event.data as Float32Array) }
+   node.port.onmessage = event => {
+    if (event.data?.type === 'flushed') {
+     flushResolveRef.current?.()
+     flushResolveRef.current = null
+    } else if (event.data instanceof Float32Array) blocks.push(event.data)
+   }
    const source = context.createMediaStreamSource(stream)
    const mute = context.createGain(); mute.gain.value = 0
    source.connect(node); node.connect(mute); mute.connect(context.destination)
    contextRef.current = context; nodeRef.current = node; blocksRef.current = blocks
    startedRef.current = Date.now(); setRecording(true); setVoiceError('')
   } catch (error) {
-   stream.getTracks().forEach(track=>track.stop()); streamRef.current=null
+   stream.getTracks().forEach(track=>track.stop())
+   await context.close().catch(()=>undefined)
+   streamRef.current=null
    const detail = error instanceof Error ? error.message : String(error)
    setVoiceError(`Could not start microphone capture: ${detail}`)
   }
@@ -154,11 +166,6 @@ export function NavigationAssistant() {
     : name === 'NotFoundError' || name === 'DevicesNotFoundError' ? text.micMissing
     : detail || text.failed)
   }
- }
- function resample(input: Float32Array, sourceRate: number): Float32Array {
-  const length = Math.floor(input.length * SAMPLE_RATE / sourceRate), output = new Float32Array(length), ratio = sourceRate / SAMPLE_RATE
-  for (let i=0;i<length;i++) { const position=i*ratio, left=Math.floor(position), fraction=position-left; output[i]=(input[left]||0)*(1-fraction)+(input[Math.min(left+1,input.length-1)]||0)*fraction }
-  return output
  }
  async function beginHoldToTalk() {
   if (!voiceReady || !workerRef.current || !holdingRef.current || streamRef.current) return
@@ -191,10 +198,15 @@ export function NavigationAssistant() {
  async function stopRecording() {
   if (!recording) { streamRef.current?.getTracks().forEach(track=>track.stop()); streamRef.current=null; return }
   const elapsed = (Date.now()-startedRef.current)/1000
-  nodeRef.current?.port.postMessage('stop')
-  await new Promise(resolve=>window.setTimeout(resolve,60))
+  const node = nodeRef.current
+  if (node) {
+   await new Promise<void>(resolve => {
+    flushResolveRef.current = resolve
+    node.port.postMessage('stop')
+   })
+  }
   const context=contextRef.current, blocks=blocksRef.current
-  nodeRef.current?.disconnect(); streamRef.current?.getTracks().forEach(track=>track.stop())
+  node?.disconnect(); streamRef.current?.getTracks().forEach(track=>track.stop())
   const rate=context?.sampleRate || SAMPLE_RATE
   await context?.close()
   nodeRef.current=null; streamRef.current=null; contextRef.current=null; blocksRef.current=[]; setRecording(false)
@@ -202,7 +214,7 @@ export function NavigationAssistant() {
   if (elapsed > 20) { setVoiceError(text.tooLong); return }
   const total=blocks.reduce((sum,block)=>sum+block.length,0), joined=new Float32Array(total)
   let offset=0; for(const block of blocks){joined.set(block,offset);offset+=block.length}
-  const pcm=resample(joined,rate)
+  const pcm=resampleAudio(joined,rate,SAMPLE_RATE)
   workerRef.current?.postMessage({type:'transcribe',id:1,pcm},[pcm.buffer]); joined.fill(0)
  }
 
