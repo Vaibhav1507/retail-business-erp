@@ -327,7 +327,10 @@ export function NavigationAssistant() {
   contextRef.current = context
   const contextActivation = context.resume().catch(() => undefined)
   // The first press-and-hold itself requests permission. There is no separate setup tap.
-  void navigator.mediaDevices.getUserMedia({ audio:{ channelCount:1, echoCancellation:true, noiseSuppression:true, autoGainControl:true } })
+  void navigator.mediaDevices.getUserMedia({ audio:{
+   channelCount:{ideal:1}, echoCancellation:{ideal:true},
+   noiseSuppression:{ideal:true}, autoGainControl:{ideal:true}
+  } })
    .then(async stream => {
     if (!holdingRef.current) {
      stream.getTracks().forEach(track => track.stop())
