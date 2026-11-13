@@ -150,3 +150,31 @@ revoke all on function integrations.finish_invoice_delivery(uuid,uuid,timestampt
 grant execute on function integrations.enqueue_invoice_delivery(uuid,uuid,uuid,uuid) to rbos_app;
 grant execute on function integrations.claim_invoice_deliveries(integer,integer) to rbos_app;
 grant execute on function integrations.finish_invoice_delivery(uuid,uuid,timestamptz) to rbos_app;
+
+-- Webhook status updates are scoped to the configured pilot tenant and provider message ID.
+-- The API verifies Meta's signature and configured phone-number ID before calling this function.
+create or replace function integrations.apply_invoice_delivery_status(
+  p_tenant_id uuid, p_provider_message_id text, p_status text,
+  p_status_at timestamptz, p_error text default null
+) returns boolean
+language plpgsql security definer
+set search_path = pg_catalog, sales
+as $$
+begin
+  if p_status not in ('Sent','Delivered','Read','Failed') then
+    raise exception 'Unsupported provider delivery status' using errcode = '22023';
+  end if;
+  update sales.invoice_delivery
+     set status = p_status,
+         provider_status_at = p_status_at,
+         last_error = case when p_status = 'Failed' then left(p_error, 300) else null end,
+         updated_at = now()
+   where tenant_id = p_tenant_id
+     and channel = 'WhatsApp'
+     and provider_message_id = p_provider_message_id
+     and (provider_status_at is null or p_status_at >= provider_status_at);
+  return found;
+end;
+$$;
+revoke all on function integrations.apply_invoice_delivery_status(uuid,text,text,timestamptz,text) from public;
+grant execute on function integrations.apply_invoice_delivery_status(uuid,text,text,timestamptz,text) to rbos_app;
