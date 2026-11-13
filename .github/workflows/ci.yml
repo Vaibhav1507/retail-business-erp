@@ -23,6 +23,7 @@ jobs:
       PGPASSWORD: ci-superuser-only
       ConnectionStrings__RbosTestMigrator: Host=localhost;Database=rbos_test;Username=rbos_migrator;Password=ci-migrator-pass
       ConnectionStrings__RbosTestApp: Host=localhost;Database=rbos_test;Username=rbos_app;Password=ci-app-pass
+      ConnectionStrings__RbosTestWhatsAppWorker: Host=localhost;Database=rbos_test;Username=rbos_worker;Password=ci-worker-pass
     steps:
       - uses: actions/checkout@v4
       - name: Install Noto fonts for Unicode PDF tests
@@ -33,7 +34,7 @@ jobs:
       - name: Create roles and databases (throwaway CI database, synthetic passwords)
         run: |
           psql -h localhost -U postgres -d postgres -f scripts/database/bootstrap-postgresql.sql
-          psql -h localhost -U postgres -d postgres -c "ALTER ROLE rbos_migrator PASSWORD 'ci-migrator-pass'" -c "ALTER ROLE rbos_app PASSWORD 'ci-app-pass'"
+          psql -h localhost -U postgres -d postgres -c "ALTER ROLE rbos_migrator PASSWORD 'ci-migrator-pass'" -c "ALTER ROLE rbos_app PASSWORD 'ci-app-pass'" -c "ALTER ROLE rbos_worker PASSWORD 'ci-worker-pass'"
       - run: dotnet build RetailBusinessOs.slnx --nologo -c Release
       - run: dotnet run --project src/Rbos.Api -c Release --no-build -- --migrate test
       - run: dotnet test RetailBusinessOs.slnx --nologo -c Release --no-build
