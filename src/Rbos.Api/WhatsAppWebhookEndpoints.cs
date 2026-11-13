@@ -34,8 +34,14 @@ public static class WhatsAppWebhookEndpoints
             if (request.ContentLength is > MaxWebhookBytes) return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
 
             await using var buffer = new MemoryStream();
-            await request.Body.CopyToAsync(buffer, ct);
-            if (buffer.Length > MaxWebhookBytes) return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            var chunk = new byte[81920];
+            int bytesRead;
+            while ((bytesRead = await request.Body.ReadAsync(chunk, ct)) > 0)
+            {
+                if (buffer.Length + bytesRead > MaxWebhookBytes)
+                    return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+                await buffer.WriteAsync(chunk.AsMemory(0, bytesRead), ct);
+            }
             var body = buffer.ToArray();
             if (!VerifySignature(secret, request.Headers["X-Hub-Signature-256"].ToString(), body))
                 return Results.Unauthorized();
