@@ -143,6 +143,15 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
   expect(await screen.findByText('Listening… release to send')).toBeInTheDocument()
   expect(screen.queryByRole('button', {name:/Set up voice/})).not.toBeInTheDocument()
 
+  // A partial Shruti result is allowed to surface a likely screen, but must never navigate.
+  MockSpeechWorker.instance?.emit({
+   type:'partial-result',
+   captureId:1,
+   text:'mujhe Ramesh ji ka purana bil'
+  })
+  await waitFor(() => expect(screen.getByRole('button', {name:'Old sale bills'})).toBeInTheDocument())
+  expect(window.location.hash).toBe('')
+
   MockAudioWorkletNode.instance?.emitAudio(new Float32Array(16000).fill(0.05))
   await new Promise(resolve => setTimeout(resolve, 450))
   fireEvent.pointerUp(mic, {pointerId:7, button:0})
