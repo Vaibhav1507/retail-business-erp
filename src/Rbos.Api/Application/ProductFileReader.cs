@@ -203,8 +203,14 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
 			{ log.LogWarning(e, "PDF catalogue extraction failed on {Model}", model); }
 		}
+		if (parsed?["products"] is not JsonArray && groq.Available)
+		{
+			try { parsed = await groq.ExtractPdfAsync(bytes, PdfCataloguePrompt, ct); }
+			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+			{ log.LogWarning(e, "Groq PDF catalogue fallback failed"); }
+		}
 		if (parsed?["products"] is not JsonArray items)
-			return ServiceResult<ProductFileResult>.Fail("The PDF was received, but AI could not identify a structured product/model list. Try a clearer catalogue or split a large PDF into smaller parts.");
+			return ServiceResult<ProductFileResult>.Fail("The PDF was received, but Gemini and Groq could not identify a structured product/model list. Try a clearer catalogue or split a large PDF into smaller parts.");
 
 		static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var value) ? value.Trim() : "";
 		var rows = new List<List<string>> { Header.ToList() };
