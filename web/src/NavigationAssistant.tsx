@@ -5,28 +5,30 @@ import './navigation-assistant.css'
 
 const copy = {
  en: {
-  title:'Go to a screen', placeholder:'Try “new bill”, “stock”, “supplier payment”…', go:'Go', shortcuts:'Quick actions',
-  unclear:'I could not identify a screen. Try a shortcut or a more specific command.',
+  title:'Ask your business assistant', placeholder:'Type a screen name or command…', go:'Go', shortcuts:'Quick actions',
+  unclear:'I could not identify that screen. Try a shortcut or a clearer command.',
   reject:'I can only navigate screens. I cannot answer business questions or perform transactions.',
-  choose:'Which screen do you mean?',
-  enableVoice:'Enable voice · ~30 MB download', loading:'Preparing on-device voice…', ready:'Voice ready on this device',
-  download:'Downloading speech model', start:'Start speaking', stop:'Stop and navigate', recording:'Listening · tap Stop when finished',
-  micDenied:'Microphone access was blocked. Typed commands and shortcuts are still available.',
-  micMissing:'No microphone was found on this device.', secure:'Voice requires HTTPS or localhost. Typed navigation still works.',
+  choose:'Which screen do you mean?', open:'Open assistant', close:'Close assistant',
+  enableVoice:'Set up voice', loading:'Preparing voice…', ready:'Voice is ready',
+  download:'Downloading speech model', start:'Start speaking', stop:'Stop and navigate', recording:'Listening… tap Stop when finished',
+  micDenied:'Microphone permission was denied. You can still type.', micMissing:'No microphone was found.',
+  secure:'Voice requires HTTPS. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
-  failed:'Voice recognition could not start. You can still type your command.', heard:'Heard:', voiceNote:'Audio stays on this device and is discarded after transcription.'
+  failed:'Voice setup could not connect. Check your connection and tap Retry. Typed navigation still works.',
+  retry:'Retry voice setup', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
  },
  hi: {
-  title:'किसी स्क्रीन पर जाएँ', placeholder:'जैसे “नया बिल”, “स्टॉक”, “सप्लायर पेमेंट”…', go:'जाएँ', shortcuts:'जल्दी खोलें',
-  unclear:'स्क्रीन समझ नहीं आई। कोई शॉर्टकट चुनें या थोड़ा स्पष्ट लिखें।',
-  reject:'मैं केवल स्क्रीन खोल सकता हूँ। मैं कारोबार के सवालों का जवाब या लेन-देन नहीं कर सकता।',
-  choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?',
-  enableVoice:'वॉइस चालू करें · लगभग 30 MB डाउनलोड', loading:'डिवाइस पर वॉइस तैयार हो रही है…', ready:'वॉइस इस डिवाइस पर तैयार है',
-  download:'स्पीच मॉडल डाउनलोड हो रहा है', start:'बोलना शुरू करें', stop:'रोकें और स्क्रीन खोलें', recording:'सुन रहा है · पूरा होने पर रोकें',
-  micDenied:'माइक्रोफोन की अनुमति नहीं मिली। टाइप और शॉर्टकट अभी भी काम करेंगे।',
-  micMissing:'इस डिवाइस पर माइक्रोफोन नहीं मिला।', secure:'वॉइस के लिए HTTPS या localhost चाहिए। टाइप से नेविगेशन जारी है।',
-  tooShort:'आवाज़ स्पष्ट नहीं मिली। कृपया फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
-  failed:'वॉइस शुरू नहीं हो सकी। आप कमांड टाइप कर सकते हैं।', heard:'सुना:', voiceNote:'आवाज़ इसी डिवाइस पर रहती है और लिखित रूप में बदलने के बाद हटा दी जाती है।'
+  title:'बिज़नेस असिस्टेंट', placeholder:'स्क्रीन या कमांड लिखें…', go:'जाएँ', shortcuts:'जल्दी खोलें',
+  unclear:'स्क्रीन समझ नहीं आई। शॉर्टकट चुनें या स्पष्ट कमांड लिखें।',
+  reject:'मैं केवल स्क्रीन खोल सकता हूँ। कारोबार के सवालों या लेन-देन में मदद नहीं कर सकता।',
+  choose:'आप कौन-सी स्क्रीन खोलना चाहते हैं?', open:'असिस्टेंट खोलें', close:'असिस्टेंट बंद करें',
+  enableVoice:'वॉइस सेटअप करें', loading:'वॉइस तैयार हो रही है…', ready:'वॉइस तैयार है',
+  download:'स्पीच मॉडल डाउनलोड हो रहा है', start:'बोलना शुरू करें', stop:'रोकें और स्क्रीन खोलें', recording:'सुन रहा है… पूरा होने पर रोकें',
+  micDenied:'माइक्रोफोन की अनुमति नहीं मिली। आप टाइप कर सकते हैं।', micMissing:'माइक्रोफोन नहीं मिला।',
+  secure:'वॉइस के लिए HTTPS चाहिए। टाइप से नेविगेशन जारी रखें।',
+  tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
+  failed:'वॉइस सेटअप कनेक्ट नहीं हो सका। इंटरनेट जाँचें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
+  retry:'वॉइस फिर से सेटअप करें', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
  }
 }
 const quick: NavigationTarget[] = [
@@ -35,7 +37,6 @@ const quick: NavigationTarget[] = [
  {id:'money.expenses',hash:'#/money/expenses',label:'Record expense'}, {id:'parties.customers',hash:'#/parties/customers',label:'Customers'}
 ]
 const SAMPLE_RATE = 16000
-
 const labelsHi: Record<string,string> = {
  'sell.bill':'नया बिल','buy.receive':'खरीद जोड़ें','stock.current':'स्टॉक देखें','sell.collect':'पैसे वसूलें','money.expenses':'खर्च दर्ज करें','parties.customers':'ग्राहक',
  'sell.return':'ग्राहक वापसी','buy.return':'सप्लायर को वापसी','sell.bills':'पुराने बिल','buy.history':'खरीद इतिहास','stock.history':'स्टॉक बदलाव इतिहास','parties.purchases':'ग्राहक खरीद इतिहास','more.audit':'ऑडिट इतिहास',
@@ -44,9 +45,10 @@ const labelsHi: Record<string,string> = {
  'money.cash':'नकद और बैंक','money.owner':'मालिक का पैसा','money.closing':'दिन बंद करें','more.menu':'और विकल्प','more.reports':'रिपोर्ट','more.print':'प्रिंट','more.lock':'पुरानी तारीखें लॉक','more.gst':'GST','more.staff':'स्टाफ','more.branches':'शाखाएँ','more.transfers':'स्टॉक ट्रांसफर','more.reconcile':'बैंक मिलान','more.loans':'लोन'
 }
 function targetLabel(target: NavigationTarget, language: 'en'|'hi') { return language === 'hi' ? labelsHi[target.id] || target.label : target.label }
+type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; text?:string; message?:string}
 
-type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; source?:string; saved?:boolean; id?:number; text?:string; message?:string}
 export function NavigationAssistant() {
+ const [open,setOpen] = useState(false)
  const [query,setQuery] = useState('')
  const [message,setMessage] = useState('')
  const [choices,setChoices] = useState<NavigationTarget[]>([])
@@ -70,7 +72,7 @@ export function NavigationAssistant() {
  }, [])
 
  function go(target: NavigationTarget) {
-  setChoices([]); setMessage(''); setQuery(''); window.location.hash = target.hash
+  setChoices([]); setMessage(''); setQuery(''); setOpen(false); window.location.hash = target.hash
  }
  function processText(value: string) {
   const result = resolveNavigation(value)
@@ -83,21 +85,27 @@ export function NavigationAssistant() {
  function enableVoice() {
   if (workerRef.current || voiceLoading || voiceReady) return
   setVoiceLoading(true); setVoiceError(''); setVoiceProgress(0)
-  const worker = new Worker('/shruti-worker.js')
-  workerRef.current = worker
-  worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
-   const data = event.data
-   if (data.type === 'progress') setVoiceProgress(data.total ? Math.min(100,Math.round((data.loaded||0)/data.total*100)) : 0)
-   if (data.type === 'ready') { setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100) }
-   if (data.type === 'error') { setVoiceLoading(false); setVoiceError(data.message || text.failed); if (data.stage !== 'transcribe') { worker.terminate(); workerRef.current = null; setVoiceReady(false) } }
-   if (data.type === 'result') {
-    const transcript = (data.text || '').trim()
-    if (!transcript) { setVoiceError(text.tooShort); return }
-    setQuery(transcript); setVoiceError(''); processText(transcript)
+  try {
+   const worker = new Worker('/shruti-worker.js')
+   workerRef.current = worker
+   worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+    const data = event.data
+    if (data.type === 'progress') setVoiceProgress(data.total ? Math.min(100,Math.round((data.loaded||0)/data.total*100)) : 0)
+    if (data.type === 'ready') { setVoiceReady(true); setVoiceLoading(false); setVoiceProgress(100); setVoiceError('') }
+    if (data.type === 'error') {
+     setVoiceLoading(false)
+     if (data.stage !== 'transcribe') { setVoiceError(text.failed); worker.terminate(); workerRef.current = null; setVoiceReady(false) }
+     else setVoiceError(data.message || text.failed)
+    }
+    if (data.type === 'result') {
+     const transcript = (data.text || '').trim()
+     if (!transcript) { setVoiceError(text.tooShort); return }
+     setQuery(transcript); setVoiceError(''); processText(transcript)
+    }
    }
-  }
-  worker.onerror = () => { setVoiceLoading(false); setVoiceError(text.failed); worker.terminate(); workerRef.current = null }
-  worker.postMessage({type:'init'})
+   worker.onerror = () => { setVoiceLoading(false); setVoiceError(text.failed); worker.terminate(); workerRef.current = null }
+   worker.postMessage({type:'init'})
+  } catch { setVoiceLoading(false); setVoiceError(text.failed); workerRef.current = null }
  }
 
  async function startRecording() {
@@ -122,15 +130,9 @@ export function NavigationAssistant() {
    setVoiceError(name === 'NotAllowedError' ? text.micDenied : name === 'NotFoundError' ? text.micMissing : text.failed)
   }
  }
-
  function resample(input: Float32Array, sourceRate: number): Float32Array {
-  const length = Math.floor(input.length * SAMPLE_RATE / sourceRate)
-  const output = new Float32Array(length)
-  const ratio = sourceRate / SAMPLE_RATE
-  for (let i=0;i<length;i++) {
-   const position=i*ratio, left=Math.floor(position), fraction=position-left
-   output[i]=(input[left]||0)*(1-fraction)+(input[Math.min(left+1,input.length-1)]||0)*fraction
-  }
+  const length = Math.floor(input.length * SAMPLE_RATE / sourceRate), output = new Float32Array(length), ratio = sourceRate / SAMPLE_RATE
+  for (let i=0;i<length;i++) { const position=i*ratio, left=Math.floor(position), fraction=position-left; output[i]=(input[left]||0)*(1-fraction)+(input[Math.min(left+1,input.length-1)]||0)*fraction }
   return output
  }
  async function stopRecording() {
@@ -138,40 +140,43 @@ export function NavigationAssistant() {
   nodeRef.current?.port.postMessage('stop')
   await new Promise(resolve=>window.setTimeout(resolve,60))
   const context=contextRef.current, blocks=blocksRef.current
-  nodeRef.current?.disconnect()
-  streamRef.current?.getTracks().forEach(track=>track.stop())
+  nodeRef.current?.disconnect(); streamRef.current?.getTracks().forEach(track=>track.stop())
   const rate=context?.sampleRate || SAMPLE_RATE
   await context?.close()
-  nodeRef.current=null; streamRef.current=null; contextRef.current=null; blocksRef.current=[]
-  setRecording(false)
+  nodeRef.current=null; streamRef.current=null; contextRef.current=null; blocksRef.current=[]; setRecording(false)
   if (elapsed < 0.4) { setVoiceError(text.tooShort); return }
   if (elapsed > 20) { setVoiceError(text.tooLong); return }
-  const total=blocks.reduce((sum,block)=>sum+block.length,0)
-  const joined=new Float32Array(total); let offset=0
-  for(const block of blocks){joined.set(block,offset);offset+=block.length}
+  const total=blocks.reduce((sum,block)=>sum+block.length,0), joined=new Float32Array(total)
+  let offset=0; for(const block of blocks){joined.set(block,offset);offset+=block.length}
   const pcm=resample(joined,rate)
-  workerRef.current?.postMessage({type:'transcribe',id:1,pcm},[pcm.buffer])
-  joined.fill(0)
+  workerRef.current?.postMessage({type:'transcribe',id:1,pcm},[pcm.buffer]); joined.fill(0)
  }
 
- return <section className="navigation-assistant" aria-label="Navigation assistant">
-  <form onSubmit={submit} className="navigation-assistant-form">
-   <label htmlFor="rbos-go-to">{text.title}</label>
-   <input id="rbos-go-to" value={query} onChange={e=>{setQuery(e.target.value);setMessage('');setChoices([])}} placeholder={text.placeholder} autoComplete="off" />
-   <button type="submit" disabled={!query.trim()}>{text.go}</button>
-  </form>
-  <div className="navigation-shortcuts" aria-label={text.shortcuts}>
-   {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
-  </div>
-  <div className="navigation-voice">
-   {!voiceReady && <button type="button" onClick={enableVoice} disabled={voiceLoading}>{voiceLoading ? text.loading : text.enableVoice}</button>}
-   {voiceLoading && <progress max="100" value={voiceProgress} aria-label={text.download} />}
-   {voiceReady && <button type="button" className={recording?'is-recording':''} onClick={recording?stopRecording:startRecording}>{recording?text.stop:text.start}</button>}
-   {voiceReady && <span className="navigation-voice-note">{recording?text.recording:text.ready}</span>}
-  </div>
-  <p className="navigation-privacy">{text.voiceNote}</p>
-  {voiceError && <p className="navigation-feedback" role="alert">{voiceError}</p>}
-  {message && <p className="navigation-feedback" role="status">{message}</p>}
-  {choices.length>0 && <div className="navigation-choices" aria-label={text.choose}>{choices.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}</div>}
- </section>
+ return <>
+  <button className="assistant-launcher" type="button" aria-label={open ? text.close : text.open} aria-expanded={open} aria-controls="rbos-assistant-panel" onClick={()=>setOpen(value=>!value)}>
+   <span aria-hidden="true">✦</span><span>{open ? text.close : 'Assistant'}</span>
+  </button>
+  {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
+   <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={()=>setOpen(false)}>×</button></header>
+   <form onSubmit={submit} className="navigation-assistant-form">
+    <input id="rbos-go-to" aria-label={text.title} value={query} onChange={e=>{setQuery(e.target.value);setMessage('');setChoices([])}} placeholder={text.placeholder} autoComplete="off" />
+    <button type="submit" disabled={!query.trim()}>{text.go}</button>
+   </form>
+   <div className="navigation-shortcuts" aria-label={text.shortcuts}>
+    {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
+   </div>
+   <div className="navigation-voice">
+    <button type="button" className={recording?'is-recording':'voice-action'} onClick={recording?stopRecording:startRecording} disabled={voiceLoading}>
+     <span aria-hidden="true">{recording?'■':'🎙'}</span> {recording?text.stop:voiceReady?text.start:text.enableVoice}
+    </button>
+    {voiceLoading && <div className="voice-progress"><progress max="100" value={voiceProgress} aria-label={text.download}/><span>{text.loading} {voiceProgress}%</span></div>}
+    {voiceReady && !recording && <span className="navigation-voice-note">{text.ready}</span>}
+    {recording && <span className="navigation-voice-note">{text.recording}</span>}
+   </div>
+   <p className="navigation-privacy">{text.voiceNote}</p>
+   {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={enableVoice}>{text.retry}</button></div>}
+   {message && <p className="navigation-feedback" role="status">{message}</p>}
+   {choices.length>0 && <div className="navigation-choices" aria-label={text.choose}>{choices.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}</div>}
+  </section>}
+ </>
 }
