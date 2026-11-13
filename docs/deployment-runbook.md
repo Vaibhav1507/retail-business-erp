@@ -29,7 +29,7 @@ Do not set Gemini or SMS secrets unless explicitly approved.
 Do not put the migrator connection string in Cloud Run.
 
 ## 4. Build and deploy
-1. Build the image: `docker build -t rbos .` (the Dockerfile has not been build-tested yet; do this first).
+1. The Docker image build is covered by GitHub Actions. For a manual build, use `docker build -t rbos .`; a successful CI build does not mean the image has been pushed or deployed.
 2. Push to Artifact Registry and deploy to Cloud Run with `--min-instances 0` and `--max-instances 1` for the pilot.
 3. Allow public access to the service; the app enforces login.
 
@@ -62,18 +62,18 @@ Do not put the migrator connection string in Cloud Run.
 - The Playwright end-to-end suite has not been re-run after the OTP changes. The CI React component test verifies that sale confirmation still invokes the browser print function when WhatsApp consent is missing; it is not a substitute for a real-browser E2E run.
 - A PostgreSQL integration test now covers exclusive WhatsApp queue claims, lease rescheduling and queue completion; it passed in CI run #214.
 - Unit tests cover Meta webhook HMAC verification, explicit opt-out keywords and valid Indian mobile-number formats. A full signed webhook status-lifecycle integration test (including duplicate/out-of-order status callbacks) remains outstanding.
-- No Meta test sender has been configured and no real provider round trip has been performed. This requires the owner's explicit Meta setup/activation approval.
+- Meta developer app and test-number setup have been started. The Meta `hello_world` test-template send was received by the approved test recipient, and Meta successfully verified the deployed webhook callback. The `messages` webhook field is subscribed. This verifies test messaging and webhook handshake only; it does not verify the shop's production sender, invoice PDF upload/template delivery, status lifecycle, or opt-out end-to-end.
 
-## 10. WhatsApp invoice delivery pilot (not activated)
+## 10. WhatsApp invoice delivery pilot (implementation deployed; production sender not activated)
 
-The application contains a single-shop Meta Cloud API integration. Do not configure production secrets, enable Meta billing, send live messages or deploy this feature until the owner explicitly approves the activation step.
+The application contains a single-shop Meta Cloud API integration. The API revision has been deployed and the webhook callback has been verified by Meta. The test-number `hello_world` send succeeded. The production shop sender is not yet connected, and the invoice-delivery worker has not completed a production round trip. Do not register/migrate the shop's existing WhatsApp Business App number, configure production sender secrets, enable billing, or send customer messages until the owner explicitly approves that activation step. Preserve the existing shop app/number while investigating an eligible coexistence path or an independently approved dedicated number.
 
 ### Meta app and WhatsApp sender setup
 
 Complete these steps only after the owner explicitly approves pilot activation. Do not create a Meta app, connect a production sender, add a payment method, or enable billing as part of CI or code review.
 
-1. Sign in to Meta for Developers using the shop owner's/business-controlled Meta account and create a **Business** app. Keep ownership and recovery details with the shop; do not use a personal employee or company account.
-2. Add the **WhatsApp** product to the app. Start with Meta's test WABA/phone number and add only the approved test recipient while validating the integration.
+1. A Meta developer app has already been created using the owner's available Facebook login. Before production, ensure the shop/business retains administrative ownership and recovery access; add the shop owner/father as an admin. Do not use any company account.
+2. The **WhatsApp** use case and test WABA/phone number are configured. The approved test recipient received Meta's `hello_world` template. Keep testing on the test sender until invoice delivery is verified.
 3. For the real pilot, select or connect the shop's own WhatsApp Business Account (WABA), register/attach the shop's approved WhatsApp Business phone number, and record the WABA ID and **Phone Number ID**. The application needs the Phone Number ID, not the visible phone number.
 4. Configure the access token for the intended environment. The token used to send messages needs `whatsapp_business_messaging`; WhatsApp Business Account/template management operations use `whatsapp_business_management`. For production, use a business-controlled system-user token with only the required asset access and permissions, and store it only in Secret Manager. Never use a short-lived test token in production.
 5. In WhatsApp Manager, create a message template and submit it for approval:
@@ -83,13 +83,13 @@ Complete these steps only after the owner explicitly approves pilot activation. 
    - Body: exactly one positional text parameter for the invoice number, for example: `Your invoice {{1}} is attached. Thank you for your purchase.`
    - Language: use the exact language code shown for the approved template (for example, `en_US`) as `WhatsApp__TemplateLanguage`.
    - Wait until the template status is **APPROVED**. The sender sends one document header parameter (the uploaded PDF media ID) and one body parameter (invoice number); templates with a different parameter layout will not work.
-6. Configure the app's WhatsApp Business Account webhook subscription:
+6. The callback URL `https://<application-domain>/webhooks/meta/whatsapp` has been verified successfully by Meta and the `messages` field is subscribed. For production, also confirm the app is subscribed to the selected pilot WABA:
    - Callback URL: `https://<application-domain>/webhooks/meta/whatsapp`.
    - Verify token: the same random value injected as `WhatsApp__VerifyToken`.
    - Subscribe to the `messages` field so inbound opt-out messages and outbound delivery status events reach the application.
    - Confirm the app is subscribed to the pilot WABA and the callback verification succeeds.
 7. Record the selected Graph API version in `WhatsApp__ApiVersion`. Recheck Meta's supported-version schedule at activation; the version is intentionally configuration, not hard-coded. Meta's current reference pages show Graph API v27.0 at the time this runbook was reviewed.
-8. Use the Meta test sender/recipient first. Verify PDF media upload, template send, webhook verification, sent/delivered/read/failed callbacks and opt-out handling before considering a production sender.
+8. Continue with the Meta test sender/recipient. Verify PDF media upload, approved invoice-template send, sent/delivered/read/failed callbacks and opt-out handling before considering a production sender. The successful `hello_world` test and callback verification are not substitutes for these invoice-flow checks.
 
 Official references:
 - [WhatsApp Business Platform overview](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview)
