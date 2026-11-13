@@ -135,21 +135,29 @@ async function main() {
   const pins = await prepareModels(config)
   writeEphemeralPinnedConfig(config)
 
-  const fa = new FileAccess()
-  const frozen = await tune(fa, { resolvers: ['A', 'C1', 'C2'], runId })
-  const report = await scoreTest(fa, { runId })
+  // Tuning must not be able to read the frozen test file. Use a fresh FileAccess
+  // instance for the test phase after thresholds and their hash have been written.
+  const tuningAccess = new FileAccess()
+  const frozen = await tune(tuningAccess, { resolvers: ['A', 'C1', 'C2'], runId })
 
   const resultFolder = join(ROOT, 'results', runId)
-  writeFileSync(join(resultFolder, 'model-pins.json'), JSON.stringify({
+  const pinsPath = join(resultFolder, 'model-pins.json')
+  const pinReport = {
     runId,
     pinnedAt: new Date().toISOString(),
     package: '@huggingface/transformers@4.3.2',
     models: pins,
     frozenThresholds: frozen.thresholds,
-    testReadCount: report.testReadCount,
+    testReadCount: null,
     modelWeightsCommitted: false,
     modelWeightsUploadedAsArtifacts: false,
-  }, null, 2) + '\n')
+  }
+  writeFileSync(pinsPath, JSON.stringify(pinReport, null, 2) + '\n')
+
+  const testAccess = new FileAccess()
+  const report = await scoreTest(testAccess, { runId })
+  pinReport.testReadCount = report.testReadCount
+  writeFileSync(pinsPath, JSON.stringify(pinReport, null, 2) + '\n')
 
   const summary = readFileSync(join(resultFolder, 'summary.md'), 'utf8')
   console.log(summary)
