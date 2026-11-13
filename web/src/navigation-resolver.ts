@@ -54,7 +54,7 @@ const stopWords = new Set([
   'please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','screen','page',
   'karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko',
   'mera','meri','mere','banao','banana','banani','banaye','banaiye','karna','chahiye','wala','wali','wale',
-  'please','ji','ab','ek','aur','se','ko','करनी','करना','करते','करती','हुआ','हुई'
+  'please','ji','ab','ek','aur','se','ko','करनी','करना','करते','करती','हुआ','हुई','है','हैं'
 ])
 
 const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
@@ -151,7 +151,7 @@ export function resolveNavigation(input: string): NavigationResolution {
   if (!q) return { kind: 'not-understood' }
   if (input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') ||
       input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) ||
-      dataQuestion.test(q) || ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => q.includes(term)) || transaction.test(q) || ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) || /\d/.test(q)) return { kind: 'reject' }
+      dataQuestion.test(q) || ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => input.includes(term)) || transaction.test(q) || ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) || /\d/.test(q)) return { kind: 'reject' }
 
   const qTokens = tokens(q)
   if (!qTokens.length) return { kind: 'not-understood' }
