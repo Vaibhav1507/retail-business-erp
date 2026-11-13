@@ -79,8 +79,11 @@ public static class WhatsAppInvoiceWorker
                         {
                             var pdf = InvoicePdfRenderer.Render(job.Snapshot.RootElement);
                             var invoiceNo = job.Snapshot.RootElement.GetProperty("sale").GetProperty("invoiceNo").GetString() ?? "invoice";
+                            var mediaId = await provider!.UploadInvoicePdfAsync(pdf, invoiceNo, ct);
+                            // Only the template-send call can create a customer-visible WhatsApp message.
+                            // An upload timeout is therefore safe to retry; a send timeout is ambiguous.
                             messageSendStarted = true;
-                            var messageId = await provider!.SendInvoiceAsync(recipient, invoiceNo, pdf, ct);
+                            var messageId = await provider.SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
                             messageAccepted = true;
                             await FinishQueueAsync(queueDataSource, item, null, ct);
