@@ -10,7 +10,7 @@ import { classify, mcnemarExact, selectThresholds } from '../scripts/lib/evaluat
 import { validateData } from '../scripts/lib/validate.mjs'
 import { LEXICON_FILE, generateLexicon } from '../scripts/build-lexicon.mjs'
 import { runValidation } from '../scripts/validate.mjs'
-import { parseDecision as parseLlmDecision, chatMessages as llmChatMessages } from '../scripts/run-llm-bakeoff.mjs'
+import { parseDecision as parseLlmDecision, chatMessages as llmChatMessages } from '../scripts/lib/llm-router.mjs'
 import { gate, loadContext, prepareSet, test as runTest, tune } from '../scripts/run.mjs'
 
 const FROZEN_TEST_SHA = '068754fcc42b8fc40817911cfafeb508215a5a4bf8913a6a7989dbef27ea5818'
