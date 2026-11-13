@@ -54,7 +54,7 @@ const stopWords = new Set([
   'please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','screen','page',
   'karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko',
   'mera','meri','mere','banao','banana','banani','banaye','banaiye','karna','chahiye','wala','wali','wale',
-  'please','ji','ab','ek','aur','se','ko'
+  'please','ji','ab','ek','aur','se','ko','करनी','करना','करते','करती','हुआ','हुई'
 ])
 
 const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
@@ -69,11 +69,11 @@ const canonicalWords: Record<string, string> = {
   'खर्च':'expense','खर्चा':'expense','व्यय':'expense','expense':'expense','expence':'expense',
   'वापसी':'return','रिटर्न':'return','वापस':'return','return':'return',
   'पुराना':'past','पुराने':'past','पिछला':'past','पिछली':'past','history':'history','इतिहास':'history',
-  'पैसा':'payment','पैसे':'payment','भुगतान':'payment','पेमेंट':'payment','payment':'payment','भुगतान':'payment',
+  'पैसा':'payment','पैसे':'payment','भुगतान':'payment','पेमेंट':'payment','payment':'payment',
   'जोड़':'add','जोड़ो':'add','जोड़ना':'add','बनाओ':'create','बनाना':'create','बनानी':'create','बनाइए':'create','बनाए':'create','create':'create','add':'add',
   'देखो':'view','दिखाओ':'view','दिखाना':'view','दिखाइए':'view','खोलो':'view','खोलना':'view','देखना':'view','show':'view','check':'view','view':'view',
   'सूची':'list','लिस्ट':'list','list':'list','खाता':'ledger','बही':'ledger','उधार':'dues','बकाया':'dues',
-  'नया':'new','नई':'new','new':'new','मौजूदा':'current','current':'current',
+  'एंट्री':'entry','प्रविष्टि':'entry','entry':'entry','नया':'new','नई':'new','new':'new','मौजूदा':'current','current':'current',
   'से':'','का':'','की':'','के':'','को':'','है':'','हैं':'','मुझे':'','मेरे':'','मेरी':'','मेरा':''
 }
 
