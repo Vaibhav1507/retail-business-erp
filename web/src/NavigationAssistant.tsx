@@ -212,9 +212,9 @@ export function NavigationAssistant() {
   </button>
   {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={()=>setOpen(false)}>×</button></header>
-   <div className="navigation-shortcuts" aria-label={text.shortcuts}>
+   {(!query.trim() || (message && choices.length===0)) && <div className="navigation-shortcuts" aria-label={text.shortcuts}>
     {quick.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}
-   </div>
+   </div>}
    <form onSubmit={submit} className="navigation-assistant-form">
     <input id="rbos-go-to" aria-label={text.title} value={query} onChange={e=>{setQuery(e.target.value);setMessage('');setChoices([])}} placeholder={text.placeholder} autoComplete="off" />
     {!voiceReady ? <button type="button" className="assistant-mic-setup" aria-label={text.setupVoice} title={text.setupVoice} onClick={prepareVoice} disabled={voiceLoading}>🎙</button> :
