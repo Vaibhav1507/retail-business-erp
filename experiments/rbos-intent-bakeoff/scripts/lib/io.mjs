@@ -15,6 +15,7 @@ export class FileAccess {
     this.root = resolve(root)
     this.forbidden = new Set()
     this.log = []
+    this.readCache = new Map()
     for (const p of forbid) this.forbid(p)
   }
   rel(p) { return relative(this.root, isAbsolute(p) ? p : resolve(this.root, p)).split(sep).join('/') }
