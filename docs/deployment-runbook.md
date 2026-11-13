@@ -75,7 +75,8 @@ Configure these only in Cloud Run Secret Manager / environment injection. Never 
 - `WhatsApp__TemplateName` — approved Utility template name with a document header and one body parameter for the invoice number.
 - `WhatsApp__TemplateLanguage` — approved template language code, for example `en`.
 - `WhatsApp__ApiVersion` — explicitly selected supported Graph API version.
-- `WhatsApp__PilotTenantId` — tenant UUID for this one-shop pilot.\n- `WhatsApp__PilotActorUserId` — active owner/member user UUID in that tenant; webhook updates run under this user's normal tenant RLS context.
+- `WhatsApp__PilotTenantId` — tenant UUID for this one-shop pilot.
+- `WhatsApp__PilotActorUserId` — active owner/member user UUID in that tenant; webhook updates run under this user's normal tenant RLS context.
 
 The template must be approved by Meta before production messages can be sent. The application uploads a PDF to the Cloud API media endpoint and sends it using the approved document-header template. The delivery webhook uses the configured pilot tenant and actor to update delivery rows under ordinary tenant RLS; it does not use a cross-tenant database bypass.
 
@@ -84,10 +85,11 @@ The template must be approved by Meta before production messages can be sent. Th
 1. Create a Cloud Run Job from the same container image as the API.
 2. Override the command to `dotnet Rbos.Api.dll --whatsapp-worker`.
 3. Set `Rbos__Database=prod` and inject only `ConnectionStrings__RbosProdApp` plus the WhatsApp secrets listed above. Do not provide any migrator connection string.
-4. Use a service account with access only to the required Secret Manager secrets and Cloud Run Job execution.
-5. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). The worker drains currently available queue items and exits.
-6. Configure the Meta webhook callback URL as `https://<application-domain>/webhooks/meta/whatsapp`, subscribe to message status events, and use the same app secret, verify token and phone-number ID as the API configuration.
-7. Before live use, test using Meta's test sender/recipient and verify sent, delivered, read, failed and retry paths.
+4. Configure a separate PostgreSQL role `rbos_worker` for the Cloud Run Job. It can only call the queue claim/finish functions; it has no direct queue-table access and no tenant business-data permissions. Inject `ConnectionStrings__RbosProdWhatsAppWorker` for this role. The API's `rbos_app` connection remains separate and cannot claim or finish queue records.
+5. Use a service account with access only to the required Secret Manager secrets and Cloud Run Job execution.
+6. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). The worker drains currently available queue items and exits.
+7. Configure the Meta webhook callback URL as `https://<application-domain>/webhooks/meta/whatsapp`, subscribe to message status events, and use the same app secret, verify token and phone-number ID as the API configuration.
+8. Before live use, test using Meta's test sender/recipient and verify sent, delivered, read, failed and retry paths.
 
 ### Customer permission
 
