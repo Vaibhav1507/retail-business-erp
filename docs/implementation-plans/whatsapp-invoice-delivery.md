@@ -100,8 +100,21 @@
 
 ## Latest verification findings (2026-11-13)
 
-- First full build exposed and then cleared a C# command-lifetime compile error.
-- Latest frontend job passed TypeScript, unit tests and production build.
-- Backend build passed, and all migrations 001–043 applied successfully to disposable PostgreSQL 17.
-- Backend test run: 79 unit tests passed; 131 integration tests passed and 2 failed. Failures identified the dispatch queue's missing forced RLS and an overly strict enqueue membership helper check. Both have been corrected in migration 043; a fresh CI run is pending.
-- No production database was touched. Migration 043 has only been exercised on disposable CI PostgreSQL.
+- GitHub Actions run #188 on commit `ec913118` completed successfully:
+  - Backend Release build passed.
+  - Disposable PostgreSQL 17 database applied migrations 001–043 successfully.
+  - Backend tests: 92 unit tests and 134 integration tests passed (226 total).
+  - Frontend: TypeScript check, 74 Vitest tests and production build passed.
+  - `npm audit --audit-level=high` reported 0 vulnerabilities.
+- The earlier 2 integration-test failures (dispatch queue forced RLS and enqueue membership check) were fixed in migration 043 and are now covered by the successful run above.
+- Follow-up source-review fixes committed after run #188:
+  - HTTP client timeouts are classified separately from worker shutdown: PDF-upload timeouts can retry; ambiguous message-send timeouts move to manual review.
+  - Meta webhook request bodies are bounded to 1 MB while streaming, rather than checked only after buffering.
+  - Sale detail API now returns the saved GST rate and customer address/notes; Sales History uses the saved GST rate to render historical GST invoices. An integration assertion covers both fields.
+  - Serial/IMEI values render on a separate invoice line.
+  - Deployment runbook now includes Meta Business app, WhatsApp sender, permissions, Utility document-template, webhook and test-sender setup.
+- These follow-up commits triggered newer CI runs. The latest branch commit is `1a8d8267`; run #198 is in progress at the time of this update. Do not treat run #188 as verification of the later follow-up commits.
+- No Meta credentials or production sender have been configured. No live WhatsApp send or production deployment has occurred.
+- No WhatsApp feature PR has been raised. Older conflicting manual-sharing PR #7 is closed without merging.
+- The branch is 10 commits behind `main`; the intervening main commits affect voice-navigation files, not the WhatsApp feature files. The final PR diff should still be checked against `main` before opening the PR.
+- Remaining verification gaps: a real Meta test-sender round trip (requires owner-approved Meta setup), worker lease/retry behaviour under injected transport failures, and browser-level proof that sale confirmation still opens the automatic print dialog while WhatsApp delivery remains independent.
