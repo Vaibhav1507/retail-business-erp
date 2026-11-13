@@ -36,7 +36,9 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: experiments/rbos-intent-bakeoff/package-lock.json
-      - name: Install pinned experiment dependencies
+      - name: Install pinned experiment dependencies (CPU runtime; skip optional CUDA EP)
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: npm ci
       - name: Verify Stage 2 tests and frozen data
         run: |
