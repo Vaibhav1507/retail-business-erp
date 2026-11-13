@@ -172,7 +172,7 @@ export function buildReport(predictions, cfg, frozen) {
   return out
 }
 
-function gate(summary, rows, cfg) {
+export function gate(summary, rows, cfg) {
   const g = cfg.gate
   const byCandidate = {}
   for (const level of LEVELS) {
