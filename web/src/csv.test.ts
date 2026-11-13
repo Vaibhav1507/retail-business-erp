@@ -24,3 +24,23 @@ describe('csv import helpers', () => {
     expect(rows[1]).toMatchObject({ isGeneric: false, baseUnit: 'pcs', brand: 'Volt', attributes: {} })
   })
 })
+
+
+describe('automatic supplier-sheet detection', () => {
+  it('recognises common supplier aliases and maps MRP without asking for manual mapping', () => {
+    const mapping = autoMap(['Particulars', 'Product Category', 'Make', 'Model No', 'UOM', 'MRP'])
+    expect(mapping).toMatchObject({ name: 0, category: 1, brand: 2, model: 3, unit: 4, mrp: 5 })
+    expect(missingRequired(mapping)).toEqual([])
+    const rows = toImportRows([['LG TV', 'Television', 'LG', '43UR7500', 'Nos', '32990']], mapping)
+    expect(rows[0]).toMatchObject({ name: 'LG TV', categoryName: 'Television', brand: 'LG', model: '43UR7500', baseUnit: 'pcs', mrp: 32990 })
+  })
+
+  it('uses a safe General category and first column fallback for unfamiliar supplier headers', () => {
+    const mapping = autoMap(['Stock Details', 'Selling Price'])
+    expect(mapping.name).toBe(0)
+    expect(missingRequired(mapping)).toEqual([])
+    expect(toImportRows([['Mixer Grinder', '2499']], mapping)[0]).toMatchObject({
+      name: 'Mixer Grinder', categoryName: 'General', baseUnit: 'pcs', mrp: null,
+    })
+  })
+})

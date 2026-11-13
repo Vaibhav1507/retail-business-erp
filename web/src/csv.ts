@@ -18,6 +18,7 @@ export const FIELDS = [
   { key: 'capacity', label: 'Capacity', required: false },
   { key: 'connector_type', label: 'Connector type', required: false },
   { key: 'compatible_with', label: 'Compatible with', required: false },
+  { key: 'mrp', label: 'MRP', required: false },
 ] as const
 
 export type FieldKey = (typeof FIELDS)[number]['key']
@@ -52,15 +53,16 @@ export function parseCsv(text: string): string[][] {
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 const ALIASES: Record<FieldKey, string[]> = {
-  name: ['name', 'productname', 'product', 'item', 'itemname', 'description'],
-  category: ['category', 'group', 'type'],
-  unit: ['unit', 'uom', 'baseunit'],
-  brand: ['brand', 'make', 'manufacturer'],
-  model: ['model', 'modelno', 'modelnumber'],
-  colour: ['colour', 'color'],
-  capacity: ['capacity', 'size'],
+  name: ['name', 'productname', 'product', 'item', 'itemname', 'description', 'particulars', 'productdescription', 'materialname'],
+  category: ['category', 'group', 'type', 'productcategory', 'itemcategory', 'department', 'division'],
+  unit: ['unit', 'uom', 'baseunit', 'unitofmeasure', 'quantityunit', 'qtyunit'],
+  brand: ['brand', 'make', 'manufacturer', 'company', 'brandname'],
+  model: ['model', 'modelno', 'modelnumber', 'modelname', 'itemcode', 'productcode'],
+  colour: ['colour', 'color', 'shade'],
+  capacity: ['capacity', 'size', 'weight', 'dimensions'],
   connector_type: ['connectortype', 'connector', 'port'],
   compatible_with: ['compatiblewith', 'compatible', 'fits'],
+  mrp: ['mrp', 'maximumretailprice', 'retailprice', 'listprice'],
 }
 
 /** Guess a column for each field from header names. */
@@ -75,7 +77,7 @@ export function autoMap(headers: string[]): Mapping {
 }
 
 export function missingRequired(m: Mapping): string[] {
-  return FIELDS.filter(f => f.required && m[f.key] === undefined).map(f => f.label)
+  return m.name === undefined ? ['Name'] : []
 }
 
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
@@ -94,7 +96,7 @@ export function toImportRows(data: string[][], m: Mapping): ImportRow[] {
     }
     return {
       name: get(r, 'name'),
-      categoryName: get(r, 'category'),
+      categoryName: get(r, 'category') || 'General',
       isGeneric: !brand && !model,
       baseUnit: unitRaw === '' ? 'pcs' : (UNIT_WORDS[unitRaw.toLowerCase()] ?? unitRaw),
       brand: brand || null,
