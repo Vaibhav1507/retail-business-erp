@@ -23,7 +23,7 @@ public static class WhatsAppInvoiceWorker
         var configured = pilotTenantConfigured && !string.IsNullOrWhiteSpace(accessToken)
             && !string.IsNullOrWhiteSpace(phoneNumberId)
             && !string.IsNullOrWhiteSpace(template) && !string.IsNullOrWhiteSpace(apiVersion);
-        var meta = configured
+         IInvoiceDeliveryProvider? provider = configured
             ? new MetaWhatsAppCloudClient(http, apiVersion!, phoneNumberId!, accessToken!, template!, language)
             : null;
 
@@ -79,9 +79,8 @@ public static class WhatsAppInvoiceWorker
                         {
                             var pdf = InvoicePdfRenderer.Render(job.Snapshot.RootElement);
                             var invoiceNo = job.Snapshot.RootElement.GetProperty("sale").GetProperty("invoiceNo").GetString() ?? "invoice";
-                            var mediaId = await meta!.UploadInvoicePdfAsync(pdf, invoiceNo, ct);
                             messageSendStarted = true;
-                            var messageId = await meta.SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
+                            var messageId = await provider!.SendInvoiceAsync(recipient, invoiceNo, pdf, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
                             messageAccepted = true;
                             await FinishQueueAsync(queueDataSource, item, null, ct);
