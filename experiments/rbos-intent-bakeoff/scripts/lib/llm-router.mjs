@@ -1,6 +1,6 @@
 // Prompt construction and fail-closed output parser for the isolated Qwen evaluation.
 export function promptFor(destinations) {
-  const choices = destinations.map((d) => `- ${d.id}: ${d.label}`).join('\\n')
+  const choices = destinations.map((d) => \`- \${d.id}: \${d.label}\`).join('\n')
   return [
     'You are the navigation intent classifier for a small Indian retail shop app. You are NOT a general chatbot.',
     'Your only job is to classify the user utterance as NAVIGATE, ASK, or NOT_UNDERSTOOD. Never answer business questions and never perform a transaction.',
@@ -26,21 +26,21 @@ export function promptFor(destinations) {
     '',
     'VERIFIED DESTINATION ALLOWLIST:',
     choices
-  ].join('\\n')
+  ].join('\n')
 }
 
 export function parseDecision(output, allowed) {
   const lines = (typeof output === 'string' ? output : '')
-    .replace(/<\\|im_end\\|>\\s*$/u, '')
-    .split(/\\r?\\n/u)
+    .replace(/<\|im_end\|>\s*$/u, '')
+    .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean)
   const line = lines.at(-1) ?? ''
-  const navigate = line.match(/^NAVIGATE\\|([a-z][a-z0-9._-]*)$/iu)
+  const navigate = line.match(/^NAVIGATE\|([a-z][a-z0-9._-]*)$/iu)
   if (navigate && allowed.has(navigate[1])) {
     return { kind: 'navigate', ids: [navigate[1]], reason: 'model_navigate' }
   }
-  const ask = line.match(/^ASK\\|([a-z][a-z0-9._-]*(?:\\s*,\\s*[a-z][a-z0-9._-]*){1,2})$/iu)
+  const ask = line.match(/^ASK\|([a-z][a-z0-9._-]*(?:\s*,\s*[a-z][a-z0-9._-]*){1,2})$/iu)
   if (ask) {
     const ids = [...new Set(ask[1].split(',').map((id) => id.trim()))]
     if (ids.length >= 2 && ids.every((id) => allowed.has(id))) {
