@@ -43,7 +43,7 @@ describe('NavigationAssistant', () => {
   const actions = container.querySelector('.navigation-top-actions')!
   expect(within(actions).getByRole('button', { name: 'Current stock' })).toBeInTheDocument()
   expect(within(actions).getByRole('button', { name: 'Products' })).toBeInTheDocument()
-  expect(within(actions).getByRole('button', { name: 'Low stock alerts' })).toBeInTheDocument()
+  expect(within(actions).getByRole('button', { name: 'Stock alerts' })).toBeInTheDocument()
   expect(window.location.hash).toBe('')
  })
 
