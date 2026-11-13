@@ -47,7 +47,7 @@ describe('NavigationAssistant', () => {
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), 'how much cash do I have')
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
-  expect(screen.getByRole('status')).toHaveTextContent('I can only navigate screens')
+  expect(screen.getByText('I can only navigate screens. I cannot answer business questions or perform transactions.')).toBeInTheDocument()
   expect(window.location.hash).toBe('')
  })
  it('uses Hindi labels when the saved app language is Hindi', async () => {
