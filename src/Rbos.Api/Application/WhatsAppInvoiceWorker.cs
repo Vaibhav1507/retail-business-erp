@@ -10,7 +10,7 @@ public static class WhatsAppInvoiceWorker
     sealed record Claimed(Guid DeliveryId, Guid TenantId, Guid SaleId, Guid ActorUserId, Guid LeaseToken, int AttemptCount);
     sealed record InvoiceJob(JsonDocument Snapshot, string? Recipient, string ConsentStatus);
 
-    public static async Task RunAsync(NpgsqlDataSource dataSource, IConfiguration config, ILogger logger, CancellationToken ct)
+    public static async Task RunAsync(NpgsqlDataSource dataSource, NpgsqlDataSource queueDataSource, IConfiguration config, ILogger logger, CancellationToken ct)
     {
         var db = new TenantDb(dataSource);
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
@@ -29,7 +29,7 @@ public static class WhatsAppInvoiceWorker
 
         while (!ct.IsCancellationRequested)
         {
-            var claimed = await ClaimAsync(dataSource, ct);
+            var claimed = await ClaimAsync(queueDataSource, ct);
             if (claimed.Count == 0) break;
             foreach (var item in claimed)
             {
@@ -39,7 +39,7 @@ public static class WhatsAppInvoiceWorker
                     if (!pilotTenantConfigured || item.TenantId != pilotTenantId)
                     {
                         await UpdateDeliveryAsync(db, item, "WaitingForSetup", null, "No WhatsApp sender is configured for this business.", ct);
-                        await FinishQueueAsync(dataSource, item, null, ct);
+                        await FinishQueueAsync(queueDataSource, item, null, ct);
                         continue;
                     }
                     var job = await LoadJobAsync(db, item, ct);
