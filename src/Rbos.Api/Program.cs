@@ -1,8 +1,35 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.StaticFiles;
 using Rbos.Api.Persistence;
+using Rbos.Api.Application;
 
 // Tooling modes (no web server). Normal startup is added in a later stage.
+if (args.Contains("--whatsapp-worker"))
+{
+    var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
+    var database = config["Rbos:Database"] ?? "dev";
+    var key = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
+    var connectionString = config[key] ?? throw new InvalidOperationException($"Missing secret {key}");
+    var workerKey = database switch { "test" => "ConnectionStrings:RbosTestWhatsAppWorker", "prod" => "ConnectionStrings:RbosProdWhatsAppWorker", _ => "ConnectionStrings:RbosDevWhatsAppWorker" };
+    var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
+    await using var dataSource = Npgsql.NpgsqlDataSource.Create(connectionString);
+    await using var queueDataSource = Npgsql.NpgsqlDataSource.Create(workerConnectionString);
+    await using (var probe = await dataSource.OpenConnectionAsync())
+    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
+        if ((string?)await who.ExecuteScalarAsync() != "rbos_app")
+            throw new InvalidOperationException("WhatsApp tenant data connection must use rbos_app.");
+    await using (var probe = await queueDataSource.OpenConnectionAsync())
+    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
+        if ((string?)await who.ExecuteScalarAsync() != "rbos_worker")
+            throw new InvalidOperationException("WhatsApp queue connection must use rbos_worker.");
+    using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+    var logger = loggerFactory.CreateLogger("WhatsAppInvoiceWorker");
+    QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+    QuestPDF.Settings.UseSystemFonts = true;
+    await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config, logger, CancellationToken.None);
+    return;
+}
+
 if (args.Contains("--emit-identity-sql"))
 {
 	var options = new DbContextOptionsBuilder<RbosIdentityDbContext>()
@@ -25,6 +52,8 @@ if (args.Contains("--migrate"))
 	return;
 }
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+QuestPDF.Settings.UseSystemFonts = true;
 var builder = WebApplication.CreateBuilder(args);
 var dbKey = (builder.Configuration["Rbos:Database"] ?? "dev") switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
 var appCs = builder.Configuration[dbKey] ?? throw new InvalidOperationException($"Missing secret {dbKey}");
@@ -129,6 +158,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/api/health").AllowAnonymous();
 Rbos.Api.Endpoints.Map(app);
+Rbos.Api.WhatsAppWebhookEndpoints.Map(app);
 app.MapFallback("/api/{**path}", () => Results.NotFound()).AllowAnonymous();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 app.Run();

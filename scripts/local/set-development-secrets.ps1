@@ -24,17 +24,19 @@ if (-not (Select-String -Path (Join-Path $ApiProject 'Rbos.Api.csproj') -Pattern
 
 $migPw = Read-Host 'Password for rbos_migrator' -AsSecureString
 $appPw = Read-Host 'Password for rbos_app' -AsSecureString
+$workerPw = Read-Host 'Password for rbos_worker (WhatsApp queue access only)' -AsSecureString
 $mig = ConvertTo-Plain $migPw
 $app = ConvertTo-Plain $appPw
-if ($mig.Length -lt 12 -or $app.Length -lt 12) { throw 'Use passwords of at least 12 characters.' }
-if ($mig -eq $app) { throw 'Migrator and app passwords must differ.' }
-if ($mig -match "['\x22;=\s]" -or $app -match "['\x22;=\s]") { throw 'Avoid quotes, semicolons, equals signs and spaces in passwords.' }
+$worker = ConvertTo-Plain $workerPw
+if ($mig.Length -lt 12 -or $app.Length -lt 12 -or $worker.Length -lt 12) { throw 'Use passwords of at least 12 characters.' }
+if ($mig -eq $app -or $mig -eq $worker -or $app -eq $worker) { throw 'Migrator, app and worker passwords must differ.' }
+if ($mig -match "['\x22;=\s]" -or $app -match "['\x22;=\s]" -or $worker -match "['\x22;=\s]") { throw 'Avoid quotes, semicolons, equals signs and spaces in passwords.' }
 
 # Set role passwords in local PostgreSQL via psql stdin (never on a command line).
 $su = Get-Content "$env:USERPROFILE\.rbos-local\pg-superuser.dpapi" | ConvertTo-SecureString
 $env:PGPASSWORD = ConvertTo-Plain $su
 try {
-	$sql = "ALTER ROLE rbos_migrator PASSWORD '$mig';`nALTER ROLE rbos_app PASSWORD '$app';"
+	$sql = "ALTER ROLE rbos_migrator PASSWORD '$mig';`nALTER ROLE rbos_app PASSWORD '$app';`nALTER ROLE rbos_worker PASSWORD '$worker';"
 	$sql | & "$PgBin\psql.exe" -h localhost -p $Port -U postgres -d postgres -w -q -v ON_ERROR_STOP=1 | Out-Null
 	if ($LASTEXITCODE -ne 0) { throw 'Failed to set role passwords.' }
 } finally { Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue }
@@ -44,6 +46,8 @@ $map = @{
 	'ConnectionStrings:RbosDevApp'       = @('rbos_app',      $app, 'rbos_dev')
 	'ConnectionStrings:RbosTestMigrator' = @('rbos_migrator', $mig, 'rbos_test')
 	'ConnectionStrings:RbosTestApp'      = @('rbos_app',      $app, 'rbos_test')
+	'ConnectionStrings:RbosDevWhatsAppWorker'  = @('rbos_worker', $worker, 'rbos_dev')
+	'ConnectionStrings:RbosTestWhatsAppWorker' = @('rbos_worker', $worker, 'rbos_test')
 }
 foreach ($k in $map.Keys) {
 	$u, $p, $d = $map[$k]
@@ -52,5 +56,5 @@ foreach ($k in $map.Keys) {
 	if ($LASTEXITCODE -ne 0) { throw "Failed to set $k" }
 	Write-Host "Configured: $k"
 }
-$mig = $null; $app = $null
+$mig = $null; $app = $null; $worker = $null
 Write-Host 'Done. No password values were displayed or stored in files.'
