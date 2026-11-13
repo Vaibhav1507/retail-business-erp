@@ -30,7 +30,7 @@ export function Customers({ reload }: { reload: () => void }) {
       <h3>Customers</h3>
       <div>
         <label>Customer name <input value={cname} onChange={e => setCname(e.target.value)} /></label>
-        <label>Phone <input value={cphone} onChange={e => setCphone(e.target.value)} /></label>
+        <label>Phone <input value={cphone} onChange={e => { setCphone(e.target.value); setConsent("Unknown") }} /></label>
         <label>Notes <input value={cnotes} onChange={e => setCnotes(e.target.value)} /></label>
         <label>WhatsApp invoice permission <select value={consent} onChange={e => setConsent(e.target.value as 'Unknown' | 'OptedIn' | 'OptedOut')}><option value="Unknown">Not confirmed</option><option value="OptedIn">Customer agreed to receive invoices</option><option value="OptedOut">Customer opted out</option></select></label>
         <p className="billing-hint">Choose agreed only after the customer has given permission. This setting is not asked at every checkout.</p>
