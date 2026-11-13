@@ -34,6 +34,7 @@ public static class WhatsAppInvoiceWorker
             foreach (var item in claimed)
             {
                 ct.ThrowIfCancellationRequested();
+                var messageSendStarted = false;
                 try
                 {
                     if (!pilotTenantConfigured || item.TenantId != pilotTenantId)
@@ -78,6 +79,7 @@ public static class WhatsAppInvoiceWorker
                             var pdf = InvoicePdfRenderer.Render(job.Snapshot.RootElement);
                             var invoiceNo = job.Snapshot.RootElement.GetProperty("sale").GetProperty("invoiceNo").GetString() ?? "invoice";
                             var mediaId = await meta!.UploadInvoicePdfAsync(pdf, invoiceNo, ct);
+                            messageSendStarted = true;
                             var messageId = await meta.SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
                             await FinishQueueAsync(queueDataSource, item, null, ct);
@@ -97,17 +99,25 @@ public static class WhatsAppInvoiceWorker
                 }
                 catch (HttpRequestException ex)
                 {
-                    logger.LogWarning(ex, "WhatsApp delivery outcome is uncertain for {DeliveryId}", item.DeliveryId);
-                    await UpdateDeliveryAsync(db, item, "NeedsReview", null, "The provider response was not received. Check WhatsApp before retrying.", ct);
-                    await FinishQueueAsync(queueDataSource, item, null, ct);
+                    var uncertain = messageSendStarted;
+                    var retryAt = !uncertain && item.AttemptCount < 6
+                        ? DateTimeOffset.UtcNow.AddSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Max(0, item.AttemptCount - 1))))
+                        : (DateTimeOffset?)null;
+                    var status = uncertain ? "NeedsReview" : retryAt is null ? "Failed" : "Retry";
+                    logger.LogWarning(ex, "WhatsApp delivery transport error for {DeliveryId} (message send started={SendStarted})", item.DeliveryId, messageSendStarted);
+                    await UpdateDeliveryAsync(db, item, status, null,
+                        uncertain ? "The provider response was not received. Check WhatsApp before retrying." : "The PDF upload request could not be completed.", ct);
+                    await FinishQueueAsync(queueDataSource, item, retryAt, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogError(ex, "Unexpected invoice delivery worker error for {DeliveryId}", item.DeliveryId);
-                    var retryAt = item.AttemptCount < 6 ? DateTimeOffset.UtcNow.AddMinutes(2) : (DateTimeOffset?)null;
+                    var retryAt = !messageSendStarted && item.AttemptCount < 6 ? DateTimeOffset.UtcNow.AddMinutes(2) : (DateTimeOffset?)null;
+                    var status = messageSendStarted ? "NeedsReview" : retryAt is null ? "Failed" : "Retry";
                     try
                     {
-                        await UpdateDeliveryAsync(db, item, retryAt is null ? "Failed" : "Retry", null, "Unexpected delivery processing error.", ct);
+                        await UpdateDeliveryAsync(db, item, status, null,
+                            messageSendStarted ? "Message send may have reached WhatsApp. Check WhatsApp before retrying." : "Unexpected delivery processing error.", ct);
                         await FinishQueueAsync(queueDataSource, item, retryAt, ct);
                     }
                     catch (Exception completionError)
@@ -122,7 +132,7 @@ public static class WhatsAppInvoiceWorker
     static async Task<List<Claimed>> ClaimAsync(NpgsqlDataSource source, CancellationToken ct)
     {
         await using var conn = await source.OpenConnectionAsync(ct);
-        await using var cmd = new NpgsqlCommand("select delivery_id, tenant_id, sale_id, actor_user_id, lease_token, attempt_count from integrations.claim_invoice_deliveries(10,180)", conn);
+        await using var cmd = new NpgsqlCommand("select delivery_id, tenant_id, sale_id, actor_user_id, lease_token, attempt_count from integrations.claim_invoice_deliveries(5,900)", conn);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         var result = new List<Claimed>();
         while (await reader.ReadAsync(ct))
