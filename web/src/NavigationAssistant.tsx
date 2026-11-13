@@ -235,7 +235,7 @@ export function NavigationAssistant() {
     {recording && <span className="navigation-voice-note">{text.recording}</span>}
    </div>
    <p className="navigation-privacy">{text.voiceNote}</p>
-   {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={startRecording}>{text.retry}</button></div>}
+   {voiceError && <div className="voice-error" role="alert"><span>{voiceError}</span><button type="button" onClick={prepareVoice}>{text.retry}</button></div>}
    {message && <p className="navigation-feedback" role="status">{message}</p>}
    {choices.length>0 && <div className="navigation-choices" aria-label={text.choose}>{choices.map(target=><button type="button" key={target.id} onClick={()=>go(target)}>{targetLabel(target,lang)}</button>)}</div>}
   </section>}
