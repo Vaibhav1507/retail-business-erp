@@ -152,6 +152,14 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
   expect(screen.getByLabelText('Ask your business assistant')).toHaveAttribute('readonly')
   expect(screen.getByRole('button', {name:'Go'})).toBeDisabled()
 
+  // Ignore a delayed result belonging to a previous capture.
+  MockSpeechWorker.instance?.emit({
+   type:'partial-result',
+   captureId:0,
+   text:'mujhe Ramesh ji ka purana bil'
+  })
+  expect(screen.queryByRole('button', {name:'Old sale bills'})).not.toBeInTheDocument()
+
   // A partial Shruti result is allowed to surface a likely screen, but must never navigate.
   MockSpeechWorker.instance?.emit({
    type:'partial-result',
