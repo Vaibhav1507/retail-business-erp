@@ -106,6 +106,11 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         await c.Send(HttpMethod.Put, "/customers/" + customer, new { name = "Opted In Updated", phone = "9876543210", notes = (string?)null, isActive = true });
         var listed = (await c.GetJson("/customers")).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == customer);
         Assert.Equal("OptedIn", listed.GetProperty("whatsappConsentStatus").GetString());
+
+        // A changed phone is a new WhatsApp recipient. Permission must be collected again.
+        await c.Send(HttpMethod.Put, "/customers/" + customer, new { name = "Opted In Updated", phone = "9876543212", notes = (string?)null, isActive = true });
+        var changedPhone = (await c.GetJson("/customers")).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == customer);
+        Assert.Equal("Unknown", changedPhone.GetProperty("whatsappConsentStatus").GetString());
     }
 
     [Fact] public async Task Unknown_or_opted_out_consent_never_queues_whatsapp_delivery()
