@@ -90,7 +90,7 @@ public static class WhatsAppInvoiceWorker
                             var retryAt = retryable
                                 ? DateTimeOffset.UtcNow.AddSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Max(0, item.AttemptCount - 1))))
                                 : (DateTimeOffset?)null;
-                            await UpdateDeliveryAsync(db, item, retryable ? "Retry" : "Failed", null, ex.SafeMessage, ct);
+                            await UpdateDeliveryAsync(db, item, ex.NeedsReview ? "NeedsReview" : retryable ? "Retry" : "Failed", null, ex.SafeMessage, ct);
                             await FinishQueueAsync(dataSource, item, retryAt, ct);
                             logger.LogWarning("WhatsApp delivery {DeliveryId} failed (retryable={Retryable}, attempt={Attempt})", item.DeliveryId, retryable, item.AttemptCount);
                         }
@@ -258,14 +258,16 @@ public static class WhatsAppInvoiceWorker
         return string.IsNullOrWhiteSpace(safe) ? "invoice" : safe;
     }
 
-    sealed class MetaApiException(bool retryable, string safeMessage) : Exception(safeMessage)
+    sealed class MetaApiException(bool retryable, string safeMessage, bool needsReview = false) : Exception(safeMessage)
     {
         public bool Retryable { get; } = retryable;
+        public bool NeedsReview { get; } = needsReview;
         public string SafeMessage { get; } = safeMessage;
 
         public static MetaApiException FromResponse(HttpStatusCode status, string body)
         {
-            var retryable = status == HttpStatusCode.TooManyRequests || (int)status >= 500;
+            var retryable = status == HttpStatusCode.TooManyRequests;
+            var needsReview = (int)status >= 500;
             string message = "Meta WhatsApp API request failed (HTTP " + (int)status + ").";
             try
             {
@@ -274,7 +276,7 @@ public static class WhatsAppInvoiceWorker
                     message += " Provider error code: " + code.ToString() + ".";
             }
             catch (JsonException) { }
-            return new MetaApiException(retryable, message);
+            return new MetaApiException(retryable, message, needsReview);
         }
     }
 }
