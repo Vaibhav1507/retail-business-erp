@@ -1,14 +1,14 @@
 # Semantic intent model bake-off — v1 result
 
 Date: 2026-11-13  
-Workflow run: [43418998859](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859)  
+Workflow run: [43419876997](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/43418998859)  
 Dataset: synthetic, frozen v1 (160 items; 110 navigation, 30 ambiguity, 20 reject)
 
 ## Decision
 
 **Neither embedding model is approved for RBOS integration.**
 
-The workflow successfully installed the pinned runtime, verified the model artefacts, ran CPU inference locally on the ephemeral CI runner, tuned thresholds on the separate 54-item tuning set, and scored the frozen v1 test set. The model-selection gate failed for every model/preprocessing combination.
+The final verified workflow (28/28 Stage 2 tests, validator and lexicon checks passed) installed the pinned runtime, verified the model artefacts, ran CPU inference locally on the ephemeral CI runner, tuned thresholds on the separate 54-item tuning set, and scored the frozen v1 test set. The test file was checksum-verified and read once from a cached buffer after threshold freeze. The model-selection gate failed for every model/preprocessing combination.
 
 This is a useful negative result. It does not show that semantic understanding is inherently unsuitable; it shows that these two general-purpose multilingual embedding models, with the current anchors, preprocessing and synthetic evaluation set, are not adequate evidence for a production navigation resolver.
 
@@ -16,15 +16,15 @@ This is a useful negative result. It does not show that semantic understanding i
 
 | Resolver | Correct navigation | Wrong navigation | Reject items navigated | Not understood | p50 / p95 inference |
 |---|---:|---:|---:|---:|---:|
-| A/L0 deterministic | 9.1% | 8.8% | 2 | 83.1% | 1.12 / 2.09 ms |
-| A/L1 deterministic | 13.6% | 10.0% | 2 | 65.6% | 1.03 / 1.98 ms |
-| A/L2 deterministic | 13.6% | 5.6% | 0 | 80.6% | 2.06 / 4.04 ms |
-| C1/L0 multilingual-e5-small | 2.7% | 1.3% | 0 | 49.4% | 2.54 / 3.08 ms |
-| C1/L1 multilingual-e5-small | 3.6% | 1.3% | 0 | 41.9% | 2.57 / 3.36 ms |
-| C1/L2 multilingual-e5-small | 4.5% | 1.9% | 0 | 12.5% | 2.96 / 8.41 ms |
-| C2/L0 multilingual-MiniLM | 14.5% | 11.3% | 0 | 65.0% | 2.34 / 10.03 ms |
-| C2/L1 multilingual-MiniLM | 5.5% | 7.5% | 0 | 78.1% | 2.22 / 2.68 ms |
-| C2/L2 multilingual-MiniLM | 9.1% | 2.5% | 0 | 66.3% | 2.40 / 3.32 ms |
+| A/L0 deterministic | 9.1% | 8.8% | 2 | 83.1% | 1.37 / 3.09 ms |
+| A/L1 deterministic | 13.6% | 10.0% | 2 | 65.6% | 1.24 / 2.48 ms |
+| A/L2 deterministic | 13.6% | 5.6% | 0 | 80.6% | 2.53 / 5.32 ms |
+| C1/L0 multilingual-e5-small | 2.7% | 1.3% | 0 | 49.4% | 3.12 / 3.96 ms |
+| C1/L1 multilingual-e5-small | 3.6% | 1.3% | 0 | 41.9% | 3.34 / 24.24 ms |
+| C1/L2 multilingual-e5-small | 4.5% | 1.9% | 0 | 12.5% | 3.66 / 6.09 ms |
+| C2/L0 multilingual-MiniLM | 14.5% | 11.3% | 0 | 65.0% | 2.49 / 4.83 ms |
+| C2/L1 multilingual-MiniLM | 5.5% | 7.5% | 0 | 78.1% | 2.71 / 16.48 ms |
+| C2/L2 multilingual-MiniLM | 9.1% | 2.5% | 0 | 66.3% | 3.06 / 4.93 ms |
 
 *Times are from the GitHub CPU runner, not an Android phone.*
 
@@ -50,7 +50,7 @@ The declared acceptance gate requires a candidate to improve correct navigation 
 - C2/MiniLM: **FAIL** at L0, L1 and L2. L0 has a small overall gain over A but 11.3% wrong navigation; L2 lowers wrong navigation to 2.5% but loses coverage and does not improve every language bucket.
 - The gate also fails under the debatable-items-excluded view; this is not an artefact of the disputed test labels.
 
-The corrected evaluator additionally enforces the wrong-navigation ceiling independently in each language bucket, not only on the pooled total.
+The corrected evaluator enforces the wrong-navigation ceiling independently in each language bucket, not only on the pooled total. The final rerun completed with the same no-pass decision.
 
 ## Interpretation and limitations
 
