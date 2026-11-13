@@ -149,6 +149,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/api/health").AllowAnonymous();
 Rbos.Api.Endpoints.Map(app);
+Rbos.Api.WhatsAppWebhookEndpoints.Map(app);
 app.MapFallback("/api/{**path}", () => Results.NotFound()).AllowAnonymous();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 app.Run();
