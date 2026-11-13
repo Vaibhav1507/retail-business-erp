@@ -108,7 +108,10 @@ public static class InvoicePdfRenderer
                             var halfTax = (net - lineTaxable) / 2m;
                             void Cell(string value) => table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(value);
                             Cell((++index).ToString(CultureInfo.InvariantCulture));
-                            Cell(Text(line, "name"));
+                            var serials = line.TryGetProperty("serials", out var serialArray) && serialArray.ValueKind == JsonValueKind.Array
+                                ? string.Join(", ", serialArray.EnumerateArray().Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x)))
+                                : "";
+                            Cell(Text(line, "name") + (serials.Length > 0 ? "\\nSerial/IMEI: " + serials : ""));
                             Cell(Number(line, "quantity").ToString("0.###", CultureInfo.InvariantCulture));
                             Cell(Money(Number(line, "unitPrice")));
                             Cell(Money(Number(line, "discount")));
