@@ -10,9 +10,10 @@ Every step that creates accounts, cloud resources or touches the production data
 
 ## 2. Database (Neon)
 1. Create a project and a database.
-2. Create two roles:
-   - `rbos_app`: runtime role, no DDL rights.
-   - a migrator role: used only from a trusted machine.
+2. Create the three roles listed below (the repository bootstrap script creates them with least privilege):
+   - `rbos_app`: API runtime role, with tenant-scoped business-data permissions.
+   - `rbos_worker`: Cloud Run Job role, with only invoice queue claim/finish function access.
+   - `rbos_migrator`: DDL/migration role, used only from a trusted machine.
 3. Run migrations with the migrator role (`ConnectionStrings:RbosProdMigrator`):
    `dotnet run --project src/Rbos.Api -- --migrate prod`
    This applies all ordered SQL files in `db/migrations/`, including the latest numbered migration. Keep the API runtime role separate from the migrator role.
