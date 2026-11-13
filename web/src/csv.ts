@@ -77,7 +77,7 @@ export function autoMap(headers: string[]): Mapping {
 }
 
 export function missingRequired(m: Mapping): string[] {
-  return [...(m.name === undefined ? ['Name'] : []), ...(m.category === undefined ? ['Category'] : [])]
+  return [...(m.name === undefined ? ['Name'] : []), ...(m.category === undefined && m.mrp === undefined ? ['Category'] : [])]
 }
 
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
