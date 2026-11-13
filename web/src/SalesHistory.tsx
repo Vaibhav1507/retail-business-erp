@@ -22,11 +22,21 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
   const [biz, setBiz] = useState<BizProfile | null>(null)
   useEffect(() => { api<BizProfile>('GET', '/business-profile').then(setBiz).catch(() => undefined) }, [])
   const [loaded, setLoaded] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const loadSales = useCallback(async () => { setSales(await api<SaleRow[]>('GET', '/sales' + (saleSearch.trim() ? '?q=' + encodeURIComponent(saleSearch.trim()) : ''))); setLoaded(true) }, [saleSearch])
   useEffect(() => { loadSales().catch(e => setError(msg(e))) }, [loadSales])
   useEffect(() => { if (!detail) return; const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setDetail(null) }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [detail])
   const shownSales = unpaid ? sales.filter(s => s.balance > 0) : sales
   const open = async (id: string) => { setError(''); try { setDetail(await api<SaleDetail>('GET', '/sales/' + id)) } catch (e) { setError(msg(e)) } }
+  const retryWhatsApp = async () => {
+    if (!detail) return
+    setRetrying(true); setError('')
+    try {
+      await api('POST', '/sales/' + detail.sale.id + '/invoice/whatsapp/retry', {})
+      await loadSales()
+      setDetail(await api<SaleDetail>('GET', '/sales/' + detail.sale.id))
+    } catch (e) { setError(msg(e)) } finally { setRetrying(false) }
+  }
   return (
     <section aria-label="Sales" className="billing-screen">
       {error && <p role="alert">{error}</p>}
@@ -44,6 +54,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
 	  {detail && <div className="invoice-modal" role="dialog" aria-modal="true" aria-label="Sale detail" onClick={e => { if (e.target === e.currentTarget) setDetail(null) }}>
 		<div className="invoice-modal-box">
 		  <div className="invoice-tools no-print"><span role="status">WhatsApp: {detail.sale.whatsappStatus}</span>
+            {(detail.sale.whatsappStatus === 'Failed' || detail.sale.whatsappStatus === 'WaitingForSetup') && <button type="button" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : 'Retry WhatsApp'}</button>}
 			<select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === "thermal" ? "@page{size:80mm auto;margin:3mm} @media print{.invoice-modal-box{width:74mm} .invoice{font-size:11px}}" : "@page{size:A4;margin:10mm}"}</style><button type="button" onClick={() => window.print()}>Print bill</button>
 			<button type="button" className="secondary" onClick={() => setDetail(null)}>Close</button>
 		  </div>
