@@ -18,6 +18,43 @@ public static class InvoicePdfRenderer
 
     static string Money(decimal value) => "₹" + value.ToString("N2", CultureInfo.GetCultureInfo("en-IN"));
 
+    static readonly string[] Ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    static readonly string[] Tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+    static string Below100(int number) => number < 20
+        ? Ones[number]
+        : Tens[number / 10] + (number % 10 > 0 ? " " + Ones[number % 10] : "");
+
+    static string Below1000(int number)
+    {
+        var hundreds = number / 100;
+        var remainder = number % 100;
+        return string.Join(" ", new[] {
+            hundreds > 0 ? Ones[hundreds] + " Hundred" : "",
+            remainder > 0 ? Below100(remainder) : ""
+        }.Where(x => x.Length > 0));
+    }
+
+    static string AmountInWords(decimal amount)
+    {
+        var absolute = decimal.Abs(amount);
+        var rupees = (long)decimal.Floor(absolute);
+        var paise = (int)decimal.Round((absolute - rupees) * 100m, 0, MidpointRounding.AwayFromZero);
+        if (rupees == 0 && paise == 0) return "Zero Rupees Only";
+        var parts = new List<string>();
+        var crore = rupees / 10_000_000;
+        var lakh = (rupees / 100_000) % 100;
+        var thousand = (rupees / 1_000) % 100;
+        if (crore > 0) parts.Add(Below100((int)crore) + " Crore");
+        if (lakh > 0) parts.Add(Below100((int)lakh) + " Lakh");
+        if (thousand > 0) parts.Add(Below100((int)thousand) + " Thousand");
+        if (rupees % 1_000 > 0) parts.Add(Below1000((int)(rupees % 1_000)));
+        var rupeeText = rupees > 0 ? string.Join(" ", parts) + " Rupees" : "";
+        var paiseText = paise > 0 ? Below100(paise) + " Paise" : "";
+        var result = string.Join(" and ", new[] { rupeeText, paiseText }.Where(x => x.Length > 0));
+        return result + " Only";
+    }
+
     public static byte[] Render(JsonElement snapshot)
     {
         var sale = snapshot.GetProperty("sale");
@@ -68,7 +105,7 @@ public static class InvoicePdfRenderer
                             p.Item().Text(Text(customer, "name", "Walk-in customer"));
                             var phone = Text(customer, "phone");
                             if (phone.Length > 0) p.Item().Text("Phone: " + phone);
-                            var notes = Text(customer, "notes");
+                            var notes = string.Join(", ", Text(customer, "notes").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
                             if (notes.Length > 0) p.Item().Text(notes);
                         });
                         row.RelativeItem().AlignRight().Column(p =>
@@ -140,6 +177,7 @@ public static class InvoicePdfRenderer
                         }
                     });
 
+                    col.Item().PaddingTop(10).Text("Amount in words: " + AmountInWords(total)).SemiBold();
                     col.Item().PaddingTop(24).Text("Goods once sold will not be taken back. Prices are inclusive of all taxes.");
                     col.Item().PaddingTop(28).AlignRight().Text("For " + Text(business, "businessName", "Business") + "\nAuthorised signatory");
                 });
