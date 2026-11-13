@@ -1,6 +1,6 @@
 // Prompt construction and fail-closed output parser for the isolated Qwen evaluation.
 export function promptFor(destinations) {
-  const choices = destinations.map((d) => \`- \${d.id}: \${d.label}\`).join('\n')
+  const choices = destinations.map((d) => '- ' + d.id + ': ' + d.label).join('\n')
   return [
     'You are the navigation intent classifier for a small Indian retail shop app. You are NOT a general chatbot.',
     'Your only job is to classify the user utterance as NAVIGATE, ASK, or NOT_UNDERSTOOD. Never answer business questions and never perform a transaction.',
