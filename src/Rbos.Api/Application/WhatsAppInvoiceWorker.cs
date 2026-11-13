@@ -78,7 +78,7 @@ public static class WhatsAppInvoiceWorker
                         {
                             var pdf = InvoicePdfRenderer.Render(job.Snapshot.RootElement);
                             var invoiceNo = job.Snapshot.RootElement.GetProperty("sale").GetProperty("invoiceNo").GetString() ?? "invoice";
-                            var mediaId = await UploadPdfAsync(http, apiVersion, phoneNumberId!, accessToken!, pdf, invoiceNo, ct);
+                            var mediaId = await UploadPdfAsync(http, apiVersion!, phoneNumberId!, accessToken!, pdf, invoiceNo, ct);
                             var messageId = await SendTemplateAsync(http, apiVersion, phoneNumberId!, accessToken!, template!, language, recipient, mediaId, invoiceNo, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
                             await FinishQueueAsync(dataSource, item, null, ct);
