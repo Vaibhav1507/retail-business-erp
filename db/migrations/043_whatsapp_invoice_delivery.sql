@@ -62,7 +62,7 @@ grant select, insert, update on sales.invoice_delivery to rbos_app;
 
 -- Queue rows are private to SECURITY DEFINER functions. The runtime role cannot query the queue.
 create schema if not exists integrations;
-grant usage on schema integrations to rbos_app;
+grant usage on schema integrations to rbos_app, rbos_worker;
 
 create table integrations.invoice_dispatch_queue (
   delivery_id uuid primary key,
@@ -159,5 +159,5 @@ revoke all on function integrations.enqueue_invoice_delivery(uuid,uuid,uuid,uuid
 revoke all on function integrations.claim_invoice_deliveries(integer,integer) from public;
 revoke all on function integrations.finish_invoice_delivery(uuid,uuid,timestamptz) from public;
 grant execute on function integrations.enqueue_invoice_delivery(uuid,uuid,uuid,uuid) to rbos_app;
-grant execute on function integrations.claim_invoice_deliveries(integer,integer) to rbos_app;
-grant execute on function integrations.finish_invoice_delivery(uuid,uuid,timestamptz) to rbos_app;
+grant execute on function integrations.claim_invoice_deliveries(integer,integer) to rbos_worker;
+grant execute on function integrations.finish_invoice_delivery(uuid,uuid,timestamptz) to rbos_worker;
