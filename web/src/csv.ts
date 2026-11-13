@@ -53,7 +53,7 @@ export function parseCsv(text: string): string[][] {
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 const ALIASES: Record<FieldKey, string[]> = {
-  name: ['name', 'productname', 'product', 'item', 'itemname', 'description', 'particulars', 'productdescription', 'materialname'],
+  name: ['name', 'productname', 'product', 'item', 'itemname', 'description', 'particulars', 'productdescription', 'materialname', 'stockdetails'],
   category: ['category', 'group', 'type', 'productcategory', 'itemcategory', 'department', 'division'],
   unit: ['unit', 'uom', 'baseunit', 'unitofmeasure', 'quantityunit', 'qtyunit'],
   brand: ['brand', 'make', 'manufacturer', 'company', 'brandname'],
@@ -62,7 +62,7 @@ const ALIASES: Record<FieldKey, string[]> = {
   capacity: ['capacity', 'size', 'weight', 'dimensions'],
   connector_type: ['connectortype', 'connector', 'port'],
   compatible_with: ['compatiblewith', 'compatible', 'fits'],
-  mrp: ['mrp', 'maximumretailprice', 'retailprice', 'listprice'],
+  mrp: ['mrp', 'maximumretailprice', 'retailprice', 'listprice', 'sellingprice'],
 }
 
 /** Guess a column for each field from header names. */
@@ -77,7 +77,7 @@ export function autoMap(headers: string[]): Mapping {
 }
 
 export function missingRequired(m: Mapping): string[] {
-  return m.name === undefined ? ['Name'] : []
+  return [...(m.name === undefined ? ['Name'] : []), ...(m.category === undefined ? ['Category'] : [])]
 }
 
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
