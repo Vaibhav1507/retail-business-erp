@@ -99,6 +99,19 @@ public static class WhatsAppInvoiceWorker
                         }
                     }
                 }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // HttpClient.Timeout is distinct from worker shutdown. An upload timeout
+                    // is safe to retry; a message-send timeout has an ambiguous provider outcome.
+                    var uncertain = messageSendStarted;
+                    var retryAt = !uncertain && item.AttemptCount < 6
+                        ? DateTimeOffset.UtcNow.AddSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Max(0, item.AttemptCount - 1))))
+                        : (DateTimeOffset?)null;
+                    var status = uncertain ? "NeedsReview" : retryAt is null ? "Failed" : "Retry";
+                    await UpdateDeliveryAsync(db, item, status, null,
+                        uncertain ? "The provider response timed out. Check WhatsApp before retrying." : "The PDF upload timed out and can be retried.", ct);
+                    await FinishQueueAsync(queueDataSource, item, retryAt, ct);
+                }
                 catch (HttpRequestException ex)
                 {
                     var uncertain = messageSendStarted;
