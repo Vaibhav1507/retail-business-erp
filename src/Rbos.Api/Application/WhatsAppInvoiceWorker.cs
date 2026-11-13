@@ -1,8 +1,4 @@
 using System.Globalization;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Npgsql;
 using Rbos.Api.Persistence;
@@ -84,7 +80,7 @@ public static class WhatsAppInvoiceWorker
                             await FinishQueueAsync(dataSource, item, null, ct);
                             logger.LogInformation("WhatsApp invoice accepted for delivery {DeliveryId}, provider message {MessageId}", item.DeliveryId, messageId);
                         }
-                        catch (MetaApiException ex)
+                        catch (MetaWhatsAppApiException ex)
                         {
                             var retryable = ex.Retryable && item.AttemptCount < 6;
                             var retryAt = retryable
@@ -204,79 +200,5 @@ public static class WhatsAppInvoiceWorker
         return null;
     }
 
-    static async Task<string> UploadPdfAsync(HttpClient http, string version, string phoneNumberId, string token, byte[] pdf, string invoiceNo, CancellationToken ct)
-    {
-        using var form = new MultipartFormDataContent();
-        form.Add(new StringContent("whatsapp"), "messaging_product");
-        var file = new ByteArrayContent(pdf);
-        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-        form.Add(file, "file", SafeFileName(invoiceNo) + ".pdf");
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"https://graph.facebook.com/{version}/{phoneNumberId}/media") { Content = form };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var response = await http.SendAsync(request, ct);
-        var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw MetaApiException.FromResponse(response.StatusCode, body);
-        using var json = JsonDocument.Parse(body);
-        return json.RootElement.GetProperty("id").GetString() ?? throw new MetaApiException(false, "Meta media upload did not return a media ID.");
-    }
 
-    static async Task<string> SendTemplateAsync(HttpClient http, string version, string phoneNumberId, string token, string template, string language, string recipient, string mediaId, string invoiceNo, CancellationToken ct)
-    {
-        var payload = new
-        {
-            messaging_product = "whatsapp",
-            recipient_type = "individual",
-            to = recipient,
-            type = "template",
-            template = new
-            {
-                name = template,
-                language = new { code = language },
-                components = new object[]
-                {
-                    new { type = "header", parameters = new object[] { new { type = "document", document = new { id = mediaId, filename = SafeFileName(invoiceNo) + ".pdf" } } } },
-                    new { type = "body", parameters = new object[] { new { type = "text", text = invoiceNo } } }
-                }
-            }
-        };
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"https://graph.facebook.com/{version}/{phoneNumberId}/messages")
-        {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var response = await http.SendAsync(request, ct);
-        var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw MetaApiException.FromResponse(response.StatusCode, body);
-        using var json = JsonDocument.Parse(body);
-        return json.RootElement.GetProperty("messages")[0].GetProperty("id").GetString()
-            ?? throw new MetaApiException(false, "Meta send response did not contain a message ID.");
-    }
-
-    static string SafeFileName(string value)
-    {
-        var safe = new string(value.Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_').Take(40).ToArray());
-        return string.IsNullOrWhiteSpace(safe) ? "invoice" : safe;
-    }
-
-    sealed class MetaApiException(bool retryable, string safeMessage, bool needsReview = false) : Exception(safeMessage)
-    {
-        public bool Retryable { get; } = retryable;
-        public bool NeedsReview { get; } = needsReview;
-        public string SafeMessage { get; } = safeMessage;
-
-        public static MetaApiException FromResponse(HttpStatusCode status, string body)
-        {
-            var retryable = status == HttpStatusCode.TooManyRequests;
-            var needsReview = (int)status >= 500;
-            string message = "Meta WhatsApp API request failed (HTTP " + (int)status + ").";
-            try
-            {
-                using var json = JsonDocument.Parse(body);
-                if (json.RootElement.TryGetProperty("error", out var error) && error.TryGetProperty("code", out var code))
-                    message += " Provider error code: " + code.ToString() + ".";
-            }
-            catch (JsonException) { }
-            return new MetaApiException(retryable, message, needsReview);
-        }
-    }
 }
