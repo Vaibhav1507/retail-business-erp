@@ -315,7 +315,7 @@ test('Qwen policy is a system message and user utterance remains separate', () =
   assert.equal(messages.length, 2)
   assert.equal(messages[0].role, 'system')
   assert.match(messages[0].content, /how much stock do I have => NAVIGATE\|stock.current/)
-  assert.match(messages[0].content, /NOT_UNDERSTOOD for greetings/)
+  assert.match(messages[0].content, /NOT_UNDERSTOOD: if the user asks for an actual business result\/value/)
   assert.match(messages[0].content, /stock.current/)
   assert.equal(messages[1].role, 'user')
   assert.equal(messages[1].content, 'stock position check karo')
