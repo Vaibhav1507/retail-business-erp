@@ -91,4 +91,34 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Empty((await b.GetJson("/sales")).EnumerateArray());
         Assert.Equal(HttpStatusCode.BadRequest, (await b.Send(HttpMethod.Post, "/sales", Sale(cust, await b.Location(), p, 1, 50m, "Credit"), K())).StatusCode);
     }
+    [Fact] public async Task Invoice_snapshot_and_delivery_respect_explicit_customer_consent()
+    {
+        var (c, loc, p) = await Stocked(f);
+        var created = await c.Send(HttpMethod.Post, "/customers", new { name = "Opted In", phone = "9876543210", whatsappConsentStatus = "OptedIn" });
+        var customer = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var response = await c.Send(HttpMethod.Post, "/sales", Sale(customer, loc, p, 1, 100m, "Cash"), K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + id);
+        Assert.Equal("Pending", detail.GetProperty("sale").GetProperty("whatsappStatus").GetString());
+
+        // Checkout's ordinary customer update omits the consent field; it must preserve the customer's permission.
+        await c.Send(HttpMethod.Put, "/customers/" + customer, new { name = "Opted In Updated", phone = "9876543210", notes = (string?)null, isActive = true });
+        var listed = (await c.GetJson("/customers")).EnumerateArray().Single(x => x.GetProperty("id").GetGuid() == customer);
+        Assert.Equal("OptedIn", listed.GetProperty("whatsappConsentStatus").GetString());
+    }
+
+    [Fact] public async Task Unknown_or_opted_out_consent_never_queues_whatsapp_delivery()
+    {
+        var (c, loc, p) = await Stocked(f);
+        var unknown = await Customer(c, "Unknown Consent");
+        var unknownSale = (await (await c.Send(HttpMethod.Post, "/sales", Sale(unknown, loc, p, 1, 50m, "Cash"), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal("ConsentRequired", (await c.GetJson("/sales/" + unknownSale)).GetProperty("sale").GetProperty("whatsappStatus").GetString());
+
+        var optedOutResponse = await c.Send(HttpMethod.Post, "/customers", new { name = "Opted Out", phone = "9876543211", whatsappConsentStatus = "OptedOut" });
+        var optedOut = (await optedOutResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var optedOutSale = (await (await c.Send(HttpMethod.Post, "/sales", Sale(optedOut, loc, p, 1, 50m, "Cash"), K())).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal("Suppressed", (await c.GetJson("/sales/" + optedOutSale)).GetProperty("sale").GetProperty("whatsappStatus").GetString());
+    }
+
 }
