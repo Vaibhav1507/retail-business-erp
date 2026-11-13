@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Npgsql;
+using Rbos.Api.Persistence;
 
 namespace Rbos.Api;
 
@@ -22,12 +22,14 @@ public static class WhatsAppWebhookEndpoints
             return Results.Text(challenge, "text/plain");
         }).AllowAnonymous();
 
-        app.MapPost("/webhooks/meta/whatsapp", async (HttpRequest request, IConfiguration config, NpgsqlDataSource dataSource, CancellationToken ct) =>
+        app.MapPost("/webhooks/meta/whatsapp", async (HttpRequest request, IConfiguration config, TenantDb db, CancellationToken ct) =>
         {
             var secret = config["WhatsApp:AppSecret"];
             var phoneNumberId = config["WhatsApp:PhoneNumberId"];
             var tenantText = config["WhatsApp:PilotTenantId"];
-            if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(phoneNumberId) || !Guid.TryParse(tenantText, out var tenantId))
+            var actorText = config["WhatsApp:PilotActorUserId"];
+            if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(phoneNumberId)
+                || !Guid.TryParse(tenantText, out var tenantId) || !Guid.TryParse(actorText, out var actorUserId))
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             if (request.ContentLength is > MaxWebhookBytes) return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
 
@@ -43,7 +45,7 @@ public static class WhatsAppWebhookEndpoints
                 using var json = JsonDocument.Parse(body);
                 if (!json.RootElement.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
                     return Results.Ok();
-                await using var connection = await dataSource.OpenConnectionAsync(ct);
+                await using var session = await db.BeginAsync(actorUserId, tenantId, ct);
                 foreach (var entry in entries.EnumerateArray())
                 {
                     if (!entry.TryGetProperty("changes", out var changes) || changes.ValueKind != JsonValueKind.Array) continue;
@@ -75,17 +77,30 @@ public static class WhatsAppWebhookEndpoints
                             string? error = null;
                             if (status.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
                                 error = "Meta delivery error " + GetString(errors[0], "code");
-                            await using var command = new NpgsqlCommand(
-                                "select integrations.apply_invoice_delivery_status(@tenant,@message,@status,@at,@error)", connection);
+                            await using var command = session.Command(@"update sales.invoice_delivery
+                                set status=@status, provider_status_at=@at,
+                                    last_error=case when @status='Failed' then left(@error,300) else null end,
+                                    updated_at=now()
+                                where tenant_id=@tenant and channel='WhatsApp' and provider_message_id=@message
+                                  and (
+                                    provider_status_at is null or @at > provider_status_at
+                                    or (
+                                      @at = provider_status_at
+                                      and (case @status when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else 0 end)
+                                          >=
+                                          (case status when 'Accepted' then 0 when 'Sent' then 1 when 'Delivered' then 2 when 'Read' then 3 when 'Failed' then 4 else -1 end)
+                                    )
+                                  )");
                             command.Parameters.AddWithValue("tenant", tenantId);
                             command.Parameters.AddWithValue("message", messageId);
                             command.Parameters.AddWithValue("status", mapped);
                             command.Parameters.AddWithValue("at", statusAt);
                             command.Parameters.AddWithValue("error", (object?)error ?? DBNull.Value);
-                            await command.ExecuteScalarAsync(ct);
+                            await command.ExecuteNonQueryAsync(ct);
                         }
                     }
                 }
+                await session.CommitAsync(ct);
                 return Results.Ok();
             }
             catch (JsonException)
