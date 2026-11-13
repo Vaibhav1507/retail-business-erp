@@ -77,7 +77,7 @@ export function autoMap(headers: string[]): Mapping {
 }
 
 export function missingRequired(m: Mapping): string[] {
-  return FIELDS.filter(f => f.required && m[f.key] === undefined).map(f => f.label)
+  return m.name === undefined ? ['Name'] : []
 }
 
 const UNIT_WORDS: Record<string, string> = { pc: 'pcs', pcs: 'pcs', piece: 'pcs', pieces: 'pcs', nos: 'pcs', each: 'pcs', set: 'set', sets: 'set', pack: 'pack', packs: 'pack', m: 'm', mtr: 'm', meter: 'm', metre: 'm', meters: 'm', metres: 'm' }
