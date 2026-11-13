@@ -91,7 +91,8 @@ function transcribe(message) {
   if (length < 0) throw new Error(lastError())
   const result = JSON.parse(M.UTF8ToString(outputPointer))
   send({
-   type: 'result', id: message.id, text: result.text || '', language: result.language || null,
+   type: message.partial ? 'partial-result' : 'result', id: message.id,
+   captureId: message.captureId, text: result.text || '', language: result.language || null,
    ms: performance.now() - started
   })
  } finally {
@@ -107,6 +108,6 @@ self.onmessage = event => {
  if (message.type === 'init') { if (!loaded) void init(); else send({ type: 'ready', source: 'memory', saved: true }); return }
  if (message.type === 'transcribe') {
   try { if (!loaded) throw new Error('Load the speech model first.'); transcribe(message) }
-  catch (error) { send({ type: 'error', id: message.id, stage: 'transcribe', message: String(error?.message || error) }) }
+  catch (error) { send({ type: 'error', id: message.id, stage: 'transcribe', partial: !!message.partial, captureId: message.captureId, message: String(error?.message || error) }) }
  }
 }
