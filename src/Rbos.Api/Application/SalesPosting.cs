@@ -20,7 +20,7 @@ public sealed class SalesService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        await using var c = s.Command(@"select c.id, c.name, c.phone, c.notes, c.is_active,
+        await using var c = s.Command(@"select c.id, c.name, c.phone, c.notes, c.is_active, c.whatsapp_invoice_consent_status,
             coalesce((select sum(total - amount_paid) from sales.sale x where x.customer_id=c.id and not exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id)),0)
                       - coalesce((select sum(amount) from sales.customer_payment p where p.customer_id=c.id),0)
                       - coalesce((select sum(receivable_credit) from sales.sale_return r where r.customer_id=c.id),0) as owed
@@ -37,6 +37,7 @@ public sealed class SalesService(TenantDb db)
 
     public async Task<ServiceResult<object>> CreateCustomerAsync(Guid uid, CustomerCommand m, CancellationToken ct)
     {
+        if (m.WhatsappConsentStatus is not ("Unknown" or "OptedIn" or "OptedOut")) return ServiceResult<object>.Fail("Invalid WhatsApp consent status.");
         if (!SalesRules.TryValidateCustomer(m.Name, m.Phone, m.Notes, out var err)) return ServiceResult<object>.Fail(err!);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -68,7 +69,8 @@ public sealed class SalesService(TenantDb db)
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
         await using var c = s.Command(@"select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, c.name, x.number,
-            exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no
+            exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no,
+            (select d.status from sales.invoice_delivery d where d.tenant_id=x.tenant_id and d.sale_id=x.id and d.channel='WhatsApp')
             from sales.sale x left join sales.customer c on c.id=x.customer_id
             where (@c::uuid is null or x.customer_id=@c)
               and (@q::text is null or lower(coalesce(c.name,'walk-in')) like '%' || lower(@q) || '%'
@@ -92,7 +94,8 @@ public sealed class SalesService(TenantDb db)
         await using var s = await db.BeginAsync(uid, tid, ct);
         object? head = null;
         await using (var c = s.Command(@"select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, x.pay_method, c.name, l.name, x.number, c.phone,
-            c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no
+            c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no,
+            (select d.status from sales.invoice_delivery d where d.tenant_id=x.tenant_id and d.sale_id=x.id and d.channel='WhatsApp')
             from sales.sale x left join sales.customer c on c.id=x.customer_id join core.stock_location l on l.id=x.location_id where x.id=@i"))
         {
             c.Parameters.AddWithValue("i", id);
@@ -250,7 +253,7 @@ public sealed class SalesService(TenantDb db)
                 join core.stock_location l on l.tenant_id=x.tenant_id and l.id=x.location_id
                 left join sales.customer c on c.tenant_id=x.tenant_id and c.id=x.customer_id
                 where x.tenant_id=@t and x.id=@s
-                returning invoice_no"));
+                "));
             snapshot.Parameters.AddWithValue("t", tenantId);
             snapshot.Parameters.AddWithValue("s", id);
             if (await snapshot.ExecuteNonQueryAsync(ct) != 1)
