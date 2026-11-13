@@ -26,7 +26,7 @@ public sealed class MetaWhatsAppCloudClient(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         using var response = await http.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw MetaWhatsAppApiException.FromResponse(response.StatusCode, body);
+        if (!response.IsSuccessStatusCode) throw MetaWhatsAppApiException.FromResponse(response.StatusCode, body, reviewOnServerError: false);
         using var json = JsonDocument.Parse(body);
         return json.RootElement.GetProperty("id").GetString()
             ?? throw new MetaWhatsAppApiException(false, "Meta media upload did not return a media ID.");
@@ -58,7 +58,7 @@ public sealed class MetaWhatsAppCloudClient(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         using var response = await http.SendAsync(request, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
-        if (!response.IsSuccessStatusCode) throw MetaWhatsAppApiException.FromResponse(response.StatusCode, body);
+        if (!response.IsSuccessStatusCode) throw MetaWhatsAppApiException.FromResponse(response.StatusCode, body, reviewOnServerError: true);
         using var json = JsonDocument.Parse(body);
         return json.RootElement.GetProperty("messages")[0].GetProperty("id").GetString()
             ?? throw new MetaWhatsAppApiException(false, "Meta send response did not contain a message ID.");
@@ -71,14 +71,17 @@ public sealed class MetaWhatsAppCloudClient(
     }
 }
 
-public sealed class MetaWhatsAppApiException(bool retryable, string safeMessage) : Exception(safeMessage)
+public sealed class MetaWhatsAppApiException(bool retryable, string safeMessage, bool needsReview = false) : Exception(safeMessage)
 {
     public bool Retryable { get; } = retryable;
+    public bool NeedsReview { get; } = needsReview;
     public string SafeMessage { get; } = safeMessage;
 
-    public static MetaWhatsAppApiException FromResponse(HttpStatusCode status, string body)
+    public static MetaWhatsAppApiException FromResponse(HttpStatusCode status, string body, bool reviewOnServerError)
     {
-        var retryable = status == HttpStatusCode.TooManyRequests || (int)status >= 500;
+        var serverError = (int)status >= 500;
+        var needsReview = serverError && reviewOnServerError;
+        var retryable = status == HttpStatusCode.TooManyRequests || (serverError && !reviewOnServerError);
         var message = "Meta WhatsApp API request failed (HTTP " + (int)status + ").";
         try
         {
@@ -87,6 +90,6 @@ public sealed class MetaWhatsAppApiException(bool retryable, string safeMessage)
                 message += " Provider error code: " + code.ToString() + ".";
         }
         catch (JsonException) { }
-        return new MetaWhatsAppApiException(retryable, message);
+        return new MetaWhatsAppApiException(retryable, message, needsReview);
     }
 }
