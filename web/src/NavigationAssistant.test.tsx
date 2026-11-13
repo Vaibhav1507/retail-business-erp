@@ -22,7 +22,7 @@ describe('NavigationAssistant', () => {
  it('keeps quick actions directly below the header and the microphone outside the scrolling chat', async () => {
   const { container } = render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
-  const panel = container.querySelector('.navigation-assistant')!
+  const panel = container.querySelector('.navigation-assistant') as HTMLElement
   const header = panel.querySelector('.assistant-heading')!
   const actions = panel.querySelector('.navigation-top-actions')!
   const history = panel.querySelector('.navigation-history')!
@@ -40,7 +40,7 @@ describe('NavigationAssistant', () => {
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
   const input = screen.getByLabelText('Ask your business assistant')
   await userEvent.type(input, 'mould you have no stock taken that hand')
-  const actions = container.querySelector('.navigation-top-actions')!
+  const actions = container.querySelector('.navigation-top-actions') as HTMLElement
   expect(within(actions).getByRole('button', { name: 'Current stock' })).toBeInTheDocument()
   expect(within(actions).getByRole('button', { name: 'Products' })).toBeInTheDocument()
   expect(within(actions).getByRole('button', { name: 'Stock alerts' })).toBeInTheDocument()
