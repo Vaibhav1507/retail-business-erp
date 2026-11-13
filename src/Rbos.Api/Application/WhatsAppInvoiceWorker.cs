@@ -35,6 +35,7 @@ public static class WhatsAppInvoiceWorker
             {
                 ct.ThrowIfCancellationRequested();
                 var messageSendStarted = false;
+                var messageAccepted = false;
                 try
                 {
                     if (!pilotTenantConfigured || item.TenantId != pilotTenantId)
@@ -82,6 +83,7 @@ public static class WhatsAppInvoiceWorker
                             messageSendStarted = true;
                             var messageId = await meta.SendInvoiceTemplateAsync(recipient, mediaId, invoiceNo, ct);
                             await UpdateDeliveryAsync(db, item, "Accepted", messageId, null, ct);
+                            messageAccepted = true;
                             await FinishQueueAsync(queueDataSource, item, null, ct);
                             logger.LogInformation("WhatsApp invoice accepted for delivery {DeliveryId}, provider message {MessageId}", item.DeliveryId, messageId);
                         }
@@ -112,6 +114,14 @@ public static class WhatsAppInvoiceWorker
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogError(ex, "Unexpected invoice delivery worker error for {DeliveryId}", item.DeliveryId);
+                    if (messageAccepted)
+                    {
+                        // Meta accepted the message and the delivery record is already committed.
+                        // Do not downgrade Accepted just because retiring the queue lease failed.
+                        try { await FinishQueueAsync(queueDataSource, item, null, ct); }
+                        catch (Exception completionError) { logger.LogError(completionError, "Could not retire accepted invoice queue lease {DeliveryId}; it will expire automatically", item.DeliveryId); }
+                        continue;
+                    }
                     var retryAt = !messageSendStarted && item.AttemptCount < 6 ? DateTimeOffset.UtcNow.AddMinutes(2) : (DateTimeOffset?)null;
                     var status = messageSendStarted ? "NeedsReview" : retryAt is null ? "Failed" : "Retry";
                     try
