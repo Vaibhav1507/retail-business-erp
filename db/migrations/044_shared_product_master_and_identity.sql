@@ -131,6 +131,8 @@ set attributes = a.attributes || c.attributes,
     hsn_code = coalesce(c.hsn_code, a.hsn_code),
     gst_rate = coalesce(c.gst_rate, a.gst_rate),
     mrp = coalesce(c.mrp, a.mrp),
+    brand_id = coalesce(c.brand_id, a.brand_id),
+    track_serials = c.track_serials or a.track_serials,
     source_document_id = coalesce(c.source_document_id, a.source_document_id),
     source_page = coalesce(c.source_page, a.source_page)
 from _product_duplicate_map m
@@ -201,6 +203,25 @@ set level=greatest(inventory.reorder_level.level, excluded.level);
 delete from inventory.reorder_level x
 using _product_duplicate_map m
 where x.tenant_id=m.tenant_id and x.product_id=m.alias_product_id;
+
+-- A conflicting unit conversion cannot be combined safely. Abort the whole
+-- migration instead of silently discarding one tenant-owned conversion factor.
+do $rbos$
+begin
+  if exists (
+    select 1
+    from _product_duplicate_map m
+    join inventory.unit_conversion alias_conversion
+      on alias_conversion.tenant_id=m.tenant_id and alias_conversion.product_id=m.alias_product_id
+    join inventory.unit_conversion canonical_conversion
+      on canonical_conversion.tenant_id=m.tenant_id
+     and canonical_conversion.product_id=m.canonical_product_id
+     and canonical_conversion.unit=alias_conversion.unit
+    where canonical_conversion.factor <> alias_conversion.factor
+  ) then
+    raise exception 'Conflicting unit conversions exist for duplicate products. Reconcile them before applying migration 044.';
+  end if;
+end $rbos$;
 
 insert into inventory.unit_conversion (tenant_id, product_id, unit, factor)
 select x.tenant_id, m.canonical_product_id, x.unit, x.factor
