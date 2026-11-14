@@ -70,6 +70,14 @@ public class ProductRulesTests
     }
 
     [Fact]
+    public void No_model_placeholder_uses_name_fallback()
+    {
+        Assert.NotEqual(
+            ProductRules.IdentityKey("Air Conditioner", "LG", "No Model"),
+            ProductRules.IdentityKey("Washing Machine", "LG", "No Model"));
+    }
+
+    [Fact]
     public void Shared_master_identity_reuses_model_across_categories_but_scopes_generic_goods()
     {
         Assert.Equal(
