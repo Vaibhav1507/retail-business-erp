@@ -296,7 +296,8 @@ Do not integrate either embedder just because the workflow completes. First revi
 - Voice is opt-in and push-to-talk. Audio is captured in memory, resampled to 16 kHz mono, transcribed locally in a Web Worker, and transient PCM buffers are cleared after inference. No audio or transcript is sent to RBOS APIs or written to logs.
 - The model is cached in browser Cache Storage after checksum verification. Model downloads happen only after the user selects Enable voice. The existing RBOS app shell is not fully offline; cached recognition is intended to work locally after the app has loaded.
 - Navigation from billing, purchase receiving, and opening-stock routes is guarded with a confirmation before leaving. This currently uses route-level protection rather than field-level dirty-state tracking.
-- Remaining acceptance work: resolve all CI failures; verify the production build and runtime asset download; test mic permission denial, model cache/reload, Hindi/English/Hinglish commands, silence/noise rejection, and unsaved-form protection on desktop and low-end Android; then update this status after validation.
+- CI status at 2026-11-14: latest PR workflow #290 passed frontend TypeScript, the full Vitest suite, production build, and dependency audit. The backend Release build, migration validation, tests, and container build were still running at the time of this update; do not mark the full pipeline green until they complete.
+- Remaining manual acceptance: verify the same-origin Shruti runtime asset download and cache/reload; Android Chrome first-use microphone permission and push-to-talk; Hindi, English and Hinglish recognition; silence/noise rejection; and unsaved-form protection on desktop and a low-end Android device. No production deployment or cloud speech provider is enabled.
 
 
 ## 12. Speech provider boundary (2026-11-14)
