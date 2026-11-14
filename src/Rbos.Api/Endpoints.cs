@@ -101,7 +101,12 @@ public static class Endpoints
 			{ return ApiResults.Fail(429, "Speech backup limit reached. Please type the command or try again later."); }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
 			{ return ApiResults.Fail(503, "Speech backup is temporarily unavailable. Please type the command or try again."); }
-			finally { CryptographicOperations.ZeroMemory(wav); }
+			finally
+			{
+				CryptographicOperations.ZeroMemory(wav);
+				CryptographicOperations.ZeroMemory(chunk);
+				if (buffer.TryGetBuffer(out var audioBuffer)) CryptographicOperations.ZeroMemory(audioBuffer.AsSpan());
+			}
 		}).RequireAuthorization();
 
 		AuthOtpEndpoints.Map(api);
