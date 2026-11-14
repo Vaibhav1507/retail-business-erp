@@ -149,13 +149,13 @@ Never invent an ID, route, URL, screen, fact or action.
             ["type"] = "OBJECT",
             ["properties"] = new JsonObject
             {
-                ["intent"] = new JsonObject { ["type"] = "STRING", ["enum"] = new JsonArray("navigate", "clarify", "reject", "not-understood") },
+                ["intent"] = new JsonObject { ["type"] = "STRING", ["enum"] = new JsonArray(JsonValue.Create("navigate"), JsonValue.Create("clarify"), JsonValue.Create("reject"), JsonValue.Create("not-understood")) },
                 ["destinationId"] = Str(),
                 ["confidence"] = new JsonObject { ["type"] = "NUMBER" },
                 ["clarificationCandidates"] = new JsonObject { ["type"] = "ARRAY", ["items"] = Str() },
                 ["reason"] = Str()
             },
-            ["required"] = new JsonArray("intent", "destinationId", "confidence", "clarificationCandidates", "reason")
+            ["required"] = new JsonArray(JsonValue.Create("intent"), JsonValue.Create("destinationId"), JsonValue.Create("confidence"), JsonValue.Create("clarificationCandidates"), JsonValue.Create("reason"))
         };
     }
 
@@ -165,9 +165,10 @@ Never invent an ID, route, URL, screen, fact or action.
         var intent = obj["intent"]?.GetValue<string>()?.Trim();
         var confidence = Number(obj["confidence"]);
         if (confidence is < 0 or > 1) return null;
-        var candidates = (obj["clarificationCandidates"] as JsonArray ?? [])
-            .Select(x => x?.GetValue<string>())
-            .Where(x => x is not null && Destinations.Contains(x))
+        var candidateArray = obj["clarificationCandidates"] as JsonArray;
+        var candidates = (candidateArray ?? new JsonArray())
+            .Select(x => x is JsonValue value && value.TryGetValue<string>(out var id) ? id : null)
+            .Where(id => id is not null && Destinations.Contains(id))
             .Cast<string>().Distinct(StringComparer.Ordinal).Take(3).ToArray();
 
         if (intent == "navigate")
