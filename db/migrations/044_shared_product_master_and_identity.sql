@@ -26,7 +26,7 @@ as $$
   select case
     when catalog.norm_text(p_brand) <> ''
       and catalog.norm_text(p_model) <> ''
-      and catalog.norm_text(p_model) not in ('na','none','unknown','generic','tbd','notavailable','notapplicable','null')
+      and catalog.norm_text(p_model) not in ('na','none','unknown','generic','tbd','notavailable','notapplicable','null','nomodel','notspecified','notprovided','unspecified','unknownmodel')
       then 'model|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
     else 'name|' || catalog.norm_text(p_name) || '|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
   end
@@ -38,7 +38,7 @@ as $$
   select case
     when catalog.norm_text(p_brand) <> ''
       and catalog.norm_text(p_model) <> ''
-      and catalog.norm_text(p_model) not in ('na','none','unknown','generic','tbd','notavailable','notapplicable','null')
+      and catalog.norm_text(p_model) not in ('na','none','unknown','generic','tbd','notavailable','notapplicable','null','nomodel','notspecified','notprovided','unspecified','unknownmodel')
       then 'model|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
     else 'name|' || catalog.norm_text(p_category) || '|' || catalog.norm_text(p_name) || '|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
   end
