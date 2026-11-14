@@ -107,6 +107,8 @@ describe('keyword navigation resolver', () => {
     expect(resolveNavigation('mujhe Ramesh ji ka purana bil').kind).toBe('not-understood')
     expect(suggestNavigation('mujhe Ramesh ji ka purana bil').some(target => target.id === 'sell.bills')).toBe(true)
     expect(resolveNavigation('बकाया').kind).toBe('ask')
+    expect(resolveNavigation('बाकी').kind).toBe('ask')
+    expect(resolveNavigation('उधार').kind).toBe('ask')
   })
 
   it('asks when a lone keyword does not identify a unique destination', () => {
@@ -131,7 +133,7 @@ describe('keyword navigation resolver', () => {
       'paise jama kar do',
       'transfer 12 stock items',
       'open google.com',
-    ]) expect(resolveNavigation(input).kind).toBe('reject')
+    ]) expect(resolveNavigation(input).kind, input).toBe('reject')
   })
 
   it('does not navigate from noise or an unrelated person name', () => {
