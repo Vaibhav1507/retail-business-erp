@@ -124,20 +124,77 @@ select tenant_id, alias_product_id, canonical_product_id
 from _product_duplicate_map
 on conflict (tenant_id, alias_product_id) do nothing;
 
--- Preserve non-empty local product metadata on the canonical record.
+-- Preserve non-empty local product metadata from every retired duplicate.
+-- Correlated aggregates avoid UPDATE ... FROM's arbitrary-row behavior when a
+-- legacy identity has more than two duplicate rows. Canonical values win conflicts.
 update catalog.product c
-set attributes = a.attributes || c.attributes,
-    specs = coalesce(a.specs, '{}'::jsonb) || coalesce(c.specs, '{}'::jsonb),
-    hsn_code = coalesce(c.hsn_code, a.hsn_code),
-    gst_rate = coalesce(c.gst_rate, a.gst_rate),
-    mrp = coalesce(c.mrp, a.mrp),
-    brand_id = coalesce(c.brand_id, a.brand_id),
-    track_serials = c.track_serials or a.track_serials,
-    source_document_id = coalesce(c.source_document_id, a.source_document_id),
-    source_page = coalesce(c.source_page, a.source_page)
-from _product_duplicate_map m
-join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
-where c.tenant_id=m.tenant_id and c.id=m.canonical_product_id;
+set attributes = coalesce((
+      select jsonb_object_agg(x.key, x.value)
+      from (
+        select distinct on (e.key) e.key, e.value
+        from _product_duplicate_map m
+        join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+        cross join lateral jsonb_each(coalesce(a.attributes, '{}'::jsonb)) e
+        where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id
+        order by e.key, a.created_at, a.id
+      ) x
+    ), '{}'::jsonb) || coalesce(c.attributes, '{}'::jsonb),
+    specs = coalesce((
+      select jsonb_object_agg(x.key, x.value)
+      from (
+        select distinct on (e.key) e.key, e.value
+        from _product_duplicate_map m
+        join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+        cross join lateral jsonb_each(coalesce(a.specs, '{}'::jsonb)) e
+        where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id
+        order by e.key, a.created_at, a.id
+      ) x
+    ), '{}'::jsonb) || coalesce(c.specs, '{}'::jsonb),
+    hsn_code = coalesce(c.hsn_code, (
+      select a.hsn_code from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.hsn_code is not null
+      order by a.created_at, a.id limit 1
+    )),
+    gst_rate = coalesce(c.gst_rate, (
+      select a.gst_rate from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.gst_rate is not null
+      order by a.created_at, a.id limit 1
+    )),
+    mrp = coalesce(c.mrp, (
+      select a.mrp from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.mrp is not null
+      order by a.created_at, a.id limit 1
+    )),
+    brand_id = coalesce(c.brand_id, (
+      select a.brand_id from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.brand_id is not null
+      order by a.created_at, a.id limit 1
+    )),
+    track_serials = coalesce(c.track_serials,false) or exists (
+      select 1 from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.track_serials
+    ),
+    source_document_id = coalesce(c.source_document_id, (
+      select a.source_document_id from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.source_document_id is not null
+      order by a.created_at, a.id limit 1
+    )),
+    source_page = coalesce(c.source_page, (
+      select a.source_page from _product_duplicate_map m
+      join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.source_page is not null
+      order by a.created_at, a.id limit 1
+    ))
+where exists (
+  select 1 from _product_duplicate_map m
+  where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id
+);
 
 -- Carry source references to the canonical product. Source documents remain
 -- tenant-private; only the product facts are shared through master_product.
