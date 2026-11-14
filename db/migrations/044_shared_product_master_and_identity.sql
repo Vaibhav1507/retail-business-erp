@@ -97,7 +97,8 @@ with ranked as (
                select 1 from catalog.product_source_reference sr
                where sr.tenant_id=p.tenant_id and sr.product_id=p.id
              )) desc,
-             (jsonb_object_length(p.attributes) + jsonb_object_length(coalesce(p.specs, '{}'::jsonb))) desc,
+             (select count(*) from jsonb_object_keys(coalesce(p.attributes, '{}'::jsonb))) +
+             (select count(*) from jsonb_object_keys(coalesce(p.specs, '{}'::jsonb))) desc,
              p.created_at asc, p.id
          ) as canonical_product_id,
          row_number() over (
@@ -107,7 +108,8 @@ with ranked as (
                select 1 from catalog.product_source_reference sr
                where sr.tenant_id=p.tenant_id and sr.product_id=p.id
              )) desc,
-             (jsonb_object_length(p.attributes) + jsonb_object_length(coalesce(p.specs, '{}'::jsonb))) desc,
+             (select count(*) from jsonb_object_keys(coalesce(p.attributes, '{}'::jsonb))) +
+             (select count(*) from jsonb_object_keys(coalesce(p.specs, '{}'::jsonb))) desc,
              p.created_at asc, p.id
          ) as position
   from catalog.product p
