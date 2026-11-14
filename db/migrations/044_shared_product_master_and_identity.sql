@@ -29,6 +29,7 @@ create table catalog.master_product (
   business_category text not null check (business_category in ('electronics_mobile','electrical_hardware','general_retail','garments_apparel','automobile_spares','sports_fitness','pharmacy_medical','other_retail')),
   category_name    text not null check (length(btrim(category_name)) between 1 and 80),
   name             text not null check (length(btrim(name)) between 1 and 160),
+  base_unit        text not null check (base_unit in ('pcs','set','pack','m')),
   is_generic       boolean not null,
   brand            text null check (brand is null or length(btrim(brand)) between 1 and 80),
   model            text null check (model is null or length(btrim(model)) between 1 and 80),
@@ -199,9 +200,9 @@ where p.tenant_id=m.tenant_id and p.id=m.alias_product_id;
 -- Seed the shared vertical catalogue from the canonical, tenant-owned records.
 -- Do not copy internal SKU, cost, selling price, MRP or source document metadata.
 insert into catalog.master_product
-  (id, business_category, category_name, name, is_generic, brand, model, attributes, specs, hsn_code, gst_rate)
+  (id, business_category, category_name, name, base_unit, is_generic, brand, model, attributes, specs, hsn_code, gst_rate)
 select distinct on (bp.business_category, catalog.master_product_identity_key(p.name, c.name, p.brand, p.model))
-       gen_random_uuid(), bp.business_category, c.name, p.name, p.is_generic, p.brand, p.model,
+       gen_random_uuid(), bp.business_category, c.name, p.name, p.base_unit, p.is_generic, p.brand, p.model,
        p.attributes, coalesce(p.specs, '{}'::jsonb), p.hsn_code, p.gst_rate
 from catalog.product p
 join core.business_profile bp on bp.tenant_id=p.tenant_id
