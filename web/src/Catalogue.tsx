@@ -62,12 +62,11 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp) }
+    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp), barcode: !editingId && barcode ? barcode.code : null }
     try {
       if (editingId) await api('PUT', `/products/${editingId}`, body)
       else {
-        const created = await api<{ id: string }>('POST', '/products', body)
-        if (barcode) await api('POST', `/products/${created.id}/barcodes`, { code: barcode.code, symbology: barcode.symbology })
+        await api('POST', '/products', body)
       }
       if (!editingId) setD(electronics ? { ...blank, generic: false } : blank)
       onSaved()
