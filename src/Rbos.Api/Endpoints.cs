@@ -40,6 +40,28 @@ public static class Endpoints
 		PermissionFilter.Apply(api);
 		api.MapGet("/csrf", (HttpContext c, IAntiforgery af) => Results.Ok(new { token = af.GetAndStoreTokens(c).RequestToken })).AllowAnonymous();
 
+		api.MapPost("/voice/transcribe", async (HttpRequest request, GroqSpeechToTextClient whisper, CancellationToken ct) =>
+		{
+			if (!whisper.Available) return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
+			if (request.ContentLength is null or <= 44 or > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+			await using var buffer = new MemoryStream();
+			await request.Body.CopyToAsync(buffer, ct);
+			if (buffer.Length is <= 44 or > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+			var wav = buffer.ToArray();
+			if (wav[0] != (byte)'R' || wav[1] != (byte)'I' || wav[2] != (byte)'F' || wav[3] != (byte)'F' ||
+				wav[8] != (byte)'W' || wav[9] != (byte)'A' || wav[10] != (byte)'V' || wav[11] != (byte)'E')
+				return ApiResults.Fail(400, "Voice command audio must be a valid WAV file.");
+			try
+			{
+				var transcript = await whisper.TranscribeWavAsync(wav, ct);
+				return string.IsNullOrWhiteSpace(transcript) ? ApiResults.Fail(422, "Speech could not be transcribed.") : Results.Ok(new { text = transcript });
+			}
+			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+			{ return ApiResults.Fail(429, "Speech backup limit reached. Please type the command or try again later."); }
+			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+			{ return ApiResults.Fail(503, "Speech backup is temporarily unavailable. Please type the command or try again."); }
+		}).RequireAuthorization();
+
 		AuthOtpEndpoints.Map(api);
 
 		api.MapPost("/auth/login", async (Credentials m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, IWebHostEnvironment env) =>
