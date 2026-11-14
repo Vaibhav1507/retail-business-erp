@@ -169,7 +169,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   async function addFromMaster(id: string) {
     setError('')
     try {
-      await api('POST', `/products/master/${id}/add')
+      await api('POST', `/products/master/${id}/add`)
       await Promise.all([load(), loadMaster()])
       reload()
     } catch (err) { setError(msg(err)) }
