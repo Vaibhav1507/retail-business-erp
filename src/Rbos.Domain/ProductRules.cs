@@ -17,11 +17,14 @@ public static class ProductRules
     /// name: the same brand/model remains one product even when a catalogue or invoice
     /// describes it differently. Without both values, fall back to the normalized name.
     /// </summary>
+    static bool HasUsableModel(string modelKey) =>
+        modelKey.Length > 0 && modelKey is not ("na" or "none" or "unknown" or "generic" or "tbd" or "notavailable" or "notapplicable" or "null");
+
     public static string IdentityKey(string? name, string? brand, string? model)
     {
         var brandKey = Normalize(brand);
         var modelKey = Normalize(model);
-        return brandKey.Length > 0 && modelKey.Length > 0
+        return brandKey.Length > 0 && HasUsableModel(modelKey)
             ? $"model|{brandKey}|{modelKey}"
             : $"name|{Normalize(name)}|{brandKey}|{modelKey}";
     }
@@ -34,7 +37,7 @@ public static class ProductRules
     {
         var brandKey = Normalize(brand);
         var modelKey = Normalize(model);
-        return brandKey.Length > 0 && modelKey.Length > 0
+        return brandKey.Length > 0 && HasUsableModel(modelKey)
             ? $"model|{brandKey}|{modelKey}"
             : $"name|{Normalize(categoryName)}|{Normalize(name)}|{brandKey}|{modelKey}";
     }
