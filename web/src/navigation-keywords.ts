@@ -41,7 +41,7 @@ export const navigationKeywordProfiles: Record<string, KeywordProfile> = {
   'money.expenses': { groups: [['expense', 'kharcha', 'spending']] },
   'money.owner': { groups: [['owner', 'malik'], ['capital', 'drawing', 'withdrawal', 'deposit']] },
   'money.closing': { groups: [['day', 'daily', 'closing', 'end'], ['hisab', 'account', 'cash', 'galla']] },
-  'more.menu': { groups: [['more', 'other', 'baaki'], ['menu', 'option']] },
+  'more.menu': { groups: [['more', 'other', 'baki'], ['menu', 'option']] },
   'more.reports': { groups: [['report', 'profit', 'loss', 'pnl']] },
   'more.print': { groups: [['print', 'printing', 'printer', 'chhapai']] },
   'more.lock': { groups: [['lock', 'freeze'], ['period', 'month', 'books', 'hisab']] },
@@ -76,14 +76,14 @@ export const navigationWordAliases: Record<string, string> = {
   // Goods and stock
   'स्टॉक': 'stock', 'स्टोक': 'stock', 'इन्वेंटरी': 'stock', 'भंडार': 'stock',
   'stock': 'stock', 'stok': 'stock', 'stokh': 'stock', 'inventory': 'stock',
-  'माल': 'goods', 'मालो': 'goods', 'सामान': 'goods', 'सामान': 'goods', 'वस्तु': 'goods',
+  'माल': 'goods', 'मालो': 'goods', 'सामान': 'goods', 'वस्तु': 'goods',
   'maal': 'goods', 'mal': 'goods', 'saman': 'goods', 'samaan': 'goods', 'item': 'item', 'items': 'item', 'product': 'product', 'products': 'product', 'प्रोडक्ट': 'product', 'उत्पाद': 'product', 'कैटलॉग': 'catalogue', 'catalogue': 'catalogue', 'catalog': 'catalogue',
   // Purchase, receipt, and supplier workflows
   'खरीद': 'purchase', 'खरीदी': 'purchase', 'खरीदारी': 'purchase', 'परचेज': 'purchase', 'मंगाई': 'purchase',
-  'kharid': 'purchase', 'kharidi': 'purchase', 'khareed': 'purchase', 'purchase': 'purchase', 'purches': 'purchase', 'procurement': 'purchase',
+  'kharid': 'purchase', 'kharidi': 'purchase', 'khareed': 'purchase', 'karid': 'purchase', 'khared': 'purchase', 'purchase': 'purchase', 'purches': 'purchase', 'procurement': 'purchase', 'entri': 'entry',
   'आया': 'arrival', 'आई': 'arrival', 'आए': 'arrival', 'आयो': 'arrival', 'उतरा': 'arrival', 'उतरी': 'arrival', 'aaya': 'arrival', 'aayi': 'arrival', 'aaye': 'arrival', 'aayo': 'arrival', 'utra': 'arrival', 'utara': 'arrival', 'arrival': 'arrival', 'receive': 'receive', 'received': 'receive', 'मिला': 'receive',
   // Payments, dues, and returns
-  'भुगतान': 'payment', 'पेमेंट': 'payment', 'भुगतान': 'payment', 'रकम': 'payment', 'payment': 'payment', 'pymnt': 'payment', 'pay': 'pay',
+  'भुगतान': 'payment', 'पेमेंट': 'payment', 'रकम': 'payment', 'payment': 'payment', 'pymnt': 'payment', 'pay': 'pay',
   'उधार': 'udhar', 'उधारी': 'udhar', 'उधारि': 'udhar', 'बकाया': 'baki', 'बाकी': 'baki', 'बकाया': 'baki',
   'udhar': 'udhar', 'udhaar': 'udhar', 'baki': 'baki', 'baaki': 'baki', 'bakaya': 'baki', 'dues': 'dues', 'outstanding': 'outstanding', 'vasooli': 'vasooli', 'वसूली': 'vasooli',
   'वापसी': 'return', 'वापस': 'return', 'लौट': 'return', 'लौटाना': 'return', 'लौटाया': 'return', 'return': 'return', 'wapas': 'return', 'wapasi': 'return', 'lautana': 'return', 'lauta': 'return', 'lautaya': 'return',
@@ -103,7 +103,7 @@ export const navigationWordAliases: Record<string, string> = {
   'unit': 'unit', 'units': 'unit', 'measure': 'measure', 'conversion': 'conversion', 'box': 'box', 'piece': 'piece', 'pieces': 'piece', 'kg': 'kg', 'kilo': 'kg', 'kilogram': 'kg', 'litre': 'litre', 'liter': 'litre', 'dozen': 'dozen',
   // Finance
   'नकद': 'cash', 'रोकड़': 'cash', 'गल्ला': 'galla', 'बैंक': 'bank', 'खाता': 'account', 'बही': 'account', 'हिसाब': 'hisab',
-  'cash': 'cash', 'bank': 'bank', 'galla': 'galla', 'cashbook': 'cashbook', 'cashbook': 'cashbook', 'paisa': 'money', 'paise': 'money', 'money': 'money', 'account': 'account', 'hisab': 'hisab',
+  'cash': 'cash', 'bank': 'bank', 'galla': 'galla', 'cashbook': 'cashbook', 'paisa': 'money', 'paise': 'money', 'money': 'money', 'account': 'account', 'hisab': 'hisab',
   'खर्च': 'expense', 'खर्चा': 'expense', 'खरचा': 'expense', 'व्यय': 'expense', 'expense': 'expense', 'expenses': 'expense', 'expence': 'expense', 'kharch': 'kharcha', 'kharcha': 'kharcha', 'spending': 'spending',
   'मालिक': 'malik', 'मालिकाना': 'malik', 'पूंजी': 'capital', 'निवेश': 'capital', 'निकासी': 'withdrawal', 'निकाला': 'withdrawal',
   'owner': 'owner', 'malik': 'malik', 'capital': 'capital', 'drawing': 'drawing', 'drawings': 'drawing', 'withdrawal': 'withdrawal', 'withdraw': 'withdrawal', 'deposit': 'deposit',
@@ -116,7 +116,7 @@ export const navigationWordAliases: Record<string, string> = {
   'ऑडिट': 'audit', 'बदलाव': 'change', 'audit': 'audit', 'change': 'change', 'log': 'log', 'trail': 'trail',
   'जीएसटी': 'gst', 'gst': 'gst', 'कर': 'tax', 'tax': 'tax',
   'कर्मचारी': 'employee', 'स्टाफ': 'staff', 'नौकर': 'employee', 'staff': 'staff', 'employee': 'employee', 'team': 'team', 'karmchari': 'employee',
-  'शाखा': 'branch', 'शाखाएं': 'branch', 'ब्रांच': 'branch', 'branch': 'branch', 'branches': 'branch', 'shoplocation': 'shoplocation',
+  'शाखा': 'branch', 'शाखाएं': 'branch', 'ब्रांच': 'branch', 'branch': 'branch', 'branches': 'branch', 'shoplocation': 'shoplocation', 'location': 'shoplocation',
   'ट्रांसफर': 'transfer', 'स्थानांतरण': 'transfer', 'transfer': 'transfer', 'move': 'move',
   'ऑर्डर': 'order', 'आर्डर': 'order', 'मंगवाना': 'mangwana', 'मंगाना': 'mangwana', 'order': 'order', 'orders': 'order', 'po': 'po', 'mangwana': 'mangwana',
   'मिलान': 'milan', 'मिलाना': 'milan', 'reconcile': 'reconcile', 'match': 'match', 'milan': 'milan', 'statement': 'statement', 'passbook': 'passbook',
@@ -129,7 +129,7 @@ export const navigationWordAliases: Record<string, string> = {
 }
 
 export const navigationStopWords = new Set([
-  'please', 'plz', 'the', 'a', 'an', 'to', 'me', 'my', 'i', 'we', 'for', 'with', 'from', 'of',
+  'please', 'plz', 'the', 'a', 'an', 'to', 'me', 'my', 'i', 'we', 'for', 'with', 'from', 'of', 'mujhe', 'mujko', 'zara',
   'karo', 'kar', 'kr', 'krna', 'kro', 'kijiye', 'kiji', 'kiye', 'do', 'ji', 'bhai', 'bhaiya', 'bhayya',
   'kholo', 'kholiye', 'dikhao', 'dikha', 'dikhaao', 'dekho', 'dekhna', 'jao', 'chalo', 'par', 'pe',
   'mujhe', 'mujko', 'zara', 'ab', 'ek', 'aur', 'se', 'ka', 'ki', 'ke', 'ko', 'hai', 'hain', 'ho',
