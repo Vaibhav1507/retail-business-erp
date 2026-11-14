@@ -510,7 +510,7 @@ public sealed class CatalogueService(TenantDb db)
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("g", m.IsGeneric); c.Parameters.AddWithValue("s", sku); c.Parameters.AddWithValue("u", m.BaseUnit!);
         c.Parameters.AddWithValue("b", (object?)NullIfBlank(m.Brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(m.Model) ?? DBNull.Value);
         c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes)));
-        c.Parameters.AddWithValue("mp", masterProductId);
+        c.Parameters.AddWithValue("mp", (object?)masterProductId ?? DBNull.Value);
         await c.ExecuteNonQueryAsync(ct);
     }
 
