@@ -26,7 +26,7 @@ Whisper is not to replace Shruti. The provider implementation (local versus host
 ### Level 3 — AI / LLM intent understanding
 
 1. **Gemini Flash — primary LLM.**
-2. **Groq-hosted Qwen — candidate fallback**, reusing the existing Groq client only if its configured model supports text-only intent classification and its current contract can be safely generalized. The existing Groq integration is for catalogue image/PDF extraction, not voice intent. It is not an xAI Grok integration.
+2. **Groq-hosted Qwen — text fallback.** A separate text-only client uses `qwen/qwen3.8-27b`; do not reuse the vision-only request contract. It is Groq-hosted Qwen, not xAI Grok.
 
 Level 3 is invoked only when Level 1 cannot confidently resolve the normalized transcript or needs contextual interpretation. It returns a constrained structured intent, never an arbitrary URL or direct transaction action. All destinations are validated against the canonical route allowlist. Existing unsaved-work protection remains the final navigation guard.
 
@@ -42,8 +42,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | Whisper backup STT | Added Groq Whisper Turbo client, authenticated API endpoint, WAV encoder and UI failover path; feature remains disabled until `Groq:WhisperEnabled=true` is configured | Implemented, CI/acceptance pending |
 | Gemini Flash voice intent | Added constrained intent service and endpoint; provider calls remain disabled by default until explicit config | Implemented, tests/CI pending |
 | Groq/Qwen voice intent | Separate text-only `GroqTextIntentClient` uses `qwen/qwen3.8-27b`; official docs confirm text input/output and JSON mode | Implemented, tests/CI pending |
-| Qwen voice intent | `GroqVisionClient` defaults to `qwen/qwen3.8-27b` for vision extraction; text-only intent capability and model compatibility are unverified | Audit required |
-| Three-level orchestrator | Level 2 fallback is now wired; Level 3 intent orchestration is still pending | Partial |
+| Three-level orchestrator | Shruti→Whisper failover and deterministic→Gemini→Groq Qwen intent path are integrated in the existing assistant flow | Implemented, end-to-end tests/CI pending |
 | End-to-end speech tests | Synthetic resolver/provider tests exist; no paired RBOS audio acceptance corpus yet | Pending |
 | Device acceptance | Android Chrome and low-end device acceptance outstanding | Pending |
 
@@ -83,26 +82,26 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 **Gate:** Shruti works without network after model assets are cached; Whisper is invoked only on an eligible Shruti failure/quality condition; a Whisper failure returns a safe clarification/error and never navigates. The adapter and API are implemented but remain disabled by default until `Groq:WhisperEnabled=true` is explicitly set in the deployment environment.
 
 ### W3 — Level 3 LLM intent fallback
-- [ ] Define a strict structured response schema (intent type, canonical destination ID, confidence, clarification candidates/reason).
-- [ ] Implement Gemini Flash as primary intent provider.
-- [ ] Implement Gemini Flash as primary voice-intent provider.
-- [ ] Evaluate Groq-hosted Qwen as fallback using a text-generation model; do not assume the existing vision client can be reused unchanged.
-- [ ] Send transcript and minimal screen context only; never send raw audio to Level 3.
-- [ ] Validate provider output against the allowlisted destination IDs and current user permissions.
-- [ ] Add bounded timeouts, retry limits, provider availability checks and redacted logs.
+- [x] Define a strict structured response schema (intent type, canonical destination ID, confidence, clarification candidates/reason).
+- [x] Implement Gemini Flash as primary voice-intent provider.
+- [x] Verify Groq-hosted Qwen text-generation support and implement a separate text-only fallback client.
+- [x] Send transcript and allowlisted current-screen ID only; never send raw audio to Level 3.
+- [x] Validate provider output against the 35 allowlisted destination IDs; final app route and permission guards remain authoritative.
+- [x] Add bounded 10-second provider timeouts, no automatic retry cascade, explicit provider flags and status-only redacted logs.
+- [x] Add tests for Gemini primary success, invalid destination rejection/Groq fallback and disabled-by-default configuration.
 
 **Gate:** No LLM output can supply a URL, invoke a transaction, bypass authorization or bypass unsaved-work protection. Invalid/low-confidence output asks the user.
 
 ### W4 — Orchestration and UX integration
-- [ ] Implement one orchestration service for Level 1 → Level 2 → Level 3.
-- [ ] Direct quick actions and clear typed commands take the fast Level 1 path.
-- [ ] Voice uses Shruti first; Whisper only as STT backup.
-- [ ] Run deterministic resolver after transcription before spending an LLM call.
-- [ ] Call Gemini only when deterministic resolution is insufficient; fallback to the approved Groq-hosted Qwen text-intent provider, if verified and configured.
-- [ ] Preserve current assistant UI, chat history, push-to-talk and Hindi labels.
-- [ ] Maintain explicit user clarification when providers disagree or confidence is insufficient.
+- [x] Integrate one assistant orchestration path for Level 1 → Level 2 → Level 3 without changing the UI.
+- [x] Direct quick actions and clear typed commands take the fast Level 1 path.
+- [x] Voice uses Shruti first; Whisper only as STT backup.
+- [x] Run deterministic resolver after transcription and retry unresolvable Shruti output with Whisper before any LLM call.
+- [x] Call Gemini only when deterministic resolution is insufficient; fall back to Groq-hosted Qwen text intent when Gemini is unavailable, invalid or low-confidence.
+- [x] Preserve current assistant UI, chat history, push-to-talk and Hindi labels.
+- [x] Maintain explicit user clarification when providers disagree or confidence is insufficient.
 
-**Gate:** Instrumented tests prove each transition and prove no unnecessary provider call occurs on the Level 1 fast path.
+**Gate:** Backend provider contract tests are added. UI-level instrumentation for every transition, real-device acceptance and full CI remain outstanding.
 
 ### W5 — Evaluation and pilot readiness
 - [ ] Build a consented, anonymized RBOS speech corpus with Hindi Devanagari, Romanized Hindi, Hinglish, Bundelkhandi and Indian English.
@@ -136,7 +135,9 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | 2026-11-14 | Audited AI-related backend files | `InvoiceExtractionService` uses Gemini only; `ProductFileReader` uses `GroqVisionClient` with Qwen vision as catalogue image/PDF fallback |
 | 2026-11-14 | Owner clarified provider name | Existing integration is Groq, not xAI Grok; it is catalogue extraction only, not voice intent |
 | 2026-11-14 | Owner clarified Level 2 audio-transfer constraint | Hosted Whisper is acceptable for ordinary navigation commands; selected Groq Whisper Turbo as the backup candidate, with free-plan limits and explicit enablement documented |
-| 2026-11-14 | Level 2 implementation | Added server-side Groq Whisper client, authenticated/CSRF-protected raw-WAV endpoint, 1 MB cap, 100-request/day per-user quota, browser WAV encoder, Shruti-first timeout/error/empty-result failover, PCM cleanup and UI disclosure. Automated fallback-transition tests and CI remain pending. |
+| 2026-11-14 | Level 2 implementation | Added server-side Groq Whisper client, authenticated/CSRF-protected raw-WAV endpoint, 1 MB cap, 100-request/day per-user quota, browser WAV encoder, Shruti-first timeout/error/empty/unresolvable-result failover, PCM cleanup and UI disclosure. Automated transition tests and CI remain pending. |
+| 2026-11-14 | Level 3 implementation | Added Gemini Flash primary intent service, separate Groq Qwen text fallback, strict destination allowlist/schema, authenticated endpoint, provider opt-in flags, 100-request/day cap and frontend integration. Added provider fallback tests; CI and real-device acceptance remain pending. |
+| 2026-11-14 | Project-wide AI audit | Added Groq Qwen vision fallback to invoice extraction; confirmed product/catalogue extraction already uses Gemini→Groq. Documented the mandatory fallback standard for current and future AI workflows. |
 | 2026-11-14 | Updated voice research to restore Whisper backup and Level 3 to current scope | Documentation correction in progress |
 
 ## 7. Project-wide AI fallback standard
@@ -169,9 +170,7 @@ Rules for all future AI integrations:
 
 - **Confirmed:** Level 1 basic common navigation options.
 - **Confirmed:** Level 2 Shruti primary, Whisper backup.
-- **Confirmed:** Level 3 Gemini Flash primary. Groq is the existing inference provider used for Qwen vision fallback in catalogue extraction; it is not xAI Grok and is not currently integrated with voice navigation.
-- **To verify:** Whether a suitable Groq-hosted Qwen text-generation model is available and appropriate for voice intent fallback.
-- **Not assumed:** Existing Qwen vision configuration does not prove text-intent capability. Do not wire it until model/API compatibility is verified.
+- **Confirmed:** Level 3 Gemini Flash primary with a separate Groq Qwen text-generation fallback. Official Groq model documentation confirms text input/output and JSON mode for `qwen/qwen3.8-27b`; this is not xAI Grok.
 - **Confirmed:** Preserve current UI and deterministic route safety.
 - **Confirmed:** Hosted Whisper is acceptable for ordinary navigation-command audio. Prefer Groq Free-plan use for the pilot; do not upgrade the provider account or enable paid usage without explicit owner approval.
 - **To measure:** Shruti→Whisper failover latency and transcript/navigation accuracy on consented RBOS command audio.
