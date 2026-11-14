@@ -17,7 +17,7 @@ const copy = {
   micMissing:'No microphone was found.', secure:'Voice requires HTTPS and microphone support. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
   failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.',
-  retry:'Retry speech setup', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
+  retry:'Retry speech setup', voiceNote:'Voice is processed on this device first. If local recognition fails, audio may be sent to hosted Whisper as a fallback.'
  },
  hi: {
   title:'बिज़नेस असिस्टेंट', placeholder:'कमांड लिखें या माइक दबाकर रखें…', go:'जाएँ', shortcuts:'जल्दी खोलें', suggestions:'संभावित विकल्प',
@@ -30,7 +30,7 @@ const copy = {
   micMissing:'माइक्रोफोन नहीं मिला।', secure:'वॉइस के लिए HTTPS और माइक्रोफोन सपोर्ट चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
   failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
-  retry:'स्पीच सेटअप फिर से आज़माएँ', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
+  retry:'स्पीच सेटअप फिर से आज़माएँ', voiceNote:'आवाज़ पहले इसी डिवाइस पर समझी जाती है। लोकल पहचान विफल होने पर रिकॉर्डिंग बैकअप के लिए hosted Whisper को भेजी जा सकती है।'
  }
 }
 const quick: NavigationTarget[] = [
