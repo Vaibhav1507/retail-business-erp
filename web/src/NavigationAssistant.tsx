@@ -253,8 +253,10 @@ export function NavigationAssistant() {
   }, 12000)
   try { worker.postMessage({ type:'transcribe', id:++messageIdRef.current, pcm }, [pcm.buffer]) }
   catch {
+   pcm.fill(0)
    clearShrutiTimeout()
    worker.terminate()
+   workerLoadingRef.current = false
    workerRef.current = null
    workerReadyRef.current = false
    void runWhisperFallback(partialTranscriptRef.current || undefined)
