@@ -54,7 +54,7 @@ public sealed class GroqVisionClientTests
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    """{"choices":[{"message":{"content":"{\\"supplierName\\":\\"Acme\\",\\"lines\\":[{\\"description\\":\\"Cable\\",\\"quantity\\":2,\\"unitCost\\":10,\\"amount\\":20}]}"}}]}""",
+                    """{"choices":[{"message":{"content":"{\"supplierName\":\"Acme\",\"lines\":[{\"description\":\"Cable\",\"quantity\":2,\"unitCost\":10,\"amount\":20}]}"}}]}""",
                     Encoding.UTF8,
                     "application/json")
             };
