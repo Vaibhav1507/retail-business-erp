@@ -53,7 +53,7 @@ const ambiguousTerms: Record<string, string[]> = {
   bill: ['sell.bill', 'sell.bills'],
   purchase: ['buy.receive', 'buy.history', 'buy.return'],
   history: ['sell.bills', 'buy.history', 'parties.purchases', 'more.audit'],
-  stock: ['stock.current', 'stock.adjust', 'stock.count'],
+  stock: ['stock.current', 'stock.products', 'stock.adjust'],
   goods: ['stock.current', 'buy.receive', 'more.transfers'],
   udhar: ['sell.collect', 'parties.dues'],
   baki: ['sell.collect', 'parties.dues'],
