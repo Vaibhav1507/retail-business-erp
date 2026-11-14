@@ -40,14 +40,14 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | Level 1 resolver | Keyword/concept profiles, aliases, ambiguity and rejection handling; 35 canonical destinations | Implemented foundation |
 | Shruti primary STT | Local worker, model integrity/cache, push-to-talk and partial transcript flow | Integrated |
 | Whisper backup STT | Added Groq Whisper Turbo client, authenticated API endpoint, WAV encoder and UI failover path; feature remains disabled until `Groq:WhisperEnabled=true` is configured | Implemented, CI/acceptance pending |
-| Gemini Flash voice intent | Gemini is used by invoice extraction, not yet voice intent routing | Pending for voice |
-| Groq/Qwen voice intent | Existing `GroqVisionClient` is used by catalogue image/PDF extraction only; vision model/contract not verified for text-only intent | Adapt only after model/API capability review |
+| Gemini Flash voice intent | Added constrained intent service and endpoint; provider calls remain disabled by default until explicit config | Implemented, tests/CI pending |
+| Groq/Qwen voice intent | Separate text-only `GroqTextIntentClient` uses `qwen/qwen3.8-27b`; official docs confirm text input/output and JSON mode | Implemented, tests/CI pending |
 | Qwen voice intent | `GroqVisionClient` defaults to `qwen/qwen3.8-27b` for vision extraction; text-only intent capability and model compatibility are unverified | Audit required |
 | Three-level orchestrator | Level 2 fallback is now wired; Level 3 intent orchestration is still pending | Partial |
 | End-to-end speech tests | Synthetic resolver/provider tests exist; no paired RBOS audio acceptance corpus yet | Pending |
 | Device acceptance | Android Chrome and low-end device acceptance outstanding | Pending |
 
-**Important provider distinction:** Grok (xAI) and Groq (inference provider) are different. The repository contains `GroqVisionClient`, configured with a Qwen vision model, used as a fallback in `ProductFileReader` for catalogue photo/PDF extraction when Gemini extraction is unavailable or unsuccessful. This is a Groq-hosted Qwen vision integration, not xAI Grok, and not a voice intent integration. `InvoiceExtractionService` uses Gemini model fallbacks and does not use Groq. Do not describe this as an existing Grok voice integration or wire the vision-only contract directly into text intent routing.
+**Important provider distinction:** Grok (xAI) and Groq (inference provider) are different. The repository contains `GroqVisionClient`, configured with a Qwen vision model, used as a fallback in `ProductFileReader` for catalogue photo/PDF extraction and now in `InvoiceExtractionService` for invoice photo/PDF extraction. This is a Groq-hosted Qwen vision integration, not xAI Grok and not a voice intent integration. Voice intent uses a separate text-only Groq client.
 
 ## 3. Work plan and acceptance gates
 
@@ -56,8 +56,8 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [x] Confirm latest PR workflow #291 passed frontend and backend jobs.
 - [x] Correct research document statements that incorrectly deferred Whisper and Level 3.
 - [x] Locate Groq integration and its current use: Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`.
-- [x] Verify invoice extraction uses Gemini model fallbacks only; no Groq fallback in `InvoiceExtractionService`.
-- [ ] Verify a suitable Groq-hosted Qwen text-generation model/API contract before adopting it for voice intent.
+- [x] Audit invoice extraction and add Groq Qwen vision as the cross-provider fallback after the Gemini model chain.
+- [x] Verify `qwen/qwen3.8-27b` supports text input/output and JSON mode through Groq chat completions; use a separate text-only client rather than reusing the vision contract.
 - [ ] Inventory Gemini Flash configuration and distinguish invoice extraction from voice intent use.
 - [ ] Record exact provider ownership and deployment configuration without exposing secrets.
 
@@ -138,6 +138,32 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | 2026-11-14 | Owner clarified Level 2 audio-transfer constraint | Hosted Whisper is acceptable for ordinary navigation commands; selected Groq Whisper Turbo as the backup candidate, with free-plan limits and explicit enablement documented |
 | 2026-11-14 | Level 2 implementation | Added server-side Groq Whisper client, authenticated/CSRF-protected raw-WAV endpoint, 1 MB cap, 100-request/day per-user quota, browser WAV encoder, Shruti-first timeout/error/empty-result failover, PCM cleanup and UI disclosure. Automated fallback-transition tests and CI remain pending. |
 | 2026-11-14 | Updated voice research to restore Whisper backup and Level 3 to current scope | Documentation correction in progress |
+
+## 7. Project-wide AI fallback standard
+
+Every AI-backed workflow must declare a primary provider, an independent provider fallback, and a deterministic/manual recovery path. Provider failures must not silently turn into empty or fabricated business data. Validate the output against the feature's schema and business rules before presenting or persisting it.
+
+| AI workflow | Primary | Independent fallback | Safe final recovery |
+|---|---|---|---|
+| Product/catalogue photo or PDF extraction | Gemini | Groq Qwen vision | Local OCR/text extraction where available; otherwise manual column mapping |
+| Supplier invoice photo/PDF extraction | Gemini Flash model chain | Groq Qwen vision | Manual invoice entry; extracted invoice remains an unsaved draft |
+| Voice transcription | Local Shruti | Groq Whisper Turbo | Typed command / deterministic resolver |
+| Voice navigation intent | Gemini Flash | Groq Qwen text generation | Deterministic suggestions or ask the user |
+
+Rules for all future AI integrations:
+- No feature may depend on one AI provider without a documented independent fallback or a clearly justified deterministic/manual alternative.
+- Provider fallback is feature-specific. Do not reuse a vision-only client for text classification or an STT model for intent understanding.
+- Keep provider credentials server-side; never log audio, full transcripts, prompts, provider payloads or sensitive business data.
+- Bound request size, timeouts, retries and per-user usage. Treat provider output as untrusted and validate it before use.
+- Keep provider flags disabled by default until the owner explicitly enables the workflow and confirms the provider account's cost tier.
+- If every provider fails, preserve the user's input and offer manual recovery; never silently discard or post unreviewed data.
+
+### Current enablement
+
+- Level 2 Whisper: `Groq:WhisperEnabled=true` plus the existing `Groq:ApiKey`. Default is false.
+- Level 3 intent: `VoiceIntent:Enabled=true` and at least one provider flag/key. Gemini: `Gemini:VoiceIntentEnabled=true` with `Gemini:ApiKey`; Groq fallback: `Groq:VoiceIntentEnabled=true` with `Groq:ApiKey`. All flags default false.
+- Level 3 uses the exact 35 destination IDs, rejects unknown IDs, requires confidence >= 0.85 for navigation, and can only return navigate/clarify/reject/not-understood. It cannot return a URL or transaction action.
+- Both Level 2 and Level 3 endpoints require an authenticated session and CSRF protection on POST requests; each has a 100-request/user/UTC-day pilot limit. The current in-memory counters are per API instance, so provider-level organization quotas remain the final shared limit.
 
 ## 6. Decision log / open questions
 
