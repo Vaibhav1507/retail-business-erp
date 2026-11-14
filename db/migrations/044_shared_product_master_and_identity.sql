@@ -185,12 +185,12 @@ set attributes = coalesce((
       where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.source_document_id is not null
       order by a.created_at, a.id limit 1
     )),
-    source_page = coalesce(c.source_page, (
+    source_page = case when c.source_document_id is null then (
       select a.source_page from _product_duplicate_map m
       join catalog.product a on a.tenant_id=m.tenant_id and a.id=m.alias_product_id
-      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.source_page is not null
+      where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id and a.source_document_id is not null
       order by a.created_at, a.id limit 1
-    ))
+    ) else c.source_page end
 where exists (
   select 1 from _product_duplicate_map m
   where m.tenant_id=c.tenant_id and m.canonical_product_id=c.id
