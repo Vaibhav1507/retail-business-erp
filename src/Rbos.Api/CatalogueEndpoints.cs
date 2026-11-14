@@ -5,7 +5,7 @@ using static Rbos.Api.ApiResults;
 
 namespace Rbos.Api;
 
-public sealed record ProductUpsertRequest(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool? IsActive, string? HsnCode = null, decimal? GstRate = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null);
+public sealed record ProductUpsertRequest(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool? IsActive, string? HsnCode = null, decimal? GstRate = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null, string? Barcode = null);
 public sealed record ImportRowRequest(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, string? Barcode = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null, int? SourcePage = null);
 public sealed record ImportRequest(List<ImportRowRequest>? Rows, ImportSource? Source = null);
 public sealed record RenameCategoryRequest(string? Name);
@@ -77,7 +77,7 @@ public static class CatalogueEndpoints
 
 	static Guid Uid(ClaimsPrincipal p) => Guid.Parse(p.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-	static ProductCommand ToCommand(ProductUpsertRequest m) => new(m.Name, m.CategoryName, m.IsGeneric, m.BaseUnit, m.Brand, m.Model, m.Attributes, m.IsActive ?? true, m.HsnCode, m.GstRate, m.Mrp, m.Specs);
+	static ProductCommand ToCommand(ProductUpsertRequest m) => new(m.Name, m.CategoryName, m.IsGeneric, m.BaseUnit, m.Brand, m.Model, m.Attributes, m.IsActive ?? true, m.HsnCode, m.GstRate, m.Mrp, m.Specs, null, m.Barcode);
 
 	static List<ImportRowInput>? ToRows(ImportRequest m) =>
 		m.Rows?.Select(r => new ImportRowInput(r.Name, r.CategoryName, r.IsGeneric, r.BaseUnit, r.Brand, r.Model, r.Attributes, r.Barcode, r.Mrp, r.Specs, r.SourcePage)).ToList();
