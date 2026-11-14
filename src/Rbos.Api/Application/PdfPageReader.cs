@@ -54,7 +54,7 @@ public static class PdfPageReader
 
         var invalid = chars.Count(c => char.IsControl(c) || char.IsSurrogate(c) ||
             char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.PrivateUse or System.Globalization.UnicodeCategory.OtherNotAssigned ||
-            c == '\\uFFFD');
+            c == (char)0xFFFD);
         if ((double)invalid / chars.Length >= 0.01) return true;
 
         var letters = chars.Where(char.IsLetter).ToArray();
