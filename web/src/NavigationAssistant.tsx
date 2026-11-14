@@ -569,6 +569,13 @@ export function NavigationAssistant() {
    whisperAbortRef.current?.abort()
    fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
    clearShrutiTimeout()
+   workerRef.current?.terminate()
+   workerRef.current = null
+   workerReadyRef.current = false
+   workerLoadingRef.current = false
+   partialInFlightRef.current = false
+   transcribingRef.current = false
+   setTranscribing(false)
   }
   setOpen(false)
  }
