@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getLanguage } from './i18n'
 import { resampleAudio } from './audio-utils'
+import { createSpeechWorker } from './speech-provider'
 import { resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
 import './navigation-assistant.css'
 
@@ -207,7 +208,7 @@ export function NavigationAssistant() {
   workerLoadingRef.current = true
   setVoiceLoading(true); setVoiceError(''); setVoiceProgress(0)
   try {
-   const worker = new Worker('/shruti-worker.js')
+   const worker = createSpeechWorker()
    workerRef.current = worker
    worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
     const data = event.data
