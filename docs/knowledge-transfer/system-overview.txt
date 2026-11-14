@@ -1,4 +1,4 @@
-CURRENT-STATE NOTICE — 2026-11-13
+CURRENT-STATE NOTICE — 2026-11-14
 ================================
 This file is a historical Slice 1.1 / Slice 4 knowledge-transfer snapshot. Its
 older "current state", slice acceptance, route inventory, test counts, and
@@ -7,12 +7,15 @@ Do not use it to infer that later functionality is absent.
 
 Use these current sources instead:
   - README.md                         current project summary and documentation map
+  - docs/current-implementation-status.md current feature/provider/PR status
   - docs/deployment-runbook.md        current Cloud Run / Neon / Meta pilot operations
   - docs/implementation-plans/whatsapp-invoice-delivery.md
                                       current WhatsApp implementation and activation gates
   - docs/quality/slice-2-4-evidence.md
                                       evidence for the earlier accepted delivery slices
   - Source code, migrations and current CI results take precedence over all docs.
+
+PR #24 merged three-level voice navigation on 2026-11-14. PR #22 (local Qwen benchmark) was closed without merge. PR #25 and #26 are duplicate quick-action wrapping CSS PRs; merge at most one.
 
 The sections below are retained for historical context only.
 
