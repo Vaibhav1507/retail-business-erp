@@ -306,10 +306,27 @@ The H2 assistant UI and interaction design remain unchanged. Speech runtime sele
 
 - Active provider: `shruti-local`, using the existing Shruti model and local Web Worker. The existing push-to-talk flow, partial transcript previews, PCM cleanup, model integrity checks and browser cache remain in place.
 - The provider registry is intentionally small and currently registers only Shruti. The agreed Level 2 design is Shruti primary with Whisper as the backup STT provider; the backup adapter and automatic failover are still pending.
-- The agreed Level 3 design is Gemini Flash primary. The repository's existing Groq integration is a Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`; it is not xAI Grok and is not currently used for voice intent. `InvoiceExtractionService` uses Gemini model fallbacks only. A Groq-hosted Qwen text-generation model may be evaluated as the voice LLM fallback, but its model/API capability must be verified first. These are intent-understanding providers, not STT providers. Use transcript-only transfer for Level 3, keep credentials server-side, and document provider limits, privacy and cost before enabling calls.
+- The agreed Level 3 design is Gemini Flash primary. The repository's existing Groq integration is a Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`; it is not xAI Grok and is not currently used for voice intent. `InvoiceExtractionService` now uses the Gemini model chain followed by Groq Qwen vision as a cross-provider fallback. Voice intent uses a separate text-only Groq client; official Groq documentation confirms `qwen/qwen3.8-27b` accepts text input, returns text and supports JSON mode. Provider calls remain disabled by default until the owner enables them. These are intent-understanding providers, not STT providers. Use transcript-only transfer for Level 3, keep credentials server-side, and document provider limits, privacy and cost before enabling calls.
 - This change does not add packages, API keys, backend endpoints, network speech calls or model downloads beyond the existing opt-in Shruti flow.
 - `speech-provider.test.ts` verifies the default provider and worker selection. Existing assistant UI and resolver tests remain the regression baseline.
 
+
+## 12.1 Project-wide AI fallback policy (2026-11-14)
+
+The implementation now applies a consistent fallback rule to every AI workflow found in the API audit:
+
+| Workflow | Primary | Fallback | Recovery |
+|---|---|---|---|
+| Product/catalogue photo/PDF | Gemini | Groq Qwen vision | Local OCR/text extraction where available; manual column mapping |
+| Supplier invoice photo/PDF | Gemini model chain | Groq Qwen vision | Manual entry; extracted invoice remains an unsaved draft |
+| Voice STT | Local Shruti | Groq Whisper Turbo | Typed command and deterministic resolver |
+| Voice intent | Gemini Flash | Groq Qwen text generation | Deterministic suggestions or ask the user |
+
+Qwen 3.8 27B is documented by Groq as accepting text and image inputs, returning text and supporting JSON object/schema output. The voice-intent integration therefore uses a dedicated text-only client rather than reusing the catalogue vision client. [Groq model documentation](https://console.groq.com/docs/model/qwen/qwen3.8-27b) and [text generation documentation](https://console.groq.com/docs/text-chat).
+
+All new AI features must have an independent provider fallback or a documented deterministic/manual recovery path. Validate structured outputs, bound payloads/timeouts/retries/usage, keep credentials server-side, and do not log audio, full transcripts or provider payloads. If all providers fail, preserve user input and offer manual recovery.
+
+Level 2 and Level 3 hosted providers are disabled by default in appsettings and require explicit environment flags. The API applies authenticated, CSRF-protected endpoints and a 100-request-per-user-per-UTC-day pilot cap. These in-memory counters are instance-local and supplement—not replace—provider organization limits.
 
 ## 13. Whisper vs Shruti evaluation (2026-11-14)
 
