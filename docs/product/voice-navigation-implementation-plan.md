@@ -72,7 +72,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [ ] Define a provider-neutral STT result contract: transcript, language, provider, duration, status and confidence/quality metadata where available.
 - [x] Keep Shruti as primary.
 - [x] Implement Groq-hosted Whisper (`whisper-large-v3-turbo`) as backup behind the provider boundary; require an explicit `Groq:WhisperEnabled` switch and the existing server-side Groq key.
-- [x] Define fallback conditions for Shruti initialization/runtime failure, 12-second timeout and empty/unusable final output; partial previews remain usable and avoid unnecessary hosted calls.
+- [x] Define fallback conditions for Shruti initialization/runtime failure, 12-second timeout, empty output and a non-empty transcript that the deterministic resolver cannot interpret; partial previews remain usable and avoid unnecessary hosted calls.
 - [x] Preserve a short-lived PCM copy only until Shruti succeeds or Whisper completes; clear it on success, failure, cancellation and component disposal.
 - [x] Encode final audio as bounded 16 kHz mono WAV; backend enforces a 1 MB cap and a 100-request/day per-user pilot quota.
 
@@ -119,7 +119,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - Do not upload raw audio to Level 3. LLM providers receive only the minimum transcript/context needed.
 - The owner confirmed that ordinary navigation-command audio may be sent to hosted Whisper. The Level 2 fallback sends audio only after Shruti failure; do not send it to Level 3.
 - The hosted Whisper feature is disabled by default in `appsettings.json`; enable with `Groq__WhisperEnabled=true` only after confirming the Groq account remains on its Free plan. The API reuses `Groq:ApiKey`, never exposes it to the browser, caps WAV uploads at 1 MB, and limits each authenticated user to 100 fallback requests per UTC day.
-- Groq Free-plan rate limits currently list Whisper at 20 RPM, 2,000 RPD, 7,200 audio seconds/hour and 28,800 audio seconds/day; actual account limits may vary. Paid Developer usage is billed separately. Enforce a small application-side pilot quota and handle HTTP 429 safely.
+- Groq Free-plan rate limits currently list Whisper at 20 RPM, 2,000 RPD, 7,200 audio seconds/hour and 28,800 audio seconds/day; actual account limits may vary. Paid Developer usage is billed separately. The API adds a 100-request/user/day pilot cap and handles HTTP 429 safely.
 - No API keys in frontend bundles, source control, logs or test fixtures. Provider secrets remain server-side.
 - No silent paid dependency. Check actual quotas and pricing; temporary free allowances are not permanent zero-cost guarantees.
 - Never log audio, full transcripts, authorization headers, provider payloads or sensitive business data.
