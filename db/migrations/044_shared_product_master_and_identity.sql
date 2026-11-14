@@ -213,12 +213,13 @@ on conflict (business_category, identity_key) do nothing;
 
 update catalog.product p
 set master_product_id=mp.id
-from core.business_profile bp
+from catalog.master_product mp
+join core.business_profile bp on bp.business_category=mp.business_category
 join catalog.category c on c.tenant_id=bp.tenant_id
-join catalog.master_product mp
-  on mp.business_category=bp.business_category
- and mp.identity_key=catalog.master_product_identity_key(p.name, c.name, p.brand, p.model)
-where p.tenant_id=bp.tenant_id and p.category_id=c.id and p.master_product_id is null;
+where p.tenant_id=bp.tenant_id
+  and p.category_id=c.id
+  and p.master_product_id is null
+  and mp.identity_key=catalog.master_product_identity_key(p.name, c.name, p.brand, p.model);
 
 -- From this point onward there is exactly one active tenant product per identity.
 drop index if exists catalog.product_active_dup_uq;
