@@ -20,7 +20,7 @@ describe('speech provider registry', () => {
 
   it('creates the selected provider worker without UI-owned runtime paths', () => {
     const worker = { terminate: vi.fn() }
-    const WorkerMock = vi.fn(() => worker)
+    const WorkerMock = vi.fn(function (this: unknown) { return worker })
     vi.stubGlobal('Worker', WorkerMock)
 
     expect(createSpeechWorker()).toBe(worker)
