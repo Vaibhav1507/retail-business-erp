@@ -228,7 +228,7 @@ public sealed class CatalogueService(TenantDb db)
             await using var c = s.Command("update catalog.product set category_id=@c,name=@n,is_generic=@g,brand=@b,model=@m,attributes=@a::jsonb,is_active=@x,master_product_id=@mp where id=@i");
             c.Parameters.AddWithValue("c", cat); c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("g", m.IsGeneric);
             c.Parameters.AddWithValue("b", (object?)NullIfBlank(m.Brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(m.Model) ?? DBNull.Value);
-            c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes))); c.Parameters.AddWithValue("x", m.IsActive); c.Parameters.AddWithValue("mp", masterProductId); c.Parameters.AddWithValue("i", id);
+            c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes))); c.Parameters.AddWithValue("x", m.IsActive); c.Parameters.AddWithValue("mp", (object?)masterProductId ?? DBNull.Value); c.Parameters.AddWithValue("i", id);
             if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Product not found.", 404);
             await SetTaxAsync(s, id, m, ct);
             await SetCatalogueDataAsync(s, tid.Value, id, m.Brand, m.Mrp, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), ct);
@@ -435,7 +435,7 @@ public sealed class CatalogueService(TenantDb db)
         return (Guid)(await sel.ExecuteScalarAsync(ct))!;
     }
 
-    static async Task<Guid> EnsureMasterProductAsync(TenantSession s, Guid tid, string name, string categoryName,
+    static async Task<Guid?> EnsureMasterProductAsync(TenantSession s, Guid tid, string name, string categoryName,
         bool isGeneric, string baseUnit, string? brand, string? model,
         IReadOnlyDictionary<string, string>? attributes, IReadOnlyDictionary<string, string>? specs,
         string? hsnCode, decimal? gstRate, CancellationToken ct)
@@ -446,8 +446,9 @@ public sealed class CatalogueService(TenantDb db)
             q.Parameters.AddWithValue("t", tid);
             businessCategory = await q.ExecuteScalarAsync(ct) as string;
         }
-        if (string.IsNullOrWhiteSpace(businessCategory))
-            throw new InvalidOperationException("Complete business setup before adding products to the shared catalogue.");
+        // Products may be entered during first-run setup. They stay tenant-local until
+        // the owner selects a business vertical; ProfileEndpoints then publishes them.
+        if (string.IsNullOrWhiteSpace(businessCategory)) return null;
         await using var c = s.Command(@"
             insert into catalog.master_product
               (id,business_category,category_name,name,base_unit,is_generic,brand,model,attributes,specs,hsn_code,gst_rate)
@@ -494,7 +495,7 @@ public sealed class CatalogueService(TenantDb db)
         return last - count + 1;
     }
 
-    static async Task InsertAsync(TenantSession s, Guid tid, Guid id, Guid cat, string sku, ProductInput m, Guid masterProductId, CancellationToken ct)
+    static async Task InsertAsync(TenantSession s, Guid tid, Guid id, Guid cat, string sku, ProductInput m, Guid? masterProductId, CancellationToken ct)
     {
         await using var c = s.Command("insert into catalog.product(tenant_id,id,category_id,name,is_generic,internal_sku,base_unit,brand,model,attributes,master_product_id) values (@t,@i,@c,@n,@g,@s,@u,@b,@m,@a::jsonb,@mp)");
         c.Parameters.AddWithValue("t", tid); c.Parameters.AddWithValue("i", id); c.Parameters.AddWithValue("c", cat);
