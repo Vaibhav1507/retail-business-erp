@@ -48,7 +48,18 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
             }
             if (images.Count > 6) return null;
         }
-        return await CallAsync(images, prompt, ct);
+        var merged = new JsonObject { ["lines"] = new JsonArray() };
+        foreach (var batch in images.Chunk(3))
+        {
+            var partial = await CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct);
+            if (partial is not JsonObject) return null;
+            foreach (var key in new[] { "supplierName", "invoiceNumber", "date", "total", "subtotal", "taxAmount" })
+                if (partial[key] is not null) merged[key] = partial[key]!.DeepClone();
+            if (partial["lines"] is JsonArray lines)
+                foreach (var line in lines)
+                    if (line is not null) ((JsonArray)merged["lines"]!).Add(line.DeepClone());
+        }
+        return merged;
     }
 
     public async Task<JsonNode?> ExtractPdfAsync(byte[] pdf, string prompt, CancellationToken ct)
