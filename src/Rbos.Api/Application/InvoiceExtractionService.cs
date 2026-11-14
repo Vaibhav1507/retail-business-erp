@@ -10,7 +10,7 @@ public sealed record DraftLine(string Description, decimal? Quantity, decimal? U
 public sealed record InvoiceDraft(Guid FileId, string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, List<DraftLine> Lines, List<string> Warnings, decimal? Subtotal = null, decimal? TaxAmount = null);
 
 /// <summary>Reads a supplier invoice photo/PDF with Gemini and returns an unsaved draft for the user to review. Nothing is posted here.</summary>
-public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log)
+public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log, GroqVisionClient groq)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
@@ -51,20 +51,22 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
-        JsonNode? parsed;
+        JsonNode? parsed = null;
         try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
         catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-        { return ServiceResult<object>.Fail("Free reading limit reached. Try again later or enter the invoice by hand."); }
-        catch (HttpRequestException e) when (e.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.InternalServerError or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.GatewayTimeout)
-        {
-            log.LogWarning(e, "Invoice reading service unavailable");
-            return ServiceResult<object>.Fail("The invoice reading service is busy right now. Please try again in a minute or enter the invoice by hand.", 503);
-        }
+        { log.LogWarning("Gemini invoice extraction rate limited; trying configured fallback providers"); }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+        { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
+
+        if (parsed is null && groq.Available)
         {
-            log.LogWarning(e, "Invoice extraction failed");
-            return ServiceResult<object>.Fail("Could not read this invoice. Try a clearer photo or enter it by hand.");
+            try { parsed = await groq.ExtractInvoiceAsync([(mime, b64), .. extra], Prompt, ct); }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+            { log.LogWarning(e, "Groq invoice extraction fallback failed"); }
         }
+        if (parsed is null)
+            return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
+
 
         await using var s = await db.BeginAsync(uid, tid, ct);
         var products = new List<(Guid Id, string Name)>();
