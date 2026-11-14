@@ -3,7 +3,7 @@
 **Status date:** 2026-11-14  
 **Working branch:** `feature/voice-provider-boundary`  
 **Tracking PR:** [#24 — H2 voice navigation](https://github.com/Vaibhav1507/retail-business-erp/pull/24)  
-**Status:** In progress; do not merge as a completed three-level voice feature yet.
+**Status:** Implementation complete; workflow #344 passed on the implementation commit. Two subsequent commits changed documentation only. Controlled production pilot acceptance remains a post-merge gate.
 
 ## 1. Agreed architecture (source of truth)
 
@@ -39,10 +39,10 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | Level 1 quick actions | Six common shortcuts are present in `NavigationAssistant.tsx` | Implemented baseline; review coverage |
 | Level 1 resolver | Keyword/concept profiles, aliases, ambiguity and rejection handling; 35 canonical destinations | Implemented foundation |
 | Shruti primary STT | Local worker, model integrity/cache, push-to-talk and partial transcript flow | Integrated |
-| Whisper backup STT | Added Groq Whisper Turbo client, authenticated API endpoint, bounded WAV encoder and Shruti-first failover; disabled by default | Implemented; automated backend/frontend CI passed on current head except container build still running at last check |
-| Gemini Flash voice intent | Added constrained intent service and authenticated endpoint; disabled by default until explicitly configured | Implemented; provider contract tests pass in CI |
+| Whisper backup STT | Added Groq Whisper Turbo client, authenticated API endpoint, bounded WAV encoder and Shruti-first failover; disabled by default | Implemented; frontend and backend CI including container build passed on implementation commit in workflow #344 |
+| Gemini Flash voice intent | Added constrained intent service and authenticated endpoint; disabled by default until explicitly configured | Implemented; provider contract tests pass in workflow #344 |
 | Groq/Qwen voice intent | Separate text-only `GroqTextIntentClient` uses configurable `qwen/qwen3.8-27b` (Preview) for structured text fallback | Implemented; provider contract tests pass in CI |
-| Three-level orchestrator | Existing assistant UI now routes through deterministic navigation, Shruti→Whisper STT failover and Gemini→Groq Qwen intent fallback | Integrated; synthetic regression coverage passes; device acceptance remains pending |
+| Three-level orchestrator | Existing assistant UI now routes through deterministic navigation, Shruti→Whisper STT failover and Gemini→Groq Qwen intent fallback | Integrated; synthetic regression coverage and workflow #344 pass; device acceptance remains a controlled post-merge pilot gate |
 | End-to-end speech tests | Synthetic resolver/provider tests exist; no paired RBOS audio acceptance corpus yet | Pending |
 | Device acceptance | Android Chrome and low-end device acceptance outstanding | Pending |
 
@@ -52,7 +52,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 
 ### W0 — Repository/provider audit and documentation
 - [x] Re-check PR #24 head, changed files and latest workflow.
-- [x] Confirm latest PR workflow #344 frontend checks passed and backend Release build, migration validation and unit tests passed; container build was still running at last check.
+- [x] Confirm workflow #344 completed successfully: frontend checks, backend Release build, test-database migration validation, unit tests and deployment container build all passed. Subsequent commits changed documentation only.
 - [x] Correct research document statements that incorrectly deferred Whisper and Level 3.
 - [x] Locate Groq integration and its current use: Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`.
 - [x] Audit invoice extraction and add Groq Qwen vision as the cross-provider fallback after the Gemini model chain.
@@ -111,7 +111,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [ ] Run Android Chrome first-use permission, model download/cache, low-end device memory and latency tests.
 - [ ] Update this document and the research report with actual measured results.
 
-**Gate:** All automated CI jobs green, no unresolved high-severity review comments, and manual acceptance evidence recorded. Keep PR draft until then.
+**Gate:** All automated CI jobs green, no unresolved high-severity review comments, and manual acceptance evidence recorded. Keep production acceptance as a post-merge pilot gate; do not enable hosted providers until the pilot owner verifies cost tier, backup and rollback.
 
 ## 4. Safety, privacy and cost constraints
 
@@ -130,12 +130,12 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 
 | Date | Change / evidence | Result |
 |---|---|---|
-| 2026-11-14 | Rechecked PR #24 head `bbb5a27`; workflow #344 | Frontend checks, backend Release build, migration validation and unit tests passed; backend container build was still running at last check |
+| 2026-11-14 | Rechecked PR #24 head `bbb5a27`; workflow #344 | Frontend and backend jobs completed successfully, including backend Release build, test-database migration validation, unit tests and deployment container build |
 | 2026-11-14 | Audited current speech provider and assistant integration | Shruti is the only registered STT provider; assistant calls deterministic resolver directly |
 | 2026-11-14 | Audited AI-related backend files | `InvoiceExtractionService` uses Gemini only; `ProductFileReader` uses `GroqVisionClient` with Qwen vision as catalogue image/PDF fallback |
 | 2026-11-14 | Owner clarified provider name | Existing integration is Groq, not xAI Grok; it is catalogue extraction only, not voice intent |
 | 2026-11-14 | Owner clarified Level 2 audio-transfer constraint | Hosted Whisper is acceptable for ordinary navigation commands; selected Groq Whisper Turbo as the backup candidate, with free-plan limits and explicit enablement documented |
-| 2026-11-14 | Level 2 implementation | Added server-side Groq Whisper client, authenticated/CSRF-protected raw-WAV endpoint, 640,044-byte (20-second) cap, 100-request/day per-user quota, browser WAV encoder, Shruti-first timeout/error/empty/unresolvable-result failover, PCM cleanup and UI disclosure. WAV encoding and provider-contract tests pass; full transition coverage and Android real-device acceptance remain pending. |
+| 2026-11-14 | Level 2 implementation | Added server-side Groq Whisper client, authenticated/CSRF-protected raw-WAV endpoint, 640,044-byte (20-second) cap, 100-request/day per-user quota, browser WAV encoder, Shruti-first timeout/error/empty/unresolvable-result failover, PCM cleanup and UI disclosure. WAV encoding and provider-contract tests pass in workflow #344. Full live speech corpus and Android real-device acceptance remain for the controlled production pilot. |
 | 2026-11-14 | Level 3 implementation | Added Gemini Flash primary intent service, separate Groq Qwen text fallback, strict destination allowlist/schema, authenticated endpoint, provider opt-in flags, 100-request/day cap and frontend integration. Added provider fallback tests; current workflow passed backend tests and frontend suite/build; Android real-device acceptance remains pending. |
 | 2026-11-14 | Project-wide AI audit | Added Groq Qwen vision fallback to invoice extraction; confirmed product/catalogue extraction already uses Gemini→Groq. Documented the mandatory fallback standard for current and future AI workflows. |
 | 2026-11-14 | Updated voice research to restore Whisper backup and Level 3 to current scope | Documentation correction in progress |
