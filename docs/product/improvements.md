@@ -142,7 +142,7 @@ GST, CA workspace and team screens plus Finance heading/tabs translated; rest of
 | G7 | Income-tax preparation | Product | Low | XL | Ref | - | Undecided | Deferred | Much later |
 | D7 | Background jobs, only when a scheduled job needs them | Engineering | Low | M | Seen (none) | - | Rejected | Dropped | Owner decision: not needed; G5 reminders are in-app and computed on request |
 | H1 | AI-assisted document extraction improvements | AI | Low | M | Seen | - | Approved | Deferred | Owner order: after unit tests and Playwright E2E; do whatever is possible without paid AI APIs |
-| H2 | Navigation-only assistant: typed, shortcuts and local push-to-talk voice | Product / UX | High | M | Seen | Missing capability | Approved | In progress | Implemented on `experiment/h2-stage2-repair`: typed resolver, allowlisted routes, ambiguity/out-of-scope guard, Shruti + Cactus WASM local voice worker. Awaiting green CI, production build and browser/device validation. H2 never answers business-data questions or executes transactions; X1 remains separate. |
+| H2 | Navigation-only assistant: typed, shortcuts and local push-to-talk voice | Product / UX | High | M | Seen | Missing capability | Approved | Implemented; pilot acceptance pending | Merged via PR #24 on 2026-11-14. Level 1 deterministic keyword/concept resolver covers 35 canonical destinations; Level 2 Shruti primary with opt-in Groq Whisper Turbo backup; Level 3 Gemini Flash primary with separate Groq Qwen text fallback. Hosted providers default off. Workflow #344 passed on implementation commit; Android/device and consented speech-corpus acceptance remain open. Quick-action wrapping merged through PR #25; duplicate PR #26 was closed without merging. See `docs/product/voice-navigation-implementation-plan.md` and `docs/current-implementation-status.md`. |
 All WER figures vendor-reported, unverified. Local-AI track (section 9): option C = STT + on-device multilingual embedding classifier (e5-small / MiniLM-L12, ~113 MB int8, MIT/Apache, ungated) + allowlist guard; generative LLMs (Qwen 0.5-0.6B ~460-540 MB, Gemma gated/custom terms, SmolLM weak Hindi) not recommended now. Next decision: approve offline text-only bake-off A vs C; adopt C only if >=5 pt better with wrong-nav <=2% quiet / <=3% noisy within device limits. X1 remains separate |
 | H3 | Additional retail verticals, one at a time | Product | Low | XL | - | - | Undecided | Deferred | |
 | H4 | Multiple themes | UX | Low | S | - | - | Approved | Done: light/dark toggle in the header, persisted in localStorage; theme.test.tsx passes; no visual check yet | |
@@ -154,7 +154,7 @@ Proposed as "do not do now". Change the status here only if the reasoning change
 
 | ID | Idea | Suggested decision | Reason | Decision | Status |
 |---|---|---|---|---|---|
-| X1 | AI chatbot | Defer | Does not solve an established critical gap. H2 is deliberately navigation-only and deterministic (no LLM, no data questions, no actions), so it does not reopen X1 | Undecided | Deferred |
+| X1 | AI chatbot | Defer | Does not solve an established critical gap. H2 is navigation-only: Level 3 may use a constrained LLM to classify intent, but cannot answer business-data questions or execute actions, so it does not reopen X1 | Undecided | Deferred |
 | X2 | Microservices | Do not do | Operational complexity without benefit at this scale | Undecided | Skipped |
 | X3 | Kafka or other message broker | Do not do | No demonstrated need | Undecided | Skipped |
 | X4 | Kubernetes | Do not do | Unnecessary for the current stage | Undecided | Skipped |
@@ -211,3 +211,13 @@ For each approved item, record:
 | 2026-11-08 | Catalogue provenance work (local dev/test databases only; nothing deployed, no production migration). Migration 041 (catalog.product_source_reference, tenant RLS, backfill from 040, rollback in db/rollback) applied to rbos_dev and rbos_test after pre-migration dumps with rbos_backup. Products keep multiple source references (document, version, actual PDF page) shown in the Catalogue Source column. PDF import now reads actual pages with PdfPig; scanned pages are rendered with PDFtoImage and OCR-ed by local Tesseract 5.4 (default Windows path detected); legacy content-stream parser kept only as fallback for unparseable PDFs. Category attributes (AttributeDefinitions) applied on create/update/import into generic specs JSON. Same brand + normalized model is flagged possibleDuplicate for review, never merged. Tests: unit 86, integration 142, frontend 62, all passing. Limitations: no dedicated product details screen (sources shown in list); ProductFileReader mixed-PDF flow not tested end to end (components are); PDFtoImage is Windows/Skia-platform dependent (CA1416 warning); Tesseract must be installed on any host doing OCR; migration 041 not yet applied to production. |
 | 2026-11-13 | Added W1 for merged Meta WhatsApp invoice delivery; marked this register's older item statuses and phase totals as historical pending item-by-item revalidation. |
 | 2026-11-08 | Final local-pilot verification: suites pass (86/142/62), migrations 039-041 consistent in rbos_dev and rbos_test, seven LG PDFs parsed with real pages and scheme separated, CA1416 reviewed, Tesseract setup documented. See catalogue-scanning-and-master-list-status.md. |
+
+
+## Current reconciliation — 2026-11-14
+
+- H2 is implemented and merged through PR #24. Do not describe it as deterministic-only: Level 3 is an implemented, constrained Gemini Flash → Groq Qwen text intent path, disabled by default. Level 2 is Shruti → optional Groq Whisper Turbo. See the voice implementation plan for exact gates and limits.
+- PR #22 (local Qwen LLM benchmark) was closed without merging; it is not part of the production voice architecture.
+- PR #25 is the preferred focused CSS-only quick-action wrapping fix. PR #26 duplicates the same UI fix; merge at most one.
+- The historical phase summaries and many pre-existing improvement rows remain unverified item by item. Do not mass-change their statuses based only on feature presence.
+
+| 2026-11-14 | Reconciled H2 after PR #24 merge; recorded #22 closed without merge and #25/#26 duplicate UI fix status. |

@@ -1,6 +1,6 @@
 # Voice and text navigation assistant: research and recommendation (H2)
 
-Status: Three-level voice navigation is implemented on `feature/voice-provider-boundary` (PR #24). Level 1 uses 35 canonical deterministic destinations; Level 2 keeps local Shruti primary with an opt-in Groq-hosted Whisper Turbo fallback; Level 3 uses Gemini Flash primary with a separate Groq Qwen text fallback. Product/catalogue extraction uses Gemini→Groq Qwen vision; invoice extraction has an opt-in Groq Qwen vision fallback and manual-entry recovery. Hosted voice providers and invoice fallback remain disabled by default. Workflow #344 passed frontend and backend checks, including backend Release build, test-database migration validation, unit tests and deployment container build, on the implementation commit `bbb5a27`; subsequent commits changed documentation only. Android/device acceptance remains a controlled post-merge pilot gate. Status: 2026-11-14.
+Status (2026-11-14): Three-level voice navigation is implemented and merged to `main` via PR #24 (`fc8ecacd27d91ee4a36eba6c45e56b794471b9a6`). Level 1 uses 35 canonical deterministic destinations; Level 2 keeps local Shruti primary with an opt-in Groq-hosted Whisper Turbo fallback; Level 3 uses Gemini Flash primary with a separate Groq Qwen text fallback. Product/catalogue extraction uses Gemini→Groq Qwen vision; invoice extraction has an opt-in Groq Qwen vision fallback and manual-entry recovery. Hosted voice providers and invoice fallback remain disabled by default. Workflow #344 passed frontend and backend checks, including backend Release build, test-database migration validation, unit tests and deployment container build, on the implementation commit `bbb5a27`; subsequent commits changed documentation only. Android/device acceptance remains a controlled post-merge pilot gate. Status: 2026-11-14.
 
 ## 1. Scope
 
@@ -405,3 +405,17 @@ A new synthetic regression suite exercises every allowlisted screen with multipl
 ### Limits
 
 Dialect variants are starting hypotheses informed by published descriptions, not verified Konch shopkeeper utterances. Add or change a local word only after checking it with speakers from the target area and keeping a held-out test set. An incorrect dialect alias can create false navigation, so a lower confidence result should ask rather than guess.
+
+
+## 15. Implementation outcome and current repository status (2026-11-14)
+
+The research recommendations have been translated into the current three-level implementation and merged through PR #24. Treat sections 1–13 as research evidence and design rationale, not as a statement that the recommended alternatives remain unimplemented. The current runtime contract is:
+
+- Level 1: six quick actions and deterministic keyword/concept navigation across 35 canonical destinations.
+- Level 2: local Shruti primary; Groq-hosted Whisper Turbo backup on eligible Shruti failures/unusable output. The two transcripts share the same normalisation/resolver path.
+- Level 3: Gemini Flash primary; separate Groq Qwen text-generation fallback. Invoked only when deterministic navigation is insufficient; strict structured intent is allowlist-validated. Raw audio is not sent to Level 3.
+- Hosted Whisper, Gemini voice intent, Groq voice intent and invoice Groq fallback remain disabled by default. Existing server-side provider keys are reused; no separate voice-only key is introduced. No paid usage/account upgrade without explicit owner approval.
+- Workflow #344 passed on the implementation commit. Android Chrome, low-end device and consented real-speech corpus evaluation remain outstanding; synthetic tests are not acoustic accuracy evidence.
+- PR #22 local Qwen benchmark closed without merge. It is not the runtime architecture. PR #25 merged the quick-action wrapping CSS fix; duplicate PR #26 closed without merge.
+
+When implementation status conflicts with an older recommendation or candidate table, use `docs/product/voice-navigation-implementation-plan.md` and `docs/current-implementation-status.md` for current implementation facts. This does not invalidate the historical research comparisons or imply independent accuracy validation.

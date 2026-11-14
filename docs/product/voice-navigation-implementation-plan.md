@@ -1,9 +1,9 @@
 # Voice Navigation — Implementation Plan and Progress
 
 **Status date:** 2026-11-14  
-**Working branch:** `feature/voice-provider-boundary`  
-**Tracking PR:** [#24 — H2 voice navigation](https://github.com/Vaibhav1507/retail-business-erp/pull/24)  
-**Status:** Implementation complete; workflow #344 passed on the implementation commit. Two subsequent commits changed documentation only. Controlled production pilot acceptance remains a post-merge gate.
+**Merged implementation:** `main` (PR #24; merge commit `fc8ecacd27d91ee4a36eba6c45e56b794471b9a6`)  
+**Implementation PR:** [#24 — H2 voice navigation](https://github.com/Vaibhav1507/retail-business-erp/pull/24) (merged 2026-11-14)  
+**Status:** Implementation merged. Workflow #344 passed on implementation commit `bbb5a27`; subsequent PR #24 commits were documentation-only. Controlled production pilot acceptance remains outstanding. The separate mobile quick-action wrapping fix merged through PR #25; duplicate PR #26 was closed without merging.
 
 ## 1. Agreed architecture (source of truth)
 
@@ -57,8 +57,8 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [x] Locate Groq integration and its current use: Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`.
 - [x] Audit invoice extraction and add Groq Qwen vision as the cross-provider fallback after the Gemini model chain.
 - [x] Verify `qwen/qwen3.8-27b` supports text input/output and JSON mode through Groq chat completions; use a separate text-only client rather than reusing the vision contract.
-- [ ] Inventory Gemini Flash configuration and distinguish invoice extraction from voice intent use.
-- [ ] Record exact provider ownership and deployment configuration without exposing secrets.
+- [x] Inventory Gemini Flash configuration and distinguish invoice extraction from voice intent use.
+- [x] Record provider ownership and configuration contract without exposing secrets.
 
 ### W1 — Level 1 completion
 - [ ] Audit the six quick actions against the most common pilot-shop workflows.
@@ -178,3 +178,13 @@ Rules for all future AI integrations:
 - **To configure:** Provider keys, quotas, model IDs and environment-specific enablement without committing secrets.
 
 Update this file at every meaningful implementation milestone, provider decision, test result and deployment/acceptance gate. Keep `voice-navigation-research.md` as the evidence/research companion; this file is the execution tracker.
+
+
+## 8. Post-merge repository status — 2026-11-14
+
+- PR #24 is merged into `main` as `fc8ecacd27d91ee4a36eba6c45e56b794471b9a6`. The implementation baseline described above is no longer merely on a feature branch.
+- Workflow #344 passed on implementation commit `bbb5a27`: frontend typecheck, Vitest, production build and dependency audit; backend Release build, disposable test-database migration validation, unit tests and deployment-container build. This does not certify production migration state or live provider/device acceptance.
+- PR #22, a separate local Qwen model benchmark, was closed without merge. Its candidate is not part of the production runtime.
+- PR #25 merged the focused CSS-only quick-action wrapping fix; duplicate PR #26 closed without merge. This UI correction is separate from the PR #24 voice implementation.
+- No voice-specific database migration is introduced by PR #24. Provider flags remain disabled by default. Existing Gemini/Groq server-side credentials are reused; no new voice-specific secret type is required.
+- Remaining acceptance: Android Chrome and low-end device checks; consented RBOS speech corpus and real utterance evaluation; provider quota/cost verification before enabling hosted paths; production pilot with non-real business data and rollback readiness.

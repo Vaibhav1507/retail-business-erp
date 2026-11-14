@@ -1,3 +1,5 @@
+> **Current-state note — 2026-11-14:** This document preserves the original dependency-aware slice plan and its historical assumptions. The repository implementation has since expanded beyond the original Slice 1–4 sequence (see `docs/current-implementation-status.md`). Do not use the old “not delivered” statements or original proposed-slice labels below as a current inventory of code. This roadmap remains useful for scope/dependency intent; verify current implementation against source, migrations, tests and the feature trackers.
+
 # Dependency-aware roadmap
 
 ## Implementation status (reconciled after Slice 4)

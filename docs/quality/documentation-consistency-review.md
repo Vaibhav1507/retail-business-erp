@@ -1,3 +1,5 @@
+> **Current-state addendum — 2026-11-14:** The Phase 0 consistency checks below remain historical and are not a current code audit. PR #24 merged the three-level voice navigation implementation; PR #22 closed without merge; PR #25 merged the quick-action wrapping CSS fix; duplicate PR #26 closed without merge. For the current implementation/provider/PR snapshot, see `docs/current-implementation-status.md`. For the scope of the latest documentation reconciliation and remaining domain-document review debt, see `docs/quality/documentation-freshness-review.md`.
+
 > **Historical review:** The checks below describe the Phase 0 documentation baseline and are not a current implementation audit. See `docs/quality/documentation-freshness-review.md` for the latest targeted review against the merged repository.
 
 # Documentation consistency review

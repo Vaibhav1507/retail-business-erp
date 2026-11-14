@@ -1,64 +1,66 @@
 # Retail Business OS
 
-India-first, multilingual, multitenant retail operating system for small shops in towns and villages.
-Personal learning project. Free-first, local-first, synthetic-data-first.
+India-first, multilingual, multitenant retail operating system for small shops in towns and villages. Personal learning project; free-first, local-first and synthetic-data-first.
 
-## Status
+## Current status
 
-**Pilot implementation in progress.** The repository now contains the broader retail workflows through purchases, sales, returns, finance/reporting, staff/location capabilities, product tax metadata, supplier invoice extraction, barcode/serial tracking, and WhatsApp invoice delivery. Do not treat the presence of code as product-owner acceptance or production readiness. The current deployment and verification state is tracked in `docs/deployment-runbook.md`; WhatsApp implementation and activation gates are tracked in `docs/implementation-plans/whatsapp-invoice-delivery.md`. The older knowledge-transfer snapshots are historical and must not be used as the source of truth.
+**Pilot implementation in progress — not a production-readiness claim.** The repository now contains a broad retail workflow implementation, including identity and tenant isolation, catalogue and stock setup, purchasing, sales and returns, finance/reporting, staff/location capabilities, product tax metadata, supplier invoice and catalogue extraction, barcode/serial support, WhatsApp invoice delivery and navigation assistance.
 
-| Slice | Delivered |
+Implementation, CI verification, production deployment, production database migration, product-owner acceptance and live business activation are separate states. Read **[Current implementation status](docs/current-implementation-status.md)** first for the reconciled feature/provider map, latest PR status and remaining acceptance work. Deployment state is in `docs/deployment-runbook.md`; WhatsApp activation gates are in `docs/implementation-plans/whatsapp-invoice-delivery.md`.
+
+| Delivery slice | Core scope |
 |---|---|
-| 1 | Authentication, tenant bootstrap, tenant isolation, RLS, opening stock, inventory valuation (WAC), audit, idempotency |
-| 1.1 | Domain extraction, WAC tests, integration tests, Playwright, security controls, foundation hardening |
-| 2 | Product catalogue, categories, generic products, search, editing, duplicate detection, CSV import, Stock Setup Assistant |
-| 3 | Suppliers, purchase receipts, supplier balances, supplier payments, purchasing workflow |
-| 4 | Customers, cash/UPI/credit sales, partial payment at sale, customer balances, sales search and detail, stock deduction, oversell prevention |
+| 1 | Authentication, tenant bootstrap, tenant isolation, RLS, opening stock, WAC valuation, audit, idempotency |
+| 1.1 | Domain extraction, WAC tests, integration tests, Playwright, security controls and foundation hardening |
+| 2 | Product catalogue, categories, generic products, search/edit, duplicate detection, CSV import and Stock Setup Assistant |
+| 3 | Suppliers, purchase receipts, supplier balances/payments and purchasing workflow |
+| 4 | Customers, cash/UPI/credit sales, partial payment, customer balances, sales search/detail, stock deduction and oversell prevention |
 
-Implemented after Slice 4 (evidence: migrations, not yet accepted): customer collections, sales and purchase returns (009); expenses, cash/bank/UPI accounts, owner capital/drawings, stock adjustments, reports, period lock (011); business profile and GST status/GSTIN (012); stored sale GST rate, no GST engine (013); supplier invoice files and optional AI extraction (014-015); mobile OTP (016); product barcodes and optional serial/IMEI capture on sale lines (017-018).
+Later work expanded the implementation beyond those original delivery slices. Do not interpret the table as a complete current feature inventory; use the current-status document and source code/migrations/tests.
 
-Optional external services are OFF unless explicitly configured: Google Gemini (`Gemini:ApiKey`) is the primary AI provider for invoice and catalogue photo/PDF reading; Groq vision (`Groq:ApiKey`, optional `Groq:Model`, default `qwen/qwen3.8-27b`) is attempted only when Gemini is unavailable or fails. Groq receives rendered PDF page images (maximum three per request) and uploaded photos. Both providers transmit document/image contents to their respective services; use only with data you are comfortable sharing. MSG91 SMS remains optional (`Sms:Provider`). Secrets must be supplied through .NET user secrets locally or a managed secret store in deployment; never commit API keys.
+## AI and external services
 
-All 24 ADRs remain **Proposed**;
+Current AI paths are Gemini→Groq Qwen vision for product/catalogue extraction; Gemini model chain→optional Groq Qwen vision for supplier invoices; local Shruti→optional Groq Whisper Turbo for voice transcription; and Gemini Flash→optional Groq Qwen text generation for navigation intent. Provider fallbacks are feature-specific and disabled by default where they introduce hosted usage. Manual/deterministic recovery remains available. External providers receive the relevant uploaded document/image/audio/transcript when that feature is explicitly enabled; review the relevant feature documentation before enabling. No paid usage or provider-account upgrade without explicit owner approval.
 
-Slice numbers above are delivery numbers;
-
-Run: `dotnet build RetailBusinessOs.slnx`, `dotnet test`, then in `web`: `npm test`, `npm run build`, `npm run test:e2e`. Migrations: `dotnet run --project src/Rbos.Api -- --migrate test|dev`. Secrets live in .NET user secrets, never in the repo.
+MSG91 SMS and Meta WhatsApp Cloud API are optional integrations. Never commit API keys, tokens, passwords or connection strings. Use .NET user secrets locally and an appropriately scoped managed secret store in deployment.
 
 ## Read first
 
 1. `docs/00-guardrails.md` — non-negotiable company-separation and free-first rules
-2. `docs/00-discovery-report.md` — original Phase 0 discovery report (historical; refined by the documents below)
-3. `docs/product/scope-phase-1a-1b-future.md` — what is in and out
-4. `docs/decisions/product-owner-decisions.md` — decisions waiting for you
-5. `docs/adr/index.md` — proposed architecture decisions
+2. `docs/current-implementation-status.md` — current implementation and PR status
+3. `docs/product/scope-phase-1a-1b-future.md` — approved product scope boundaries
+4. `docs/decisions/product-owner-decisions.md` — owner decisions and open items
+5. `docs/adr/index.md` — architecture decision status
+6. `docs/deployment-runbook.md` — deployment and production activation gates
 
 ## Documentation map
 
 | Folder | Contents |
 |---|---|
-| `docs/product/` | Vision, users, glossary, assumptions, open questions, scope, roadmap, electronics validation plan |
-| `docs/workflows/` | Onboarding, stock setup, purchase-to-pay, sale-to-cash, returns and adjustments (incl. period lock) |
-| `docs/architecture/` | Domain model/ERD, database strategy, tenant isolation, transactions and projections, vertical templates, tracking extensibility, document numbering |
-| `docs/finance/` | Accounting invariants, posting catalogue, inventory invariants, WAC policy and worked examples, unknown opening cost, purchase evidence, report definitions |
-| `docs/security/` | Threat model, authorisation matrix, security test plan |
-| `docs/quality/` | Testing strategy, risk register, dependency/licence review, consistency review |
+| `docs/product/` | Vision, users, glossary, assumptions, scope, roadmap, improvements, voice navigation |
+| `docs/workflows/` | Onboarding, stock setup, purchase-to-pay, sale-to-cash, returns and adjustments |
+| `docs/architecture/` | Domain model/ERD, database strategy, tenant isolation, transactions/projections, vertical templates, tracking and numbering |
+| `docs/finance/` | Accounting/inventory invariants, posting catalogue, valuation policy/examples, purchase evidence and report definitions |
+| `docs/security/` | Threat model, authorisation matrix and security test plan |
+| `docs/quality/` | Testing strategy, risk register, dependency/licence and documentation reviews |
 | `docs/decisions/` | Product-owner and professional-review decision registers |
-| `docs/adr/` | ADR-001 … ADR-024 (all Proposed), grouped into four files |
+| `docs/adr/` | ADR-001…ADR-024; ADR-001…021 accepted by owner, ADR-022…024 proposed (see index and individual status lines) |
+| `docs/implementation-plans/` | WhatsApp invoice delivery implementation and activation tracker |
+| `docs/knowledge-transfer/` | Historical repository investigation snapshots; not current source of truth |
 
-## Planned documentation (deliberately deferred)
+## Build and test
 
-Not written yet to avoid shallow placeholders. Each will be written when its slice approaches:
+```sh
+dotnet build RetailBusinessOs.slnx
+dotnet test
+cd web
+npm test
+npm run build
+npm run test:e2e
+```
 
-| Document | Needed before |
-|---|---|
-| `workflows/gst-preparation.md` | Phase 1B GST workspace |
-| `workflows/auditor-review.md` | Phase 1B CA workspace |
-| `workflows/period-close.md` (full close; 1A lock is in `returns-adjustments.md`) | Slice 6 |
-| `architecture/api.md` (conventions are summarised in the discovery report §12) | Slice 1 implementation planning |
-| `architecture/frontend.md` | Slice 1 implementation planning |
-| `architecture/documents-barcode-ocr-ai-jobs.md` | Slice 2 (barcode), Phase 1B (OCR/AI) |
-| `security/data-classification.md` | Slice 1 |
-| `quality/definition-of-ready-done.md` | Slice 1 |
-| `quality/known-limitations.md` | End of Slice 1 |
-| `01-environment-assessment.md` (covered by discovery report §2–3) | Refresh before Slice 1 |
+Migrations: `dotnet run --project src/Rbos.Api -- --migrate test|dev`. Integration tests require the configured PostgreSQL test database and local secrets. A green CI migration run against a disposable database does not prove production migrations have been applied.
+
+## Deliberately deferred documentation
+
+Some detailed future workflow/architecture documents remain intentionally unwritten until their scope is approved and implementation approaches. See `docs/product/scope-phase-1a-1b-future.md` and the roadmap. Do not create shallow placeholders or treat deferred scope as implemented.
