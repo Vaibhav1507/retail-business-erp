@@ -52,6 +52,26 @@ public class CatalogueTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Barcode_collision_does_not_leave_a_second_product()
+    {
+        var c = await NewClient(f);
+        var first = await c.Send(HttpMethod.Post, "/products", new
+        {
+            name = "LG Refrigerator One", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs",
+            brand = "LG", model = "REF-A", barcode = "8901234567890"
+        });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var second = await c.Send(HttpMethod.Post, "/products", new
+        {
+            name = "LG Refrigerator Two", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs",
+            brand = "LG", model = "REF-B", barcode = "8901234567890"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Single((await c.GetJson("/products")).EnumerateArray());
+    }
+
+    [Fact]
     public async Task Product_can_be_edited_and_attributes_are_stored()
     {
         var c = await NewClient(f);
