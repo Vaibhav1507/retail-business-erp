@@ -130,6 +130,7 @@ export function NavigationAssistant() {
    return
   }
   if (result.kind === 'not-understood' && await voiceIntentEnabled()) {
+   if (!panelOpenRef.current) return
    try {
     const current = navigationTargets.find(target => target.hash === window.location.hash)?.id ?? null
     const ai = await api<VoiceIntentApiResult>('POST','/voice/intent',{ transcript:command, currentScreenId:current })
