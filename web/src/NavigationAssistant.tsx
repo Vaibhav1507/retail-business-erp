@@ -17,7 +17,7 @@ const copy = {
   transcribing:'Transcribing on this device…', opening:'Opening', micDenied:'Microphone access was denied. Allow microphone access for this site in your browser or Android settings, then try again. You can still type.',
   micMissing:'No microphone was found.', secure:'Voice requires HTTPS and microphone support. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
-  failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.',
+  failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.', whisperDisabled:'Local speech recognition could not resolve this command, and hosted Whisper backup is not enabled. Please type the command.',
   retry:'Retry speech setup', voiceNote:'Voice is processed on this device first. If local recognition fails, audio may be sent to hosted Whisper as a fallback.'
  },
  hi: {
@@ -30,7 +30,7 @@ const copy = {
   micDenied:'माइक्रोफोन की अनुमति नहीं मिली। ब्राउज़र या Android सेटिंग में इस वेबसाइट के लिए माइक्रोफोन अनुमति दें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
   micMissing:'माइक्रोफोन नहीं मिला।', secure:'वॉइस के लिए HTTPS और माइक्रोफोन सपोर्ट चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
-  failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
+  failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।', whisperDisabled:'लोकल आवाज़ पहचान कमांड नहीं समझ पाई और hosted Whisper बैकअप चालू नहीं है। कृपया कमांड टाइप करें।',
   retry:'स्पीच सेटअप फिर से आज़माएँ', voiceNote:'आवाज़ पहले इसी डिवाइस पर समझी जाती है। लोकल पहचान विफल होने पर रिकॉर्डिंग बैकअप के लिए hosted Whisper को भेजी जा सकती है।'
  }
 }
@@ -60,6 +60,14 @@ function voiceIntentEnabled(): Promise<boolean> {
   .then(result => result.enabled === true)
   .catch(() => false)
  return voiceIntentEnabledPromise
+}
+
+let whisperEnabledPromise: Promise<boolean> | null = null
+function hostedWhisperEnabled(): Promise<boolean> {
+ whisperEnabledPromise ??= api<{enabled:boolean}>('GET','/voice/transcribe/config')
+  .then(result => result.enabled === true)
+  .catch(() => false)
+ return whisperEnabledPromise
 }
 
 export function NavigationAssistant() {
@@ -189,6 +197,8 @@ export function NavigationAssistant() {
   const controller = new AbortController()
   whisperAbortRef.current = controller
   try {
+   if (!(await hostedWhisperEnabled())) throw new Error(text.whisperDisabled)
+   if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
    const transcript = await transcribeNavigationWithWhisper(pcm, controller.signal)
    if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
    if (!transcript) throw new Error(text.tooShort)
@@ -344,6 +354,9 @@ export function NavigationAssistant() {
      const transcript = finalTranscript || partialTranscriptRef.current
      partialTranscriptRef.current = ''
      if (!transcript) { void runWhisperFallback(); return }
+     // A non-empty transcript that the deterministic resolver cannot interpret is
+     // treated as a low-quality ASR result; retry it with Whisper before Level 3.
+     if (resolveNavigation(transcript).kind === 'not-understood') { void runWhisperFallback(); return }
      fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
      transcribingRef.current = false
      setTranscribing(false)
