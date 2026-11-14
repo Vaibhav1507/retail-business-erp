@@ -41,7 +41,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | Shruti primary STT | Local worker, model integrity/cache, push-to-talk and partial transcript flow | Integrated |
 | Whisper backup STT | Added Groq Whisper Turbo client, authenticated API endpoint, WAV encoder and UI failover path; feature remains disabled until `Groq:WhisperEnabled=true` is configured | Implemented, CI/acceptance pending |
 | Gemini Flash voice intent | Added constrained intent service and endpoint; provider calls remain disabled by default until explicit config | Implemented, tests/CI pending |
-| Groq/Qwen voice intent | Separate text-only `GroqTextIntentClient` uses `qwen/qwen3.8-27b`; official docs confirm text input/output and JSON mode | Implemented, tests/CI pending |
+| Groq/Qwen voice intent | Separate text-only `GroqTextIntentClient` uses `qwen/qwen3.8-27b` (currently marked Preview by Groq); official docs confirm text input/output and JSON mode | Implemented, tests/CI pending |
 | Three-level orchestrator | Shruti→Whisper failover and deterministic→Gemini→Groq Qwen intent path are integrated in the existing assistant flow | Implemented, end-to-end tests/CI pending |
 | End-to-end speech tests | Synthetic resolver/provider tests exist; no paired RBOS audio acceptance corpus yet | Pending |
 | Device acceptance | Android Chrome and low-end device acceptance outstanding | Pending |
@@ -171,7 +171,7 @@ Rules for all future AI integrations:
 
 - **Confirmed:** Level 1 basic common navigation options.
 - **Confirmed:** Level 2 Shruti primary, Whisper backup.
-- **Confirmed:** Level 3 Gemini Flash primary with a separate Groq Qwen text-generation fallback. Official Groq model documentation confirms text input/output and JSON mode for `qwen/qwen3.8-27b`; this is not xAI Grok.
+- **Confirmed:** Level 3 Gemini Flash primary with a separate Groq Qwen text-generation fallback. Official Groq model documentation confirms text input/output and JSON mode for `qwen/qwen3.8-27b`; it is currently marked Preview, so keep the provider opt-in and model ID configurable. This is not xAI Grok.
 - **Confirmed:** Preserve current UI and deterministic route safety.
 - **Confirmed:** Hosted Whisper is acceptable for ordinary navigation-command audio. Prefer Groq Free-plan use for the pilot; do not upgrade the provider account or enable paid usage without explicit owner approval.
 - **To measure:** Shruti→Whisper failover latency and transcript/navigation accuracy on consented RBOS command audio.
