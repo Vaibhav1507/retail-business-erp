@@ -358,3 +358,32 @@ The published comparison cannot replace the test plan in section 7. The next mea
 5. Apply the existing safety gate: wrong navigation <=2% quiet and <=3% noisy; silence/noise must never navigate. Prefer not-understood over a wrong screen.
 
 **Evaluation status:** literature/vendor comparison complete; actual paired RBOS audio test not run because the consented recordings and a verified Groq free allowance are not available in this task. No Whisper code, API key, external audio upload or cloud call has been added.
+
+
+## 14. Keyword-first resolver and Bundeli/North Indian Hindi coverage (2026-11-14)
+
+### Scope and evidence
+
+The navigation resolver has been changed from whole-phrase anchor scoring to **required keyword/concept groups**. It still uses an explicit allowlist of the 40 RBOS destinations. Each destination is grounded in the actual route rendering and tab definitions in `App.tsx`, `Pages.tsx`, `Stock.tsx`, and `Home.tsx`. The 40 UI targets are checked against the 40 resolver keyword profiles by a test.
+
+Research notes:
+- Bundeli/Bundelkhandi is a Western Hindi variety with local variation. A Census-hosted Linguistic Survey description explicitly includes Jalaun, Hamirpur and Jhansi in the Bundeli-speaking area; an older district account identifies Bundeli as the prevailing Western Hindi variety in Jalaun, including Konch tehsil. This is useful geographic context, not a modern survey of an individual speaker's vocabulary.
+- Bundeli has multiple local forms; a historical linguistic description records tendencies such as long final `a` shifting toward `o` and some loss of medial aspiration. Such patterns are treated only as optional romanised matching variants, never as a blanket rewrite of every word.
+- Contemporary speech also mixes local Bundeli with standard Hindi and English product/business words. Do not assume one canonical "North Indian Hindi" vocabulary. Keep Hindi Devanagari, Romanised Hindi, Hinglish and locally reviewed words side by side.
+
+### Implementation
+
+- Removed sentence/phrase anchors from the production resolver. Each screen now has required groups of keywords; all groups must be evidenced before navigation.
+- Added word aliases for common Hindi, Romanised Hindi, Hinglish, shop vocabulary and a conservative Bundeli spelling-fold layer (vowel length, aspiration, terminal a/o comparison).
+- Added distinct contextual requirements for easy collisions: bill vs old bill, customer receipt vs supplier payment, customer return vs supplier return, purchase receive vs purchase history/return, stock view vs count/adjust/history/alerts, and customer dues vs collections.
+- Kept ambiguous single words as clarification prompts. Data questions, transaction commands, numbers and arbitrary URLs remain rejected before routing.
+- Suggestions use incomplete keyword matches but never execute navigation.
+- Layer 3 (the existing allowlisted navigation/action and unsaved-work guard) is not changed by this resolver refactor.
+
+### Synthetic test protocol and caveats
+
+A new synthetic regression suite exercises every allowlisted screen with multiple compact keyword inputs plus Hindi/Hinglish/Bundeli-style spellings, ASR-like variants, ambiguous terms and out-of-scope requests. The old v1 benchmark files remain frozen and unchanged. These tests measure the resolver **after transcription**; they do not fine-tune or change the Shruti acoustic model. Improving Shruti's actual speech recognition requires consented, recorded audio with accurate transcripts and an appropriate model-training or adapter process. Text-only synthetic inputs cannot train the ASR weights.
+
+### Limits
+
+Dialect variants are starting hypotheses informed by published descriptions, not verified Konch shopkeeper utterances. Add or change a local word only after checking it with speakers from the target area and keeping a held-out test set. An incorrect dialect alias can create false navigation, so a lower confidence result should ask rather than guess.
