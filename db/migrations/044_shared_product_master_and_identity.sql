@@ -7,7 +7,7 @@
 -- The migrator is intentionally NOBYPASSRLS. It owns these tables, so temporarily
 -- disable FORCE (not RLS itself) while it performs the all-tenant one-time backfill.
 -- Runtime rbos_app is not the table owner and remains subject to the existing policies.
-do $
+do $rbos$
 declare t text;
 begin
   foreach t in array array[
@@ -17,7 +17,7 @@ begin
   ] loop
     execute format('alter table %s no force row level security', t);
   end loop;
-end $;
+end $rbos$;
 
 
 create or replace function catalog.product_identity_key(p_name text, p_brand text, p_model text)
@@ -242,8 +242,14 @@ where p.tenant_id=bp.tenant_id
   and p.master_product_id is null
   and mp.identity_key=catalog.master_product_identity_key(p.name, c.name, p.brand, p.model);
 
+-- From this point onward there is exactly one active tenant product per identity.
+drop index if exists catalog.product_active_dup_uq;
+create unique index product_active_identity_uq on catalog.product (tenant_id, identity_key) where is_active;
+create unique index ux_product_tenant_master_active on catalog.product (tenant_id, master_product_id)
+  where is_active and master_product_id is not null;
+
 -- Re-enable FORCE RLS before the migration transaction commits.
-do $
+do $rbos$
 declare t text;
 begin
   foreach t in array array[
@@ -253,13 +259,9 @@ begin
   ] loop
     execute format('alter table %s force row level security', t);
   end loop;
-end $;
+end $rbos$;
 
--- From this point onward there is exactly one active tenant product per identity.
-drop index if exists catalog.product_active_dup_uq;
-create unique index product_active_identity_uq on catalog.product (tenant_id, identity_key) where is_active;
-create unique index ux_product_tenant_master_active on catalog.product (tenant_id, master_product_id)
-  where is_active and master_product_id is not null;
+
 
 create function catalog.check_product_master_vertical() returns trigger
 language plpgsql
