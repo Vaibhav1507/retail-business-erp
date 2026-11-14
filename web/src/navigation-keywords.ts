@@ -69,7 +69,7 @@ export const navigationWordAliases: Record<string, string> = {
   'मेनू': 'menu', 'मेन्यू': 'menu', 'विकल्प': 'option', 'options': 'option', 'section': 'section',
   // Bills and receipts
   'बिल': 'bill', 'बील': 'bill', 'बिलो': 'bill', 'बिलिंग': 'bill', 'bil': 'bill', 'चालान': 'bill', 'इनवॉइस': 'bill', 'रसीद': 'bill', 'पर्ची': 'bill', 'पर्चा': 'bill',
-  'bil': 'bill', 'bll': 'bill', 'bila': 'bill', 'invoice': 'bill', 'challan': 'bill', 'parchi': 'bill', 'parcha': 'bill', 'receipt': 'bill', 'rasid': 'bill',
+   'bll': 'bill', 'bila': 'bill', 'invoice': 'bill', 'challan': 'bill', 'parchi': 'bill', 'parcha': 'bill', 'receipt': 'bill', 'rasid': 'bill',
   // Customers and suppliers
   'ग्राहक': 'customer', 'ग्राहकों': 'customer', 'ग्रहक': 'customer', 'कस्टमर': 'customer', 'ग्राहकी': 'customer',
   'grahak': 'customer', 'graahak': 'customer', 'grahakko': 'customer', 'grahako': 'customer', 'customer': 'customer', 'customers': 'customer', 'custmer': 'customer', 'costumer': 'customer',
@@ -86,7 +86,7 @@ export const navigationWordAliases: Record<string, string> = {
   'आया': 'arrival', 'आई': 'arrival', 'आए': 'arrival', 'आयो': 'arrival', 'उतरा': 'arrival', 'उतरी': 'arrival', 'aaya': 'arrival', 'aayi': 'arrival', 'aaye': 'arrival', 'aayo': 'arrival', 'utra': 'arrival', 'utara': 'arrival', 'arrival': 'arrival', 'receive': 'receive', 'received': 'receive', 'मिला': 'receive',
   // Payments, dues, and returns
   'भुगतान': 'payment', 'पेमेंट': 'payment', 'रकम': 'payment', 'payment': 'payment', 'pymnt': 'payment', 'pay': 'pay',
-  'उधार': 'udhar', 'उधारी': 'udhar', 'उधारि': 'udhar', 'बकाया': 'baki', 'बाकी': 'baki', 'बकाया': 'baki',
+  'उधार': 'udhar', 'उधारी': 'udhar', 'उधारि': 'udhar', 'बकाया': 'baki', 'बाकी': 'baki', 
   'udhar': 'udhar', 'udhaar': 'udhar', 'baki': 'baki', 'baaki': 'baki', 'bakaya': 'baki', 'dues': 'dues', 'outstanding': 'outstanding', 'vasooli': 'vasooli', 'वसूली': 'vasooli',
   'वापसी': 'return', 'वापस': 'return', 'लौट': 'return', 'लौटाना': 'return', 'लौटाया': 'return', 'return': 'return', 'wapas': 'return', 'wapasi': 'return', 'lautana': 'return', 'lauta': 'return', 'lautaya': 'return',
   // Common navigation intent and time modifiers
@@ -95,7 +95,7 @@ export const navigationWordAliases: Record<string, string> = {
   'पुराना': 'old', 'पुराने': 'old', 'पिछला': 'old', 'पिछली': 'old', 'पिछले': 'old', 'पहले': 'old', 'old': 'old', 'past': 'past', 'previous': 'old', 'pichla': 'old', 'pichle': 'old', 'pichhle': 'old', 'purana': 'old', 'purane': 'old',
   'इतिहास': 'history', 'हिस्ट्री': 'history', 'history': 'history', 'record': 'record', 'रिकॉर्ड': 'record', 'सूची': 'list', 'लिस्ट': 'list', 'list': 'list',
   'दिखाओ': 'view', 'दिखाइए': 'view', 'दिखाना': 'view', 'देखो': 'view', 'देखना': 'view', 'खोलो': 'view', 'खोलिए': 'view', 'खोलना': 'view',
-  'dikhao': 'view', 'dikha': 'view', 'dikhao': 'view', 'dekho': 'view', 'dekhna': 'view', 'khol': 'view', 'kholo': 'view', 'khul': 'view', 'show': 'view', 'open': 'view', 'view': 'view', 'check': 'view', 'manage': 'manage',
+  'dikhao': 'view', 'dikha': 'view',  'dekho': 'view', 'dekhna': 'view', 'khol': 'view', 'kholo': 'view', 'khul': 'view', 'show': 'view', 'open': 'view', 'view': 'view', 'check': 'view', 'manage': 'manage',
   // Stock maintenance and measurements
   'समायोजन': 'adjust', 'सुधार': 'correction', 'ठीक': 'correct', 'गिनती': 'ginti', 'गिनना': 'count', 'गिनो': 'count',
   'adjust': 'adjust', 'adjustment': 'adjustment', 'correction': 'correction', 'correct': 'correct', 'change': 'change', 'damage': 'damage', 'broken': 'damage', 'toota': 'damage', 'count': 'count', 'ginti': 'ginti', 'ginati': 'ginti', 'physical': 'physical', 'verify': 'verify',
@@ -111,11 +111,11 @@ export const navigationWordAliases: Record<string, string> = {
   'owner': 'owner', 'malik': 'malik', 'capital': 'capital', 'drawing': 'drawing', 'drawings': 'drawing', 'withdrawal': 'withdrawal', 'withdraw': 'withdrawal', 'deposit': 'deposit',
   'दिन': 'day', 'रोज': 'daily', 'दैनिक': 'daily', 'समापन': 'closing', 'बंद': 'closing', 'day': 'day', 'daily': 'daily', 'closing': 'closing', 'end': 'end',
   // More and administration
-  'और': 'more', 'बाकी': 'baaki', 'अन्य': 'other', 'more': 'more', 'other': 'other', 'option': 'option',
+  'और': 'more',  'अन्य': 'other', 'more': 'more', 'other': 'other', 'option': 'option',
   'रिपोर्ट': 'report', 'रिपोर्टें': 'report', 'report': 'report', 'reports': 'report', 'profit': 'profit', 'लाभ': 'profit', 'loss': 'loss', 'हानि': 'loss', 'pnl': 'pnl',
   'प्रिंट': 'print', 'छापना': 'print', 'छपाई': 'chhapai', 'print': 'print', 'printing': 'print', 'printer': 'printer', 'chhapai': 'chhapai',
   'लॉक': 'lock', 'ताला': 'lock', 'lock': 'lock', 'freeze': 'freeze', 'अवधि': 'period', 'महीना': 'month', 'माह': 'month', 'period': 'period', 'month': 'month', 'books': 'books',
-  'ऑडिट': 'audit', 'बदलाव': 'change', 'audit': 'audit', 'change': 'change', 'log': 'log', 'trail': 'trail',
+  'ऑडिट': 'audit', 'बदलाव': 'change', 'audit': 'audit',  'log': 'log', 'trail': 'trail',
   'जीएसटी': 'gst', 'gst': 'gst', 'कर': 'tax', 'tax': 'tax',
   'कर्मचारी': 'employee', 'स्टाफ': 'staff', 'नौकर': 'employee', 'staff': 'staff', 'employee': 'employee', 'team': 'team', 'karmchari': 'employee',
   'शाखा': 'branch', 'शाखाएं': 'branch', 'ब्रांच': 'branch', 'दुकान': 'shop', 'branch': 'branch', 'branches': 'branch', 'shoplocation': 'shoplocation', 'location': 'shoplocation',
@@ -123,7 +123,7 @@ export const navigationWordAliases: Record<string, string> = {
   'ऑर्डर': 'order', 'आर्डर': 'order', 'मंगवाना': 'mangwana', 'मंगाना': 'mangwana', 'order': 'order', 'orders': 'order', 'po': 'po', 'mangwana': 'mangwana',
   'मिलान': 'milan', 'मिलाना': 'milan', 'reconcile': 'reconcile', 'match': 'match', 'milan': 'milan', 'statement': 'statement', 'passbook': 'passbook',
   'लोन': 'loan', 'कर्ज': 'karza', 'कर्जा': 'karza', 'ऋण': 'loan', 'loan': 'loan', 'loans': 'loan', 'karza': 'karza', 'borrow': 'borrow', 'borrowing': 'borrow',
-  'सेटिंग': 'setting', 'सेटिंग्स': 'setting', 'जानकारी': 'details', 'दुकान': 'shop', 'setting': 'setting', 'settings': 'setting', 'profile': 'profile', 'business': 'business', 'shop': 'shop', 'dukaan': 'shop', 'details': 'details',
+  'सेटिंग': 'setting', 'सेटिंग्स': 'setting', 'जानकारी': 'details',  'setting': 'setting', 'settings': 'setting', 'profile': 'profile', 'business': 'business', 'shop': 'shop', 'dukaan': 'shop', 'details': 'details',
   // Bundeli / conversational particles and inflections
   'moro': 'my', 'mor': 'my', 'mori': 'my', 'मोर': 'my', 'मोरो': 'my', 'मोरी': 'my',
   'mai': 'i', 'main': 'i', 'mae': 'i', 'ham': 'we', 'hama': 'we', 'हम': 'we', 'मैं': 'i',
