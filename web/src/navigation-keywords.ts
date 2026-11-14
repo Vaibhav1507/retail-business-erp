@@ -11,6 +11,8 @@
 export type KeywordProfile = {
   /** Every group must have at least one matching token. */
   readonly groups: readonly (readonly string[])[]
+  /** Tokens that disqualify a destination when the user names another entity. */
+  readonly excludes?: readonly string[]
 }
 
 export const navigationKeywordProfiles: Record<string, KeywordProfile> = {
@@ -18,12 +20,12 @@ export const navigationKeywordProfiles: Record<string, KeywordProfile> = {
   'sell.menu': { groups: [['sell'], ['menu', 'option', 'section']] },
   'sell.bill': { groups: [['bill'], ['new', 'create', 'make', 'generate']] },
   'sell.bills': { groups: [['bill'], ['old', 'history', 'list', 'past', 'previous']] },
-  'sell.collect': { groups: [['customer'], ['collect', 'receive', 'payment', 'take', 'vasooli']] },
-  'sell.return': { groups: [['customer', 'sell'], ['return']] },
-  'buy.receive': { groups: [['purchase', 'supplier'], ['new', 'add', 'receive', 'entry', 'arrival', 'goods']] },
-  'buy.pay': { groups: [['supplier'], ['payment', 'pay', 'settle', 'chukana']] },
-  'buy.history': { groups: [['purchase', 'supplier'], ['history', 'old', 'list', 'past']] },
-  'buy.return': { groups: [['supplier', 'purchase'], ['return']] },
+  'sell.collect': { groups: [['customer'], ['collect', 'receive', 'payment', 'take', 'vasooli']], excludes: ['supplier'] },
+  'sell.return': { groups: [['customer', 'sell'], ['return']], excludes: ['supplier'] },
+  'buy.receive': { groups: [['purchase', 'supplier'], ['new', 'add', 'receive', 'entry', 'arrival', 'goods']], excludes: ['customer'] },
+  'buy.pay': { groups: [['supplier'], ['payment', 'pay', 'settle', 'chukana']], excludes: ['customer'] },
+  'buy.history': { groups: [['purchase', 'supplier'], ['history', 'old', 'past']], excludes: ['customer'] },
+  'buy.return': { groups: [['supplier', 'purchase'], ['return']], excludes: ['customer'] },
   'stock.current': { groups: [['stock', 'goods'], ['current', 'view', 'available', 'remaining', 'bacha']] },
   'stock.products': { groups: [['product', 'item', 'catalogue'], ['list', 'add', 'manage', 'new']] },
   'stock.opening': { groups: [['opening', 'starting', 'initial', 'shuru'], ['stock', 'goods']] },
@@ -35,8 +37,8 @@ export const navigationKeywordProfiles: Record<string, KeywordProfile> = {
   'stock.units': { groups: [['unit', 'measure', 'conversion', 'box', 'piece', 'kg', 'litre', 'dozen']] },
   'parties.customers': { groups: [['customer']] },
   'parties.suppliers': { groups: [['supplier']] },
-  'parties.purchases': { groups: [['customer'], ['purchase', 'bought', 'history', 'kharid']] },
-  'parties.dues': { groups: [['customer'], ['dues', 'outstanding', 'baki', 'udhar', 'ageing']] },
+  'parties.purchases': { groups: [['customer'], ['purchase', 'bought', 'history', 'kharid']], excludes: ['supplier'] },
+  'parties.dues': { groups: [['customer'], ['dues', 'outstanding', 'baki', 'udhar', 'ageing']], excludes: ['supplier'] },
   'money.cash': { groups: [['cash', 'bank', 'galla', 'cashbook']] },
   'money.expenses': { groups: [['expense', 'kharcha', 'spending']] },
   'money.owner': { groups: [['owner', 'malik'], ['capital', 'drawing', 'withdrawal', 'deposit']] },
@@ -53,7 +55,7 @@ export const navigationKeywordProfiles: Record<string, KeywordProfile> = {
   'more.orders': { groups: [['order', 'po'], ['purchase', 'supplier', 'goods', 'mangwana']] },
   'more.reconcile': { groups: [['reconcile', 'match', 'milan'], ['bank', 'statement', 'passbook']] },
   'more.loans': { groups: [['loan', 'karza', 'borrow', 'borrowing']] },
-  settings: { groups: [['setting', 'settings', 'profile', 'business', 'shop']] },
+  settings: { groups: [['setting', 'settings', 'profile', 'business', 'shop']], excludes: ['shoplocation'] },
 }
 
 /**
@@ -66,7 +68,7 @@ export const navigationWordAliases: Record<string, string> = {
   'बिक्री': 'sell', 'बिकरी': 'sell', 'बेच': 'sell', 'बेचना': 'sell', 'सेल': 'sell', 'sales': 'sell', 'selling': 'sell', 'bikri': 'sell', 'bikree': 'sell', 'vikri': 'sell', 'bech': 'sell', 'bechna': 'sell',
   'मेनू': 'menu', 'मेन्यू': 'menu', 'विकल्प': 'option', 'options': 'option', 'section': 'section',
   // Bills and receipts
-  'बिल': 'bill', 'बील': 'bill', 'बिलो': 'bill', 'बिलिंग': 'bill', 'चालान': 'bill', 'इनवॉइस': 'bill', 'रसीद': 'bill', 'पर्ची': 'bill', 'पर्चा': 'bill',
+  'बिल': 'bill', 'बील': 'bill', 'बिलो': 'bill', 'बिलिंग': 'bill', 'bil': 'bill', 'चालान': 'bill', 'इनवॉइस': 'bill', 'रसीद': 'bill', 'पर्ची': 'bill', 'पर्चा': 'bill',
   'bil': 'bill', 'bll': 'bill', 'bila': 'bill', 'invoice': 'bill', 'challan': 'bill', 'parchi': 'bill', 'parcha': 'bill', 'receipt': 'bill', 'rasid': 'bill',
   // Customers and suppliers
   'ग्राहक': 'customer', 'ग्राहकों': 'customer', 'ग्रहक': 'customer', 'कस्टमर': 'customer', 'ग्राहकी': 'customer',
@@ -116,7 +118,7 @@ export const navigationWordAliases: Record<string, string> = {
   'ऑडिट': 'audit', 'बदलाव': 'change', 'audit': 'audit', 'change': 'change', 'log': 'log', 'trail': 'trail',
   'जीएसटी': 'gst', 'gst': 'gst', 'कर': 'tax', 'tax': 'tax',
   'कर्मचारी': 'employee', 'स्टाफ': 'staff', 'नौकर': 'employee', 'staff': 'staff', 'employee': 'employee', 'team': 'team', 'karmchari': 'employee',
-  'शाखा': 'branch', 'शाखाएं': 'branch', 'ब्रांच': 'branch', 'branch': 'branch', 'branches': 'branch', 'shoplocation': 'shoplocation', 'location': 'shoplocation',
+  'शाखा': 'branch', 'शाखाएं': 'branch', 'ब्रांच': 'branch', 'दुकान': 'shop', 'branch': 'branch', 'branches': 'branch', 'shoplocation': 'shoplocation', 'location': 'shoplocation',
   'ट्रांसफर': 'transfer', 'स्थानांतरण': 'transfer', 'transfer': 'transfer', 'move': 'move',
   'ऑर्डर': 'order', 'आर्डर': 'order', 'मंगवाना': 'mangwana', 'मंगाना': 'mangwana', 'order': 'order', 'orders': 'order', 'po': 'po', 'mangwana': 'mangwana',
   'मिलान': 'milan', 'मिलाना': 'milan', 'reconcile': 'reconcile', 'match': 'match', 'milan': 'milan', 'statement': 'statement', 'passbook': 'passbook',
