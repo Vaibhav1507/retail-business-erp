@@ -74,7 +74,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [x] Implement Groq-hosted Whisper (`whisper-large-v3-turbo`) as backup behind the provider boundary; require an explicit `Groq:WhisperEnabled` switch and the existing server-side Groq key.
 - [x] Define fallback conditions for Shruti initialization/runtime failure, 12-second timeout, empty output and a non-empty transcript that the deterministic resolver cannot interpret; partial previews remain usable and avoid unnecessary hosted calls.
 - [x] Preserve a short-lived PCM copy only until Shruti succeeds or Whisper completes; clear it on success, failure, cancellation and component disposal.
-- [x] Encode final audio as bounded 16 kHz mono WAV; backend enforces a 1 MB cap and a 100-request/day per-user pilot quota.
+- [x] Encode final audio as bounded 16 kHz mono WAV; backend enforces mono 16 kHz PCM WAV format, a 20-second/640,044-byte cap and a 100-request/day per-user pilot quota.
 
 - [x] Ensure both STT outputs enter the same normalization and Level 1 resolver.
 - [ ] Add automated orchestration tests for Shruti success, initialization failure, timeout, empty transcript, cancellation, 429 and provider outage; WAV encoder tests are added.
@@ -118,7 +118,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - Keep Shruti as the local-first primary STT.
 - Do not upload raw audio to Level 3. LLM providers receive only the minimum transcript/context needed.
 - The owner confirmed that ordinary navigation-command audio may be sent to hosted Whisper. The Level 2 fallback sends audio only after Shruti failure; do not send it to Level 3.
-- The hosted Whisper feature is disabled by default in `appsettings.json`; enable with `Groq__WhisperEnabled=true` only after confirming the Groq account remains on its Free plan. The API reuses `Groq:ApiKey`, never exposes it to the browser, caps WAV uploads at 1 MB, and limits each authenticated user to 100 fallback requests per UTC day.
+- The hosted Whisper feature is disabled by default in `appsettings.json`; enable with `Groq__WhisperEnabled=true` only after confirming the Groq account remains on its Free plan. The API reuses `Groq:ApiKey`, never exposes it to the browser, caps WAV uploads at 20 seconds/640,044 bytes, and limits each authenticated user to 100 fallback requests per UTC day.
 - Groq's public rate-limit table labels 20 RPM, 2,000 RPD, 7,200 audio seconds/hour and 28,800 audio seconds/day as Developer-plan base limits, not Free-plan guarantees. Free-plan quotas are lower and account-specific; verify the actual organization limit in the console. Turbo's published Developer price is US$0.04/audio hour. The API adds a 100-request/user/day pilot cap and handles HTTP 429 safely.
 - No API keys in frontend bundles, source control, logs or test fixtures. Provider secrets remain server-side.
 - No silent paid dependency. Check actual quotas and pricing; temporary free allowances are not permanent zero-cost guarantees.
