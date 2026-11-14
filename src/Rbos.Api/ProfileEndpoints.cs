@@ -111,7 +111,7 @@ public static class ProfileEndpoints
             await using (var link = s.Command(@"
                 update catalog.product p set master_product_id=mp.id
                 from catalog.category c, catalog.master_product mp
-                where p.tenant_id=@t and p.is_active and p.master_product_id is null
+                where p.tenant_id=@t and p.is_active and p.master_product_id is distinct from mp.id
                   and c.tenant_id=p.tenant_id and c.id=p.category_id
                   and mp.business_category=@bc
                   and mp.identity_key=catalog.master_product_identity_key(p.name,c.name,p.brand,p.model)"))
