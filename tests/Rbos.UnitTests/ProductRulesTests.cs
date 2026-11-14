@@ -45,6 +45,49 @@ public class ProductRulesTests
         Assert.NotEqual(ProductRules.DuplicateKey("Cable", null, null), ProductRules.DuplicateKey("Cable", "A", null));
     }
 
+    [Fact]
+    public void Manufacturer_model_identity_ignores_catalogue_display_name_and_category()
+    {
+        Assert.Equal(
+            ProductRules.IdentityKey("French Door Refrigerator GV-B25FFGMB", "LG", "GV-B25FFGMB"),
+            ProductRules.IdentityKey("LG French Door refrigerator", "LG", "GV-B25FFGMB"));
+    }
+
+    [Fact]
+    public void Manufacturer_model_identity_keeps_distinct_model_variants_separate()
+    {
+        Assert.NotEqual(
+            ProductRules.IdentityKey("French Door Refrigerator", "LG", "GV-B25FFGMB"),
+            ProductRules.IdentityKey("French Door Refrigerator", "LG", "GV-B25FFLMB"));
+    }
+
+    [Fact]
+    public void Placeholder_model_values_do_not_collapse_unrelated_products()
+    {
+        Assert.NotEqual(
+            ProductRules.IdentityKey("Air Conditioner", "LG", "N/A"),
+            ProductRules.IdentityKey("Washing Machine", "LG", "N/A"));
+    }
+
+    [Fact]
+    public void No_model_placeholder_uses_name_fallback()
+    {
+        Assert.NotEqual(
+            ProductRules.IdentityKey("Air Conditioner", "LG", "No Model"),
+            ProductRules.IdentityKey("Washing Machine", "LG", "No Model"));
+    }
+
+    [Fact]
+    public void Shared_master_identity_reuses_model_across_categories_but_scopes_generic_goods()
+    {
+        Assert.Equal(
+            ProductRules.MasterIdentityKey("French Door", "Refrigerators", "LG", "GV-B25FFGMB"),
+            ProductRules.MasterIdentityKey("LG refrigerator", "Home Appliances", "LG", "GV-B25FFGMB"));
+        Assert.NotEqual(
+            ProductRules.MasterIdentityKey("Cable", "Cables", null, null),
+            ProductRules.MasterIdentityKey("Cable", "Chargers", null, null));
+    }
+
     [Theory]
     [InlineData(1, "INT-000001")]
     [InlineData(42, "INT-000042")]

@@ -81,6 +81,46 @@ public static class ProfileEndpoints
             c.Parameters.AddWithValue("l", m.Language!);
             var n = await c.ExecuteNonQueryAsync(ct);
             if (n == 0) return ApiResults.Fail(409, "No business profile found.");
+
+            // Once the owner chooses a vertical, publish this business's existing
+            // product facts to the corresponding shared master catalogue and link
+            // its local inventory products. Commercial data is deliberately excluded.
+            await using (var publish = s.Command(@"
+                insert into catalog.master_product
+                  (id,business_category,category_name,name,base_unit,is_generic,brand,model,attributes,specs,hsn_code,gst_rate)
+                select distinct on (bp.business_category, catalog.master_product_identity_key(p.name, c.name, p.brand, p.model))
+                       gen_random_uuid(), bp.business_category, c.name, p.name, p.base_unit, p.is_generic,
+                       p.brand, p.model, p.attributes, coalesce(p.specs,'{}'::jsonb), p.hsn_code, p.gst_rate
+                from core.business_profile bp
+                join catalog.product p on p.tenant_id=bp.tenant_id and p.is_active
+                join catalog.category c on c.tenant_id=p.tenant_id and c.id=p.category_id
+                where bp.tenant_id=@t and bp.business_category=@bc
+                order by bp.business_category, catalog.master_product_identity_key(p.name,c.name,p.brand,p.model),
+                         p.created_at, p.id
+                on conflict (business_category,identity_key) do update set
+                  attributes=excluded.attributes || catalog.master_product.attributes,
+                  specs=excluded.specs || catalog.master_product.specs,
+                  hsn_code=coalesce(catalog.master_product.hsn_code,excluded.hsn_code),
+                  gst_rate=coalesce(catalog.master_product.gst_rate,excluded.gst_rate),
+                  updated_at=now()"))
+            {
+                publish.Parameters.AddWithValue("t", tid.Value);
+                publish.Parameters.AddWithValue("bc", m.BusinessCategory!);
+                await publish.ExecuteNonQueryAsync(ct);
+            }
+            await using (var link = s.Command(@"
+                update catalog.product p set master_product_id=mp.id
+                from catalog.category c, catalog.master_product mp
+                where p.tenant_id=@t and p.is_active and p.master_product_id is distinct from mp.id
+                  and c.tenant_id=p.tenant_id and c.id=p.category_id
+                  and mp.business_category=@bc
+                  and mp.identity_key=catalog.master_product_identity_key(p.name,c.name,p.brand,p.model)"))
+            {
+                link.Parameters.AddWithValue("t", tid.Value);
+                link.Parameters.AddWithValue("bc", m.BusinessCategory!);
+                await link.ExecuteNonQueryAsync(ct);
+            }
+
             await s.CommitAsync(ct);
             return Results.Ok();
         }).RequireAuthorization();

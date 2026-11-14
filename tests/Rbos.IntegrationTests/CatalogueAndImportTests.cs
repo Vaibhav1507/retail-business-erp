@@ -37,6 +37,41 @@ public class CatalogueTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Different_display_name_with_same_brand_and_model_is_rejected()
+    {
+        var c = await NewClient(f);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/products",
+            Product("French Door Refrigerator GV-B25FFGMB", "Refrigerators", "LG", "GV-B25FFGMB"))).StatusCode);
+        var duplicate = await c.Send(HttpMethod.Post, "/products",
+            Product("LG French Door refrigerator", "Home Appliances", "LG", "GV-B25FFGMB"));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+
+        // Different model suffixes are real product variants and must remain separate.
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/products",
+            Product("LG French Door refrigerator", "Home Appliances", "LG", "GV-B25FFLMB"))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Barcode_collision_does_not_leave_a_second_product()
+    {
+        var c = await NewClient(f);
+        var first = await c.Send(HttpMethod.Post, "/products", new
+        {
+            name = "LG Refrigerator One", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs",
+            brand = "LG", model = "REF-A", barcode = "8901234567890"
+        });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var second = await c.Send(HttpMethod.Post, "/products", new
+        {
+            name = "LG Refrigerator Two", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs",
+            brand = "LG", model = "REF-B", barcode = "8901234567890"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Single((await c.GetJson("/products")).EnumerateArray());
+    }
+
+    [Fact]
     public async Task Product_can_be_edited_and_attributes_are_stored()
     {
         var c = await NewClient(f);
@@ -145,6 +180,58 @@ public class ProductImportTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(2, list.GetArrayLength());
         Assert.Equal(new[] { "INT-000001", "INT-000002" }, list.EnumerateArray().Select(x => x.GetProperty("sku").GetString()!).Order().ToArray());
         Assert.Equal(HttpStatusCode.Conflict, (await c.Send(HttpMethod.Post, "/products/import/commit", new { rows = new[] { Row("Different") } }, key)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reimport_with_changed_product_name_but_same_model_is_classified_as_duplicate()
+    {
+        var c = await NewClient(f);
+        var firstRows = new[] { new { name = "French Door Refrigerator GV-B25FFGMB", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs", brand = "LG", model = "GV-B25FFGMB" } };
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/products/import/commit", new { rows = firstRows }, Guid.NewGuid().ToString())).StatusCode);
+
+        var reupload = new[] { new { name = "LG French Door refrigerator", categoryName = "Home Appliances", isGeneric = false, baseUnit = "pcs", brand = "LG", model = "GV-B25FFGMB" } };
+        var preview = await c.Send(HttpMethod.Post, "/products/import/preview", new { rows = reupload });
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        var result = await preview.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, result.GetProperty("ok").GetInt32());
+        Assert.Equal(1, result.GetProperty("duplicate").GetInt32());
+        Assert.Single((await c.GetJson("/products")).EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Product_master_is_shared_between_same_verticals_but_inventory_products_are_local()
+    {
+        var a = await NewClient(f);
+        var b = await NewClient(f);
+        var otherVertical = await NewClient(f);
+        await SetBusinessCategory(a, "electronics_mobile");
+        await SetBusinessCategory(b, "electronics_mobile");
+        await SetBusinessCategory(otherVertical, "general_retail");
+
+        Assert.Equal(HttpStatusCode.OK, (await a.Send(HttpMethod.Post, "/products", new { name = "French Door Refrigerator GV-B25FFGMB", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs", brand = "LG", model = "GV-B25FFGMB" })).StatusCode);
+
+        var sharedA = await b.GetJson("/products/master?q=GV-B25FFGMB");
+        var master = Assert.Single(sharedA.EnumerateArray());
+        Assert.False(master.GetProperty("alreadyInBusiness").GetBoolean());
+        var masterId = master.GetProperty("id").GetGuid();
+
+        Assert.Empty((await otherVertical.GetJson("/products/master?q=GV-B25FFGMB")).EnumerateArray());
+        Assert.Equal(HttpStatusCode.OK, (await b.Send(HttpMethod.Post, $"/products/master/{masterId}/add")).StatusCode);
+
+        Assert.Single((await b.GetJson("/products?q=GV-B25FFGMB")).EnumerateArray());
+        Assert.Single((await a.GetJson("/products?q=GV-B25FFGMB")).EnumerateArray());
+        Assert.True((await b.GetJson("/products/master?q=GV-B25FFGMB"))[0].GetProperty("alreadyInBusiness").GetBoolean());
+    }
+
+    static async Task SetBusinessCategory(Client c, string category)
+    {
+        var response = await c.Send(HttpMethod.Put, "/business-profile", new
+        {
+            businessName = "Synthetic Traders", businessCategory = category, ownerName = "Test Owner",
+            address = "1 Test Road", city = "Bengaluru", state = "Karnataka", pinCode = "560001",
+            gstStatus = "NotRegistered", gstin = (string?)null, financialYearStartMonth = 4, language = "en"
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

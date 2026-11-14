@@ -157,7 +157,11 @@ public sealed class StockInsightsService(TenantDb db, FinanceService finance)
             from inventory.stock_balance b
             join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
             left join inventory.item_cost c on c.tenant_id=b.tenant_id and c.product_id=b.product_id
-            left join (select l.product_id, sa.sale_date from sales.sale_line l join sales.sale sa on sa.tenant_id=l.tenant_id and sa.id=l.sale_id) sl on sl.product_id=b.product_id
+            left join (select l.tenant_id, coalesce(pa.canonical_product_id,l.product_id) product_id, sa.sale_date
+                from sales.sale_line l
+                join sales.sale sa on sa.tenant_id=l.tenant_id and sa.id=l.sale_id
+                left join catalog.product_alias pa on pa.tenant_id=l.tenant_id and pa.alias_product_id=l.product_id) sl
+              on sl.tenant_id=b.tenant_id and sl.product_id=b.product_id
             where b.quantity > 0
             group by p.id, p.name, p.base_unit, c.wac
             having max(sl.sale_date) is null or max(sl.sale_date) < @c
@@ -174,7 +178,10 @@ public sealed class StockInsightsService(TenantDb db, FinanceService finance)
             join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
             left join inventory.item_cost c on c.tenant_id=b.tenant_id and c.product_id=b.product_id
             where b.quantity > 0 order by p.name", ct);
-        var movements = await Rows(s!, "select product_id, location_id, effective_date, quantity_delta from inventory.stock_movement where quantity_delta > 0 order by effective_date desc, occurred_at desc", ct);
+        var movements = await Rows(s!, @"select coalesce(pa.canonical_product_id,m.product_id), m.location_id, m.effective_date, m.quantity_delta
+            from inventory.stock_movement m
+            left join catalog.product_alias pa on pa.tenant_id=m.tenant_id and pa.alias_product_id=m.product_id
+            where m.quantity_delta > 0 order by m.effective_date desc, m.occurred_at desc", ct);
         var byKey = movements.GroupBy(m => ((Guid)m[0], (Guid)m[1])).ToDictionary(g => g.Key, g => g.ToList());
 
         var items = new Dictionary<Guid, (string Name, decimal[] Qty, decimal Value)>();

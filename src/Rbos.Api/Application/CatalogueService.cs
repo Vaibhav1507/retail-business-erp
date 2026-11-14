@@ -7,7 +7,7 @@ using Rbos.Domain;
 
 namespace Rbos.Api.Application;
 
-public sealed record ProductCommand(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool IsActive = true, string? HsnCode = null, decimal? GstRate = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null, int? SourcePage = null)
+public sealed record ProductCommand(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool IsActive = true, string? HsnCode = null, decimal? GstRate = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null, int? SourcePage = null, string? Barcode = null)
 {
     public ProductInput ToInput() => new(Name, CategoryName, IsGeneric, BaseUnit, Brand, Model, Attributes);
 }
@@ -36,14 +36,16 @@ public sealed class CatalogueService(TenantDb db)
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid.Value, ct);
-        await using var c = s.Command(@"select p.id,p.name,p.category_id,c.name,p.is_generic,p.internal_sku,p.base_unit,p.brand,p.model,p.attributes::text,p.is_active,p.hsn_code,p.gst_rate,p.brand_id,p.mrp,p.specs::text,
+        await using var c = s.Command(@"select p.id,p.name,p.category_id,c.name,p.is_generic,p.internal_sku,p.base_unit,coalesce(p.brand,mp.brand),coalesce(p.model,mp.model),(coalesce(mp.attributes,'{}'::jsonb)||p.attributes)::text,p.is_active,coalesce(p.hsn_code,mp.hsn_code),coalesce(p.gst_rate,mp.gst_rate),p.brand_id,p.mrp,(coalesce(mp.specs,'{}'::jsonb)||p.specs)::text,
               coalesce((select json_agg(json_build_object('documentId',d.id,'documentName',d.document_name,'brand',d.brand,'versionLabel',d.version_label,'page',sr.source_page) order by d.imported_at desc, sr.source_page)::text from catalog.product_source_reference sr join catalog.source_document d on d.tenant_id=sr.tenant_id and d.id=sr.source_document_id where sr.tenant_id=p.tenant_id and sr.product_id=p.id),'[]'),
               (p.model_norm is not null and p.model_norm<>'' and exists (select 1 from catalog.product o where o.tenant_id=p.tenant_id and o.id<>p.id and o.is_active and o.model_norm=p.model_norm and catalog.norm_text(o.brand) is not distinct from catalog.norm_text(p.brand)))
             from catalog.product p join catalog.category c on c.tenant_id=p.tenant_id and c.id=p.category_id
+            left join catalog.master_product mp on mp.id=p.master_product_id
             where (@act or p.is_active)
+              and not exists (select 1 from catalog.product_alias pa where pa.tenant_id=p.tenant_id and pa.alias_product_id=p.id)
               and (@cat::uuid is null or p.category_id=@cat)
               and (@br::uuid is null or p.brand_id=@br)
-              and (@q::text is null or p.name ilike @q or p.brand ilike @q or p.model ilike @q or p.internal_sku ilike @q or p.attributes::text ilike @q
+              and (@q::text is null or p.name ilike @q or mp.name ilike @q or coalesce(p.brand,mp.brand) ilike @q or coalesce(p.model,mp.model) ilike @q or p.internal_sku ilike @q or (p.attributes::text || p.specs::text || coalesce(mp.attributes::text,'') || coalesce(mp.specs::text,'')) ilike @q
                    or (@qn::text is not null and p.model_norm like @qn)
                    or exists (select 1 from catalog.product_barcode pb where pb.tenant_id=p.tenant_id and pb.product_id=p.id and pb.code=@qc))
             order by p.name limit 300");
@@ -69,6 +71,89 @@ public sealed class CatalogueService(TenantDb db)
                 possibleDuplicate = !r.IsDBNull(17) && r.GetBoolean(17),
             });
         return ServiceResult<object>.Ok(list);
+    }
+
+    /// <summary>Search the shared product catalogue visible to businesses in the same vertical.</summary>
+    public async Task<ServiceResult<object>> MasterSearchAsync(Guid uid, string? q, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid.Value, ct);
+        await using var c = s.Command(@"select mp.id,mp.name,mp.category_name,mp.is_generic,mp.brand,mp.model,mp.attributes::text,mp.specs::text,mp.hsn_code,mp.gst_rate,
+              exists(select 1 from catalog.product p where p.tenant_id=@t and p.master_product_id=mp.id and p.is_active)
+            from catalog.master_product mp
+            where @q::text is null or mp.name ilike @q or mp.brand ilike @q or mp.model ilike @q
+               or mp.category_name ilike @q or mp.attributes::text ilike @q or mp.specs::text ilike @q
+               or (@qn::text is not null and catalog.norm_text(mp.model) like @qn)
+            order by mp.name limit 1000");
+        c.Parameters.AddWithValue("t", tid.Value);
+        c.Parameters.AddWithValue("q", string.IsNullOrWhiteSpace(q) ? DBNull.Value : "%" + Like(q.Trim()) + "%");
+        var qn = ProductRules.Normalize(q);
+        c.Parameters.AddWithValue("qn", qn.Length == 0 ? DBNull.Value : "%" + Like(qn) + "%");
+        var list = new List<object>();
+        await using var r = await c.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            list.Add(new
+            {
+                id = r.GetGuid(0), name = r.GetString(1), categoryName = r.GetString(2), isGeneric = r.GetBoolean(3),
+                brand = r.IsDBNull(4) ? null : r.GetString(4), model = r.IsDBNull(5) ? null : r.GetString(5),
+                attributes = JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(6)) ?? new Dictionary<string, string>(),
+                specs = JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(7)) ?? new Dictionary<string, string>(),
+                hsnCode = r.IsDBNull(8) ? null : r.GetString(8), gstRate = r.IsDBNull(9) ? (decimal?)null : r.GetDecimal(9),
+                alreadyInBusiness = r.GetBoolean(10)
+            });
+        return ServiceResult<object>.Ok(list);
+    }
+
+    /// <summary>Create a tenant-owned inventory product linked to an existing shared master item.</summary>
+    public async Task<ServiceResult<object>> AddFromMasterAsync(Guid uid, Guid masterProductId, CancellationToken ct)
+    {
+        var tid = await db.FindTenantAsync(uid, ct);
+        if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
+        await using var s = await db.BeginAsync(uid, tid.Value, ct);
+        string name, categoryName, baseUnit;
+        bool isGeneric;
+        string? brand, model, hsnCode;
+        decimal? gstRate;
+        Dictionary<string, string> attributes, specs;
+        await using (var q = s.Command(@"select name,category_name,base_unit,is_generic,brand,model,attributes::text,specs::text,hsn_code,gst_rate
+            from catalog.master_product where id=@i"))
+        {
+            q.Parameters.AddWithValue("i", masterProductId);
+            await using var r = await q.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return ServiceResult<object>.Fail("Shared product not found for this business category.", 404);
+            name = r.GetString(0); categoryName = r.GetString(1); baseUnit = r.GetString(2); isGeneric = r.GetBoolean(3);
+            brand = r.IsDBNull(4) ? null : r.GetString(4); model = r.IsDBNull(5) ? null : r.GetString(5);
+            attributes = JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(6)) ?? new();
+            specs = JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(7)) ?? new();
+            hsnCode = r.IsDBNull(8) ? null : r.GetString(8); gstRate = r.IsDBNull(9) ? null : r.GetDecimal(9);
+        }
+        await using (var exists = s.Command("select internal_sku from catalog.product where tenant_id=@t and master_product_id=@m and is_active limit 1"))
+        {
+            exists.Parameters.AddWithValue("t", tid.Value); exists.Parameters.AddWithValue("m", masterProductId);
+            var sku = await exists.ExecuteScalarAsync(ct) as string;
+            if (sku is not null) return ServiceResult<object>.Fail($"This shared product is already in your catalogue ({sku}).", 409);
+        }
+        var input = new ProductInput(name, categoryName, isGeneric, baseUnit, brand, model, attributes);
+        var err = ProductRules.Validate(input) ?? ProductRules.ValidateCatalogueData(null, specs);
+        if (err is not null) return ServiceResult<object>.Fail(err);
+        var cat = await EnsureCategoryAsync(s, tid.Value, categoryName, ct);
+        var first = await NextSkuAsync(s, tid.Value, 1, ct);
+        var id = Guid.NewGuid();
+        var skuValue = ProductRules.FormatSku(first);
+        var command = new ProductCommand(name, categoryName, isGeneric, baseUnit, brand, model, attributes, true, hsnCode, gstRate, null, specs);
+        try
+        {
+            await InsertAsync(s, tid.Value, id, cat, skuValue, input, masterProductId, ct);
+            await SetTaxAsync(s, id, command, ct);
+            await SetCatalogueDataAsync(s, tid.Value, id, brand, null, specs, ct);
+        }
+        catch (PostgresException e) when (e.SqlState == "23505")
+        {
+            return ServiceResult<object>.Fail("This product is already linked to your catalogue. Refresh and try again.", 409);
+        }
+        await s.CommitAsync(ct);
+        return ServiceResult<object>.Ok(new { id, sku = skuValue });
     }
 
     public async Task<ServiceResult<object>> CategoriesAsync(Guid uid, CancellationToken ct)
@@ -110,10 +195,18 @@ public sealed class CatalogueService(TenantDb db)
         var cat = await EnsureCategoryAsync(s, tid.Value, m.CategoryName!, ct);
         var dup = await FindDuplicateAsync(s, m.Name, m.Brand, m.Model, null, ct);
         if (dup is not null) return ServiceResult<object>.Fail($"A product with the same name, brand and model already exists ({dup.Value.sku}).", 409);
+        var masterProductId = await EnsureMasterProductAsync(s, tid.Value, m.Name!, m.CategoryName!, m.IsGeneric, m.BaseUnit!, m.Brand, m.Model, m.Attributes, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), m.HsnCode, m.GstRate, ct);
         var first = await NextSkuAsync(s, tid.Value, 1, ct);
         var id = Guid.NewGuid();
         var sku = ProductRules.FormatSku(first);
-        try { await InsertAsync(s, tid.Value, id, cat, sku, m.ToInput(), ct); await SetTaxAsync(s, id, m, ct); await SetCatalogueDataAsync(s, tid.Value, id, m.Brand, m.Mrp, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), ct); }
+        try
+        {
+            await InsertAsync(s, tid.Value, id, cat, sku, m.ToInput(), masterProductId, ct);
+            if (!string.IsNullOrWhiteSpace(m.Barcode) && !await BarcodeService.LinkIfFreeAsync(s, tid.Value, id, m.Barcode, ct))
+                return ServiceResult<object>.Fail("This barcode is already linked to another product.", 409);
+            await SetTaxAsync(s, id, m, ct);
+            await SetCatalogueDataAsync(s, tid.Value, id, m.Brand, m.Mrp, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), ct);
+        }
         catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("A product with the same name, brand and model already exists.", 409); }
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id, sku });
@@ -136,12 +229,13 @@ public sealed class CatalogueService(TenantDb db)
             var dup = await FindDuplicateAsync(s, m.Name, m.Brand, m.Model, id, ct);
             if (dup is not null) return ServiceResult<object>.Fail($"A product with the same name, brand and model already exists ({dup.Value.sku}).", 409);
         }
+        var masterProductId = await EnsureMasterProductAsync(s, tid.Value, m.Name!, m.CategoryName!, m.IsGeneric, m.BaseUnit!, m.Brand, m.Model, m.Attributes, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), m.HsnCode, m.GstRate, ct);
         try
         {
-            await using var c = s.Command("update catalog.product set category_id=@c,name=@n,is_generic=@g,brand=@b,model=@m,attributes=@a::jsonb,is_active=@x where id=@i");
+            await using var c = s.Command("update catalog.product set category_id=@c,name=@n,is_generic=@g,brand=@b,model=@m,attributes=@a::jsonb,is_active=@x,master_product_id=@mp where id=@i");
             c.Parameters.AddWithValue("c", cat); c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("g", m.IsGeneric);
             c.Parameters.AddWithValue("b", (object?)NullIfBlank(m.Brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(m.Model) ?? DBNull.Value);
-            c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes))); c.Parameters.AddWithValue("x", m.IsActive); c.Parameters.AddWithValue("i", id);
+            c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes))); c.Parameters.AddWithValue("x", m.IsActive); c.Parameters.AddWithValue("mp", (object?)masterProductId ?? DBNull.Value); c.Parameters.AddWithValue("i", id);
             if (await c.ExecuteNonQueryAsync(ct) == 0) return ServiceResult<object>.Fail("Product not found.", 404);
             await SetTaxAsync(s, id, m, ct);
             await SetCatalogueDataAsync(s, tid.Value, id, m.Brand, m.Mrp, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), ct);
@@ -198,8 +292,9 @@ public sealed class CatalogueService(TenantDb db)
             foreach (var row in good)
             {
                 var cat = await EnsureCategoryAsync(s, tid.Value, row.CategoryName!, ct);
+                var masterProductId = await EnsureMasterProductAsync(s, tid.Value, row.Name!, row.CategoryName!, row.IsGeneric, row.BaseUnit!, row.Brand, row.Model, row.Attributes, WithCategoryAttributes(row.CategoryName, row.Name, row.Specs), null, null, ct);
                 var pid = Guid.NewGuid();
-                await InsertAsync(s, tid.Value, pid, cat, ProductRules.FormatSku(first + n), row.ToInput(), ct);
+                await InsertAsync(s, tid.Value, pid, cat, ProductRules.FormatSku(first + n), row.ToInput(), masterProductId, ct);
                 await SetCatalogueDataAsync(
                     s,
                     tid.Value,
@@ -209,7 +304,8 @@ public sealed class CatalogueService(TenantDb db)
                     WithCategoryAttributes(row.CategoryName, row.Name, row.Specs),
                     ct);
                 if (docId is not null) await SetSourceAsync(s, tid.Value, pid, docId.Value, row.SourcePage, ct);
-                if (!string.IsNullOrWhiteSpace(row.Barcode)) await BarcodeService.LinkIfFreeAsync(s, tid.Value, pid, row.Barcode, ct);
+                if (!string.IsNullOrWhiteSpace(row.Barcode) && !await BarcodeService.LinkIfFreeAsync(s, tid.Value, pid, row.Barcode, ct))
+                    return ServiceResult<ImportCommitResult>.Fail("A barcode became linked during this import. Preview again to reconcile it.", 409);
                 n++;
             }
             await using var b = s.Command("insert into catalog.import_batch(tenant_id,id,idempotency_key,request_hash,created_by,total_rows,created_count,skipped_count,source_document_id) values (@t,@i,@k,@h,@u,@r,@c,@s,@d)");
@@ -291,7 +387,7 @@ public sealed class CatalogueService(TenantDb db)
     static async Task<(List<ImportRowResult>, HashSet<string>)> ClassifyAsync(TenantSession s, List<ImportRowInput> rows, CancellationToken ct)
     {
         var existing = new HashSet<string>();
-        await using (var c = s.Command("select dup_key from catalog.product where is_active"))
+        await using (var c = s.Command("select identity_key from catalog.product where is_active"))
         {
             await using var r = await c.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct)) existing.Add(r.GetString(0));
@@ -347,10 +443,52 @@ public sealed class CatalogueService(TenantDb db)
         return (Guid)(await sel.ExecuteScalarAsync(ct))!;
     }
 
+    static async Task<Guid?> EnsureMasterProductAsync(TenantSession s, Guid tid, string name, string categoryName,
+        bool isGeneric, string baseUnit, string? brand, string? model,
+        IReadOnlyDictionary<string, string>? attributes, IReadOnlyDictionary<string, string>? specs,
+        string? hsnCode, decimal? gstRate, CancellationToken ct)
+    {
+        string? businessCategory;
+        await using (var q = s.Command("select business_category from core.business_profile where tenant_id=@t"))
+        {
+            q.Parameters.AddWithValue("t", tid);
+            businessCategory = await q.ExecuteScalarAsync(ct) as string;
+        }
+        // Products may be entered during first-run setup. They stay tenant-local until
+        // the owner selects a business vertical; ProfileEndpoints then publishes them.
+        if (string.IsNullOrWhiteSpace(businessCategory)) return null;
+        await using var c = s.Command(@"
+            insert into catalog.master_product
+              (id,business_category,category_name,name,base_unit,is_generic,brand,model,attributes,specs,hsn_code,gst_rate)
+            values
+              (@i,@bc,@cat,@n,@u,@g,@b,@m,@a::jsonb,@sp::jsonb,@h,@gr)
+            on conflict (business_category,identity_key) do update set
+              attributes=excluded.attributes || catalog.master_product.attributes,
+              specs=excluded.specs || catalog.master_product.specs,
+              hsn_code=coalesce(catalog.master_product.hsn_code,excluded.hsn_code),
+              gst_rate=coalesce(catalog.master_product.gst_rate,excluded.gst_rate),
+              updated_at=now()
+            returning id");
+        c.Parameters.AddWithValue("i", Guid.NewGuid());
+        c.Parameters.AddWithValue("bc", businessCategory);
+        c.Parameters.AddWithValue("cat", categoryName.Trim());
+        c.Parameters.AddWithValue("n", name.Trim());
+        c.Parameters.AddWithValue("u", baseUnit);
+        c.Parameters.AddWithValue("g", isGeneric);
+        c.Parameters.AddWithValue("b", (object?)NullIfBlank(brand) ?? DBNull.Value);
+        c.Parameters.AddWithValue("m", (object?)NullIfBlank(model) ?? DBNull.Value);
+        c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(attributes)));
+        c.Parameters.AddWithValue("sp", JsonSerializer.Serialize(ProductRules.CleanSpecs(specs)));
+        c.Parameters.AddWithValue("h", (object?)NullIfBlank(hsnCode) ?? DBNull.Value);
+        c.Parameters.AddWithValue("gr", (object?)gstRate ?? DBNull.Value);
+        return (Guid)(await c.ExecuteScalarAsync(ct))!;
+    }
+
     static async Task<(Guid id, string sku)?> FindDuplicateAsync(TenantSession s, string? name, string? brand, string? model, Guid? excludeId, CancellationToken ct)
     {
-        await using var c = s.Command("select id,internal_sku from catalog.product where is_active and dup_key=catalog.norm_text(@n)||'|'||catalog.norm_text(@b)||'|'||catalog.norm_text(@m) and (@x::uuid is null or id<>@x) limit 1");
-        c.Parameters.AddWithValue("n", name!.Trim()); c.Parameters.AddWithValue("b", (object?)NullIfBlank(brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(model) ?? DBNull.Value);
+        var key = ProductRules.IdentityKey(name, brand, model);
+        await using var c = s.Command("select id,internal_sku from catalog.product where is_active and identity_key=@k and (@x::uuid is null or id<>@x) limit 1");
+        c.Parameters.AddWithValue("k", key);
         c.Parameters.AddWithValue("x", (object?)excludeId ?? DBNull.Value);
         await using var r = await c.ExecuteReaderAsync(ct);
         return await r.ReadAsync(ct) ? (r.GetGuid(0), r.GetString(1)) : null;
@@ -365,13 +503,14 @@ public sealed class CatalogueService(TenantDb db)
         return last - count + 1;
     }
 
-    static async Task InsertAsync(TenantSession s, Guid tid, Guid id, Guid cat, string sku, ProductInput m, CancellationToken ct)
+    static async Task InsertAsync(TenantSession s, Guid tid, Guid id, Guid cat, string sku, ProductInput m, Guid? masterProductId, CancellationToken ct)
     {
-        await using var c = s.Command("insert into catalog.product(tenant_id,id,category_id,name,is_generic,internal_sku,base_unit,brand,model,attributes) values (@t,@i,@c,@n,@g,@s,@u,@b,@m,@a::jsonb)");
+        await using var c = s.Command("insert into catalog.product(tenant_id,id,category_id,name,is_generic,internal_sku,base_unit,brand,model,attributes,master_product_id) values (@t,@i,@c,@n,@g,@s,@u,@b,@m,@a::jsonb,@mp)");
         c.Parameters.AddWithValue("t", tid); c.Parameters.AddWithValue("i", id); c.Parameters.AddWithValue("c", cat);
         c.Parameters.AddWithValue("n", m.Name!.Trim()); c.Parameters.AddWithValue("g", m.IsGeneric); c.Parameters.AddWithValue("s", sku); c.Parameters.AddWithValue("u", m.BaseUnit!);
         c.Parameters.AddWithValue("b", (object?)NullIfBlank(m.Brand) ?? DBNull.Value); c.Parameters.AddWithValue("m", (object?)NullIfBlank(m.Model) ?? DBNull.Value);
         c.Parameters.AddWithValue("a", JsonSerializer.Serialize(ProductRules.CleanAttributes(m.Attributes)));
+        c.Parameters.AddWithValue("mp", (object?)masterProductId ?? DBNull.Value);
         await c.ExecuteNonQueryAsync(ct);
     }
 

@@ -15,6 +15,11 @@ export type Product = {
 export type ProductSource = { documentId: string; documentName: string; brand: string | null; versionLabel: string | null; page: number | null }
 export const sourceLabel = (s: ProductSource) => `${s.documentName}${s.versionLabel ? ` (${s.versionLabel})` : ''}${s.page ? `, page ${s.page}` : ''}`
 export type Category = { id: string; name: string; productCount: number }
+type MasterProduct = {
+  id: string; name: string; categoryName: string; isGeneric: boolean; brand: string | null; model: string | null
+  attributes: Record<string, string>; specs: Record<string, string>; hsnCode: string | null; gstRate: number | null
+  alreadyInBusiness: boolean
+}
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong')
 const UNITS = ['pcs', 'set', 'pack', 'm']
@@ -57,12 +62,11 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp) }
+    const body = { name: d.name, categoryName: d.category, isGeneric: d.generic, baseUnit: d.unit, brand: d.generic ? null : d.brand, model: d.generic ? null : d.model, attributes: d.attrs, isActive: d.active, hsnCode: d.hsn.trim() || null, gstRate: d.gst.trim() === '' ? null : Number(d.gst), mrp: d.mrp.trim() === '' ? null : Number(d.mrp), barcode: !editingId && barcode ? barcode.code : null }
     try {
       if (editingId) await api('PUT', `/products/${editingId}`, body)
       else {
-        const created = await api<{ id: string }>('POST', '/products', body)
-        if (barcode) await api('POST', `/products/${created.id}/barcodes`, { code: barcode.code, symbology: barcode.symbology })
+        await api('POST', '/products', body)
       }
       if (!editingId) setD(electronics ? { ...blank, generic: false } : blank)
       onSaved()
@@ -114,6 +118,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   const [showInactive, setShowInactive] = useState(false)
   const [items, setItems] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [masterItems, setMasterItems] = useState<MasterProduct[]>([])
   const [editing, setEditing] = useState<Product | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [error, setError] = useState('')
@@ -155,6 +160,21 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 
   const saved = () => { setEditing(null); setView('list'); load().catch(() => undefined); reload() }
 
+  const loadMaster = useCallback(async () => {
+    const params = new URLSearchParams()
+    if (q.trim()) params.set('q', q.trim())
+    setMasterItems(await api<MasterProduct[]>('GET', `/products/master?${params}`))
+  }, [q])
+
+  async function addFromMaster(id: string) {
+    setError('')
+    try {
+      await api('POST', `/products/master/${id}/add`)
+      await Promise.all([load(), loadMaster()])
+      reload()
+    } catch (err) { setError(msg(err)) }
+  }
+
   async function rename(e: React.FormEvent) {
     e.preventDefault()
     if (!renaming) return
@@ -162,8 +182,13 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
     try { await api('PUT', `/categories/${renaming.id}`, { name: renaming.name }); setRenaming(null); load().catch(() => undefined); reload() } catch (err) { setError(msg(err)) }
   }
 
-  const [view, setView] = useState<'list' | 'form' | 'categories'>('list')
-  const tabs: [typeof view, string][] = [['list', 'Products'], ['categories', 'Categories']]
+  const [view, setView] = useState<'list' | 'form' | 'categories' | 'master'>('list')
+  useEffect(() => {
+    if (view !== 'master') return
+    const t = setTimeout(() => { loadMaster().catch(e => setError(msg(e))) }, 150)
+    return () => clearTimeout(t)
+  }, [loadMaster, view])
+  const tabs: [typeof view, string][] = [['list', 'My products'], ['master', 'Shared catalogue'], ['categories', 'Categories']]
   const startAdd = () => { setEditing(null); setScanned(null); setView('form') }
   const closeForm = () => { setEditing(null); setScanned(null); setView('list') }
 
@@ -243,6 +268,30 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 		  )}</Paged>
 		</>
 	  )}
+	  {view === 'master' && (
+        <>
+          <p className="hint-line">Products in this catalogue are shared with businesses in the same business category. Adding one creates a product in your own business; your SKU, stock, buying cost and selling price remain private to you.</p>
+          <label>Search shared products <input type="search" placeholder="Product name, brand or model..." value={q} onChange={e => setQ(e.target.value)} /></label>
+          <Paged rows={masterItems}>{page => (
+            <div className="table-scroll">
+              <table aria-label="Shared product catalogue">
+                <thead><tr><th>Name</th><th>Category</th><th>Brand / model</th><th>Details</th><th>Action</th></tr></thead>
+                <tbody>
+                  {page.map(p => (
+                    <tr key={p.id}>
+                      <td>{p.name}</td><td>{p.categoryName}</td>
+                      <td>{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
+                      <td>{Object.entries({ ...p.attributes, ...p.specs }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ') || '-'}</td>
+                      <td><button type="button" className="secondary" disabled={p.alreadyInBusiness} onClick={() => addFromMaster(p.id)}>{p.alreadyInBusiness ? 'Already added' : 'Add to my products'}</button></td>
+                    </tr>
+                  ))}
+                  {masterItems.length === 0 && <tr><td colSpan={5}>No shared products match. Importing or adding a verified product adds it to this shared catalogue.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}</Paged>
+        </>
+      )}
 	  {view === 'categories' && (
 		<>
 		  <p className="hint-line">Groups used to organise your products. Rename a group here and every product in it follows.</p>

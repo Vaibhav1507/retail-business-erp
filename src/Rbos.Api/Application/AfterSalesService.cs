@@ -180,7 +180,7 @@ public sealed class AfterSalesService(TenantDb db)
             if (!found) return ServiceResult<object>.Fail("Sale not found.", 404);
             if (await Scalar<Guid?>(s, "select id from sales.sale_cancellation where sale_id=@i", ct, ("i", m.SaleId)) is not null) return ServiceResult<object>.Fail("This sale is cancelled and cannot be returned.", 409);
             if (m.ReturnDate < saleDate) return ServiceResult<object>.Fail("Return date cannot be before the sale date.");
-            var costed = new List<(Guid ProductId, decimal Qty, Money Amount, decimal UnitCost, Money Cost)>();
+            var costed = new List<(Guid ProductId, Guid InventoryProductId, decimal Qty, Money Amount, decimal UnitCost, Money Cost)>();
             foreach (var (productId, qty) in lines.OrderBy(x => x.ProductId))
             {
                 decimal sold = 0, lineTotal = 0, unitCost = 0, retQty = 0, retAmt = 0; var has = false;
@@ -196,7 +196,8 @@ public sealed class AfterSalesService(TenantDb db)
                 if (!has) return ServiceResult<object>.Fail("A returned product was not on this sale.");
                 if (qty.Value > sold - retQty) return ServiceResult<object>.Fail($"Cannot return {qty.Value:0.###}: only {sold - retQty:0.###} left to return for this product.");
                 var amount = AfterSalesRules.ReturnedValue(lineTotal, sold, retQty, retAmt, qty.Value);
-                costed.Add((productId, qty.Value, amount, unitCost, Money.Of(qty.Value * unitCost)));
+                var inventoryProductId = await CanonicalProductIdAsync(s, tenantId, productId, ct);
+                costed.Add((productId, inventoryProductId, qty.Value, amount, unitCost, Money.Of(qty.Value * unitCost)));
             }
             var total = Money.Of(costed.Sum(x => x.Amount.Amount));
             var costTotal = Money.Of(costed.Sum(x => x.Cost.Amount));
@@ -222,13 +223,13 @@ public sealed class AfterSalesService(TenantDb db)
                     ("t", tenantId), ("r", id), ("s", m.SaleId), ("p", x.ProductId), ("q", x.Qty), ("a", x.Amount.Amount), ("c", x.UnitCost));
                 if (x.Cost.Amount > 0)
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleReturn',@d)",
-                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.ProductId), ("l", locationId), ("q", x.Qty), ("c", x.UnitCost), ("v", x.Cost.Amount), ("e", m.ReturnDate), ("d", id));
+                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", x.UnitCost), ("v", x.Cost.Amount), ("e", m.ReturnDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
-                    ("t", tenantId), ("p", x.ProductId), ("l", locationId), ("q", x.Qty));
-                var cur = await ReadCostAsync(s, x.ProductId, ct);
+                    ("t", tenantId), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty));
+                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost.Amount;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
-                    ("t", tenantId), ("p", x.ProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
+                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
             }
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, total = total.Amount, balanceCredit = credit, cashRefund = refund });
@@ -339,7 +340,7 @@ public sealed class AfterSalesService(TenantDb db)
             if (!found) return ServiceResult<object>.Fail("Purchase receipt not found.", 404);
             if (m.ReturnDate < receiptDate) return ServiceResult<object>.Fail("Return date cannot be before the receipt date.");
 
-            var costed = new List<(Guid ProductId, decimal Qty, Money Amount, decimal UnitCost, Money Removed, Money Gst)>();
+            var costed = new List<(Guid ProductId, Guid InventoryProductId, decimal Qty, Money Amount, decimal UnitCost, Money Removed, Money Gst)>();
             foreach (var (productId, qty) in lines.OrderBy(x => x.ProductId))
             {
                 decimal bought = 0, unitCost = 0, retQty = 0, retAmt = 0, lineGst = 0; var has = false;
@@ -354,17 +355,18 @@ public sealed class AfterSalesService(TenantDb db)
                 }
                 if (!has) return ServiceResult<object>.Fail("A returned product was not on this receipt.");
                 if (qty.Value > bought - retQty) return ServiceResult<object>.Fail($"Cannot return {qty.Value:0.###}: only {bought - retQty:0.###} left to return for this product.");
-                var onHand = await Scalar<decimal?>(s, "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update", ct, ("p", productId), ("l", locationId)) ?? 0m;
+                var inventoryProductId = await CanonicalProductIdAsync(s, tenantId, productId, ct);
+                var onHand = await Scalar<decimal?>(s, "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update", ct, ("p", inventoryProductId), ("l", locationId)) ?? 0m;
                 if (onHand < qty.Value)
                 {
                     var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", productId));
                     return ServiceResult<object>.Fail($"Not enough stock to return {name}: {onHand:0.###} on hand.");
                 }
-                var cur = await ReadCostAsync(s, productId, ct);
+                var cur = await ReadCostAsync(s, inventoryProductId, ct);
                 var remaining = cur.TotalQuantity - qty.Value;
                 var removed = remaining <= 0 ? cur.InventoryValue : Math.Min(cur.InventoryValue, Money.Of(qty.Value * cur.Wac).Amount);
                 var billed = Money.Of(bought * unitCost + lineGst).Amount; var amount = AfterSalesRules.ReturnedValue(billed, bought, retQty, retAmt, qty.Value); var gstPart = gstClaimed && billed > 0 ? Money.Of(Math.Min(amount.Amount, Math.Round(lineGst * amount.Amount / billed, 2))) : Money.Of(0m);
-                costed.Add((productId, qty.Value, amount, unitCost, Money.Of(removed), gstPart));
+                costed.Add((productId, inventoryProductId, qty.Value, amount, unitCost, Money.Of(removed), gstPart));
             }
             var total = Money.Of(costed.Sum(x => x.Amount.Amount));
             var removedTotal = Money.Of(costed.Sum(x => x.Removed.Amount));
@@ -381,13 +383,13 @@ public sealed class AfterSalesService(TenantDb db)
             {
                 await Exec(s, ct, "insert into procurement.purchase_return_line(tenant_id,return_id,receipt_id,product_id,quantity,unit_cost,amount) values (@t,@r,@s,@p,@q,@c,@a)",
                     ("t", tenantId), ("r", id), ("s", m.ReceiptId), ("p", x.ProductId), ("q", x.Qty), ("c", x.UnitCost), ("a", x.Amount.Amount));
-                var cur = await ReadCostAsync(s, x.ProductId, ct);
+                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var remaining = cur.TotalQuantity - x.Qty;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'PurchaseReturn',@d)",
-                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.ProductId), ("l", locationId), ("q", -x.Qty), ("c", cur.Wac), ("v", -x.Removed.Amount), ("e", m.ReturnDate), ("d", id));
-                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", x.Qty), ("p", x.ProductId), ("l", locationId));
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", -x.Qty), ("c", cur.Wac), ("v", -x.Removed.Amount), ("e", m.ReturnDate), ("d", id));
+                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", x.Qty), ("p", x.InventoryProductId), ("l", locationId));
                 await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p",
-                    ("q", remaining), ("v", cur.InventoryValue - x.Removed.Amount), ("w", cur.Wac), ("p", x.ProductId));
+                    ("q", remaining), ("v", cur.InventoryValue - x.Removed.Amount), ("w", cur.Wac), ("p", x.InventoryProductId));
             }
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, total = total.Amount });
@@ -482,14 +484,18 @@ public sealed class AfterSalesService(TenantDb db)
             var journal = SalesRules.SaleJournal(Money.Of(total), Money.Of(paid), Money.Of(costTotal))
                 .Select(j => new JournalLineDraft(j.AccountCode, j.Credit, j.Debit)).ToList();
 
-            var lines = new List<(Guid ProductId, decimal Qty, decimal Cost)>();
+            var historicalLines = new List<(Guid ProductId, decimal Qty, decimal Cost)>();
             await using (var q = s.Command(@"select l.product_id, l.quantity, coalesce((select -sum(m.value_delta) from inventory.stock_movement m where m.source_type='Sale' and m.source_id=l.sale_id and m.product_id=l.product_id),0)
                 from sales.sale_line l where l.sale_id=@i order by l.product_id"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
-                while (await r.ReadAsync(ct)) lines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2)));
+                while (await r.ReadAsync(ct)) historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2)));
             }
+
+            var lines = new List<(Guid ProductId, Guid InventoryProductId, decimal Qty, decimal Cost)>();
+            foreach (var line in historicalLines)
+                lines.Add((line.ProductId, await CanonicalProductIdAsync(s, tenantId, line.ProductId, ct), line.Qty, line.Cost));
 
             var id = Guid.NewGuid(); var entry = Guid.NewGuid();
             await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'SaleCancelled','Sale',@d,@s,@c)",
@@ -502,13 +508,13 @@ public sealed class AfterSalesService(TenantDb db)
                 var unitCost = x.Qty == 0 ? 0m : decimal.Round(x.Cost / x.Qty, 4, MidpointRounding.AwayFromZero);
                 if (x.Cost > 0)
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleCancellation',@d)",
-                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.ProductId), ("l", locationId), ("q", x.Qty), ("c", unitCost), ("v", x.Cost), ("e", cancelDate), ("d", id));
+                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", unitCost), ("v", x.Cost), ("e", cancelDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
-                    ("t", tenantId), ("p", x.ProductId), ("l", locationId), ("q", x.Qty));
-                var cur = await ReadCostAsync(s, x.ProductId, ct);
+                    ("t", tenantId), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty));
+                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
-                    ("t", tenantId), ("p", x.ProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
+                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
             }
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, saleId, cancelled = true });
@@ -546,6 +552,13 @@ public sealed class AfterSalesService(TenantDb db)
         await Exec(s, ct, "insert into accounting.account(tenant_id,id,code,name,type) values (@t,@i,@c,@n,@y) on conflict (tenant_id,code) do nothing",
             ("t", tenantId), ("i", Guid.NewGuid()), ("c", code), ("n", name), ("y", type));
         return (await Scalar<Guid?>(s, "select id from accounting.account where code=@c", ct, ("c", code)))!.Value;
+    }
+
+    static async Task<Guid> CanonicalProductIdAsync(TenantSession s, Guid tenantId, Guid productId, CancellationToken ct)
+    {
+        return await Scalar<Guid?>(s, @"select coalesce(
+            (select canonical_product_id from catalog.product_alias where tenant_id=@t and alias_product_id=@p),
+            @p)", ct, ("t", tenantId), ("p", productId)) ?? productId;
     }
 
     static async Task<CostState> ReadCostAsync(TenantSession s, Guid productId, CancellationToken ct)
