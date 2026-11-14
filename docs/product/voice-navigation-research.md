@@ -297,3 +297,14 @@ Do not integrate either embedder just because the workflow completes. First revi
 - The model is cached in browser Cache Storage after checksum verification. Model downloads happen only after the user selects Enable voice. The existing RBOS app shell is not fully offline; cached recognition is intended to work locally after the app has loaded.
 - Navigation from billing, purchase receiving, and opening-stock routes is guarded with a confirmation before leaving. This currently uses route-level protection rather than field-level dirty-state tracking.
 - Remaining acceptance work: resolve all CI failures; verify the production build and runtime asset download; test mic permission denial, model cache/reload, Hindi/English/Hinglish commands, silence/noise rejection, and unsaved-form protection on desktop and low-end Android; then update this status after validation.
+
+
+## 12. Speech provider boundary (2026-11-14)
+
+The H2 assistant UI and interaction design remain unchanged. Speech runtime selection is now isolated in `web/src/speech-provider.ts`; `NavigationAssistant.tsx` no longer hardcodes the Shruti worker URL.
+
+- Active provider: `shruti-local`, using the existing Shruti model and local Web Worker. The existing push-to-talk flow, partial transcript previews, PCM cleanup, model integrity checks and browser cache remain in place.
+- The provider registry is intentionally small. No Whisper or Gemini API adapter is enabled.
+- Whisper (local or hosted) and Gemini transcription may be evaluated behind this boundary later. Hosted inference would transmit microphone audio outside the device and may have free-tier quotas, rate limits or future pricing; it therefore requires an explicit owner decision, credential/security design and privacy review before implementation.
+- This change does not add packages, API keys, backend endpoints, network speech calls or model downloads beyond the existing opt-in Shruti flow.
+- `speech-provider.test.ts` verifies the default provider and worker selection. Existing assistant UI and resolver tests remain the regression baseline.
