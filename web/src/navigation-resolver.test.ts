@@ -100,7 +100,7 @@ describe('keyword navigation resolver', () => {
     expect(resolveNavigation('kharid entri')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
     expect(resolveNavigation('karid entry')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
     expect(resolveNavigation('kharcho')).toMatchObject({ kind: 'navigate', target: { id: 'money.expenses' } })
-    expect(resolveNavigation('बकाया')).toMatchObject({ kind: 'not-understood' })
+    expect(resolveNavigation('बकाया').kind).toBe('ask')
   })
 
   it('asks when a lone keyword does not identify a unique destination', () => {
