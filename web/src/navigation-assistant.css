@@ -6,11 +6,8 @@
 .voice-wave i{display:block;width:3px;height:5px;border-radius:4px;background:currentColor;animation:rbos-voice-wave .72s ease-in-out infinite alternate;animation-delay:calc(var(--wave-index)*-0.035s)}
 @keyframes rbos-voice-wave{from{height:4px;opacity:.65}to{height:23px;opacity:1}}
 @media(prefers-reduced-motion:reduce){.voice-wave i{animation:none;height:10px}}
-
 /* Keep quick actions first, with command entry and microphone on one row beneath. */
 .navigation-assistant{gap:10px}.navigation-assistant-form input{min-height:46px;font-size:15px}.navigation-assistant-form .voice-wave{min-width:30px;width:30px;gap:1px}.navigation-assistant-form .voice-wave i{width:2px}
-
-
 /* Chat-style command history and live, non-executing suggestions. */
 .navigation-assistant{height:min(76dvh,680px);max-height:calc(100dvh - var(--nav-h) - env(safe-area-inset-top) - 84px);width:min(390px,calc(100vw - 24px))}
 .navigation-history{display:flex;flex-direction:column;gap:7px;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 5px;scrollbar-gutter:stable}
@@ -22,13 +19,11 @@
 .navigation-assistant-form .assistant-mic{touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 .navigation-assistant-form .assistant-mic.is-recording{background:var(--danger)}
 .navigation-assistant-form .assistant-mic:disabled{opacity:.5}
-
-
 /* Stable mobile assistant: fixed header/actions/input/mic, scroll only the conversation. */
 .navigation-assistant{grid-template-rows:auto auto minmax(0,1fr) auto 76px;align-content:stretch}
-/* Quick actions wrap naturally instead of being clipped or horizontally scrolled on narrow screens. */
-.navigation-top-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0;overflow:visible;padding:1px 1px 5px}
-.navigation-top-actions button{flex:0 1 auto;min-width:0;min-height:38px;max-width:100%;white-space:normal;overflow-wrap:anywhere;border:1px solid var(--brand);border-radius:999px;padding:7px 13px;background:var(--card);color:var(--brand-dark);font:inherit;font-size:13px;font-weight:650}
+/* Quick actions always wrap within the assistant's content width; no horizontal overflow. */
+.navigation-top-actions{display:flex;flex-flow:row wrap;align-content:flex-start;align-items:center;gap:7px;min-width:0;width:100%;max-width:100%;box-sizing:border-box;overflow:visible;padding:1px 1px 5px}
+.navigation-top-actions button{box-sizing:border-box;flex:0 1 auto;min-width:0;min-height:38px;max-width:100%;white-space:normal;overflow-wrap:anywhere;border:1px solid var(--brand);border-radius:999px;padding:7px 13px;background:var(--card);color:var(--brand-dark);font:inherit;font-size:13px;font-weight:650}
 .navigation-top-actions button:disabled{opacity:.5}
 .navigation-history{min-height:0;max-height:none}
 .assistant-empty-hint{margin:auto 0;color:var(--muted);font-size:14px;line-height:1.45;text-align:center;padding:14px}
