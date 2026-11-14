@@ -12,8 +12,36 @@ public static class ProductRules
     public static string Normalize(string? v) =>
         new(string.IsNullOrWhiteSpace(v) ? [] : v.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
+    /// <summary>
+    /// Stable product identity. A manufacturer model number is stronger than a display
+    /// name: the same brand/model remains one product even when a catalogue or invoice
+    /// describes it differently. Without both values, fall back to the normalized name.
+    /// </summary>
+    public static string IdentityKey(string? name, string? brand, string? model)
+    {
+        var brandKey = Normalize(brand);
+        var modelKey = Normalize(model);
+        return brandKey.Length > 0 && modelKey.Length > 0
+            ? $"model|{brandKey}|{modelKey}"
+            : $"name|{Normalize(name)}|{brandKey}|{modelKey}";
+    }
+
+    /// <summary>
+    /// Shared-master identity scopes non-modelled goods by category, while modelled
+    /// manufacturer products are shared by brand/model. Mirrors migration 044.
+    /// </summary>
+    public static string MasterIdentityKey(string? name, string? categoryName, string? brand, string? model)
+    {
+        var brandKey = Normalize(brand);
+        var modelKey = Normalize(model);
+        return brandKey.Length > 0 && modelKey.Length > 0
+            ? $"model|{brandKey}|{modelKey}"
+            : $"name|{Normalize(categoryName)}|{Normalize(name)}|{brandKey}|{modelKey}";
+    }
+
+    // Backwards-compatible method name used by earlier catalogue code.
     public static string DuplicateKey(string? name, string? brand, string? model) =>
-        $"{Normalize(name)}|{Normalize(brand)}|{Normalize(model)}";
+        IdentityKey(name, brand, model);
 
     public static string FormatSku(long n) => $"INT-{n:D6}";
 
