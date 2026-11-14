@@ -26,8 +26,7 @@ Whisper is not to replace Shruti. The provider implementation (local versus host
 ### Level 3 — AI / LLM intent understanding
 
 1. **Gemini Flash — primary LLM.**
-2. **Grok — existing integration to reuse as the next fallback.**
-3. **Qwen — additional fallback candidate**, subject to verifying the exact existing model/client and its capability for text-only intent classification.
+2. **Groq-hosted Qwen — candidate fallback**, reusing the existing Groq client only if its configured model supports text-only intent classification and its current contract can be safely generalized. The existing Groq integration is for catalogue image/PDF extraction, not voice intent. It is not an xAI Grok integration.
 
 Level 3 is invoked only when Level 1 cannot confidently resolve the normalized transcript or needs contextual interpretation. It returns a constrained structured intent, never an arbitrary URL or direct transaction action. All destinations are validated against the canonical route allowlist. Existing unsaved-work protection remains the final navigation guard.
 
@@ -42,13 +41,13 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | Shruti primary STT | Local worker, model integrity/cache, push-to-talk and partial transcript flow | Integrated |
 | Whisper backup STT | Research exists; no adapter or automatic failover in `speech-provider.ts` | Pending |
 | Gemini Flash voice intent | Gemini is used by invoice extraction, not yet voice intent routing | Pending for voice |
-| Grok voice intent | Owner confirms Grok is already integrated; no xAI Grok client was located in the audited PR source paths yet | Locate existing integration before reuse |
-| Qwen voice intent | `GroqVisionClient` exists and defaults to a Qwen vision model; this is not proof of a text-only Qwen intent integration | Audit required |
+| Groq/Qwen voice intent | Existing `GroqVisionClient` is used by catalogue image/PDF extraction only; vision model/contract not verified for text-only intent | Adapt only after model/API capability review |
+| Qwen voice intent | `GroqVisionClient` defaults to `qwen/qwen3.8-27b` for vision extraction; text-only intent capability and model compatibility are unverified | Audit required |
 | Three-level orchestrator | `NavigationAssistant.tsx` currently calls `resolveNavigation()` directly after transcription | Pending |
 | End-to-end speech tests | Synthetic resolver/provider tests exist; no paired RBOS audio acceptance corpus yet | Pending |
 | Device acceptance | Android Chrome and low-end device acceptance outstanding | Pending |
 
-**Important provider distinction:** Grok (xAI) and Groq (inference provider) are different. The repository contains `GroqVisionClient` configured with a Qwen vision model. Do not treat that class as the Grok integration. The owner's statement that Grok is already integrated is retained; however, the audited PR source paths did not expose an xAI Grok client. Continue locating the owner's existing integration before writing a duplicate. Do not mistake Groq's Qwen endpoint for xAI Grok.
+**Important provider distinction:** Grok (xAI) and Groq (inference provider) are different. The repository contains `GroqVisionClient`, configured with a Qwen vision model, used as a fallback in `ProductFileReader` for catalogue photo/PDF extraction when Gemini extraction is unavailable or unsuccessful. This is a Groq-hosted Qwen vision integration, not xAI Grok, and not a voice intent integration. `InvoiceExtractionService` uses Gemini model fallbacks and does not use Groq. Do not describe this as an existing Grok voice integration or wire the vision-only contract directly into text intent routing.
 
 ## 3. Work plan and acceptance gates
 
@@ -56,9 +55,10 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [x] Re-check PR #24 head, changed files and latest workflow.
 - [x] Confirm latest PR workflow #291 passed frontend and backend jobs.
 - [x] Correct research document statements that incorrectly deferred Whisper and Level 3.
-- [ ] Locate the existing Grok integration, configuration keys, calling pattern, timeout and error handling.
+- [x] Locate Groq integration and its current use: Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`.
+- [x] Verify invoice extraction uses Gemini model fallbacks only; no Groq fallback in `InvoiceExtractionService`.
+- [ ] Verify a suitable Groq-hosted Qwen text-generation model/API contract before adopting it for voice intent.
 - [ ] Inventory Gemini Flash configuration and distinguish invoice extraction from voice intent use.
-- [ ] Inventory Qwen integration; verify model ID, provider and text-generation capability.
 - [ ] Record exact provider ownership and deployment configuration without exposing secrets.
 
 ### W1 — Level 1 completion
@@ -82,8 +82,8 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 ### W3 — Level 3 LLM intent fallback
 - [ ] Define a strict structured response schema (intent type, canonical destination ID, confidence, clarification candidates/reason).
 - [ ] Implement Gemini Flash as primary intent provider.
-- [ ] Reuse the verified existing Grok integration as fallback.
-- [ ] Add Qwen only after confirming the existing integration is suitable for text-only intent understanding and the owner-approved fallback order.
+- [ ] Implement Gemini Flash as primary voice-intent provider.
+- [ ] Evaluate Groq-hosted Qwen as fallback using a text-generation model; do not assume the existing vision client can be reused unchanged.
 - [ ] Send transcript and minimal screen context only; never send raw audio to Level 3.
 - [ ] Validate provider output against the allowlisted destination IDs and current user permissions.
 - [ ] Add bounded timeouts, retry limits, provider availability checks and redacted logs.
@@ -95,7 +95,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - [ ] Direct quick actions and clear typed commands take the fast Level 1 path.
 - [ ] Voice uses Shruti first; Whisper only as STT backup.
 - [ ] Run deterministic resolver after transcription before spending an LLM call.
-- [ ] Call Gemini only when deterministic resolution is insufficient; fallback to Grok and then approved Qwen policy.
+- [ ] Call Gemini only when deterministic resolution is insufficient; fallback to the approved Groq-hosted Qwen text-intent provider, if verified and configured.
 - [ ] Preserve current assistant UI, chat history, push-to-talk and Hindi labels.
 - [ ] Maintain explicit user clarification when providers disagree or confidence is insufficient.
 
@@ -128,18 +128,18 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 |---|---|---|
 | 2026-11-14 | Rechecked PR #24 and latest head/workflow #291 | Frontend and backend CI jobs passed |
 | 2026-11-14 | Audited current speech provider and assistant integration | Shruti is the only registered STT provider; assistant calls deterministic resolver directly |
-| 2026-11-14 | Audited visible AI-related backend files | Gemini invoice extraction exists; GroqVisionClient uses Qwen vision; no xAI Grok voice client found in the audited files |
-| 2026-11-14 | Owner confirmed Grok is already integrated | Must locate and reuse exact Grok implementation; current PR source audit did not locate it |
+| 2026-11-14 | Audited AI-related backend files | `InvoiceExtractionService` uses Gemini only; `ProductFileReader` uses `GroqVisionClient` with Qwen vision as catalogue image/PDF fallback |
+| 2026-11-14 | Owner clarified provider name | Existing integration is Groq, not xAI Grok; it is catalogue extraction only, not voice intent |
 | 2026-11-14 | Updated voice research to restore Whisper backup and Level 3 to current scope | Documentation correction in progress |
 
 ## 6. Decision log / open questions
 
 - **Confirmed:** Level 1 basic common navigation options.
 - **Confirmed:** Level 2 Shruti primary, Whisper backup.
-- **Confirmed:** Level 3 Gemini Flash primary, Grok fallback; Qwen also part of the fallback strategy.
+- **Confirmed:** Level 3 Gemini Flash primary. Groq is the existing inference provider used for Qwen vision fallback in catalogue extraction; it is not xAI Grok and is not currently integrated with voice navigation.
+- **To verify:** Whether a suitable Groq-hosted Qwen text-generation model is available and appropriate for voice intent fallback.
+- **Not assumed:** Existing Qwen vision configuration does not prove text-intent capability. Do not wire it until model/API compatibility is verified.
 - **Confirmed:** Preserve current UI and deterministic route safety.
-- **To verify:** Exact existing Grok integration location and whether it is an xAI Grok API client or a Groq-hosted model integration. These are not interchangeable.
-- **To decide after audit:** Whether Qwen is a second fallback after Grok or a provider selected by availability/capability. Do not invent the order.
 - **To measure:** Best viable Whisper backup deployment under the zero-cost/privacy/performance constraints.
 - **To configure:** Provider keys, quotas, model IDs and environment-specific enablement without committing secrets.
 
