@@ -193,11 +193,45 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 			return ServiceResult<ProductFileResult>.Fail("AI catalogue extraction is not configured and this PDF has no readable text. Configure Gemini for automatic catalogue understanding, or use a searchable PDF.");
 		}
 
+		// A PDF can look normal while its embedded font map returns corrupted text.
+		// Render only those affected pages and send the images to Gemini instead of repeating
+		// the same broken text-layer extraction from the original PDF.
+		var unreliablePages = PdfPageReader.Read(bytes)?
+			.Where(p => p.NeedsOcr && p.Rows.SelectMany(row => row).Sum(cell => cell.Length) >= 100)
+			.Select(p => p.Page).Distinct().ToList() ?? [];
+		var imagePages = new List<(string Mime, string Base64)>();
+		foreach (var page in unreliablePages)
+		{
+			var png = PdfPageReader.RenderPng(bytes, page);
+			if (png is null)
+			{
+				log.LogWarning("Could not render PDF page {Page} with an unreliable text layer; falling back to normal PDF processing", page);
+				imagePages.Clear();
+				break;
+			}
+			imagePages.Add(("image/png", Convert.ToBase64String(png)));
+		}
+		if (imagePages.Count > 0)
+			log.LogInformation("Using rendered-page extraction for PDF pages {Pages} because embedded text is unreliable", string.Join(",", unreliablePages));
+
 		var models = string.IsNullOrWhiteSpace(apiKey) ? Array.Empty<string>() : new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest" }.Distinct().ToArray();
 		JsonNode? parsed = null;
 		foreach (var model in models)
 		{
-			try { parsed = await CallAsync(model, apiKey, "application/pdf", b64, PdfCataloguePrompt, ct); break; }
+			try
+			{
+				if (imagePages.Count > 0)
+				{
+					var first = imagePages[0];
+					parsed = await CallAsync(model, apiKey, first.Mime, first.Base64,
+						PdfCataloguePrompt + " These are rendered images of specification pages whose embedded PDF text could not be decoded. Extract products only from visible tables; do not infer missing values.",
+						ct, imagePages.Skip(1).ToArray());
+				}
+				else parsed = await CallAsync(model, apiKey, "application/pdf", b64, PdfCataloguePrompt, ct);
+				if (parsed?["products"] is JsonArray) break;
+				log.LogWarning("Gemini returned no structured product list for PDF catalogue using model {Model}", model);
+			}
+
 			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
 			{ log.LogWarning("Gemini PDF catalogue extraction rate limited; trying configured fallback providers"); break; }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
@@ -263,7 +297,7 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		return Finish(rows, true);
 	}
 
-	async Task<JsonNode?> CallAsync(string model, string apiKey, string mime, string b64, string prompt, CancellationToken ct)
+	async Task<JsonNode?> CallAsync(string model, string apiKey, string mime, string b64, string prompt, CancellationToken ct, IReadOnlyList<(string Mime, string Base64)>? additionalMedia = null)
 	{
 		static JsonObject T() => new() { ["type"] = "STRING", ["nullable"] = true };
 		var item = new JsonObject
@@ -272,14 +306,17 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 			["properties"] = new JsonObject { ["name"] = T(), ["category"] = T(), ["unit"] = T(), ["brand"] = T(), ["model"] = T(), ["colour"] = T(), ["capacity"] = T(), ["connectorType"] = T(), ["compatibleWith"] = T() }
 		};
 		var schema = new JsonObject { ["type"] = "OBJECT", ["properties"] = new JsonObject { ["products"] = new JsonObject { ["type"] = "ARRAY", ["items"] = item } } };
+		var parts = new JsonArray
+		{
+			new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = mime, ["data"] = b64 } }
+		};
+		if (additionalMedia is not null)
+			foreach (var media in additionalMedia)
+				parts.Add(new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = media.Mime, ["data"] = media.Base64 } });
+		parts.Add(new JsonObject { ["text"] = prompt });
 		var body = new JsonObject
 		{
-			["contents"] = new JsonArray(new JsonObject
-			{
-				["parts"] = new JsonArray(
-					new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = mime, ["data"] = b64 } },
-					new JsonObject { ["text"] = prompt })
-			}),
+			["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
 			["generationConfig"] = new JsonObject { ["responseMimeType"] = "application/json", ["responseSchema"] = schema, ["temperature"] = 0 }
 		};
 		using var req = new HttpRequestMessage(HttpMethod.Post, $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
