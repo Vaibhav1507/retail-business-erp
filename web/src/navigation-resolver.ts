@@ -144,6 +144,9 @@ type RankedTarget = { id: string; score: number; matchedGroups: number }
 
 function rankTargets(queryTokens: string[], allowPartial = false): RankedTarget[] {
   return Object.entries(navigationKeywordProfiles).map(([id, profile]) => {
+    if (profile.excludes?.some(excluded => queryTokens.some(token => tokenMatches(token, excluded)))) {
+      return { id, score: 0, matchedGroups: 0 }
+    }
     let matchedGroups = 0
     let matchedTokens = 0
     for (const group of profile.groups) {
@@ -186,6 +189,9 @@ export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
   if (isRejectedRequest(input, q)) return { kind: 'reject' }
+  // A named customer/supplier reference is a lookup-like utterance. It can
+  // suggest the relevant screen, but generic navigation must not discard the name.
+  if (namedPersonReference.test(input)) return { kind: 'not-understood' }
 
   const qTokens = tokenize(q)
   if (!qTokens.length) return { kind: 'not-understood' }
