@@ -103,6 +103,7 @@ describe('keyword navigation resolver', () => {
     expect(resolveNavigation('mujhe Ramesh ji ka purana bil').kind).toBe('not-understood')
     expect(resolveNavigation('रमेश जी का पुराना बिल').kind).toBe('not-understood')
     expect(suggestNavigation('mujhe Ramesh ji ka purana bil').some(target => target.id === 'sell.bills')).toBe(true)
+    expect(suggestNavigation('रमेश जी का पुराना बिल').some(target => target.id === 'sell.bills')).toBe(true)
     expect(resolveNavigation('बकाया').kind).toBe('ask')
     expect(resolveNavigation('customer se udhar lena').kind).toMatch(/^(navigate|ask)$/)
     expect(resolveNavigation('बाकी').kind).toBe('ask')
