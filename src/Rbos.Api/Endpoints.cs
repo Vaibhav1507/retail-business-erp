@@ -22,8 +22,6 @@ public static class Endpoints
 {
 	static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateOnly Day, int Count)> WhisperDailyUsage = new();
 	const int MaxWhisperRequestsPerUserPerDay = 100;
-
-{
 	static readonly string[] Units = ["pcs", "set", "pack", "m"];
 	static readonly string[] AttrKeys = ["colour", "capacity", "connector_type", "compatible_with"];
 
