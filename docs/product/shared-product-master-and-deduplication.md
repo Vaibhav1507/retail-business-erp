@@ -46,7 +46,7 @@ The invoice-extraction service uses existing tenant products to map extracted in
 - Apply through the normal ordered migration runner; do not manually rerun the migration after it has been recorded.
 - Run backend build, PostgreSQL migration, integration tests and frontend typecheck/build from CI before merging.
 - Take a database backup before production migration. The migration reconciles existing inventory/product references transactionally.
-- The uploaded product export used for the investigation contained 671 tenant product rows. It showed four repeated LG brand/model identities under different display names/categories: `T80KMMB3Z`, `FHP1410Z3M`, `FHP1209Z5M`, and `GV-B25FFGMB`. The French-door catalogue's seven distinct model codes remain separate products.
+- The supplied product-table export contains 671 active rows for one tenant. It shows four repeated LG brand/model pairs under different display names/categories: `T80KMMB3Z`, `FHP1410Z3M`, `FHP1209Z5M`, and `GV-B25FFGMB`. The expected result is 667 active tenant products plus four inactive alias rows retained for history. The catalogue-described row wins each pair because it has source-document provenance and richer attributes. The French-door catalogue's seven distinct model codes remain separate products. This CSV contains only product rows—not stock, cost, barcode, serial or transaction tables—so full FK/data-preservation rehearsal still requires a complete database backup restored to a separate test database.
 
 ## Known limits
 
