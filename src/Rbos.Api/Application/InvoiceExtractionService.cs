@@ -41,7 +41,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             extra.Add((pm, pb));
         }
         var apiKey = cfg["Gemini:ApiKey"];
-        if (string.IsNullOrWhiteSpace(apiKey)) return ServiceResult<object>.Fail("Invoice reading is not set up yet. Ask the owner to add the Gemini key.");
+
         if (mime is null || !Allowed.Contains(mime)) return ServiceResult<object>.Fail("Upload a JPEG, PNG, WebP or PDF file.");
         if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<object>.Fail("File is empty or larger than 8 MB.");
         byte[] bytes;
@@ -52,11 +52,14 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
         JsonNode? parsed = null;
-        try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
-        catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-        { log.LogWarning("Gemini invoice extraction rate limited; trying configured fallback providers"); }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
-        { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            { log.LogWarning("Gemini invoice extraction rate limited; trying configured fallback providers"); }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+            { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
+        }
 
         if (parsed is null && groq.Available)
         {
