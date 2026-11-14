@@ -387,7 +387,7 @@ public sealed class AfterSalesService(TenantDb db)
                 var remaining = cur.TotalQuantity - x.Qty;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'PurchaseReturn',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", -x.Qty), ("c", cur.Wac), ("v", -x.Removed.Amount), ("e", m.ReturnDate), ("d", id));
-                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", x.Qty), ("p", x.ProductId), ("l", locationId));
+                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", x.Qty), ("p", x.InventoryProductId), ("l", locationId));
                 await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p",
                     ("q", remaining), ("v", cur.InventoryValue - x.Removed.Amount), ("w", cur.Wac), ("p", x.InventoryProductId));
             }
