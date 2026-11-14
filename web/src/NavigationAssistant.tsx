@@ -3,7 +3,8 @@ import { getLanguage } from './i18n'
 import { resampleAudio } from './audio-utils'
 import { createSpeechWorker } from './speech-provider'
 import { transcribeNavigationWithWhisper } from './speech-fallback'
-import { resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
+import { api } from './api'
+import { navigationTargets, resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
 import './navigation-assistant.css'
 
 const copy = {
@@ -51,6 +52,15 @@ const labelsHi: Record<string,string> = {
 function targetLabel(target: NavigationTarget, language: 'en'|'hi') { return language === 'hi' ? labelsHi[target.id] || target.label : target.label }
 type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; text?:string; message?:string; language?:string|null; ms?:number; partial?:boolean; captureId?:number}
 type ChatMessage = {id:number; role:'user'|'assistant'; content:string}
+
+type VoiceIntentApiResult = { kind:'navigate'|'clarify'|'reject'|'not-understood'; targetId:string|null; candidates:string[]; confidence:number; provider:string }
+let voiceIntentEnabledPromise: Promise<boolean> | null = null
+function voiceIntentEnabled(): Promise<boolean> {
+ voiceIntentEnabledPromise ??= api<{enabled:boolean}>('GET','/voice/intent/config')
+  .then(result => result.enabled === true)
+  .catch(() => false)
+ return voiceIntentEnabledPromise
+}
 
 export function NavigationAssistant() {
  const [open,setOpen] = useState(false)
@@ -104,7 +114,7 @@ export function NavigationAssistant() {
   window.location.hash = target.hash
  }
 
- function handleCommand(value: string) {
+ async function handleCommand(value: string) {
   const command = value.trim()
   if (!command) return
   addHistory('user', command)
@@ -112,12 +122,40 @@ export function NavigationAssistant() {
   const result = resolveNavigation(command)
   if (result.kind === 'navigate') {
    addHistory('assistant', `${text.opening} ${targetLabel(result.target, lang)}.`)
-    window.location.hash = result.target.hash
+   window.location.hash = result.target.hash
    return
   }
   if (result.kind === 'ask') {
    setChoices(result.targets); setMessage(text.choose); addHistory('assistant', text.choose)
    return
+  }
+  if (result.kind === 'not-understood' && await voiceIntentEnabled()) {
+   try {
+    const current = navigationTargets.find(target => target.hash === window.location.hash)?.id ?? null
+    const ai = await api<VoiceIntentApiResult>('POST','/voice/intent',{ transcript:command, currentScreenId:current })
+    if (!panelOpenRef.current) return
+    if (ai.kind === 'navigate' && ai.targetId && ai.confidence >= 0.85) {
+     const target = navigationTargets.find(item => item.id === ai.targetId)
+     if (target) {
+      addHistory('assistant', `${text.opening} ${targetLabel(target, lang)}.`)
+      window.location.hash = target.hash
+      return
+     }
+    }
+    if (ai.kind === 'clarify') {
+     const targets = ai.candidates.map(id => navigationTargets.find(item => item.id === id)).filter((item): item is NavigationTarget => Boolean(item))
+     if (targets.length > 0) {
+      setChoices(targets); setMessage(text.choose); addHistory('assistant', text.choose)
+      return
+     }
+    }
+    if (ai.kind === 'reject') {
+     setMessage(text.reject); addHistory('assistant', text.reject)
+     return
+    }
+   } catch {
+    // Provider failure falls through to deterministic suggestions/clarification.
+   }
   }
   if (result.kind === 'not-understood') {
    const suggestions = suggestNavigation(command)
