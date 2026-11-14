@@ -62,6 +62,9 @@ const ambiguousTerms: Record<string, string[]> = {
   goods: ['stock.current', 'buy.receive', 'more.transfers'],
   udhar: ['sell.collect', 'parties.dues'],
   baki: ['sell.collect', 'parties.dues'],
+  'बकाया': ['sell.collect', 'parties.dues'],
+  'बाकी': ['sell.collect', 'parties.dues'],
+  'उधार': ['sell.collect', 'parties.dues'],
   money: ['money.cash', 'money.expenses', 'money.owner'],
 }
 
@@ -181,7 +184,9 @@ const namedPersonReference = /\b[a-z][a-z'-]{2,}\s+(?:ji|bhai|bhaiya|sahab)\b/i
 
 function isRejectedRequest(input: string, normalized: string): boolean {
   if (/https?:\/\/|www\./i.test(input) || /\b[a-z0-9-]+\.(?:com|in|org|net|io)(?=$|[\s/?#])/i.test(input)) return true
-  if (/\d/.test(normalized) || actionRequest.test(normalized)) return true
+  const moneyMovement = /\b(paisa|paise|payment)\b|पैसा|पैसे|पेमेंट|भुगतान|रकम/i.test(normalized)
+    && /\b(jama|bhej|send|transfer|do|karo)\b|जमा|भेज|दे दो|कर दो/i.test(normalized)
+  if (/\d/.test(normalized) || actionRequest.test(normalized) || moneyMovement) return true
   if (directDataRequest.test(normalized)) return true
   return questionIntent.test(normalized) && dataTerms.test(normalized)
 }
