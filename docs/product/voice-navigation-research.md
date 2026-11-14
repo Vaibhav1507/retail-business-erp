@@ -306,7 +306,7 @@ The H2 assistant UI and interaction design remain unchanged. Speech runtime sele
 
 - Active provider: `shruti-local`, using the existing Shruti model and local Web Worker. The existing push-to-talk flow, partial transcript previews, PCM cleanup, model integrity checks and browser cache remain in place.
 - The provider registry is intentionally small and currently registers only Shruti. The agreed Level 2 design is Shruti primary with Whisper as the backup STT provider; the backup adapter and automatic failover are still pending.
-- The agreed Level 3 design is Gemini Flash primary, with the existing Grok integration as fallback and Qwen considered as an additional fallback. These are intent-understanding providers, not STT providers. Hosted inference transmits audio or transcript content outside the device depending on the stage; use transcript-only transfer for Level 3, keep credentials server-side, and document provider limits, privacy and cost before enabling calls.
+- The agreed Level 3 design is Gemini Flash primary. The repository's existing Groq integration is a Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`; it is not xAI Grok and is not currently used for voice intent. `InvoiceExtractionService` uses Gemini model fallbacks only. A Groq-hosted Qwen text-generation model may be evaluated as the voice LLM fallback, but its model/API capability must be verified first. These are intent-understanding providers, not STT providers. Use transcript-only transfer for Level 3, keep credentials server-side, and document provider limits, privacy and cost before enabling calls.
 - This change does not add packages, API keys, backend endpoints, network speech calls or model downloads beyond the existing opt-in Shruti flow.
 - `speech-provider.test.ts` verifies the default provider and worker selection. Existing assistant UI and resolver tests remain the regression baseline.
 
@@ -379,7 +379,7 @@ Research notes:
 - Added distinct contextual requirements for easy collisions: bill vs old bill, customer receipt vs supplier payment, customer return vs supplier return, purchase receive vs purchase history/return, stock view vs count/adjust/history/alerts, and customer dues vs collections.
 - Kept ambiguous single words as clarification prompts. Data questions, transaction commands, numbers and arbitrary URLs remain rejected before routing.
 - Suggestions use incomplete keyword matches but never execute navigation.
-- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. They are separate from the agreed Level 3 AI intent layer (Gemini Flash primary, existing Grok integration as fallback, with Qwen as an additional fallback candidate). Level 3 is part of the current three-level voice-navigation scope; it is not deferred as a product feature. Its voice-specific orchestration remains to be implemented and validated.
+- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. They are separate from the agreed Level 3 AI intent layer (Gemini Flash primary, with Groq-hosted Qwen text generation being evaluated as a fallback). The existing Groq integration is only Qwen vision fallback for catalogue extraction, not voice intent. Level 3 is part of the current three-level voice-navigation scope; it is not deferred as a product feature. Its voice-specific orchestration remains to be implemented and validated.
 
 ### Synthetic test protocol and caveats
 
