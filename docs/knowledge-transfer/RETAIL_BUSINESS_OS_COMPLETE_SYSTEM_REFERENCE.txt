@@ -1,17 +1,19 @@
-CURRENT-STATE NOTICE — 2026-11-13
+CURRENT-STATE NOTICE — 2026-11-14
 ================================
 This is a historical, read-only repository investigation snapshot. It predates
 the merged WhatsApp invoice-delivery implementation (PR #18 / merge commit
-1d56e15) and later repository/deployment changes. Its file counts, route list,
+1d56e15), three-level voice navigation (PR #24), and later repository/deployment changes. Its file counts, route list,
 migration inventory, test inventory, implementation status and limitations
 must not be treated as current.
 
-For the current state, read README.md, docs/deployment-runbook.md and
-docs/implementation-plans/whatsapp-invoice-delivery.md. Verify claims against
+For the current state, read README.md, docs/current-implementation-status.md,
+docs/deployment-runbook.md and the feature-specific implementation trackers. Verify claims against
 the current source tree, migrations and latest CI/workflow runs. In particular,
 migration 043 adds WhatsApp invoice delivery, and production migration status
 must be confirmed from the latest "Migrate production database" workflow before
 claiming it is applied.
+
+PR #24 merged three-level voice navigation on 2026-11-14. PR #22 (local Qwen benchmark) was closed without merge. PR #25 and #26 are duplicate quick-action wrapping CSS PRs; merge at most one.
 
 The original investigation below is preserved as historical evidence only.
 
