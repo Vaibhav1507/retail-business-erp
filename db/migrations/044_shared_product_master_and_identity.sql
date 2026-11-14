@@ -8,7 +8,9 @@ create or replace function catalog.product_identity_key(p_name text, p_brand tex
 returns text language sql immutable parallel safe
 as $$
   select case
-    when catalog.norm_text(p_brand) <> '' and catalog.norm_text(p_model) <> ''
+    when catalog.norm_text(p_brand) <> ''
+      and catalog.norm_text(p_model) <> ''
+      and catalog.norm_text(p_model) not in ('na','none','unknown','generic','tbd','notavailable','notapplicable','null')
       then 'model|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
     else 'name|' || catalog.norm_text(p_name) || '|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
   end
@@ -18,7 +20,9 @@ create or replace function catalog.master_product_identity_key(p_name text, p_ca
 returns text language sql immutable parallel safe
 as $$
   select case
-    when catalog.norm_text(p_brand) <> '' and catalog.norm_text(p_model) <> ''
+    when catalog.norm_text(p_brand) <> ''
+      and catalog.norm_text(p_model) <> ''
+      and catalog.norm_text(p_model) not in ('na','none','unknown','generic','tbd','notavailable','notapplicable','null')
       then 'model|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
     else 'name|' || catalog.norm_text(p_category) || '|' || catalog.norm_text(p_name) || '|' || catalog.norm_text(p_brand) || '|' || catalog.norm_text(p_model)
   end
