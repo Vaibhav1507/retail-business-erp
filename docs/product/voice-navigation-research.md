@@ -305,8 +305,8 @@ Do not integrate either embedder just because the workflow completes. First revi
 The H2 assistant UI and interaction design remain unchanged. Speech runtime selection is now isolated in `web/src/speech-provider.ts`; `NavigationAssistant.tsx` no longer hardcodes the Shruti worker URL.
 
 - Active provider: `shruti-local`, using the existing Shruti model and local Web Worker. The existing push-to-talk flow, partial transcript previews, PCM cleanup, model integrity checks and browser cache remain in place.
-- The provider registry is intentionally small. No Whisper or Gemini API adapter is enabled.
-- Whisper (local or hosted) and Gemini transcription may be evaluated behind this boundary later. Hosted inference would transmit microphone audio outside the device and may have free-tier quotas, rate limits or future pricing; it therefore requires an explicit owner decision, credential/security design and privacy review before implementation.
+- The provider registry is intentionally small and currently registers only Shruti. The agreed Level 2 design is Shruti primary with Whisper as the backup STT provider; the backup adapter and automatic failover are still pending.
+- The agreed Level 3 design is Gemini Flash primary, with the existing Grok integration as fallback and Qwen considered as an additional fallback. These are intent-understanding providers, not STT providers. Hosted inference transmits audio or transcript content outside the device depending on the stage; use transcript-only transfer for Level 3, keep credentials server-side, and document provider limits, privacy and cost before enabling calls.
 - This change does not add packages, API keys, backend endpoints, network speech calls or model downloads beyond the existing opt-in Shruti flow.
 - `speech-provider.test.ts` verifies the default provider and worker selection. Existing assistant UI and resolver tests remain the regression baseline.
 
@@ -315,7 +315,7 @@ The H2 assistant UI and interaction design remain unchanged. Speech runtime sele
 
 ### Decision summary
 
-**Do not replace Shruti with Whisper for the RBOS Hindi/Hinglish navigation path.** Keep Shruti as the default on-device speech provider. Whisper remains a candidate for an explicitly enabled, internet-connected English-heavy fallback only if a later, separately approved evaluation justifies its recurring cost and audio-transfer trade-off.
+**Keep Shruti as the primary STT provider and implement Whisper as its backup.** The published comparison does not support replacing Shruti for Hindi/Hinglish. Whisper remains useful as a recovery path when Shruti fails, times out or produces an unusable transcript. The backup implementation must respect the project's zero-cost preference: first assess a viable local option; if the selected option is hosted, make the network transfer, provider limits and possible charges explicit, and keep it disabled until configured.
 
 This is a research-based decision, not an RBOS audio benchmark. No owner-recorded audio corpus has been supplied yet, so no claim is made that either model has passed RBOS acceptance criteria.
 
@@ -358,7 +358,7 @@ The published comparison cannot replace the test plan in section 7. The next mea
 4. Compare normalised WER/CER, correct navigation, wrong navigation, ask/not-understood rate, silence hallucinations, release-to-navigation p50/p95, network dependency and total cost.
 5. Apply the existing safety gate: wrong navigation <=2% quiet and <=3% noisy; silence/noise must never navigate. Prefer not-understood over a wrong screen.
 
-**Evaluation status:** literature/vendor comparison complete; actual paired RBOS audio test not run because the consented recordings and a verified Groq free allowance are not available in this task. No Whisper code, API key, external audio upload or cloud call has been added.
+**Evaluation status:** literature/vendor comparison complete; actual paired RBOS audio test not run because consented recordings are not yet available. The research supports Shruti as primary and Whisper as backup, but the implementation choice (local versus hosted) still needs a measured RBOS-specific evaluation. No Whisper adapter or automatic failover is currently implemented.
 
 
 ## 14. Keyword-first resolver and Bundeli/North Indian Hindi coverage (2026-11-14)
@@ -379,7 +379,7 @@ Research notes:
 - Added distinct contextual requirements for easy collisions: bill vs old bill, customer receipt vs supplier payment, customer return vs supplier return, purchase receive vs purchase history/return, stock view vs count/adjust/history/alerts, and customer dues vs collections.
 - Kept ambiguous single words as clarification prompts. Data questions, transaction commands, numbers and arbitrary URLs remain rejected before routing.
 - Suggestions use incomplete keyword matches but never execute navigation.
-- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. They are not the AI intent-router layer: the agreed Layer 3 LLM fallback remains deferred, disabled, and outside this PR.
+- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. They are separate from the agreed Level 3 AI intent layer (Gemini Flash primary, existing Grok integration as fallback, with Qwen as an additional fallback candidate). Level 3 is part of the current three-level voice-navigation scope; it is not deferred as a product feature. Its voice-specific orchestration remains to be implemented and validated.
 
 ### Synthetic test protocol and caveats
 
