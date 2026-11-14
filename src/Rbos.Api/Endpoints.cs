@@ -67,14 +67,24 @@ public static class Endpoints
 		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, GroqSpeechToTextClient whisper, CancellationToken ct) =>
 		{
 			if (!whisper.Available) return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
-			if (request.ContentLength is null or <= 44 or > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+			if (request.ContentLength is <= 44 or > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
 			await using var buffer = new MemoryStream();
-			await request.Body.CopyToAsync(buffer, ct);
+			var chunk = new byte[81920];
+			while (true)
+			{
+				var read = await request.Body.ReadAsync(chunk, ct);
+				if (read == 0) break;
+				if (buffer.Length + read > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+				await buffer.WriteAsync(chunk.AsMemory(0, read), ct);
+			}
 			if (buffer.Length is <= 44 or > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
 			var wav = buffer.ToArray();
 			if (wav[0] != (byte)'R' || wav[1] != (byte)'I' || wav[2] != (byte)'F' || wav[3] != (byte)'F' ||
-				wav[8] != (byte)'W' || wav[9] != (byte)'A' || wav[10] != (byte)'V' || wav[11] != (byte)'E')
-				return ApiResults.Fail(400, "Voice command audio must be a valid WAV file.");
+				wav[8] != (byte)'W' || wav[9] != (byte)'A' || wav[10] != (byte)'V' || wav[11] != (byte)'E' ||
+				wav[12] != (byte)'f' || wav[13] != (byte)'m' || wav[14] != (byte)'t' || wav[15] != (byte)' ' ||
+				BitConverter.ToUInt16(wav, 20) != 1 || BitConverter.ToUInt16(wav, 22) != 1 ||
+				BitConverter.ToUInt32(wav, 24) != 16000 || BitConverter.ToUInt16(wav, 34) != 16)
+				return ApiResults.Fail(400, "Voice command audio must be mono 16 kHz PCM WAV.");
 			var userId = UserId(principal);
 			var today = DateOnly.FromDateTime(DateTime.UtcNow);
 			var usage = WhisperDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
