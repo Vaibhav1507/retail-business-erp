@@ -188,8 +188,7 @@ public class ProductImportTests(ApiFactory f) : IClassFixture<ApiFactory>
         await SetBusinessCategory(b, "electronics_mobile");
         await SetBusinessCategory(otherVertical, "general_retail");
 
-        Assert.Equal(HttpStatusCode.OK, (await a.Send(HttpMethod.Post, "/products",
-            Product("French Door Refrigerator GV-B25FFGMB", "Refrigerators", "LG", "GV-B25FFGMB"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await a.Send(HttpMethod.Post, "/products", new { name = "French Door Refrigerator GV-B25FFGMB", categoryName = "Refrigerators", isGeneric = false, baseUnit = "pcs", brand = "LG", model = "GV-B25FFGMB" })).StatusCode);
 
         var sharedA = await b.GetJson("/products/master?q=GV-B25FFGMB");
         var master = Assert.Single(sharedA.EnumerateArray());
