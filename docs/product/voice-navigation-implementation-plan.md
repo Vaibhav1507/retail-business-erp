@@ -119,7 +119,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - Do not upload raw audio to Level 3. LLM providers receive only the minimum transcript/context needed.
 - The owner confirmed that ordinary navigation-command audio may be sent to hosted Whisper. The Level 2 fallback sends audio only after Shruti failure; do not send it to Level 3.
 - The hosted Whisper feature is disabled by default in `appsettings.json`; enable with `Groq__WhisperEnabled=true` only after confirming the Groq account remains on its Free plan. The API reuses `Groq:ApiKey`, never exposes it to the browser, caps WAV uploads at 1 MB, and limits each authenticated user to 100 fallback requests per UTC day.
-- Groq Free-plan rate limits currently list Whisper at 20 RPM, 2,000 RPD, 7,200 audio seconds/hour and 28,800 audio seconds/day; actual account limits may vary. Paid Developer usage is billed separately. The API adds a 100-request/user/day pilot cap and handles HTTP 429 safely.
+- Groq's public rate-limit table labels 20 RPM, 2,000 RPD, 7,200 audio seconds/hour and 28,800 audio seconds/day as Developer-plan base limits, not Free-plan guarantees. Free-plan quotas are lower and account-specific; verify the actual organization limit in the console. Turbo's published Developer price is US$0.04/audio hour. The API adds a 100-request/user/day pilot cap and handles HTTP 429 safely.
 - No API keys in frontend bundles, source control, logs or test fixtures. Provider secrets remain server-side.
 - No silent paid dependency. Check actual quotas and pricing; temporary free allowances are not permanent zero-cost guarantees.
 - Never log audio, full transcripts, authorization headers, provider payloads or sensitive business data.
@@ -163,6 +163,7 @@ Rules for all future AI integrations:
 
 - Level 2 Whisper: `Groq:WhisperEnabled=true` plus the existing `Groq:ApiKey`. Default is false.
 - Level 3 intent: `VoiceIntent:Enabled=true` and at least one provider flag/key. Gemini: `Gemini:VoiceIntentEnabled=true` with `Gemini:ApiKey`; Groq fallback: `Groq:VoiceIntentEnabled=true` with `Groq:ApiKey`. All flags default false.
+- Invoice fallback: `Groq:InvoiceFallbackEnabled=true` plus `Groq:ApiKey`. Default is false so invoice processing does not silently introduce additional Groq usage.
 - Level 3 uses the exact 35 destination IDs, rejects unknown IDs, requires confidence >= 0.85 for navigation, and can only return navigate/clarify/reject/not-understood. It cannot return a URL or transaction action.
 - Both Level 2 and Level 3 endpoints require an authenticated session and CSRF protection on POST requests; each has a 100-request/user/UTC-day pilot limit. The current in-memory counters are per API instance, so provider-level organization quotas remain the final shared limit.
 
