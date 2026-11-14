@@ -42,13 +42,13 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | Shruti primary STT | Local worker, model integrity/cache, push-to-talk and partial transcript flow | Integrated |
 | Whisper backup STT | Research exists; no adapter or automatic failover in `speech-provider.ts` | Pending |
 | Gemini Flash voice intent | Gemini is used by invoice extraction, not yet voice intent routing | Pending for voice |
-| Grok voice intent | Owner confirms Grok is already integrated; locate and verify exact client/configuration before reuse | Audit required |
+| Grok voice intent | Owner confirms Grok is already integrated; no xAI Grok client was located in the audited PR source paths yet | Locate existing integration before reuse |
 | Qwen voice intent | `GroqVisionClient` exists and defaults to a Qwen vision model; this is not proof of a text-only Qwen intent integration | Audit required |
 | Three-level orchestrator | `NavigationAssistant.tsx` currently calls `resolveNavigation()` directly after transcription | Pending |
 | End-to-end speech tests | Synthetic resolver/provider tests exist; no paired RBOS audio acceptance corpus yet | Pending |
 | Device acceptance | Android Chrome and low-end device acceptance outstanding | Pending |
 
-**Important provider distinction:** Grok (xAI) and Groq (inference provider) are different. The repository contains `GroqVisionClient` configured with a Qwen vision model. Do not treat that class as the Grok integration. The owner's statement that Grok is already integrated is retained; the exact existing Grok client must be found and reused rather than duplicated.
+**Important provider distinction:** Grok (xAI) and Groq (inference provider) are different. The repository contains `GroqVisionClient` configured with a Qwen vision model. Do not treat that class as the Grok integration. The owner's statement that Grok is already integrated is retained; however, the audited PR source paths did not expose an xAI Grok client. Continue locating the owner's existing integration before writing a duplicate. Do not mistake Groq's Qwen endpoint for xAI Grok.
 
 ## 3. Work plan and acceptance gates
 
@@ -128,8 +128,8 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 |---|---|---|
 | 2026-11-14 | Rechecked PR #24 and latest head/workflow #291 | Frontend and backend CI jobs passed |
 | 2026-11-14 | Audited current speech provider and assistant integration | Shruti is the only registered STT provider; assistant calls deterministic resolver directly |
-| 2026-11-14 | Audited visible AI-related backend files | Gemini invoice extraction exists; GroqVisionClient uses Qwen vision; neither proves voice intent integration |
-| 2026-11-14 | Owner confirmed Grok is already integrated | Must locate and reuse exact Grok implementation |
+| 2026-11-14 | Audited visible AI-related backend files | Gemini invoice extraction exists; GroqVisionClient uses Qwen vision; no xAI Grok voice client found in the audited files |
+| 2026-11-14 | Owner confirmed Grok is already integrated | Must locate and reuse exact Grok implementation; current PR source audit did not locate it |
 | 2026-11-14 | Updated voice research to restore Whisper backup and Level 3 to current scope | Documentation correction in progress |
 
 ## 6. Decision log / open questions
