@@ -179,6 +179,7 @@ export function NavigationAssistant() {
   transcribingRef.current = true
   setTranscribing(true)
   if (!worker || !workerReadyRef.current) {
+   pcm.fill(0)
    void runWhisperFallback()
    return
   }
