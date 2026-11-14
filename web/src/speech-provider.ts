@@ -1,10 +1,10 @@
 /**
  * Speech runtime selection is deliberately separate from the assistant UI.
  *
- * H2 currently ships one provider: Shruti running locally in a Web Worker.
- * Cloud providers (for example Whisper API or Gemini) are not registered here:
- * they need explicit owner approval, credential handling, cost limits and a
- * privacy review before they can receive microphone audio.
+ * Shruti runs locally in a Web Worker and remains the primary STT provider.
+ * Hosted Whisper is a separate API adapter in speech-fallback.ts and is called
+ * only after Shruti fails or returns no usable transcript. Its server-side key
+ * and explicit enable switch are managed by the API.
  */
 export type SpeechProviderId = 'shruti-local'
 
