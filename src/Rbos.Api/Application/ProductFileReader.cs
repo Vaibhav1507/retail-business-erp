@@ -70,7 +70,15 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		catch (Exception e) when (e is InvalidDataException or XmlException or IOException)
 		{
 			log.LogWarning(e, "Product file could not be parsed");
-			return ServiceResult<ProductFileResult>.Fail("This file could not be read. Check that it is a valid Excel (.xlsx) or Word (.docx) file with the product list as a table.");
+			return ServiceResult<ProductFileResult>.Fail("This file could not be read. Check that it is a valid Excel (.xlsx), Word (.docx), or PDF file.");
+		}
+		catch (Exception e) when (e is not OutOfMemoryException and not OperationCanceledException)
+		{
+			log.LogError(e, "Unexpected failure while reading product import file {Extension}", Path.GetExtension(fileName));
+			return ServiceResult<ProductFileResult>.Fail(
+				name.EndsWith(".pdf")
+					? "We received the PDF but could not extract its product catalogue. The file may use an unsupported font or page layout. Try exporting it again as a searchable PDF, or upload the affected product pages as clear images."
+					: "We received the file but could not read its contents. Check the file and try again.");
 		}
 		return ServiceResult<ProductFileResult>.Fail("Upload an Excel (.xlsx), Word (.docx), CSV or PDF file, or a photo (JPEG, PNG or WebP).");
 	}
@@ -323,7 +331,12 @@ public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogg
 		req.Headers.Add("x-goog-api-key", apiKey);
 		req.Content = new StringContent(body.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
 		using var res = await http.SendAsync(req, ct);
-		res.EnsureSuccessStatusCode();
+		if (!res.IsSuccessStatusCode)
+		{
+			// Log the provider status, not the uploaded document or its encoded contents.
+			log.LogWarning("Gemini product extraction returned HTTP {StatusCode}", (int)res.StatusCode);
+			res.EnsureSuccessStatusCode();
+		}
 		var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
 		var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
 		return text is null ? null : JsonNode.Parse(text);
