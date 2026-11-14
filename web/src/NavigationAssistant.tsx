@@ -191,7 +191,7 @@ export function NavigationAssistant() {
   window.location.hash = target.hash
  }
 
- async function runWhisperFallback() {
+ async function runWhisperFallback(originalTranscript?: string) {
   const pcm = fallbackPcmRef.current
   if (!pcm || whisperAbortRef.current) return
   const controller = new AbortController()
@@ -206,7 +206,17 @@ export function NavigationAssistant() {
    setQuery(transcript)
    handleCommand(transcript)
   } catch (error) {
-   if (!controller.signal.aborted) setVoiceError(error instanceof Error ? error.message : text.failed)
+   if (!controller.signal.aborted && !cancelledFinalRef.current && panelOpenRef.current) {
+    if (originalTranscript) {
+     // If hosted Whisper is disabled or unavailable, retain Shruti's transcript
+     // and let Level 3 try to interpret it instead of dropping the command.
+     setVoiceError('')
+     setQuery(originalTranscript)
+     handleCommand(originalTranscript)
+    } else {
+     setVoiceError(error instanceof Error ? error.message : text.failed)
+    }
+   }
   } finally {
    pcm.fill(0)
    if (fallbackPcmRef.current === pcm) fallbackPcmRef.current = null
@@ -356,7 +366,7 @@ export function NavigationAssistant() {
      if (!transcript) { void runWhisperFallback(); return }
      // A non-empty transcript that the deterministic resolver cannot interpret is
      // treated as a low-quality ASR result; retry it with Whisper before Level 3.
-     if (resolveNavigation(transcript).kind === 'not-understood') { void runWhisperFallback(); return }
+     if (resolveNavigation(transcript).kind === 'not-understood') { void runWhisperFallback(transcript); return }
      fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
      transcribingRef.current = false
      setTranscribing(false)
@@ -372,7 +382,7 @@ export function NavigationAssistant() {
       return
      }
      clearShrutiTimeout()
-     void runWhisperFallback()
+     void runWhisperFallback(partialTranscriptRef.current || undefined)
     }
    }
    worker.onerror = event => failWorker(event.message || text.failed)
