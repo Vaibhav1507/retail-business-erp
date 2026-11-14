@@ -61,7 +61,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
         }
 
-        if (parsed is null && groq.Available)
+        if ((parsed is null || parsed["lines"] is not JsonArray { Count: > 0 }) && groq.Available)
         {
             try { parsed = await groq.ExtractInvoiceAsync([(mime, b64), .. extra], Prompt, ct); }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
