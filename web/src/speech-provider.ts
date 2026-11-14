@@ -6,17 +6,26 @@
  * only after Shruti fails or returns no usable transcript. Its server-side key
  * and explicit enable switch are managed by the API.
  */
-export type SpeechProviderId = 'shruti-local'
+export type SpeechProviderId = 'shruti-local' | 'whisper-hosted'
+export type SpeechWorkerProviderId = 'shruti-local'
+
+export interface SpeechTranscriptResult {
+  readonly text: string
+  readonly provider: SpeechProviderId
+  readonly language?: string | null
+  readonly durationMs?: number | null
+  readonly confidence?: number | null
+}
 
 export interface SpeechProviderDescriptor {
-  readonly id: SpeechProviderId
+  readonly id: SpeechWorkerProviderId
   readonly label: string
   readonly execution: 'on-device'
   readonly workerUrl: string
   readonly modelDownloadBytes: number
 }
 
-const providers: Record<SpeechProviderId, SpeechProviderDescriptor> = {
+const providers: Record<SpeechWorkerProviderId, SpeechProviderDescriptor> = {
   'shruti-local': {
     id: 'shruti-local',
     label: 'Shruti (on-device)',
@@ -26,10 +35,10 @@ const providers: Record<SpeechProviderId, SpeechProviderDescriptor> = {
   },
 }
 
-export const DEFAULT_SPEECH_PROVIDER: SpeechProviderId = 'shruti-local'
+export const DEFAULT_SPEECH_PROVIDER: SpeechWorkerProviderId = 'shruti-local'
 
 export function getSpeechProvider(
-  id: SpeechProviderId = DEFAULT_SPEECH_PROVIDER,
+  id: SpeechWorkerProviderId = DEFAULT_SPEECH_PROVIDER,
 ): SpeechProviderDescriptor {
   return providers[id]
 }
