@@ -80,6 +80,8 @@ builder.Services.AddHttpClient<Rbos.Api.Application.InvoiceExtractionService>(h 
 builder.Services.AddSingleton<Rbos.Api.Application.LocalOcr>();
 builder.Services.AddHttpClient<Rbos.Api.Application.GroqVisionClient>(h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddHttpClient<Rbos.Api.Application.GroqSpeechToTextClient>(h => h.Timeout = TimeSpan.FromSeconds(25));
+builder.Services.AddHttpClient<Rbos.Api.Application.GroqTextIntentClient>(h => h.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHttpClient<Rbos.Api.Application.VoiceNavigationIntentService>(h => h.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddHttpClient<Rbos.Api.Application.ProductFileReader>(h => h.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddScoped<Rbos.Api.Application.OtpService>();
 if (builder.Configuration["Sms:Provider"] == "msg91") builder.Services.AddHttpClient<Rbos.Api.Application.ISmsSender, Rbos.Api.Application.Msg91SmsSender>(h => h.Timeout = TimeSpan.FromSeconds(15));
