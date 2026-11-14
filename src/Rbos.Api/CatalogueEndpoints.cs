@@ -18,6 +18,13 @@ public static class CatalogueEndpoints
 		api.MapGet("/products", async (string? q, Guid? categoryId, bool? includeInactive, Guid? brandId, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
 			=> Reply(await svc.SearchAsync(Uid(p), q, categoryId, includeInactive ?? false, ct, brandId))).RequireAuthorization();
 
+        // Shared catalogue visibility is derived from the caller's configured business vertical.
+        api.MapGet("/products/master", async (string? q, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
+            => Reply(await svc.MasterSearchAsync(Uid(p), q, ct))).RequireAuthorization();
+
+        api.MapPost("/products/master/{id:guid}/add", async (Guid id, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
+            => Reply(await svc.AddFromMasterAsync(Uid(p), id, ct))).RequireAuthorization();
+
 		api.MapPost("/products", async (ProductUpsertRequest m, ClaimsPrincipal p, CatalogueService svc, CancellationToken ct)
 			=> Reply(await svc.CreateAsync(Uid(p), ToCommand(m), ct))).RequireAuthorization();
 
