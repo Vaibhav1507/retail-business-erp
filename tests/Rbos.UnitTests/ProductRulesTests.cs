@@ -62,6 +62,14 @@ public class ProductRulesTests
     }
 
     [Fact]
+    public void Placeholder_model_values_do_not_collapse_unrelated_products()
+    {
+        Assert.NotEqual(
+            ProductRules.IdentityKey("Air Conditioner", "LG", "N/A"),
+            ProductRules.IdentityKey("Washing Machine", "LG", "N/A"));
+    }
+
+    [Fact]
     public void Shared_master_identity_reuses_model_across_categories_but_scopes_generic_goods()
     {
         Assert.Equal(
