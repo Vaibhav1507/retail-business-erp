@@ -239,7 +239,7 @@ export function NavigationAssistant() {
   setTranscribing(true)
   if (!worker || !workerReadyRef.current) {
    pcm.fill(0)
-   void runWhisperFallback()
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
    return
   }
   clearShrutiTimeout()
@@ -249,7 +249,7 @@ export function NavigationAssistant() {
    workerReadyRef.current = false
    workerLoadingRef.current = false
    clearShrutiTimeout()
-   void runWhisperFallback()
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
   }, 12000)
   worker.postMessage({ type:'transcribe', id:++messageIdRef.current, pcm }, [pcm.buffer])
  }
@@ -307,7 +307,7 @@ export function NavigationAssistant() {
   if (fallbackPcmRef.current) {
    transcribingRef.current = true
    setTranscribing(true)
-   void runWhisperFallback()
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
    return
   }
   setTranscribing(false)
