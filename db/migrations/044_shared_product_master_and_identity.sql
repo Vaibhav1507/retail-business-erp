@@ -307,7 +307,7 @@ select distinct on (bp.business_category, catalog.master_product_identity_key(p.
 from catalog.product p
 join core.business_profile bp on bp.tenant_id=p.tenant_id
 join catalog.category c on c.tenant_id=p.tenant_id and c.id=p.category_id
-where bp.business_category is not null
+where bp.business_category is not null and p.is_active
 order by bp.business_category, catalog.master_product_identity_key(p.name, c.name, p.brand, p.model),
          p.is_active desc, p.created_at asc, p.id
 on conflict (business_category, identity_key) do nothing;
@@ -317,7 +317,7 @@ set master_product_id=mp.id
 from catalog.master_product mp
 join core.business_profile bp on bp.business_category=mp.business_category
 join catalog.category c on c.tenant_id=bp.tenant_id
-where p.tenant_id=bp.tenant_id
+where p.tenant_id=bp.tenant_id and p.is_active
   and p.category_id=c.id
   and p.master_product_id is null
   and mp.identity_key=catalog.master_product_identity_key(p.name, c.name, p.brand, p.model);
@@ -327,6 +327,52 @@ drop index if exists catalog.product_active_dup_uq;
 create unique index product_active_identity_uq on catalog.product (tenant_id, identity_key) where is_active;
 create unique index ux_product_tenant_master_active on catalog.product (tenant_id, master_product_id)
   where is_active and master_product_id is not null;
+
+-- Assert that every operational reference was moved before restoring RLS.
+-- Historical transaction and stock-movement rows are intentionally excluded.
+do $rbos$
+begin
+  if exists (
+    select 1 from catalog.product_alias a
+    join catalog.product p on p.tenant_id=a.tenant_id and p.id=a.alias_product_id
+    where p.is_active
+  ) then
+    raise exception 'Migration 044 left an alias product active.';
+  end if;
+  if exists (
+    select 1 from catalog.product_alias a
+    join catalog.product_barcode x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) or exists (
+    select 1 from catalog.product_alias a
+    join inventory.serial_unit x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) or exists (
+    select 1 from catalog.product_alias a
+    join inventory.stock_balance x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) or exists (
+    select 1 from catalog.product_alias a
+    join inventory.item_cost x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) or exists (
+    select 1 from catalog.product_alias a
+    join inventory.reorder_level x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) or exists (
+    select 1 from catalog.product_alias a
+    join inventory.unit_conversion x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) or exists (
+    select 1 from catalog.product_alias a
+    join catalog.product_source_reference x on x.tenant_id=a.tenant_id and x.product_id=a.alias_product_id
+  ) then
+    raise exception 'Migration 044 left operational catalogue/inventory references on a retired alias.';
+  end if;
+  if exists (
+    select tenant_id, identity_key
+    from catalog.product
+    where is_active
+    group by tenant_id, identity_key
+    having count(*) > 1
+  ) then
+    raise exception 'Migration 044 did not eliminate all active product identity duplicates.';
+  end if;
+end $rbos$;
 
 -- Re-enable FORCE RLS before the migration transaction commits.
 do $rbos$
