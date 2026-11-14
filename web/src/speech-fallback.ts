@@ -1,3 +1,4 @@
+import type { SpeechTranscriptResult } from './speech-provider'
 import { apiBinary } from './api'
 
 const SAMPLE_RATE = 16000
@@ -33,8 +34,8 @@ export function encodeNavigationWav(samples: Float32Array): Blob {
   return new Blob([bytes], { type: 'audio/wav' })
 }
 
-export async function transcribeNavigationWithWhisper(samples: Float32Array, signal?: AbortSignal): Promise<string> {
+export async function transcribeNavigationWithWhisper(samples: Float32Array, signal?: AbortSignal): Promise<SpeechTranscriptResult> {
   const wav = encodeNavigationWav(samples)
   const result = await apiBinary<{ text: string }>('/voice/transcribe', wav, signal)
-  return (result.text || '').trim()
+  return { text: (result.text || '').trim(), provider: 'whisper-hosted', language: null, durationMs: null }
 }
