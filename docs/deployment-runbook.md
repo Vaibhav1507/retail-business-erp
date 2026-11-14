@@ -28,6 +28,25 @@ Set as environment variables or secrets (see `.env.example`). Never commit real 
 Do not set Gemini or SMS secrets unless explicitly approved.
 Do not put the migrator connection string in Cloud Run.
 
+## 3A. Optional AI and voice configuration
+
+All hosted AI integrations are optional. Do not configure or enable them merely to deploy the application. Keep the feature flags off for the initial pilot and verify provider account quotas/cost tier before enabling any hosted request.
+
+| Workflow | Configuration | Default / requirement |
+|---|---|---|
+| Gemini invoice/catalogue extraction | `Gemini__ApiKey` | Existing server-side key; only configure when approved |
+| Groq Qwen vision fallback | `Groq__ApiKey`, `Groq__InvoiceFallbackEnabled` | Invoice fallback false by default; product/catalogue fallback is feature-specific |
+| Shruti local STT | Browser model assets | Local-first; no hosted API key |
+| Whisper STT fallback | `Groq__ApiKey`, `Groq__WhisperEnabled`, optional `Groq__WhisperModel` | Disabled by default; model default `whisper-large-v3-turbo` |
+| Gemini voice intent | `Gemini__ApiKey`, `VoiceIntent__Enabled`, `Gemini__VoiceIntentEnabled`, optional `Gemini__VoiceIntentModel` | Disabled by default |
+| Groq Qwen text intent fallback | `Groq__ApiKey`, `VoiceIntent__Enabled`, `Groq__VoiceIntentEnabled`, optional `Groq__VoiceIntentModel` | Disabled by default; model default `qwen/qwen3.8-27b` |
+
+Use the existing Gemini and Groq API keys; no voice-specific API key type is required. Keys remain server-side. Never place them in frontend environment variables or commit them. The Groq text-intent model and Groq vision model serve different tasks and use separate clients.
+
+Whisper sends the captured navigation audio to Groq only when the local Shruti path meets an eligible fallback condition and the hosted feature is enabled. Level 3 receives transcript/minimal screen context, not raw audio. The voice endpoints enforce authentication, CSRF on POST, request limits and per-user pilot quotas; the current in-memory counters are per API instance, not a distributed quota.
+
+Suggested initial deployment: leave `Groq__WhisperEnabled`, `VoiceIntent__Enabled`, `Gemini__VoiceIntentEnabled`, `Groq__VoiceIntentEnabled` and `Groq__InvoiceFallbackEnabled` false. Existing invoice/catalogue behaviour should be verified separately. Enable one hosted path at a time only after explicit owner approval and cost/usage verification. See `docs/product/voice-navigation-implementation-plan.md`.
+
 ## 4. Build and deploy
 1. The Docker image build is covered by GitHub Actions. For a manual build, use `docker build -t rbos .`; a successful CI build does not mean the image has been pushed or deployed.
 2. Push to Artifact Registry and deploy to Cloud Run with `--min-instances 0` and `--max-instances 1` for the pilot.
