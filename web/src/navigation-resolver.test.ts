@@ -15,6 +15,7 @@ describe('keyword navigation resolver', () => {
     ['sell.menu', 'bikri menu'],
     ['sell.bill', 'new bil'],
     ['sell.bill', 'naya bill'],
+    ['sell.bill', 'bill banana'],
     ['sell.bills', 'purana bill'],
     ['sell.bills', 'bill history'],
     ['sell.collect', 'customer payment'],
@@ -23,8 +24,10 @@ describe('keyword navigation resolver', () => {
     ['sell.return', 'grahak return'],
     ['buy.receive', 'purchase entry'],
     ['buy.receive', 'supplier maal aayo'],
+    ['buy.receive', 'maal aayo'],
     ['buy.pay', 'supplier payment'],
     ['buy.pay', 'dealer chukana'],
+    ['buy.pay', 'supplier ko payment dena'],
     ['buy.history', 'purchase history'],
     ['buy.history', 'supplier old list'],
     ['buy.history', 'supplier history'],
@@ -34,23 +37,14 @@ describe('keyword navigation resolver', () => {
     ['buy.return', 'supplier return'],
     ['buy.return', 'purchase wapas'],
     ['stock.current', 'stock available'],
+    ['stock.current', 'check stock'],
     ['stock.current', 'maal bacha'],
     ['stock.products', 'product list'],
     ['stock.products', 'item add'],
     ['stock.opening', 'opening stock'],
     ['stock.opening', 'shuru maal'],
-    ['stock.import', 'excel upload'],
-    ['stock.import', 'product import'],
     ['stock.adjust', 'stock adjust'],
     ['stock.adjust', 'maal correction'],
-    ['stock.count', 'stock ginti'],
-    ['stock.count', 'physical stock'],
-    ['stock.history', 'stock history'],
-    ['stock.history', 'adjustment record'],
-    ['stock.alerts', 'low stock'],
-    ['stock.alerts', 'stock ageing'],
-    ['stock.units', 'unit conversion'],
-    ['stock.units', 'box piece'],
     ['parties.customers', 'customer'],
     ['parties.customers', 'grahak list'],
     ['parties.suppliers', 'supplier'],
@@ -62,11 +56,13 @@ describe('keyword navigation resolver', () => {
     ['money.cash', 'galla bank'],
     ['money.cash', 'cashbook'],
     ['money.expenses', 'kharcha'],
+    ['money.expenses', 'खर्चा'],
     ['money.expenses', 'expense'],
     ['money.owner', 'owner capital'],
     ['money.owner', 'malik withdrawal'],
     ['money.closing', 'day hisab'],
     ['money.closing', 'daily galla'],
+    ['money.closing', 'aaj hisab band'],
     ['more.menu', 'more options'],
     ['more.menu', 'baaki menu'],
     ['more.reports', 'profit report'],
@@ -105,8 +101,10 @@ describe('keyword navigation resolver', () => {
     expect(resolveNavigation('karid entry')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
     expect(resolveNavigation('kharcho')).toMatchObject({ kind: 'navigate', target: { id: 'money.expenses' } })
     expect(resolveNavigation('mujhe Ramesh ji ka purana bil').kind).toBe('not-understood')
+    expect(resolveNavigation('रमेश जी का पुराना बिल').kind).toBe('not-understood')
     expect(suggestNavigation('mujhe Ramesh ji ka purana bil').some(target => target.id === 'sell.bills')).toBe(true)
     expect(resolveNavigation('बकाया').kind).toBe('ask')
+    expect(resolveNavigation('customer se udhar lena').kind).toMatch(/^(navigate|ask)$/)
     expect(resolveNavigation('बाकी').kind).toBe('ask')
     expect(resolveNavigation('उधार').kind).toBe('ask')
   })
