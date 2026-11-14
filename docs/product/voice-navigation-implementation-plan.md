@@ -71,14 +71,13 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 
 ### W2 — Level 2 STT failover
 - [ ] Define a provider-neutral STT result contract: transcript, language, provider, duration, status and confidence/quality metadata where available.
-- [ ] Keep Shruti as primary.
-- [ ] Implement Groq-hosted Whisper (`whisper-large-v3-turbo`) as backup behind the provider boundary; require an explicit `Groq:WhisperEnabled` switch and the existing server-side Groq key.
+- [x] Keep Shruti as primary.
+- [x] Implement Groq-hosted Whisper (`whisper-large-v3-turbo`) as backup behind the provider boundary; require an explicit `Groq:WhisperEnabled` switch and the existing server-side Groq key.
 - [x] Define fallback conditions for Shruti initialization/runtime failure, 12-second timeout and empty/unusable final output; partial previews remain usable and avoid unnecessary hosted calls.
 - [x] Preserve a short-lived PCM copy only until Shruti succeeds or Whisper completes; clear it on success, failure, cancellation and component disposal.
 - [x] Encode final audio as bounded 16 kHz mono WAV; backend enforces a 1 MB cap and a 100-request/day per-user pilot quota.
-- [ ] Preserve a short-lived copy of final PCM until Shruti succeeds or Whisper finishes; clear it on success, cancellation, timeout or disposal.
-- [ ] Convert PCM to bounded 16 kHz mono WAV and upload only after Shruti fails; enforce audio duration/size limits and bounded API timeout.
-- [ ] Ensure both STT outputs enter the same normalization and Level 1 resolver.
+
+- [x] Ensure both STT outputs enter the same normalization and Level 1 resolver.
 - [ ] Add automated orchestration tests for Shruti success, initialization failure, timeout, empty transcript, cancellation, 429 and provider outage; WAV encoder tests are added.
 
 **Gate:** Shruti works without network after model assets are cached; Whisper is invoked only on an eligible Shruti failure/quality condition; a Whisper failure returns a safe clarification/error and never navigates. The adapter and API are implemented but remain disabled by default until `Groq:WhisperEnabled=true` is explicitly set in the deployment environment.
