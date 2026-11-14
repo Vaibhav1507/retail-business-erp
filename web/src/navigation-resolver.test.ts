@@ -27,6 +27,10 @@ describe('keyword navigation resolver', () => {
     ['buy.pay', 'dealer chukana'],
     ['buy.history', 'purchase history'],
     ['buy.history', 'supplier old list'],
+    ['buy.history', 'supplier history'],
+    ['parties.suppliers', 'vyapari'],
+    ['parties.purchases', 'customer purchase history'],
+    ['more.branches', 'shop location'],
     ['buy.return', 'supplier return'],
     ['buy.return', 'purchase wapas'],
     ['stock.current', 'stock available'],
@@ -100,6 +104,8 @@ describe('keyword navigation resolver', () => {
     expect(resolveNavigation('kharid entri')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
     expect(resolveNavigation('karid entry')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
     expect(resolveNavigation('kharcho')).toMatchObject({ kind: 'navigate', target: { id: 'money.expenses' } })
+    expect(resolveNavigation('mujhe Ramesh ji ka purana bil').kind).toBe('not-understood')
+    expect(suggestNavigation('mujhe Ramesh ji ka purana bil').some(target => target.id === 'sell.bills')).toBe(true)
     expect(resolveNavigation('बकाया').kind).toBe('ask')
   })
 
