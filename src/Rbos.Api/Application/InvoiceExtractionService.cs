@@ -9,7 +9,7 @@ namespace Rbos.Api.Application;
 public sealed record DraftLine(string Description, decimal? Quantity, decimal? UnitCost, decimal? Amount, Guid? ProductId, string? ProductName, string? Category = null, string? Brand = null, decimal? Gst = null);
 public sealed record InvoiceDraft(Guid FileId, string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, List<DraftLine> Lines, List<string> Warnings, decimal? Subtotal = null, decimal? TaxAmount = null);
 
-/// <summary>Reads a supplier invoice photo/PDF with Gemini and returns an unsaved draft for the user to review. Nothing is posted here.</summary>
+/// <summary>Reads a supplier invoice photo/PDF with Gemini and Groq vision fallback, then returns an unsaved draft. Nothing is posted here.</summary>
 public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log, GroqVisionClient groq)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
