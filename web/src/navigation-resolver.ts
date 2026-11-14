@@ -1,4 +1,4 @@
-import { navigationAnchors } from './navigation-anchors'
+import { navigationKeywordProfiles, navigationStopWords, navigationWordAliases } from './navigation-keywords'
 
 export type NavigationTarget = { id: string; hash: string; label: string }
 export type NavigationResolution =
@@ -50,31 +50,19 @@ export const navigationTargets: NavigationTarget[] = [
   { id: 'settings', hash: '#/settings', label: 'Business settings' },
 ]
 
-const stopWords = new Set([
-  'please','plz','the','a','an','to','me','my','for','show','open','go','take','navigate','screen','page',
-  'karo','kar','kijiye','kholo','dikhao','dikha','jao','par','pe','mujhe','zara','do','hai','hain','ka','ki','ke','ko',
-  'mera','meri','mere','apna','apne','apni','banao','banana','banani','banaye','banaiye','karna','krna','chahiye','wala','wali','wale',
-  'please','ji','ab','ek','aur','se','ko','करनी','करना','करते','करती','हुआ','हुई','है','हैं'
-])
+const targetById = new Map(navigationTargets.map(target => [target.id, target]))
 
-const dataQuestion = /\b(how much|how many|what is|what are|who owes|whose|balance|total|today|yesterday|kitna|kitne|kiska|kiski|kiske|batao|bataiye|amount|value|number|phone|address|sales|sold|revenue|profit|paisa kitna|stock kitna|कितना|कितने|किसका|किसकी|किसके|बताओ|बताइए|आज की बिक्री|कितनी बिक्री)\b/i
-const transaction = /\b(delete|remove|cancel|make payment|pay \d|send|transfer \d|post|save|submit|bhejo|bhej do|jama karo|darj karo|हटा दो|भेजो|जमा करो|पोस्ट करो)\b/i
-
-const canonicalWords: Record<string, string> = {
-  'ग्राहक':'customer','ग्राहकों':'customer','ग्रहक':'customer','कस्टमर':'customer','grahak':'customer','graahak':'customer','custmer':'customer','costumer':'customer',
-  'सप्लायर':'supplier','विक्रेता':'supplier','supplier':'supplier','suplier':'supplier','saplayer':'supplier',
-  'बिल':'bill','बिलिंग':'bill','चालान':'bill','इनवॉइस':'bill','invoice':'bill','bll':'bill',
-  'स्टॉक':'stock','माल':'stock','सामान':'stock','इन्वेंटरी':'stock','inventory':'stock','stok':'stock','stokh':'stock',
-  'खरीद':'purchase','खरीदारी':'purchase','खरीदी':'purchase','परचेज':'purchase','purchase':'purchase','purches':'purchase',
-  'खर्च':'expense','खर्चा':'expense','व्यय':'expense','expense':'expense','expence':'expense',
-  'वापसी':'return','रिटर्न':'return','वापस':'return','return':'return',
-  'पुराना':'past','पुराने':'past','पिछला':'past','पिछली':'past','history':'history','इतिहास':'history',
-  'पैसा':'payment','पैसे':'payment','भुगतान':'payment','पेमेंट':'payment','payment':'payment',
-  'जोड़':'add','जोड़ो':'add','जोड़ना':'add','बनाओ':'create','बनाना':'create','बनानी':'create','बनाइए':'create','बनाए':'create','create':'create','add':'add',
-  'देखो':'view','दिखाओ':'view','दिखाना':'view','दिखाइए':'view','खोलो':'view','खोलना':'view','देखना':'view','show':'view','check':'view','view':'view',
-  'सूची':'list','लिस्ट':'list','list':'list','खाता':'ledger','बही':'ledger','उधार':'dues','बकाया':'dues',
-  'एंट्री':'entry','प्रविष्टि':'entry','entry':'entry','नया':'new','नई':'new','new':'new','मौजूदा':'current','current':'current',
-  'से':'','का':'','की':'','के':'','को':'','है':'','हैं':'','मुझे':'','मेरे':'','मेरी':'','मेरा':''
+const ambiguousTerms: Record<string, string[]> = {
+  return: ['sell.return', 'buy.return'],
+  payment: ['sell.collect', 'buy.pay'],
+  bill: ['sell.bill', 'sell.bills'],
+  purchase: ['buy.receive', 'buy.history', 'buy.return'],
+  history: ['sell.bills', 'buy.history', 'stock.history', 'parties.purchases', 'more.audit'],
+  stock: ['stock.current', 'stock.adjust', 'stock.count'],
+  goods: ['stock.current', 'buy.receive', 'more.transfers'],
+  udhar: ['sell.collect', 'parties.dues'],
+  baki: ['sell.collect', 'parties.dues'],
+  money: ['money.cash', 'money.expenses', 'money.owner'],
 }
 
 function normalise(value: string): string {
@@ -82,19 +70,6 @@ function normalise(value: string): string {
     .replace(/[’']/g, '')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ').trim()
-}
-
-function canonicalToken(token: string): string {
-  const direct = canonicalWords[token]
-  if (direct !== undefined) return direct
-  // Common ASR spellings: normalize elongated vowels without changing short words.
-  return token.length > 5 ? token.replace(/([aeiou])\1+/g, '$1') : token
-}
-
-function tokens(value: string): string[] {
-  return normalise(value).split(' ')
-    .map(canonicalToken)
-    .filter(token => token && !stopWords.has(token))
 }
 
 function editDistance(a: string, b: string): number {
@@ -111,126 +86,140 @@ function editDistance(a: string, b: string): number {
   return previous[b.length]
 }
 
-function tokenMatches(a: string, b: string): boolean {
-  if (a === b) return true
-  if (a.length < 4 || b.length < 4) return false
-  const limit = Math.max(a.length, b.length) >= 8 ? 2 : 1
-  return editDistance(a, b) <= limit
+/**
+ * Conservative romanised-Hindi/Bundeli spelling folds:
+ * - repeated vowels: graahak -> grahak
+ * - dropped aspiration: kharid -> karid
+ * - final a/o variation: kharcha <-> kharcho
+ *
+ * These are alternate comparison forms only. They never rewrite the transcript
+ * shown to the user and never bypass the ambiguity or safety checks.
+ */
+function romanForms(token: string): string[] {
+  if (!/^[a-z]+$/.test(token)) return [token]
+  const compact = token.replace(/([aeiou])\1+/g, '$1')
+  const unaspirated = compact
+    .replace(/chh/g, 'ch')
+    .replace(/kh/g, 'k').replace(/gh/g, 'g').replace(/th/g, 't')
+    .replace(/dh/g, 'd').replace(/ph/g, 'p').replace(/bh/g, 'b')
+  const forms = new Set([token, compact, unaspirated])
+  if (compact.length >= 5 && /[ao]$/.test(compact)) {
+    forms.add(compact.slice(0, -1) + (compact.endsWith('a') ? 'o' : 'a'))
+  }
+  return [...forms]
 }
 
-function phraseScore(query: string[], phrase: string[]): number {
-  if (!query.length || !phrase.length) return 0
-  const matchedQuery = new Set<number>()
-  const matchedPhrase = new Set<number>()
-  query.forEach((word, qi) => {
-    const candidates = phrase.map((candidate, pi) => ({ pi, distance: editDistance(word, candidate) }))
-      .filter(({ pi, distance }) => !matchedPhrase.has(pi) && tokenMatches(word, phrase[pi]) && distance <= 2)
-      .sort((a, b) => a.distance - b.distance)
-    if (candidates[0]) {
-      matchedQuery.add(qi)
-      matchedPhrase.add(candidates[0].pi)
+function canonicalToken(token: string): string {
+  const direct = navigationWordAliases[token]
+  if (direct) return direct
+  for (const form of romanForms(token)) {
+    const alias = navigationWordAliases[form]
+    if (alias) return alias
+  }
+  return romanForms(token).sort((a, b) => a.length - b.length)[0]
+}
+
+function tokenize(value: string): string[] {
+  return normalise(value).split(' ')
+    .map(canonicalToken)
+    .filter(token => token && !navigationStopWords.has(token))
+}
+
+function tokenMatches(queryToken: string, keyword: string): boolean {
+  if (queryToken === keyword) return true
+  if (!/^[a-z]+$/.test(queryToken) || !/^[a-z]+$/.test(keyword)) return false
+  const queryForms = romanForms(queryToken)
+  const keywordForms = romanForms(keyword)
+  for (const a of queryForms) {
+    for (const b of keywordForms) {
+      if (a === b) return true
+      const minimum = Math.min(a.length, b.length)
+      if (minimum >= 5 && editDistance(a, b) <= (Math.max(a.length, b.length) >= 9 ? 2 : 1)) return true
     }
-  })
-  const queryCoverage = matchedQuery.size / query.length
-  const phraseCoverage = matchedPhrase.size / phrase.length
-  const extraPenalty = Math.max(0, query.length - matchedQuery.size) / query.length
-  return queryCoverage * 0.72 + phraseCoverage * 0.28 - extraPenalty * 0.12
+  }
+  return false
 }
 
-const ambiguous = new Map<string, string[]>([
-  ['return', ['sell.return','buy.return']],
-  ['payment', ['sell.collect','buy.pay']],
-  ['history', ['sell.bills','buy.history','stock.history','parties.purchases','more.audit']],
-  ['stock', ['stock.current','stock.adjust','stock.count']],
-  ['dues', ['sell.collect','parties.dues']],
-  ['order', ['more.orders','sell.bill']],
-])
+type RankedTarget = { id: string; score: number; matchedGroups: number }
+
+function rankTargets(queryTokens: string[], allowPartial = false): RankedTarget[] {
+  return Object.entries(navigationKeywordProfiles).map(([id, profile]) => {
+    let matchedGroups = 0
+    let matchedTokens = 0
+    for (const group of profile.groups) {
+      const matches = queryTokens.filter(token => group.some(keyword => tokenMatches(token, keyword)))
+      if (matches.length > 0) {
+        matchedGroups++
+        matchedTokens += Math.min(matches.length, 2)
+      } else if (!allowPartial) {
+        return { id, score: 0, matchedGroups: 0 }
+      }
+    }
+    // Required concepts carry most of the score. Extra matching vocabulary is
+    // a small tie-breaker, never enough to overrule a missing required concept.
+    const score = matchedGroups * 4 + matchedTokens * 0.15
+    return { id, score, matchedGroups }
+  }).filter(item => allowPartial ? item.matchedGroups > 0 : item.matchedGroups === navigationKeywordProfiles[item.id].groups.length)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+}
+
+function askFor(ids: string[]): NavigationResolution {
+  return {
+    kind: 'ask',
+    targets: ids.map(id => targetById.get(id)).filter((target): target is NavigationTarget => Boolean(target)),
+  }
+}
+
+const questionIntent = /\b(how much|how many|what is|what are|who owes|whose|which customer|kitna|kitne|kitni|kiska|kiski|kiske|kisne|kaun|kya|kab|kahan|batao|bataiye)\b|कितना|कितनी|कितने|किसका|किसकी|किसके|किसने|कौन|क्या|कब|कहाँ|बताओ|बताइए/i
+const dataTerms = /\b(balance|amount|total|revenue|profit|sales today|today sales|phone|address|number|baki|udhar|cash|stock|maal|goods|customer|supplier|sold|quantity|rate|price)\b|बिक्री|बिकरी|पैसा|रुपया|स्टॉक|माल|ग्राहक|सप्लायर|भाव|दाम/i
+const directDataRequest = /\b(who owes|how much|how many|phone number|contact number|business address|total sales|sales today|today sales)\b|किसका कितना|कितना बाकी|कितनी बिक्री|आज की बिक्री|कितना पैसा|कौन सा ग्राहक/i
+const actionRequest = /\b(delete|remove|cancel|save|submit|post|send|bhejo|bhej do)\b|\b(pay|transfer|send)\s+\d+|\b(jama|bhej|bhejo)\s+(kar|do)|\b(paise|paisa|payment)\s+(de do|bhej do|jama kar do)|हटा दो|भेजो|जमा करो|पोस्ट करो|भुगतान कर दो/i
+
+function isRejectedRequest(input: string, normalized: string): boolean {
+  if (/https?:\/\/|www\.|\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input)) return true
+  if (/\d/.test(normalized) || actionRequest.test(normalized)) return true
+  if (directDataRequest.test(normalized)) return true
+  return questionIntent.test(normalized) && dataTerms.test(normalized)
+}
 
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
-  if (input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') ||
-      input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) ||
-      dataQuestion.test(q) || ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => input.includes(term)) || transaction.test(q) || ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) || /\d/.test(q)) return { kind: 'reject' }
+  if (isRejectedRequest(input, q)) return { kind: 'reject' }
 
-  const qTokens = tokens(q)
+  const qTokens = tokenize(q)
   if (!qTokens.length) return { kind: 'not-understood' }
-  if (qTokens.length === 1 && ambiguous.has(qTokens[0])) {
-    return { kind: 'ask', targets: ambiguous.get(qTokens[0])!.map(id => navigationTargets.find(t => t.id === id)!).filter(Boolean) }
+
+  if (qTokens.length === 1 && ambiguousTerms[qTokens[0]]) {
+    return askFor(ambiguousTerms[qTokens[0]])
   }
 
-  const ranked = Object.entries(navigationAnchors).map(([id, phrases]) => ({
-    id,
-    score: Math.max(...phrases.map(phrase => phraseScore(qTokens, tokens(phrase)))),
-  })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+  const ranked = rankTargets(qTokens)
+  if (ranked.length === 0) return { kind: 'not-understood' }
 
   const top = ranked[0]
   const second = ranked[1]
-  if (!top || top.score < 0.54) return { kind: 'not-understood' }
-
-  // Require both a useful match and a margin. If the words point to multiple
-  // screens, ask rather than silently sending the shopkeeper to the wrong place.
-  const candidates = ranked.filter(item => top.score - item.score < 0.09 && item.score >= 0.48).slice(0, 3)
-  if (candidates.length > 1 || (second && top.score - second.score < 0.09)) {
-    return { kind: 'ask', targets: candidates.map(item => navigationTargets.find(t => t.id === item.id)!).filter(Boolean) }
+  if (second && top.score - second.score < 1.0) {
+    return askFor(ranked.filter(item => top.score - item.score < 1.0).slice(0, 3).map(item => item.id))
   }
-  const target = navigationTargets.find(item => item.id === top.id)
+
+  const target = targetById.get(top.id)
   return target ? { kind: 'navigate', target } : { kind: 'not-understood' }
 }
 
-
-// Suggestions are deliberately more permissive than execution. They may use
-// incomplete word prefixes, but callers must never navigate from this function.
-function suggestionTokenMatches(queryToken: string, phraseToken: string): boolean {
-  if (tokenMatches(queryToken, phraseToken)) return true
-  const shorter = queryToken.length <= phraseToken.length ? queryToken : phraseToken
-  const longer = queryToken.length > phraseToken.length ? queryToken : phraseToken
-  return shorter.length >= 3 && longer.startsWith(shorter)
-}
-
-function partialPhraseScore(query: string[], phrase: string[]): number {
-  if (!query.length || !phrase.length) return 0
-  const matchedQuery = new Set<number>()
-  const matchedPhrase = new Set<number>()
-  query.forEach((word, qi) => {
-    const candidates = phrase.map((candidate, pi) => ({
-      pi,
-      distance: word === candidate ? 0 : Math.abs(word.length - candidate.length),
-    })).filter(({ pi }) => !matchedPhrase.has(pi) && suggestionTokenMatches(word, phrase[pi]))
-      .sort((a, b) => a.distance - b.distance)
-    if (candidates[0]) {
-      matchedQuery.add(qi)
-      matchedPhrase.add(candidates[0].pi)
-    }
-  })
-  const queryCoverage = matchedQuery.size / query.length
-  const phraseCoverage = matchedPhrase.size / phrase.length
-  const extraPenalty = Math.max(0, query.length - matchedQuery.size) / query.length
-  return queryCoverage * 0.72 + phraseCoverage * 0.28 - extraPenalty * 0.12
-}
-
+/**
+ * Suggestions intentionally allow incomplete keywords but are never executed.
+ * A suggestion only appears when at least one meaningful group has a match.
+ */
 export function suggestNavigation(input: string): NavigationTarget[] {
   const q = normalise(input)
-  if (!q || q.length < 3 ||
-      input.toLowerCase().includes('http://') || input.toLowerCase().includes('https://') ||
-      input.toLowerCase().includes('www.') || /\b[a-z0-9-]+\.(com|in|org|net|io)\b/i.test(input) ||
-      dataQuestion.test(q) || transaction.test(q) ||
-      ['कितना','कितनी','कितने','किसका','किसकी','किसके','बताओ','बताइए','आज की बिक्री','कितनी बिक्री','मेरे पास','मेरी दुकान','मेरा बकाया','खाता कितना','कितना हुआ','कितना बाकी'].some(term => input.includes(term)) ||
-      ['हटा दो','भेजो','जमा करो','पोस्ट करो','भुगतान करो'].some(term => q.includes(term)) ||
-      /\d/.test(q)) return []
-
-  const queryTokens = tokens(q)
+  if (!q || q.length < 3 || isRejectedRequest(input, q)) return []
+  const queryTokens = tokenize(q)
   if (!queryTokens.length) return []
-
-  const ranked = Object.entries(navigationAnchors).map(([id, phrases]) => ({
-    id,
-    score: Math.max(...phrases.map(phrase => partialPhraseScore(queryTokens, tokens(phrase)))),
-  })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
-  const top = ranked[0]
-  if (!top || top.score < 0.34) return []
-  const floor = Math.max(0.28, top.score - 0.18)
-  return ranked.filter(item => item.score >= floor)
-    .slice(0, 3)
-    .map(item => navigationTargets.find(target => target.id === item.id))
+  if (queryTokens.length === 1 && ambiguousTerms[queryTokens[0]]) {
+    return ambiguousTerms[queryTokens[0]].map(id => targetById.get(id)).filter((target): target is NavigationTarget => Boolean(target))
+  }
+  return rankTargets(queryTokens, true).slice(0, 3)
+    .map(item => targetById.get(item.id))
     .filter((target): target is NavigationTarget => Boolean(target))
 }
