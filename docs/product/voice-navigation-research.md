@@ -308,3 +308,53 @@ The H2 assistant UI and interaction design remain unchanged. Speech runtime sele
 - Whisper (local or hosted) and Gemini transcription may be evaluated behind this boundary later. Hosted inference would transmit microphone audio outside the device and may have free-tier quotas, rate limits or future pricing; it therefore requires an explicit owner decision, credential/security design and privacy review before implementation.
 - This change does not add packages, API keys, backend endpoints, network speech calls or model downloads beyond the existing opt-in Shruti flow.
 - `speech-provider.test.ts` verifies the default provider and worker selection. Existing assistant UI and resolver tests remain the regression baseline.
+
+
+## 13. Whisper vs Shruti evaluation (2026-11-14)
+
+### Decision summary
+
+**Do not replace Shruti with Whisper for the RBOS Hindi/Hinglish navigation path.** Keep Shruti as the default on-device speech provider. Whisper remains a candidate for an explicitly enabled, internet-connected English-heavy fallback only if a later, separately approved evaluation justifies its recurring cost and audio-transfer trade-off.
+
+This is a research-based decision, not an RBOS audio benchmark. No owner-recorded audio corpus has been supplied yet, so no claim is made that either model has passed RBOS acceptance criteria.
+
+### Evidence from the model comparison
+
+Udgam Labs' published comparison ran Shruti and Whisper large-v3 on overlapping public test clips with the same normaliser/scorer. It is a vendor-authored comparison, not an independent third-party evaluation. Its reported WER (lower is better):
+
+| Test set | Shruti | Whisper large-v3 | Better |
+|---|---:|---:|---|
+| Monsoon Hindi | 20.46 | 33.29 | Shruti |
+| FLEURS Hindi | 20.14 | 28.88 | Shruti |
+| Lahaja Hindi accents (first 300) | 22.87 | 31.19 | Shruti |
+| MUCS Hinglish | 35.21 | 79.94 | Shruti |
+| Svarah Indian English (first 300) | 21.35 | 7.39 | Whisper |
+| LibriSpeech English (first 300) | 5.76 | 2.25 | Whisper |
+| Words invented on 100 silent clips | 0 | 538 | Shruti |
+
+Caveats: the Whisper comparison used a particular decoding configuration (beam 5, language set, without its temperature fallback); the author notes repetition loops and reports that filtering those clips does not reverse the Hindi result. These figures are not directly transferable to RBOS's short, noisy, command-style speech. They nevertheless do not support replacing Shruti for Hindi/Hinglish. Whisper is clearly stronger on the English subsets.
+
+### Hosted Whisper via Groq: cost and operational fit
+
+Groq currently documents two multilingual transcription model IDs: `whisper-large-v3` and `whisper-large-v3-turbo`. It recommends large-v3 when transcription is error-sensitive and turbo for speed/price performance. The published list price is **US$0.111 per audio hour** for large-v3 and **US$0.04 per audio hour** for turbo. Groq also documents request and audio-second rate limits; the actual limits are organization/account-specific and visible in its console. Therefore, this is **not a guaranteed zero-cost recurring service**. Any temporary free allowance or account quota must not be treated as a permanent $0 dependency.
+
+For RBOS, a hosted Groq call also means recorded shopkeeper audio leaves the device and depends on network, provider availability, API credentials and account limits. This conflicts with the current H2 design's local-only audio privacy and offline recognition after model load. A cloud Whisper adapter must remain disabled unless the owner explicitly changes those constraints.
+
+### Which Whisper variant is relevant?
+
+- **Groq `whisper-large-v3`:** choose only for a future controlled accuracy comparison, not as the default. It costs more per audio hour and Groq's documentation positions it for error-sensitive multilingual transcription.
+- **Groq `whisper-large-v3-turbo`:** the practical hosted candidate if latency and lower cost matter more; it is still paid usage, not a guaranteed free fallback.
+- **Self-hosted Whisper large-v3:** not a realistic browser/low-end Android replacement for H2. The published fp16 file is about 3.1 GB, compared with Shruti's 29.5 MB. Self-hosting also requires compute and operational hosting, so it does not meet the current zero-cost constraint.
+- **Small Whisper checkpoints/fine-tunes:** the available comparison reports substantially weaker Hindi/Hinglish results for the listed small candidates; they are not a justified shortcut without RBOS-specific measurements.
+
+### RBOS-specific test required before any provider decision
+
+The published comparison cannot replace the test plan in section 7. The next meaningful evaluation is a paired audio test using the **same recordings** for Shruti and Whisper, with consent, on RBOS commands:
+
+1. 8+ speakers with different accents; Hindi Devanagari, Romanised Hindi, Hinglish and Indian English.
+2. Quiet and realistic shop-noise conditions; include silence/noise-only clips and close/far microphone placement.
+3. Keep audio files outside GitHub. Use anonymised IDs; do not upload customer/shop transaction audio.
+4. Compare normalised WER/CER, correct navigation, wrong navigation, ask/not-understood rate, silence hallucinations, release-to-navigation p50/p95, network dependency and total cost.
+5. Apply the existing safety gate: wrong navigation <=2% quiet and <=3% noisy; silence/noise must never navigate. Prefer not-understood over a wrong screen.
+
+**Evaluation status:** literature/vendor comparison complete; actual paired RBOS audio test not run because the consented recordings and a verified Groq free allowance are not available in this task. No Whisper code, API key, external audio upload or cloud call has been added.
