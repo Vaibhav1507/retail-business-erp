@@ -199,6 +199,10 @@ export function resolveNavigation(input: string): NavigationResolution {
   // suggest the relevant screen, but generic navigation must not discard the name.
   if (namedPersonReference.test(input)) return { kind: 'not-understood' }
 
+  if (/^(बकाया|बाकी|उधार|उधारी|baki|baaki|udhar|udhaar)$/.test(q)) {
+    return askFor(['sell.collect', 'parties.dues'])
+  }
+
   const qTokens = tokenize(q)
   if (!qTokens.length) return { kind: 'not-understood' }
 
