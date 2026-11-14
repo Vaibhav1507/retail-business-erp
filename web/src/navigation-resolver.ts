@@ -173,15 +173,15 @@ function askFor(ids: string[]): NavigationResolution {
   }
 }
 
-const questionIntent = /\\b(how much|how many|what is|what are|who owes|whose|which customer|kitna|kitne|kitni|kiska|kiski|kiske|kisne|kaun|kya|kab|kahan|batao|bataiye)\\b|कितना|कितनी|कितने|किसका|किसकी|किसके|किसने|कौन|क्या|कब|कहाँ|बताओ|बताइए/i
-const dataTerms = /\\b(balance|amount|total|revenue|profit|sales today|today sales|phone|address|number|baki|udhar|cash|stock|maal|goods|customer|supplier|sold|quantity|rate|price)\\b|बिक्री|बिकरी|पैसा|रुपया|स्टॉक|माल|ग्राहक|सप्लायर|भाव|दाम/i
-const directDataRequest = /\\b(who owes|how much|how many|phone number|contact number|business address|total sales|sales today|today sales)\\b|किसका कितना|कितना बाकी|कितनी बिक्री|आज की बिक्री|कितना पैसा|कौन सा ग्राहक/i
-const actionRequest = /\\b(delete|remove|cancel|save|submit|post|send|bhejo|bhej do)\\b|\\b(pay|transfer|send)\\s+\\d+|\\b(jama|bhej|bhejo)\\s+(kar|karo|do)\\b|\\b(paise|paisa|payment)\\s+(jama|bhej|send|de do)\\b|हटा दो|भेजो|जमा करो|जमा कर दो|पोस्ट करो|भुगतान कर दो/i
-const namedPersonReference = /\\b[a-z][a-z'-]{2,}\\s+(?:ji|bhai|bhaiya|sahab)\\b/i
+const questionIntent = /\b(how much|how many|what is|what are|who owes|whose|which customer|kitna|kitne|kitni|kiska|kiski|kiske|kisne|kaun|kya|kab|kahan|batao|bataiye)\b|कितना|कितनी|कितने|किसका|किसकी|किसके|किसने|कौन|क्या|कब|कहाँ|बताओ|बताइए/i
+const dataTerms = /\b(balance|amount|total|revenue|profit|sales today|today sales|phone|address|number|baki|udhar|cash|stock|maal|goods|customer|supplier|sold|quantity|rate|price)\b|बिक्री|बिकरी|पैसा|रुपया|स्टॉक|माल|ग्राहक|सप्लायर|भाव|दाम/i
+const directDataRequest = /\b(who owes|how much|how many|phone number|contact number|business address|total sales|sales today|today sales)\b|किसका कितना|कितना बाकी|कितनी बिक्री|आज की बिक्री|कितना पैसा|कौन सा ग्राहक/i
+const actionRequest = /\b(delete|remove|cancel|save|submit|post|send|bhejo|bhej do)\b|\b(pay|transfer|send)\s+\d+|\b(jama|bhej|bhejo)\s+(kar|karo|do)\b|\b(paise|paisa|payment)\s+(jama|bhej|send|de do)\b|हटा दो|भेजो|जमा करो|जमा कर दो|पोस्ट करो|भुगतान कर दो/i
+const namedPersonReference = /\b[a-z][a-z'-]{2,}\s+(?:ji|bhai|bhaiya|sahab)\b/i
 
 function isRejectedRequest(input: string, normalized: string): boolean {
-  if (/https?:\\/\\/|www\\./i.test(input) || /\\b[a-z0-9-]+\\.(?:com|in|org|net|io)(?=$|[\\s/?#])/i.test(input)) return true
-  if (/\\d/.test(normalized) || actionRequest.test(normalized)) return true
+  if (/https?:\/\/|www\./i.test(input) || /\b[a-z0-9-]+\.(?:com|in|org|net|io)(?=$|[\s/?#])/i.test(input)) return true
+  if (/\d/.test(normalized) || actionRequest.test(normalized)) return true
   if (directDataRequest.test(normalized)) return true
   return questionIntent.test(normalized) && dataTerms.test(normalized)
 }
