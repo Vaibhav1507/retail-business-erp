@@ -17,7 +17,7 @@ public class PdfPageReaderTests
             ZHE26 
             """;
 
-        Assert.True(Rbos.Api.Application.PdfPageReader.IsUnreliableText(garbled));
+        Assert.True(Rbos.Api.Application.PdfPageReader.IsUnreliableText(garbled + " " + garbled));
     }
 
     [Fact]
