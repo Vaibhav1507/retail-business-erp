@@ -1,12 +1,12 @@
 # Voice and text navigation assistant: research and recommendation (H2)
 
-Status: H2 implementation is in progress on `experiment/h2-stage2-repair` (PR #1). The signed-in app now has typed navigation, quick actions, deterministic route allowlisting, ambiguity handling, out-of-scope rejection, and an opt-in local push-to-talk speech pipeline. The selected speech path is Shruti Hindi/English/Hinglish `.cact` weights with the Cactus Needle WebAssembly engine in a Web Worker; the browser downloads the ~29.5 MB model only after explicit opt-in and verifies SHA-256 before caching. The runtime assets are fetched at build time from a pinned upstream commit and checksum-verified. No model weights are committed to the repository. The feature is not merged or accepted yet; CI and browser/device validation remain outstanding. Status: 2026-11-12.
+Status: Three-level voice navigation is implemented on `feature/voice-provider-boundary` (PR #24, draft). Level 1 uses 35 canonical deterministic destinations; Level 2 keeps local Shruti primary with an opt-in Groq-hosted Whisper Turbo fallback; Level 3 uses Gemini Flash primary with a separate Groq Qwen text fallback when deterministic navigation cannot resolve the command. The existing assistant UI is preserved. Product/catalogue extraction uses Gemini→Groq Qwen vision; invoice extraction now has an opt-in Groq Qwen vision fallback and manual-entry recovery. Hosted voice providers and the invoice Groq fallback are disabled by default pending explicit cost-tier configuration. CI and Android/device acceptance are still outstanding. Status: 2026-11-14.
 
 ## 1. Scope
 
 - **In scope:** move the user to an existing RBOS screen from typed text, a predefined shortcut or a spoken command in Hindi, English, Romanised Hindi or Hinglish.
-- **Out of scope:** chatbot, LLM, questions about business data, creating or posting anything (X1 stays deferred).
-- **Hard constraints:** zero cost (no paid API, credits, trial or extra paid hosting); runs on the device; typed input and shortcuts always work, even with no microphone and no model.
+- **Out of scope:** general chatbot, business-data questions, and creating/posting transactions (X1 stays deferred). A navigation-only LLM intent layer is in scope as Level 3.
+- **Hard constraints:** free-first; no paid provider usage, credits, trials or extra hosting without explicit owner approval. Shruti remains local-first. Hosted Whisper and LLM calls are optional, disabled by default and subject to verified account limits. Typed input and shortcuts always work without a microphone or model.
 
 ## 2. Evidence quality
 
@@ -46,7 +46,7 @@ WER columns come from the Shruti card's comparison table (2026-10-18/19), unless
 2. **Best accuracy (local, Hindi only):** IndicConformer Hindi ONNX (MIT). Koyal is better on read Hindi, but it is gated, needs CC-BY attribution and is weaker on accents. Neither handles Hinglish. Tara claims the best accuracy overall but cannot run free on the device.
 3. **Best lightweight and most robust for commands:** Vosk small Hindi with a **closed grammar** of RBOS phrases. Its open-dictation WER is worse, but a grammar limits output to valid commands, which can lower wrong navigation. This needs measuring against Shruti on the RBOS command set.
 
-**Implementation decision:** use the Shruti original-engine WASM provider behind the shared resolver. Keep Vosk-grammar as a future fallback only if real RBOS voice testing shows a need; do not add a second provider before validating this one.
+**Implementation decision:** keep Shruti's original-engine WASM provider as primary behind the shared resolver. Add Groq-hosted Whisper Turbo as an opt-in backup for Shruti failure, timeout, empty output or an unresolvable transcript; if hosted Whisper is disabled/unavailable, preserve the Shruti transcript for Level 3 or typed correction. Vosk grammar remains a possible local alternative if real RBOS testing justifies it.
 
 ## 5. Verified RBOS context
 
@@ -54,7 +54,7 @@ WER columns come from the Shruti card's comparison table (2026-10-18/19), unless
 - **Verified tabs** (`web/src/Pages.tsx`):
   - sell: `menu`, `bill`, `bills`, `collect`, `return`
   - buy: `receive`, `pay`, `history`, `return`
-  - stock: `current`, `products`, `opening`, `import`, `adjust`, `count`, `history`, `alerts`, `units`
+  - stock: `current`, `products`, `opening`, `adjust` (stale tabs from the inactive `Pages.tsx` StockPage export are excluded; purchase receiving uses canonical `buy.receive`)
   - parties: `customers`, `suppliers`, `purchases`, `dues`
   - money: `cash`, `expenses`, `owner`, `closing`
   - more: `reports`, `print`, `lock`, `audit`, `gst`, `staff`, `branches`, `transfers`, `orders`, `reconcile`, `loans`
@@ -63,7 +63,7 @@ WER columns come from the Shruti card's comparison table (2026-10-18/19), unless
 - **Dependencies:** `web/package.json` has no speech or ML packages.
 - **Unsaved work:** the billing form (`GenerateInvoice.tsx`), opening stock (`App.tsx` `OpeningStock`) and purchase receive hold unsaved state in React. A hash change unmounts them and loses that work.
 
-## 6. Proposed architecture (design only)
+## 6. Implemented three-level architecture
 
 ```
 [Typed box] ----------------------------+
@@ -71,12 +71,12 @@ WER columns come from the Shruti card's comparison table (2026-10-18/19), unless
 [Mic button] -> SpeechProvider (Worker) -+        (pure)        (pure, table)    (unsaved/confirm)
 ```
 
-- **`SpeechProvider` interface:** `isAvailable()`, `load(onProgress)`, `start()`, `stop() -> {text, confidence?}`, `dispose()`. Implementations: `NoSpeech` (default), `ShrutiOnnx`, `VoskGrammar`, optional `WebSpeech` (opt-in, cloud warning). The resolver never knows which provider produced the text.
-- **Model loading and caching:** download only when the user turns voice on (never at app start). Show the size before downloading. Store the model in Cache Storage or IndexedDB with a version and SHA-256 hash. Serve it from RBOS's own origin or a pinned copy, not a third-party CDN at run time. Respect `navigator.storage.estimate()`, and ask for `persist()`.
-- **Web Worker:** inference and audio resampling to 16 kHz mono run off the main thread. Post-processing returns text only. Terminate the worker when idle.
+- **STT provider boundary:** Shruti remains the local Web Worker primary. `speech-fallback.ts` converts the retained final PCM to bounded 16 kHz mono WAV and calls the authenticated server-side Whisper adapter only on eligible Shruti failure/quality conditions. Both outputs enter the same deterministic resolver. The Groq key never reaches the browser.
+- **Model loading and caching:** Shruti downloads only when the user first opts into voice (never at app start), verifies SHA-256 and caches its ~29.5 MB model. Hosted Whisper uses the existing server-side Groq key and is disabled unless `Groq:WhisperEnabled=true`.
+- **Web Worker:** Shruti inference and audio resampling to 16 kHz mono run off the main thread. Final PCM is retained only until Shruti succeeds or Whisper finishes, then cleared.
 - **Microphone:** push-to-talk only (no always-listening, no wake word). Ask for permission on the first tap with an explanation. On denial, keep everything else working with a clear typed fallback. The microphone needs HTTPS, which Cloud Run provides.
 - **Normaliser (deterministic):** Unicode NFC; lowercase; remove punctuation and filler words (`please`, `zara`, `karo`, `kholo`, `dikhao`, `jao`, `par`, `pe`, `mujhe`). Map Devanagari and Romanised variants to one canonical token through a lexicon, for example `बिल|bill|bil` to `bill`, `माल|maal|saman|सामान` to `stock`, `उधार|udhar|udhaar|baki|बाकी` to `dues/collect`, `खर्चा|kharcha|kharch|expense` to `expenses`, `वापसी|wapas|return` to `return`, `खरीद|kharid|purchase` to `buy`. Number words are ignored (navigation only).
-- **Intent resolver:** a static table of `{intent, hash, phrases[]}` built only from the verified routes in section 5. Score each candidate on token overlap plus a bounded edit distance. Outcomes:
+- **Level 1 resolver:** a static table of required keyword/concept profiles built only from the 35 canonical destinations. Score candidates deterministically, preserve ambiguity and reject data/transaction requests before Level 3. Outcomes:
   - one clear winner above the threshold → navigate
   - two or more close scores (for example "return" means sell return or buy return) → show two or three choices to tap
   - nothing above the threshold → "Not understood", plus the typed box and shortcuts
@@ -166,7 +166,7 @@ There are 40 verified destinations (see section 9.6).
   3. Use cosine top-1 versus top-2 margin as the confidence score.
   4. The guard accepts only `intentId`s in the allowlist. Low margin leads to a choice prompt; low score leads to "not understood".
 - **Romanised Hindi is the open risk.** General multilingual embedders were trained mostly on Devanagari Hindi. "udhaar wale customers" may embed poorly. A transliteration lexicon in front (section 6) may matter more than the model.
-- **Small LLM (0.5–0.6B):** keep only as a last-resort experiment. Use it only with grammar- or enum-constrained output, and only if embeddings fail on the corpus. It is too large for the first-load target in section 7 (≤ 60 MB voice model).
+- **Small on-device LLM (0.5–0.6B):** this historical experiment was not selected. The current Level 3 implementation uses opt-in server-side Gemini Flash with Groq Qwen text fallback; it is separate from the on-device model candidates in this section.
 
 ### 9.3 A vs B vs C
 
@@ -197,7 +197,7 @@ There are 40 verified destinations (see section 9.6).
   - Its Romanised Hindi quality is unproven.
   - Approach A has not been measured either.
 - **Gate:** adopt C only if, on the same corpus, it beats A or B on correct navigation by **≥ 5 percentage points**, with wrong navigation **≤ 2%** (quiet) or **≤ 3%** (noisy). It must also stay inside the latency (p95 ≤ 2 s) and memory (≤ 200 MB) limits on the low-end phone.
-- **Generative LLMs:** don't build with them now. Gemma: avoid while gated and under custom terms. SmolLM: weak in Hindi.
+- **On-device generative LLM candidates:** none of the small browser models in this research were selected. This does not exclude the separate, constrained server-side navigation-only Level 3 implementation described in section 12.
 
 ### 9.5 Unverified claims and proposed experiments
 
@@ -305,7 +305,7 @@ Do not integrate either embedder just because the workflow completes. First revi
 The H2 assistant UI and interaction design remain unchanged. Speech runtime selection is now isolated in `web/src/speech-provider.ts`; `NavigationAssistant.tsx` no longer hardcodes the Shruti worker URL.
 
 - Active provider: `shruti-local`, using the existing Shruti model and local Web Worker. The existing push-to-talk flow, partial transcript previews, PCM cleanup, model integrity checks and browser cache remain in place.
-- The provider registry is intentionally small and currently registers only Shruti. The agreed Level 2 design is Shruti primary with Whisper as the backup STT provider; the backup adapter and automatic failover are still pending.
+- Shruti remains the registered local worker primary. Hosted Whisper is implemented as a separate API adapter and is automatically invoked only after eligible Shruti failure or an unresolvable transcript. It remains disabled by default.
 - The agreed Level 3 design is Gemini Flash primary. The repository's existing Groq integration is a Qwen vision fallback for catalogue photo/PDF extraction in `ProductFileReader`; it is not xAI Grok and is not currently used for voice intent. `InvoiceExtractionService` now uses the Gemini model chain followed by Groq Qwen vision as a cross-provider fallback. Voice intent uses a separate text-only Groq client; official Groq documentation confirms `qwen/qwen3.8-27b` accepts text input, returns text and supports JSON mode. Provider calls remain disabled by default until the owner enables them. These are intent-understanding providers, not STT providers. Use transcript-only transfer for Level 3, keep credentials server-side, and document provider limits, privacy and cost before enabling calls.
 - This change does not add packages, API keys, backend endpoints, network speech calls or model downloads beyond the existing opt-in Shruti flow.
 - `speech-provider.test.ts` verifies the default provider and worker selection. Existing assistant UI and resolver tests remain the regression baseline.
@@ -332,7 +332,7 @@ Level 2 and Level 3 hosted providers are disabled by default in appsettings and 
 
 ### Decision summary
 
-**Keep Shruti as the primary STT provider and implement Whisper as its backup.** The published comparison does not support replacing Shruti for Hindi/Hinglish. Whisper remains useful as a recovery path when Shruti fails, times out or produces an unusable transcript. The backup implementation must respect the project's zero-cost preference: first assess a viable local option; if the selected option is hosted, make the network transfer, provider limits and possible charges explicit, and keep it disabled until configured.
+**Keep Shruti as the primary STT provider and implement Whisper as its backup.** The published comparison does not support replacing Shruti for Hindi/Hinglish. Whisper remains useful as a recovery path when Shruti fails, times out or produces an unusable transcript. The selected backup is Groq-hosted Whisper Turbo, subject to explicit owner approval of the account's cost tier. It is disabled by default. The published Turbo Developer price is US$0.04 per audio hour; the public rate-limit table shows Developer-plan base limits, not guaranteed Free-tier limits. Free-tier quotas are account-specific and must be checked in the Groq console.
 
 This is a research-based decision, not an RBOS audio benchmark. No owner-recorded audio corpus has been supplied yet, so no claim is made that either model has passed RBOS acceptance criteria.
 
@@ -356,7 +356,7 @@ Caveats: the Whisper comparison used a particular decoding configuration (beam 5
 
 Groq currently documents two multilingual transcription model IDs: `whisper-large-v3` and `whisper-large-v3-turbo`. It recommends large-v3 when transcription is error-sensitive and turbo for speed/price performance. The published list price is **US$0.111 per audio hour** for large-v3 and **US$0.04 per audio hour** for turbo. Groq also documents request and audio-second rate limits; the actual limits are organization/account-specific and visible in its console. Therefore, this is **not a guaranteed zero-cost recurring service**. Any temporary free allowance or account quota must not be treated as a permanent $0 dependency.
 
-For RBOS, a hosted Groq call means the recorded navigation command leaves the device and depends on network, provider availability, API credentials and account limits. The owner has confirmed that this is acceptable for ordinary navigation commands. Shruti remains local-first; hosted Whisper is called only after Shruti fails or returns no usable transcript. The adapter is disabled by default and requires `Groq:WhisperEnabled=true`; use the existing server-side `Groq:ApiKey`, never expose it in the browser, and keep the account on the Free plan for the pilot. The API additionally limits each authenticated user to 100 fallback requests per UTC day.
+For RBOS, a hosted Groq call means the recorded navigation command leaves the device and depends on network, provider availability, API credentials and account limits. The owner has confirmed that this is acceptable for ordinary navigation commands. Shruti remains local-first; hosted Whisper is called only after Shruti fails or returns no usable/unresolvable output. The adapter is disabled by default and requires `Groq:WhisperEnabled=true`; use the existing server-side `Groq:ApiKey`, never expose it in the browser, and verify the account's actual Free-tier limits before enabling. The API additionally limits each authenticated user to 100 fallback requests per UTC day.
 
 ### Which Whisper variant is relevant?
 
@@ -375,7 +375,7 @@ The published comparison cannot replace the test plan in section 7. The next mea
 4. Compare normalised WER/CER, correct navigation, wrong navigation, ask/not-understood rate, silence hallucinations, release-to-navigation p50/p95, network dependency and total cost.
 5. Apply the existing safety gate: wrong navigation <=2% quiet and <=3% noisy; silence/noise must never navigate. Prefer not-understood over a wrong screen.
 
-**Evaluation status:** literature/vendor comparison complete; actual paired RBOS audio test not run because consented recordings are not yet available. The research supports Shruti as primary and Whisper as backup, but the implementation choice (local versus hosted) still needs a measured RBOS-specific evaluation. No Whisper adapter or automatic failover is currently implemented.
+**Evaluation status:** literature/vendor comparison complete; actual paired RBOS audio test not run because consented recordings are not yet available. The research supports Shruti as primary and Whisper as backup. Groq Whisper Turbo adapter and automatic failover are implemented but disabled by default pending verified account cost/limits and RBOS-specific accuracy measurements.
 
 
 ## 14. Keyword-first resolver and Bundeli/North Indian Hindi coverage (2026-11-14)
@@ -396,7 +396,7 @@ Research notes:
 - Added distinct contextual requirements for easy collisions: bill vs old bill, customer receipt vs supplier payment, customer return vs supplier return, purchase receive vs purchase history/return, stock view vs count/adjust/history/alerts, and customer dues vs collections.
 - Kept ambiguous single words as clarification prompts. Data questions, transaction commands, numbers and arbitrary URLs remain rejected before routing.
 - Suggestions use incomplete keyword matches but never execute navigation.
-- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. They are separate from the agreed Level 3 AI intent layer (Gemini Flash primary, with Groq-hosted Qwen text generation being evaluated as a fallback). The existing Groq integration is only Qwen vision fallback for catalogue extraction, not voice intent. Level 3 is part of the current three-level voice-navigation scope; it is not deferred as a product feature. Its voice-specific orchestration remains to be implemented and validated.
+- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. Level 3 is implemented as Gemini Flash primary with a separate Groq Qwen text-generation fallback. It is called only when deterministic resolution is insufficient, returns strict structured intent, and is validated against the 35 canonical destination IDs. Both provider flags are disabled by default; no raw audio is sent to Level 3.
 
 ### Synthetic test protocol and caveats
 
