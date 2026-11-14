@@ -1,59 +1,141 @@
 import { describe, expect, it } from 'vitest'
-import { resolveNavigation, suggestNavigation } from './navigation-resolver'
+import { resolveNavigation, suggestNavigation, navigationTargets } from './navigation-resolver'
+import { navigationKeywordProfiles } from './navigation-keywords'
 
-describe('navigation resolver', () => {
- it('resolves direct English, Hindi and Hinglish screen requests', () => {
-  expect(resolveNavigation('make a new bill').kind).toBe('navigate')
-  expect(resolveNavigation('नया बिल बनाओ').kind).toBe('navigate')
-  expect(resolveNavigation('मुझे बिल बनाना है').kind).toBe('navigate')
-  expect(resolveNavigation('bill banana hai').kind).toBe('navigate')
-  expect(resolveNavigation('मेरा स्टॉक दिखाओ').kind).toBe('navigate')
-  expect(resolveNavigation('मुझे स्टॉक दिखाना है').kind).toBe('navigate')
-  expect(resolveNavigation('supplier ko payment karna hai').kind).toBe('navigate')
-  expect(resolveNavigation('मुझे नया customer add करना है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
-  expect(resolveNavigation('naya customer banana hai')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
-  expect(resolveNavigation('ग्राहक की एंट्री करनी है')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
-  expect(resolveNavigation('customer ka naam likhna hai')).toMatchObject({ kind: 'navigate', target: { id: 'parties.customers' } })
-  expect(resolveNavigation('आज खरीद की एंट्री करनी है')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
-  expect(resolveNavigation('दुकान का स्टॉक दिखाओ')).toMatchObject({ kind: 'navigate', target: { id: 'stock.current' } })
-  expect(resolveNavigation('customer se udhar lena hai')).toMatchObject({ kind: 'navigate', target: { id: 'sell.collect' } })
- })
- it('asks instead of guessing on ambiguous commands', () => {
-  expect(resolveNavigation('return').kind).toBe('ask')
-  expect(resolveNavigation('history').kind).toBe('ask')
- })
- it('rejects business-data questions and transaction requests', () => {
-  expect(resolveNavigation('how much cash do I have').kind).toBe('reject')
-  expect(resolveNavigation('मेरे पास कितना पैसा है').kind).toBe('reject')
-  expect(resolveNavigation('आजकल खाता कितना हुआ').kind).toBe('reject')
-  expect(resolveNavigation('किस ग्राहक का कितना उधार बाकी है').kind).toBe('reject')
-  expect(resolveNavigation('create a new bill').kind).toBe('navigate')
-  expect(resolveNavigation('delete the last bill').kind).toBe('reject')
-  expect(resolveNavigation('ramesh ko 500 rupaye bhejo').kind).toBe('reject')
- })
- it('does not generate arbitrary routes for unknown requests', () => {
-  expect(resolveNavigation('open google.com').kind).toBe('reject')
-  expect(resolveNavigation('xyzabc qwerty').kind).toBe('not-understood')
- })
+describe('keyword navigation resolver', () => {
+  it('has a keyword profile for every allowlisted screen and no profile for an arbitrary route', () => {
+    expect(Object.keys(navigationKeywordProfiles).sort()).toEqual(navigationTargets.map(t => t.id).sort())
+    expect(navigationTargets.some(t => t.hash.includes('://'))).toBe(false)
+  })
+
+  const accepted: [string, string][] = [
+    ['home', 'dashboard'],
+    ['home', 'ghar'],
+    ['sell.menu', 'sell menu'],
+    ['sell.menu', 'bikri menu'],
+    ['sell.bill', 'new bil'],
+    ['sell.bill', 'naya bill'],
+    ['sell.bills', 'purana bill'],
+    ['sell.bills', 'bill history'],
+    ['sell.collect', 'customer payment'],
+    ['sell.collect', 'grahak vasooli'],
+    ['sell.return', 'customer wapas'],
+    ['sell.return', 'grahak return'],
+    ['buy.receive', 'purchase entry'],
+    ['buy.receive', 'supplier maal aayo'],
+    ['buy.pay', 'supplier payment'],
+    ['buy.pay', 'dealer chukana'],
+    ['buy.history', 'purchase history'],
+    ['buy.history', 'supplier old list'],
+    ['buy.return', 'supplier return'],
+    ['buy.return', 'purchase wapas'],
+    ['stock.current', 'stock available'],
+    ['stock.current', 'maal bacha'],
+    ['stock.products', 'product list'],
+    ['stock.products', 'item add'],
+    ['stock.opening', 'opening stock'],
+    ['stock.opening', 'shuru maal'],
+    ['stock.import', 'excel upload'],
+    ['stock.import', 'product import'],
+    ['stock.adjust', 'stock adjust'],
+    ['stock.adjust', 'maal correction'],
+    ['stock.count', 'stock ginti'],
+    ['stock.count', 'physical stock'],
+    ['stock.history', 'stock history'],
+    ['stock.history', 'adjustment record'],
+    ['stock.alerts', 'low stock'],
+    ['stock.alerts', 'stock ageing'],
+    ['stock.units', 'unit conversion'],
+    ['stock.units', 'box piece'],
+    ['parties.customers', 'customer'],
+    ['parties.customers', 'grahak list'],
+    ['parties.suppliers', 'supplier'],
+    ['parties.suppliers', 'vyapari list'],
+    ['parties.purchases', 'customer purchase history'],
+    ['parties.purchases', 'grahak ne kharid'],
+    ['parties.dues', 'customer baki'],
+    ['parties.dues', 'grahak udhar'],
+    ['money.cash', 'galla bank'],
+    ['money.cash', 'cashbook'],
+    ['money.expenses', 'kharcha'],
+    ['money.expenses', 'expense'],
+    ['money.owner', 'owner capital'],
+    ['money.owner', 'malik withdrawal'],
+    ['money.closing', 'day hisab'],
+    ['money.closing', 'daily galla'],
+    ['more.menu', 'more options'],
+    ['more.menu', 'baaki menu'],
+    ['more.reports', 'profit report'],
+    ['more.reports', 'hisab report'],
+    ['more.print', 'print bill'],
+    ['more.print', 'chhapai'],
+    ['more.lock', 'lock month'],
+    ['more.lock', 'freeze period'],
+    ['more.audit', 'audit history'],
+    ['more.audit', 'change record'],
+    ['more.gst', 'gst'],
+    ['more.gst', 'tax'],
+    ['more.staff', 'staff'],
+    ['more.staff', 'employee'],
+    ['more.branches', 'branch'],
+    ['more.branches', 'shop location'],
+    ['more.transfers', 'stock transfer'],
+    ['more.transfers', 'goods move'],
+    ['more.orders', 'supplier order'],
+    ['more.orders', 'purchase po'],
+    ['more.reconcile', 'bank reconcile'],
+    ['more.reconcile', 'passbook milan'],
+    ['more.loans', 'loan'],
+    ['more.loans', 'karza'],
+    ['settings', 'settings'],
+    ['settings', 'dukaan details'],
+  ]
+
+  it.each(accepted)('resolves keyword input "%s" to the expected target', (target, input) => {
+    expect(resolveNavigation(input)).toMatchObject({ kind: 'navigate', target: { id: target } })
+  })
+
+  it('normalises common ASR spellings and Bundeli-style vowel/aspiration variants conservatively', () => {
+    expect(resolveNavigation('graahak payment')).toMatchObject({ kind: 'navigate', target: { id: 'sell.collect' } })
+    expect(resolveNavigation('kharid entri')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
+    expect(resolveNavigation('karid entry')).toMatchObject({ kind: 'navigate', target: { id: 'buy.receive' } })
+    expect(resolveNavigation('kharcho')).toMatchObject({ kind: 'navigate', target: { id: 'money.expenses' } })
+    expect(resolveNavigation('बकाया')).toMatchObject({ kind: 'not-understood' })
+  })
+
+  it('asks when a lone keyword does not identify a unique destination', () => {
+    expect(resolveNavigation('return').kind).toBe('ask')
+    expect(resolveNavigation('payment').kind).toBe('ask')
+    expect(resolveNavigation('bill').kind).toBe('ask')
+    expect(resolveNavigation('purchase').kind).toBe('ask')
+    expect(resolveNavigation('stock').kind).toBe('ask')
+    expect(resolveNavigation('history').kind).toBe('ask')
+    expect(resolveNavigation('udhar').kind).toBe('ask')
+  })
+
+  it('rejects data questions, transaction execution, arbitrary URLs and numeric commands', () => {
+    for (const input of [
+      'how much cash do I have',
+      'मेरे पास कितना पैसा है',
+      'आज कितनी बिक्री हुई',
+      'किस ग्राहक का कितना उधार बाकी है',
+      'customer phone number',
+      'delete the last bill',
+      'ramesh ko 500 rupaye bhejo',
+      'paise jama kar do',
+      'transfer 12 stock items',
+      'open google.com',
+    ]) expect(resolveNavigation(input).kind).toBe('reject')
+  })
+
+  it('does not navigate from noise or an unrelated person name', () => {
+    expect(resolveNavigation('xyzabc qwerty').kind).toBe('not-understood')
+    expect(resolveNavigation('Ramesh ji nam batao').kind).toBe('not-understood')
+  })
+
+  it('suggests from partial keywords without auto-executing during typing', () => {
+    expect(suggestNavigation('purana bil').some(target => target.id === 'sell.bills')).toBe(true)
+    expect(suggestNavigation('new bil').some(target => target.id === 'sell.bill')).toBe(true)
+    expect(resolveNavigation('new bil')).toMatchObject({ kind: 'navigate', target: { id: 'sell.bill' } })
+  })
 })
-
-
-describe('partial navigation suggestions', () => {
- it('suggests a destination from an incomplete Hinglish phrase without executing navigation', () => {
-  const suggestions = suggestNavigation('mujhe Ramesh ji ka purana bil')
-  expect(suggestions.some(target => target.id === 'sell.bills')).toBe(true)
-  expect(resolveNavigation('mujhe Ramesh ji ka purana bil').kind).not.toBe('navigate')
- })
-
- it('uses word prefixes for live suggestions but does not loosen final command execution', () => {
-  expect(suggestNavigation('new bil').some(target => target.id === 'sell.bill')).toBe(true)
-  expect(resolveNavigation('new bil').kind).not.toBe('navigate')
- })
-
- it('does not suggest navigation for business questions, transactions, or external URLs', () => {
-  expect(suggestNavigation('how much cash do I have')).toEqual([])
-  expect(suggestNavigation('delete the last bill')).toEqual([])
-  expect(suggestNavigation('open https://example.com')).toEqual([])
- })
-})
-
