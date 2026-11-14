@@ -45,7 +45,7 @@ export function getSpeechProvider(
 
 /** Create the worker for the selected provider without coupling UI to its URL. */
 export function createSpeechWorker(
-  id: SpeechProviderId = DEFAULT_SPEECH_PROVIDER,
+  id: SpeechWorkerProviderId = DEFAULT_SPEECH_PROVIDER,
 ): Worker {
   const provider = getSpeechProvider(id)
   return new Worker(provider.workerUrl)
