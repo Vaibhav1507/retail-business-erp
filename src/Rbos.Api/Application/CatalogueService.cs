@@ -42,6 +42,7 @@ public sealed class CatalogueService(TenantDb db)
             from catalog.product p join catalog.category c on c.tenant_id=p.tenant_id and c.id=p.category_id
             left join catalog.master_product mp on mp.id=p.master_product_id
             where (@act or p.is_active)
+              and not exists (select 1 from catalog.product_alias pa where pa.tenant_id=p.tenant_id and pa.alias_product_id=p.id)
               and (@cat::uuid is null or p.category_id=@cat)
               and (@br::uuid is null or p.brand_id=@br)
               and (@q::text is null or p.name ilike @q or mp.name ilike @q or coalesce(p.brand,mp.brand) ilike @q or coalesce(p.model,mp.model) ilike @q or p.internal_sku ilike @q or (p.attributes::text || p.specs::text || coalesce(mp.attributes::text,'') || coalesce(mp.specs::text,'')) ilike @q
