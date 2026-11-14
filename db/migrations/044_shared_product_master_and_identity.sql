@@ -4,6 +4,22 @@
 -- Duplicate legacy product rows are soft-merged: current inventory state is rolled
 -- into one canonical row; transaction line history keeps its original product FK.
 
+-- The migrator is intentionally NOBYPASSRLS. It owns these tables, so temporarily
+-- disable FORCE (not RLS itself) while it performs the all-tenant one-time backfill.
+-- Runtime rbos_app is not the table owner and remains subject to the existing policies.
+do $
+declare t text;
+begin
+  foreach t in array array[
+    'core.business_profile','catalog.category','catalog.product',
+    'catalog.product_source_reference','catalog.product_barcode','inventory.serial_unit',
+    'inventory.stock_balance','inventory.item_cost','inventory.reorder_level','inventory.unit_conversion'
+  ] loop
+    execute format('alter table %s no force row level security', t);
+  end loop;
+end $;
+
+
 create or replace function catalog.product_identity_key(p_name text, p_brand text, p_model text)
 returns text language sql immutable parallel safe
 as $$
@@ -225,6 +241,19 @@ where p.tenant_id=bp.tenant_id
   and p.category_id=c.id
   and p.master_product_id is null
   and mp.identity_key=catalog.master_product_identity_key(p.name, c.name, p.brand, p.model);
+
+-- Re-enable FORCE RLS before the migration transaction commits.
+do $
+declare t text;
+begin
+  foreach t in array array[
+    'core.business_profile','catalog.category','catalog.product',
+    'catalog.product_source_reference','catalog.product_barcode','inventory.serial_unit',
+    'inventory.stock_balance','inventory.item_cost','inventory.reorder_level','inventory.unit_conversion'
+  ] loop
+    execute format('alter table %s force row level security', t);
+  end loop;
+end $;
 
 -- From this point onward there is exactly one active tenant product per identity.
 drop index if exists catalog.product_active_dup_uq;
