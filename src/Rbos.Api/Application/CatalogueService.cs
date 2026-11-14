@@ -85,7 +85,7 @@ public sealed class CatalogueService(TenantDb db)
             where @q::text is null or mp.name ilike @q or mp.brand ilike @q or mp.model ilike @q
                or mp.category_name ilike @q or mp.attributes::text ilike @q or mp.specs::text ilike @q
                or (@qn::text is not null and catalog.norm_text(mp.model) like @qn)
-            order by mp.name limit 200");
+            order by mp.name limit 1000");
         c.Parameters.AddWithValue("t", tid.Value);
         c.Parameters.AddWithValue("q", string.IsNullOrWhiteSpace(q) ? DBNull.Value : "%" + Like(q.Trim()) + "%");
         var qn = ProductRules.Normalize(q);
