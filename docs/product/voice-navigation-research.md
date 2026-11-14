@@ -378,7 +378,7 @@ Research notes:
 - Added distinct contextual requirements for easy collisions: bill vs old bill, customer receipt vs supplier payment, customer return vs supplier return, purchase receive vs purchase history/return, stock view vs count/adjust/history/alerts, and customer dues vs collections.
 - Kept ambiguous single words as clarification prompts. Data questions, transaction commands, numbers and arbitrary URLs remain rejected before routing.
 - Suggestions use incomplete keyword matches but never execute navigation.
-- Layer 3 (the existing allowlisted navigation/action and unsaved-work guard) is not changed by this resolver refactor.
+- The existing verified-route allowlist and unsaved-work confirmation remain the final execution safety boundary. They are not the AI intent-router layer: the agreed Layer 3 LLM fallback remains deferred, disabled, and outside this PR.
 
 ### Synthetic test protocol and caveats
 
