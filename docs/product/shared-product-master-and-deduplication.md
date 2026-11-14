@@ -29,7 +29,7 @@ Migration `044_shared_product_master_and_identity.sql`:
 
 - Selects a canonical active row using source-document provenance first, then richer specifications/attributes, then creation time.
 - Writes a durable `catalog.product_alias` mapping for retired duplicates.
-- Merges barcode/serial links, current stock balances, weighted-average inventory quantity/value, reorder levels and unit conversions onto the canonical row.
+- Merges barcode/serial links, current stock balances, weighted-average inventory quantity/value, reorder levels and unit conversions onto the canonical row. Product-level brand-master links and serial-tracking flags are retained. If duplicate rows have different conversion factors for the same unit, the migration aborts transactionally for manual reconciliation rather than silently dropping one.
 - Preserves historical purchase/sale/return/order/transfer line foreign keys by retaining the retired product row as inactive. Append-only stock movement history is not rewritten.
 - Moves source-reference records to the canonical row. Source documents remain tenant-private.
 - Builds one shared master product per vertical/identity and links each tenant's local product row.
