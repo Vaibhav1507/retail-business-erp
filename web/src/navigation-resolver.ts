@@ -194,14 +194,18 @@ function isRejectedRequest(input: string, normalized: string): boolean {
 export function resolveNavigation(input: string): NavigationResolution {
   const q = normalise(input)
   if (!q) return { kind: 'not-understood' }
+
+  // Common Hindi account-balance questions are data lookups, not navigation.
+  if (q.includes('मेरे पास') && /(कितना|कितनी|कितने|पैसा|पैसे|रुपया|रुपये|स्टॉक|माल)/.test(q)) {
+    return { kind: 'reject' }
+  }
+  if (['बकाया', 'बाकी', 'उधार', 'उधारी', 'baki', 'baaki', 'udhar', 'udhaar'].includes(q)) {
+    return askFor(['sell.collect', 'parties.dues'])
+  }
   if (isRejectedRequest(input, q)) return { kind: 'reject' }
   // A named customer/supplier reference is a lookup-like utterance. It can
   // suggest the relevant screen, but generic navigation must not discard the name.
   if (namedPersonReference.test(input)) return { kind: 'not-understood' }
-
-  if (/^(बकाया|बाकी|उधार|उधारी|baki|baaki|udhar|udhaar)$/.test(q)) {
-    return askFor(['sell.collect', 'parties.dues'])
-  }
 
   const qTokens = tokenize(q)
   if (!qTokens.length) return { kind: 'not-understood' }
