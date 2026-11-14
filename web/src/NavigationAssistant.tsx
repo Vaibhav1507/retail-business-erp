@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getLanguage } from './i18n'
 import { resampleAudio } from './audio-utils'
 import { createSpeechWorker } from './speech-provider'
+import { transcribeNavigationWithWhisper } from './speech-fallback'
 import { resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
 import './navigation-assistant.css'
 
@@ -72,6 +73,9 @@ export function NavigationAssistant() {
  const blocksRef = useRef<Float32Array[]>([])
  const flushResolveRef = useRef<(() => void)|null>(null)
  const pendingPcmRef = useRef<Float32Array|null>(null)
+ const fallbackPcmRef = useRef<Float32Array|null>(null)
+ const whisperAbortRef = useRef<AbortController|null>(null)
+ const shrutiTimeoutRef = useRef<number|null>(null)
  const startedRef = useRef(0)
  const lastPartialAtRef = useRef(0)
  const holdingRef = useRef(false)
@@ -140,17 +144,53 @@ export function NavigationAssistant() {
   window.location.hash = target.hash
  }
 
- function dispatchFinal(pcm: Float32Array) {
-  const worker = workerRef.current
-  if (!worker || !workerReadyRef.current) {
-   pendingPcmRef.current?.fill(0)
-   pendingPcmRef.current = pcm
-   transcribingRef.current = true
-   setTranscribing(true)
-   return
+ async function runWhisperFallback() {
+  const pcm = fallbackPcmRef.current
+  if (!pcm || whisperAbortRef.current) return
+  const controller = new AbortController()
+  whisperAbortRef.current = controller
+  try {
+   const transcript = await transcribeNavigationWithWhisper(pcm, controller.signal)
+   if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
+   if (!transcript) throw new Error(text.tooShort)
+   setVoiceError('')
+   setQuery(transcript)
+   handleCommand(transcript)
+  } catch (error) {
+   if (!controller.signal.aborted) setVoiceError(error instanceof Error ? error.message : text.failed)
+  } finally {
+   pcm.fill(0)
+   if (fallbackPcmRef.current === pcm) fallbackPcmRef.current = null
+   whisperAbortRef.current = null
+   transcribingRef.current = false
+   setTranscribing(false)
   }
+ }
+
+ function clearShrutiTimeout() {
+  if (shrutiTimeoutRef.current !== null) window.clearTimeout(shrutiTimeoutRef.current)
+  shrutiTimeoutRef.current = null
+ }
+
+ function dispatchFinal(pcm: Float32Array) {
+  fallbackPcmRef.current?.fill(0)
+  fallbackPcmRef.current = pcm.slice()
+  const worker = workerRef.current
   transcribingRef.current = true
   setTranscribing(true)
+  if (!worker || !workerReadyRef.current) {
+   void runWhisperFallback()
+   return
+  }
+  clearShrutiTimeout()
+  shrutiTimeoutRef.current = window.setTimeout(() => {
+   workerRef.current?.terminate()
+   workerRef.current = null
+   workerReadyRef.current = false
+   workerLoadingRef.current = false
+   clearShrutiTimeout()
+   void runWhisperFallback()
+  }, 12000)
   worker.postMessage({ type:'transcribe', id:++messageIdRef.current, pcm }, [pcm.buffer])
  }
 
@@ -197,9 +237,21 @@ export function NavigationAssistant() {
   workerLoadingRef.current = false
   workerReadyRef.current = false
   partialInFlightRef.current = false
-  setVoiceLoading(false); setVoiceError(detail); setTranscribing(false)
-  transcribingRef.current = false
+  clearShrutiTimeout()
+  setVoiceLoading(false)
+  setVoiceError(detail)
   pendingPcmRef.current?.fill(0); pendingPcmRef.current = null
+  // Do not discard a live capture if Shruti fails during model initialization.
+  // The completed utterance will be sent to Whisper after the user releases the mic.
+  if (recordingRef.current || holdingRef.current) return
+  if (fallbackPcmRef.current) {
+   transcribingRef.current = true
+   setTranscribing(true)
+   void runWhisperFallback()
+   return
+  }
+  setTranscribing(false)
+  transcribingRef.current = false
   abortCapture()
  }
 
@@ -240,18 +292,21 @@ export function NavigationAssistant() {
      return
     }
     if (data.type === 'result') {
-     transcribingRef.current = false
-     setTranscribing(false)
+     clearShrutiTimeout()
      if (cancelledFinalRef.current || !panelOpenRef.current) {
       cancelledFinalRef.current = false
+      fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
+      transcribingRef.current = false; setTranscribing(false)
       return
      }
      const finalTranscript = (data.text || '').trim()
-     // If the final pass returns empty but a rolling preview heard speech,
-     // retain that preview instead of discarding the user's command.
+     // Prefer a usable final or rolling transcript; use hosted Whisper only if Shruti has neither.
      const transcript = finalTranscript || partialTranscriptRef.current
      partialTranscriptRef.current = ''
-     if (!transcript) { setVoiceError(text.tooShort); return }
+     if (!transcript) { void runWhisperFallback(); return }
+     fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
+     transcribingRef.current = false
+     setTranscribing(false)
      setVoiceError('')
      setQuery(transcript)
      handleCommand(transcript)
@@ -263,9 +318,8 @@ export function NavigationAssistant() {
       if (data.captureId === captureIdRef.current) partialInFlightRef.current = false
       return
      }
-     transcribingRef.current = false
-     setTranscribing(false)
-     setVoiceError(data.message || text.failed)
+     clearShrutiTimeout()
+     void runWhisperFallback()
     }
    }
    worker.onerror = event => failWorker(event.message || text.failed)
@@ -438,7 +492,12 @@ export function NavigationAssistant() {
  function closeAssistant() {
   panelOpenRef.current = false
   if (holdingRef.current || recordingRef.current) abortCapture()
-  else if (transcribingRef.current) cancelledFinalRef.current = true
+  else if (transcribingRef.current) {
+   cancelledFinalRef.current = true
+   whisperAbortRef.current?.abort()
+   fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
+   clearShrutiTimeout()
+  }
   setOpen(false)
  }
 
@@ -446,6 +505,10 @@ export function NavigationAssistant() {
   holdingRef.current = false
   pendingPcmRef.current?.fill(0)
   pendingPcmRef.current = null
+  fallbackPcmRef.current?.fill(0)
+  fallbackPcmRef.current = null
+  whisperAbortRef.current?.abort()
+  clearShrutiTimeout()
   partialTranscriptRef.current = ''
   workerRef.current?.terminate()
   streamRef.current?.getTracks().forEach(track => track.stop())
