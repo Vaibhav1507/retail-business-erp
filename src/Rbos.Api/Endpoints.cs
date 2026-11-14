@@ -20,6 +20,10 @@ public sealed record OpeningStockRequest(Guid LocationId, DateOnly EffectiveDate
 
 public static class Endpoints
 {
+	static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateOnly Day, int Count)> WhisperDailyUsage = new();
+	const int MaxWhisperRequestsPerUserPerDay = 100;
+
+{
 	static readonly string[] Units = ["pcs", "set", "pack", "m"];
 	static readonly string[] AttrKeys = ["colour", "capacity", "connector_type", "compatible_with"];
 
@@ -40,7 +44,7 @@ public static class Endpoints
 		PermissionFilter.Apply(api);
 		api.MapGet("/csrf", (HttpContext c, IAntiforgery af) => Results.Ok(new { token = af.GetAndStoreTokens(c).RequestToken })).AllowAnonymous();
 
-		api.MapPost("/voice/transcribe", async (HttpRequest request, GroqSpeechToTextClient whisper, CancellationToken ct) =>
+		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, GroqSpeechToTextClient whisper, CancellationToken ct) =>
 		{
 			if (!whisper.Available) return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
 			if (request.ContentLength is null or <= 44 or > 1_000_000) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
@@ -51,6 +55,10 @@ public static class Endpoints
 			if (wav[0] != (byte)'R' || wav[1] != (byte)'I' || wav[2] != (byte)'F' || wav[3] != (byte)'F' ||
 				wav[8] != (byte)'W' || wav[9] != (byte)'A' || wav[10] != (byte)'V' || wav[11] != (byte)'E')
 				return ApiResults.Fail(400, "Voice command audio must be a valid WAV file.");
+			var userId = UserId(principal);
+			var today = DateOnly.FromDateTime(DateTime.UtcNow);
+			var usage = WhisperDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
+			if (usage.Count > MaxWhisperRequestsPerUserPerDay) return ApiResults.Fail(429, "Daily voice backup limit reached. Please type the command and try again tomorrow.");
 			try
 			{
 				var transcript = await whisper.TranscribeWavAsync(wav, ct);
