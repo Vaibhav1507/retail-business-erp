@@ -21,6 +21,8 @@ public sealed record OpeningStockRequest(Guid LocationId, DateOnly EffectiveDate
 public static class Endpoints
 {
 	static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateOnly Day, int Count)> WhisperDailyUsage = new();
+	static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateOnly Day, int Count)> VoiceIntentDailyUsage = new();
+	const int MaxVoiceIntentRequestsPerUserPerDay = 100;
 	const int MaxWhisperRequestsPerUserPerDay = 100;
 	static readonly string[] Units = ["pcs", "set", "pack", "m"];
 	static readonly string[] AttrKeys = ["colour", "capacity", "connector_type", "compatible_with"];
@@ -41,6 +43,23 @@ public static class Endpoints
 		var api = app.MapGroup("/api");
 		PermissionFilter.Apply(api);
 		api.MapGet("/csrf", (HttpContext c, IAntiforgery af) => Results.Ok(new { token = af.GetAndStoreTokens(c).RequestToken })).AllowAnonymous();
+
+		api.MapGet("/voice/intent/config", (VoiceNavigationIntentService intent) =>
+			Results.Ok(new { enabled = intent.Available })).RequireAuthorization();
+
+		api.MapPost("/voice/intent", async (VoiceIntentRequest body, ClaimsPrincipal principal, VoiceNavigationIntentService intent, CancellationToken ct) =>
+		{
+			if (!intent.Available) return ApiResults.Fail(503, "AI navigation intent is not enabled.");
+			if (string.IsNullOrWhiteSpace(body.Transcript) || body.Transcript.Trim().Length > 500)
+				return ApiResults.Fail(400, "Voice transcript must be between 1 and 500 characters.");
+			var userId = UserId(principal);
+			var today = DateOnly.FromDateTime(DateTime.UtcNow);
+			var usage = VoiceIntentDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
+			if (usage.Count > MaxVoiceIntentRequestsPerUserPerDay)
+				return ApiResults.Fail(429, "Daily AI navigation limit reached. Use the basic navigation commands and try again tomorrow.");
+			var result = await intent.ClassifyAsync(body, ct);
+			return Results.Ok(result);
+		}).RequireAuthorization();
 
 		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, GroqSpeechToTextClient whisper, CancellationToken ct) =>
 		{
