@@ -7,7 +7,7 @@ namespace Rbos.Api.Application;
 public sealed class GroqSpeechToTextClient(HttpClient http, IConfiguration cfg, ILogger<GroqSpeechToTextClient> log)
 {
     const string Endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
-    const int MaxAudioBytes = 1_000_000;
+    const int MaxAudioBytes = 640_044;
 
     public bool Available =>
         string.Equals(cfg["Groq:WhisperEnabled"], "true", StringComparison.OrdinalIgnoreCase) &&
