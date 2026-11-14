@@ -225,8 +225,8 @@ public sealed class AfterSalesService(TenantDb db)
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleReturn',@d)",
                         ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", x.UnitCost), ("v", x.Cost.Amount), ("e", m.ReturnDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
-                    ("t", tenantId), ("p", x.ProductId), ("l", locationId), ("q", x.Qty));
-                var cur = await ReadCostAsync(s, x.ProductId, ct);
+                    ("t", tenantId), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty));
+                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost.Amount;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
                     ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
@@ -383,13 +383,13 @@ public sealed class AfterSalesService(TenantDb db)
             {
                 await Exec(s, ct, "insert into procurement.purchase_return_line(tenant_id,return_id,receipt_id,product_id,quantity,unit_cost,amount) values (@t,@r,@s,@p,@q,@c,@a)",
                     ("t", tenantId), ("r", id), ("s", m.ReceiptId), ("p", x.ProductId), ("q", x.Qty), ("c", x.UnitCost), ("a", x.Amount.Amount));
-                var cur = await ReadCostAsync(s, x.ProductId, ct);
+                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var remaining = cur.TotalQuantity - x.Qty;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'PurchaseReturn',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", -x.Qty), ("c", cur.Wac), ("v", -x.Removed.Amount), ("e", m.ReturnDate), ("d", id));
                 await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", x.Qty), ("p", x.ProductId), ("l", locationId));
                 await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p",
-                    ("q", remaining), ("v", cur.InventoryValue - x.Removed.Amount), ("w", cur.Wac), ("p", x.ProductId));
+                    ("q", remaining), ("v", cur.InventoryValue - x.Removed.Amount), ("w", cur.Wac), ("p", x.InventoryProductId));
             }
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, total = total.Amount });
@@ -510,8 +510,8 @@ public sealed class AfterSalesService(TenantDb db)
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleCancellation',@d)",
                         ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", unitCost), ("v", x.Cost), ("e", cancelDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
-                    ("t", tenantId), ("p", x.ProductId), ("l", locationId), ("q", x.Qty));
-                var cur = await ReadCostAsync(s, x.ProductId, ct);
+                    ("t", tenantId), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty));
+                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
                     ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
