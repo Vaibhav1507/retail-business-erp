@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { getLanguage } from './i18n'
 import { resampleAudio } from './audio-utils'
-import { resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
+import { createSpeechWorker, type SpeechTranscriptResult } from './speech-provider'
+import { transcribeNavigationWithWhisper } from './speech-fallback'
+import { api } from './api'
+import { navigationTargets, resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
 import './navigation-assistant.css'
 
 const copy = {
@@ -14,8 +17,8 @@ const copy = {
   transcribing:'Transcribing on this device…', opening:'Opening', micDenied:'Microphone access was denied. Allow microphone access for this site in your browser or Android settings, then try again. You can still type.',
   micMissing:'No microphone was found.', secure:'Voice requires HTTPS and microphone support. Typed navigation still works.',
   tooShort:'I did not hear enough speech. Please try again.', tooLong:'Please keep commands under 20 seconds.',
-  failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.',
-  retry:'Retry speech setup', voiceNote:'Voice is processed on this device. Audio is discarded after transcription.'
+  failed:'Voice setup failed. Check the details below and retry. Typed navigation still works.', whisperDisabled:'Local speech recognition could not resolve this command, and hosted Whisper backup is not enabled. Please type the command.',
+  retry:'Retry speech setup', voiceNote:'Voice is processed on this device first. If local recognition fails, audio may be sent to hosted Whisper as a fallback.'
  },
  hi: {
   title:'बिज़नेस असिस्टेंट', placeholder:'कमांड लिखें या माइक दबाकर रखें…', go:'जाएँ', shortcuts:'जल्दी खोलें', suggestions:'संभावित विकल्प',
@@ -27,8 +30,8 @@ const copy = {
   micDenied:'माइक्रोफोन की अनुमति नहीं मिली। ब्राउज़र या Android सेटिंग में इस वेबसाइट के लिए माइक्रोफोन अनुमति दें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
   micMissing:'माइक्रोफोन नहीं मिला।', secure:'वॉइस के लिए HTTPS और माइक्रोफोन सपोर्ट चाहिए। टाइप से नेविगेशन जारी रखें।',
   tooShort:'आवाज़ स्पष्ट नहीं मिली। फिर कोशिश करें।', tooLong:'कृपया 20 सेकंड से छोटा कमांड बोलें।',
-  failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।',
-  retry:'स्पीच सेटअप फिर से आज़माएँ', voiceNote:'आवाज़ इसी डिवाइस पर प्रोसेस होती है और ट्रांसक्रिप्शन के बाद हटा दी जाती है।'
+  failed:'वॉइस सेटअप विफल हुआ। नीचे दिया विवरण देखें और फिर कोशिश करें। आप टाइप कर सकते हैं।', whisperDisabled:'लोकल आवाज़ पहचान कमांड नहीं समझ पाई और hosted Whisper बैकअप चालू नहीं है। कृपया कमांड टाइप करें।',
+  retry:'स्पीच सेटअप फिर से आज़माएँ', voiceNote:'आवाज़ पहले इसी डिवाइस पर समझी जाती है। लोकल पहचान विफल होने पर रिकॉर्डिंग बैकअप के लिए hosted Whisper को भेजी जा सकती है।'
  }
 }
 const quick: NavigationTarget[] = [
@@ -49,6 +52,23 @@ const labelsHi: Record<string,string> = {
 function targetLabel(target: NavigationTarget, language: 'en'|'hi') { return language === 'hi' ? labelsHi[target.id] || target.label : target.label }
 type WorkerMessage = {type:string; stage?:string; loaded?:number; total?:number; text?:string; message?:string; language?:string|null; ms?:number; partial?:boolean; captureId?:number}
 type ChatMessage = {id:number; role:'user'|'assistant'; content:string}
+
+type VoiceIntentApiResult = { kind:'navigate'|'clarify'|'reject'|'not-understood'; targetId:string|null; candidates:string[]; confidence:number; provider:string }
+let voiceIntentEnabledPromise: Promise<boolean> | null = null
+function voiceIntentEnabled(): Promise<boolean> {
+ voiceIntentEnabledPromise ??= api<{enabled:boolean}>('GET','/voice/intent/config')
+  .then(result => result.enabled === true)
+  .catch(() => false)
+ return voiceIntentEnabledPromise
+}
+
+let whisperEnabledPromise: Promise<boolean> | null = null
+function hostedWhisperEnabled(): Promise<boolean> {
+ whisperEnabledPromise ??= api<{enabled:boolean}>('GET','/voice/transcribe/config')
+  .then(result => result.enabled === true)
+  .catch(() => false)
+ return whisperEnabledPromise
+}
 
 export function NavigationAssistant() {
  const [open,setOpen] = useState(false)
@@ -71,6 +91,9 @@ export function NavigationAssistant() {
  const blocksRef = useRef<Float32Array[]>([])
  const flushResolveRef = useRef<(() => void)|null>(null)
  const pendingPcmRef = useRef<Float32Array|null>(null)
+ const fallbackPcmRef = useRef<Float32Array|null>(null)
+ const whisperAbortRef = useRef<AbortController|null>(null)
+ const shrutiTimeoutRef = useRef<number|null>(null)
  const startedRef = useRef(0)
  const lastPartialAtRef = useRef(0)
  const holdingRef = useRef(false)
@@ -99,7 +122,7 @@ export function NavigationAssistant() {
   window.location.hash = target.hash
  }
 
- function handleCommand(value: string) {
+ async function handleCommand(value: string) {
   const command = value.trim()
   if (!command) return
   addHistory('user', command)
@@ -107,12 +130,41 @@ export function NavigationAssistant() {
   const result = resolveNavigation(command)
   if (result.kind === 'navigate') {
    addHistory('assistant', `${text.opening} ${targetLabel(result.target, lang)}.`)
-    window.location.hash = result.target.hash
+   window.location.hash = result.target.hash
    return
   }
   if (result.kind === 'ask') {
    setChoices(result.targets); setMessage(text.choose); addHistory('assistant', text.choose)
    return
+  }
+  if (result.kind === 'not-understood' && await voiceIntentEnabled()) {
+   if (!panelOpenRef.current) return
+   try {
+    const current = navigationTargets.find(target => target.hash === window.location.hash)?.id ?? null
+    const ai = await api<VoiceIntentApiResult>('POST','/voice/intent',{ transcript:command, currentScreenId:current })
+    if (!panelOpenRef.current) return
+    if (ai.kind === 'navigate' && ai.targetId && ai.confidence >= 0.85) {
+     const target = navigationTargets.find(item => item.id === ai.targetId)
+     if (target) {
+      addHistory('assistant', `${text.opening} ${targetLabel(target, lang)}.`)
+      window.location.hash = target.hash
+      return
+     }
+    }
+    if (ai.kind === 'clarify') {
+     const targets = ai.candidates.map(id => navigationTargets.find(item => item.id === id)).filter((item): item is NavigationTarget => Boolean(item))
+     if (targets.length > 0) {
+      setChoices(targets); setMessage(text.choose); addHistory('assistant', text.choose)
+      return
+     }
+    }
+    if (ai.kind === 'reject') {
+     setMessage(text.reject); addHistory('assistant', text.reject)
+     return
+    }
+   } catch {
+    // Provider failure falls through to deterministic suggestions/clarification.
+   }
   }
   if (result.kind === 'not-understood') {
    const suggestions = suggestNavigation(command)
@@ -139,18 +191,77 @@ export function NavigationAssistant() {
   window.location.hash = target.hash
  }
 
- function dispatchFinal(pcm: Float32Array) {
-  const worker = workerRef.current
-  if (!worker || !workerReadyRef.current) {
-   pendingPcmRef.current?.fill(0)
-   pendingPcmRef.current = pcm
-   transcribingRef.current = true
-   setTranscribing(true)
-   return
+ async function runWhisperFallback(originalTranscript?: string) {
+  const pcm = fallbackPcmRef.current
+  if (!pcm || whisperAbortRef.current) return
+  const controller = new AbortController()
+  whisperAbortRef.current = controller
+  try {
+   if (!(await hostedWhisperEnabled())) throw new Error(text.whisperDisabled)
+   if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
+   const whisperResult = await transcribeNavigationWithWhisper(pcm, controller.signal)
+   if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
+   const transcript = whisperResult.text
+   if (!transcript) throw new Error(text.tooShort)
+   setVoiceError('')
+   setQuery(transcript)
+   handleCommand(transcript)
+  } catch (error) {
+   if (!controller.signal.aborted && !cancelledFinalRef.current && panelOpenRef.current) {
+    if (originalTranscript) {
+     // If hosted Whisper is disabled or unavailable, retain Shruti's transcript
+     // and let Level 3 try to interpret it instead of dropping the command.
+     setVoiceError('')
+     setQuery(originalTranscript)
+     handleCommand(originalTranscript)
+    } else {
+     setVoiceError(error instanceof Error ? error.message : text.failed)
+    }
+   }
+  } finally {
+   pcm.fill(0)
+   if (fallbackPcmRef.current === pcm) fallbackPcmRef.current = null
+   whisperAbortRef.current = null
+   transcribingRef.current = false
+   setTranscribing(false)
   }
+ }
+
+ function clearShrutiTimeout() {
+  if (shrutiTimeoutRef.current !== null) window.clearTimeout(shrutiTimeoutRef.current)
+  shrutiTimeoutRef.current = null
+ }
+
+ function dispatchFinal(pcm: Float32Array) {
+  fallbackPcmRef.current?.fill(0)
+  fallbackPcmRef.current = pcm.slice()
+  const worker = workerRef.current
   transcribingRef.current = true
   setTranscribing(true)
-  worker.postMessage({ type:'transcribe', id:++messageIdRef.current, pcm }, [pcm.buffer])
+  if (!worker || !workerReadyRef.current) {
+   pcm.fill(0)
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
+   return
+  }
+  clearShrutiTimeout()
+  shrutiTimeoutRef.current = window.setTimeout(() => {
+   workerRef.current?.terminate()
+   workerRef.current = null
+   workerReadyRef.current = false
+   workerLoadingRef.current = false
+   clearShrutiTimeout()
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
+  }, 12000)
+  try { worker.postMessage({ type:'transcribe', id:++messageIdRef.current, pcm }, [pcm.buffer]) }
+  catch {
+   pcm.fill(0)
+   clearShrutiTimeout()
+   worker.terminate()
+   workerLoadingRef.current = false
+   workerRef.current = null
+   workerReadyRef.current = false
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
+  }
  }
 
  function requestPartialTranscript() {
@@ -196,9 +307,21 @@ export function NavigationAssistant() {
   workerLoadingRef.current = false
   workerReadyRef.current = false
   partialInFlightRef.current = false
-  setVoiceLoading(false); setVoiceError(detail); setTranscribing(false)
-  transcribingRef.current = false
+  clearShrutiTimeout()
+  setVoiceLoading(false)
+  setVoiceError(detail)
   pendingPcmRef.current?.fill(0); pendingPcmRef.current = null
+  // Do not discard a live capture if Shruti fails during model initialization.
+  // The completed utterance will be sent to Whisper after the user releases the mic.
+  if (recordingRef.current || holdingRef.current) return
+  if (fallbackPcmRef.current) {
+   transcribingRef.current = true
+   setTranscribing(true)
+   void runWhisperFallback(partialTranscriptRef.current || undefined)
+   return
+  }
+  setTranscribing(false)
+  transcribingRef.current = false
   abortCapture()
  }
 
@@ -207,7 +330,7 @@ export function NavigationAssistant() {
   workerLoadingRef.current = true
   setVoiceLoading(true); setVoiceError(''); setVoiceProgress(0)
   try {
-   const worker = new Worker('/shruti-worker.js')
+   const worker = createSpeechWorker()
    workerRef.current = worker
    worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
     const data = event.data
@@ -239,18 +362,25 @@ export function NavigationAssistant() {
      return
     }
     if (data.type === 'result') {
-     transcribingRef.current = false
-     setTranscribing(false)
+     clearShrutiTimeout()
      if (cancelledFinalRef.current || !panelOpenRef.current) {
       cancelledFinalRef.current = false
+      fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
+      transcribingRef.current = false; setTranscribing(false)
       return
      }
-     const finalTranscript = (data.text || '').trim()
-     // If the final pass returns empty but a rolling preview heard speech,
-     // retain that preview instead of discarding the user's command.
+     const shrutiResult: SpeechTranscriptResult = { text:(data.text || '').trim(), provider:'shruti-local', language:data.language ?? null, durationMs:data.ms ?? null }
+     const finalTranscript = shrutiResult.text
+     // Prefer a usable final or rolling transcript; use hosted Whisper only if Shruti has neither.
      const transcript = finalTranscript || partialTranscriptRef.current
      partialTranscriptRef.current = ''
-     if (!transcript) { setVoiceError(text.tooShort); return }
+     if (!transcript) { void runWhisperFallback(); return }
+     // A non-empty transcript that the deterministic resolver cannot interpret is
+     // treated as a low-quality ASR result; retry it with Whisper before Level 3.
+     if (resolveNavigation(transcript).kind === 'not-understood') { void runWhisperFallback(transcript); return }
+     fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
+     transcribingRef.current = false
+     setTranscribing(false)
      setVoiceError('')
      setQuery(transcript)
      handleCommand(transcript)
@@ -262,9 +392,8 @@ export function NavigationAssistant() {
       if (data.captureId === captureIdRef.current) partialInFlightRef.current = false
       return
      }
-     transcribingRef.current = false
-     setTranscribing(false)
-     setVoiceError(data.message || text.failed)
+     clearShrutiTimeout()
+     void runWhisperFallback(partialTranscriptRef.current || undefined)
     }
    }
    worker.onerror = event => failWorker(event.message || text.failed)
@@ -437,7 +566,19 @@ export function NavigationAssistant() {
  function closeAssistant() {
   panelOpenRef.current = false
   if (holdingRef.current || recordingRef.current) abortCapture()
-  else if (transcribingRef.current) cancelledFinalRef.current = true
+  else if (transcribingRef.current) {
+   cancelledFinalRef.current = true
+   whisperAbortRef.current?.abort()
+   fallbackPcmRef.current?.fill(0); fallbackPcmRef.current = null
+   clearShrutiTimeout()
+   workerRef.current?.terminate()
+   workerRef.current = null
+   workerReadyRef.current = false
+   workerLoadingRef.current = false
+   partialInFlightRef.current = false
+   transcribingRef.current = false
+   setTranscribing(false)
+  }
   setOpen(false)
  }
 
@@ -445,6 +586,10 @@ export function NavigationAssistant() {
   holdingRef.current = false
   pendingPcmRef.current?.fill(0)
   pendingPcmRef.current = null
+  fallbackPcmRef.current?.fill(0)
+  fallbackPcmRef.current = null
+  whisperAbortRef.current?.abort()
+  clearShrutiTimeout()
   partialTranscriptRef.current = ''
   workerRef.current?.terminate()
   streamRef.current?.getTracks().forEach(track => track.stop())

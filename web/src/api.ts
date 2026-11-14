@@ -36,6 +36,19 @@ export async function api<T>(method: string, path: string, body?: unknown, idemp
   return data as T
 }
 
+export async function apiBinary<T>(path: string, body: Blob, signal?: AbortSignal): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': body.type || 'application/octet-stream', 'X-CSRF-TOKEN': await token() }
+  const r = await fetch(`/api${path}`, { method: 'POST', headers, credentials: 'same-origin', body, signal })
+  if (r.status === 400) csrf = null
+  const text = await r.text()
+  const data = text ? JSON.parse(text) : undefined
+  if (!r.ok) {
+    const d = data as { error?: string; detail?: string; title?: string } | undefined
+    throw new ApiError(r.status, d?.error ?? d?.detail ?? d?.title ?? 'Request failed')
+  }
+  return data as T
+}
+
 export const resetCsrf = () => { csrf = null }
 
 let otpConfig: Promise<boolean> | null = null

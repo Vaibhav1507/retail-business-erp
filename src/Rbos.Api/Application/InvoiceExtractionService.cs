@@ -9,8 +9,8 @@ namespace Rbos.Api.Application;
 public sealed record DraftLine(string Description, decimal? Quantity, decimal? UnitCost, decimal? Amount, Guid? ProductId, string? ProductName, string? Category = null, string? Brand = null, decimal? Gst = null);
 public sealed record InvoiceDraft(Guid FileId, string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, List<DraftLine> Lines, List<string> Warnings, decimal? Subtotal = null, decimal? TaxAmount = null);
 
-/// <summary>Reads a supplier invoice photo/PDF with Gemini and returns an unsaved draft for the user to review. Nothing is posted here.</summary>
-public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log)
+/// <summary>Reads a supplier invoice photo/PDF with Gemini and Groq vision fallback, then returns an unsaved draft. Nothing is posted here.</summary>
+public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log, GroqVisionClient groq)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
@@ -41,7 +41,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             extra.Add((pm, pb));
         }
         var apiKey = cfg["Gemini:ApiKey"];
-        if (string.IsNullOrWhiteSpace(apiKey)) return ServiceResult<object>.Fail("Invoice reading is not set up yet. Ask the owner to add the Gemini key.");
+
         if (mime is null || !Allowed.Contains(mime)) return ServiceResult<object>.Fail("Upload a JPEG, PNG, WebP or PDF file.");
         if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<object>.Fail("File is empty or larger than 8 MB.");
         byte[] bytes;
@@ -51,20 +51,25 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
-        JsonNode? parsed;
-        try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
-        catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-        { return ServiceResult<object>.Fail("Free reading limit reached. Try again later or enter the invoice by hand."); }
-        catch (HttpRequestException e) when (e.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.InternalServerError or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.GatewayTimeout)
+        JsonNode? parsed = null;
+        if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            log.LogWarning(e, "Invoice reading service unavailable");
-            return ServiceResult<object>.Fail("The invoice reading service is busy right now. Please try again in a minute or enter the invoice by hand.", 503);
+            try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            { log.LogWarning("Gemini invoice extraction rate limited; trying configured fallback providers"); }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+            { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+
+        if ((parsed is null || parsed["lines"] is not JsonArray { Count: > 0 }) && groq.Available && string.Equals(cfg["Groq:InvoiceFallbackEnabled"], "true", StringComparison.OrdinalIgnoreCase))
         {
-            log.LogWarning(e, "Invoice extraction failed");
-            return ServiceResult<object>.Fail("Could not read this invoice. Try a clearer photo or enter it by hand.");
+            try { parsed = await groq.ExtractInvoiceAsync([(mime, b64), .. extra], Prompt, ct); }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+            { log.LogWarning(e, "Groq invoice extraction fallback failed"); }
         }
+        if (parsed is null)
+            return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
+
 
         await using var s = await db.BeginAsync(uid, tid, ct);
         var products = new List<(Guid Id, string Name)>();

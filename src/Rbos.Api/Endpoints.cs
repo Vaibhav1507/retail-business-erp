@@ -20,6 +20,10 @@ public sealed record OpeningStockRequest(Guid LocationId, DateOnly EffectiveDate
 
 public static class Endpoints
 {
+	static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateOnly Day, int Count)> WhisperDailyUsage = new();
+	static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, (DateOnly Day, int Count)> VoiceIntentDailyUsage = new();
+	const int MaxVoiceIntentRequestsPerUserPerDay = 100;
+	const int MaxWhisperRequestsPerUserPerDay = 100;
 	static readonly string[] Units = ["pcs", "set", "pack", "m"];
 	static readonly string[] AttrKeys = ["colour", "capacity", "connector_type", "compatible_with"];
 
@@ -39,6 +43,71 @@ public static class Endpoints
 		var api = app.MapGroup("/api");
 		PermissionFilter.Apply(api);
 		api.MapGet("/csrf", (HttpContext c, IAntiforgery af) => Results.Ok(new { token = af.GetAndStoreTokens(c).RequestToken })).AllowAnonymous();
+
+		api.MapGet("/voice/intent/config", (VoiceNavigationIntentService intent) =>
+			Results.Ok(new { enabled = intent.Available })).RequireAuthorization();
+
+		api.MapPost("/voice/intent", async (VoiceIntentRequest body, ClaimsPrincipal principal, VoiceNavigationIntentService intent, CancellationToken ct) =>
+		{
+			if (!intent.Available) return ApiResults.Fail(503, "AI navigation intent is not enabled.");
+			if (string.IsNullOrWhiteSpace(body.Transcript) || body.Transcript.Trim().Length > 500)
+				return ApiResults.Fail(400, "Voice transcript must be between 1 and 500 characters.");
+			var userId = UserId(principal);
+			var today = DateOnly.FromDateTime(DateTime.UtcNow);
+			var usage = VoiceIntentDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
+			if (usage.Count > MaxVoiceIntentRequestsPerUserPerDay)
+				return ApiResults.Fail(429, "Daily AI navigation limit reached. Use the basic navigation commands and try again tomorrow.");
+			var result = await intent.ClassifyAsync(body, ct);
+			return Results.Ok(result);
+		}).RequireAuthorization();
+
+		api.MapGet("/voice/transcribe/config", (GroqSpeechToTextClient whisper) =>
+			Results.Ok(new { enabled = whisper.Available })).RequireAuthorization();
+
+		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, GroqSpeechToTextClient whisper, CancellationToken ct) =>
+		{
+			if (!whisper.Available) return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
+			if (request.ContentLength is <= 44 or > 640_044) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+			await using var buffer = new MemoryStream();
+			var chunk = new byte[81920];
+			while (true)
+			{
+				var read = await request.Body.ReadAsync(chunk, ct);
+				if (read == 0) break;
+				if (buffer.Length + read > 640_044) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+				await buffer.WriteAsync(chunk.AsMemory(0, read), ct);
+			}
+			if (buffer.Length is <= 44 or > 640_044) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
+			var wav = buffer.ToArray();
+			if (wav[0] != (byte)'R' || wav[1] != (byte)'I' || wav[2] != (byte)'F' || wav[3] != (byte)'F' ||
+				wav[8] != (byte)'W' || wav[9] != (byte)'A' || wav[10] != (byte)'V' || wav[11] != (byte)'E' ||
+				wav[12] != (byte)'f' || wav[13] != (byte)'m' || wav[14] != (byte)'t' || wav[15] != (byte)' ' ||
+				BitConverter.ToUInt32(wav, 4) != (uint)(wav.Length - 8) ||
+				BitConverter.ToUInt32(wav, 16) != 16 || BitConverter.ToUInt16(wav, 20) != 1 || BitConverter.ToUInt16(wav, 22) != 1 ||
+				BitConverter.ToUInt32(wav, 24) != 16000 || BitConverter.ToUInt32(wav, 28) != 32000 ||
+				BitConverter.ToUInt16(wav, 32) != 2 || BitConverter.ToUInt16(wav, 34) != 16 ||
+				BitConverter.ToUInt32(wav, 40) != (uint)(wav.Length - 44))
+				return ApiResults.Fail(400, "Voice command audio must be mono 16 kHz PCM WAV.");
+			var userId = UserId(principal);
+			var today = DateOnly.FromDateTime(DateTime.UtcNow);
+			var usage = WhisperDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
+			if (usage.Count > MaxWhisperRequestsPerUserPerDay) return ApiResults.Fail(429, "Daily voice backup limit reached. Please type the command and try again tomorrow.");
+			try
+			{
+				var transcript = await whisper.TranscribeWavAsync(wav, ct);
+				return string.IsNullOrWhiteSpace(transcript) ? ApiResults.Fail(422, "Speech could not be transcribed.") : Results.Ok(new { text = transcript });
+			}
+			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+			{ return ApiResults.Fail(429, "Speech backup limit reached. Please type the command or try again later."); }
+			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+			{ return ApiResults.Fail(503, "Speech backup is temporarily unavailable. Please type the command or try again."); }
+			finally
+			{
+				CryptographicOperations.ZeroMemory(wav);
+				CryptographicOperations.ZeroMemory(chunk);
+				if (buffer.TryGetBuffer(out var audioBuffer)) CryptographicOperations.ZeroMemory(audioBuffer.AsSpan());
+			}
+		}).RequireAuthorization();
 
 		AuthOtpEndpoints.Map(api);
 

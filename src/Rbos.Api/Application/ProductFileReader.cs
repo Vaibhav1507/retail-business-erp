@@ -16,7 +16,7 @@ public sealed record ProductFileResult(
 
 /// <summary>
 /// Turns an uploaded product list into plain table rows (header row first).
-/// Excel and Word files are parsed locally; only photos are sent to Gemini.
+/// Excel and Word files are parsed locally; catalogue photos/PDFs use Gemini with Groq vision fallback and local OCR recovery where available.
 /// </summary>
 public sealed class ProductFileReader(HttpClient http, IConfiguration cfg, ILogger<ProductFileReader> log, LocalOcr ocr, GroqVisionClient groq)
 {

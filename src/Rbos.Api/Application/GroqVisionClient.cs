@@ -20,6 +20,48 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         return await CallAsync([("data:" + mime + ";base64," + base64)], prompt, ct);
     }
 
+    public async Task<JsonNode?> ExtractInvoiceAsync(IReadOnlyList<(string Mime, string Base64)> pages, string prompt, CancellationToken ct)
+    {
+        if (!Available || pages.Count is 0 or > 6) return null;
+        var images = new List<string>();
+        foreach (var (mime, base64) in pages)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (mime == "application/pdf")
+            {
+                byte[] pdf;
+                try { pdf = Convert.FromBase64String(base64); }
+                catch (FormatException) { return null; }
+                var pdfPages = PdfPageReader.Read(pdf);
+                if (pdfPages is null || pdfPages.Count is 0 or > 6) return null;
+                foreach (var page in pdfPages)
+                {
+                    var png = PdfPageReader.RenderPng(pdf, page.Page);
+                    if (png is null) return null;
+                    images.Add("data:image/png;base64," + Convert.ToBase64String(png));
+                }
+            }
+            else
+            {
+                if (mime is not ("image/jpeg" or "image/png" or "image/webp")) return null;
+                images.Add("data:" + mime + ";base64," + base64);
+            }
+            if (images.Count > 6) return null;
+        }
+        var merged = new JsonObject { ["lines"] = new JsonArray() };
+        foreach (var batch in images.Chunk(3))
+        {
+            var partial = await CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct);
+            if (partial is not JsonObject) return null;
+            foreach (var key in new[] { "supplierName", "invoiceNumber", "date", "total", "subtotal", "taxAmount" })
+                if (partial[key] is not null) merged[key] = partial[key]!.DeepClone();
+            if (partial["lines"] is JsonArray lines)
+                foreach (var line in lines)
+                    if (line is not null) ((JsonArray)merged["lines"]!).Add(line.DeepClone());
+        }
+        return merged;
+    }
+
     public async Task<JsonNode?> ExtractPdfAsync(byte[] pdf, string prompt, CancellationToken ct)
     {
         if (!Available) return null;
