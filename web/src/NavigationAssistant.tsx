@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getLanguage } from './i18n'
 import { resampleAudio } from './audio-utils'
-import { createSpeechWorker } from './speech-provider'
+import { createSpeechWorker, type SpeechTranscriptResult } from './speech-provider'
 import { transcribeNavigationWithWhisper } from './speech-fallback'
 import { api } from './api'
 import { navigationTargets, resolveNavigation, suggestNavigation, type NavigationTarget } from './navigation-resolver'
@@ -199,8 +199,9 @@ export function NavigationAssistant() {
   try {
    if (!(await hostedWhisperEnabled())) throw new Error(text.whisperDisabled)
    if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
-   const transcript = await transcribeNavigationWithWhisper(pcm, controller.signal)
+   const whisperResult = await transcribeNavigationWithWhisper(pcm, controller.signal)
    if (controller.signal.aborted || cancelledFinalRef.current || !panelOpenRef.current) return
+   const transcript = whisperResult.text
    if (!transcript) throw new Error(text.tooShort)
    setVoiceError('')
    setQuery(transcript)
@@ -368,7 +369,8 @@ export function NavigationAssistant() {
       transcribingRef.current = false; setTranscribing(false)
       return
      }
-     const finalTranscript = (data.text || '').trim()
+     const shrutiResult: SpeechTranscriptResult = { text:(data.text || '').trim(), provider:'shruti-local', language:data.language ?? null, durationMs:data.ms ?? null }
+     const finalTranscript = shrutiResult.text
      // Prefer a usable final or rolling transcript; use hosted Whisper only if Shruti has neither.
      const transcript = finalTranscript || partialTranscriptRef.current
      partialTranscriptRef.current = ''
