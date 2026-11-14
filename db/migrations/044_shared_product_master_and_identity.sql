@@ -321,7 +321,7 @@ for all to rbos_app
 using (tenant_id=core.current_tenant_id() and core.is_active_member(tenant_id))
 with check (tenant_id=core.current_tenant_id() and core.is_active_member(tenant_id));
 
-grant select, insert, update (attributes, specs, hsn_code, gst_rate) on catalog.master_product to rbos_app;
+grant select, insert, update (attributes, specs, hsn_code, gst_rate, updated_at) on catalog.master_product to rbos_app;
 grant select, insert on catalog.product_alias to rbos_app;
 grant update (master_product_id) on catalog.product to rbos_app;
 grant execute on function catalog.product_identity_key(text,text,text),
