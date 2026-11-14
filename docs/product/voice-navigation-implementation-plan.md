@@ -72,8 +72,10 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 ### W2 — Level 2 STT failover
 - [ ] Define a provider-neutral STT result contract: transcript, language, provider, duration, status and confidence/quality metadata where available.
 - [ ] Keep Shruti as primary.
-- [ ] Implement Whisper as backup behind the provider boundary.
-- [ ] Define deterministic fallback conditions (init/runtime error, timeout, empty transcript, unusable output); do not confuse transcript confidence with intent confidence.
+- [ ] Implement Groq-hosted Whisper (`whisper-large-v3-turbo`) as backup behind the provider boundary; require an explicit `Groq:WhisperEnabled` switch and the existing server-side Groq key.
+- [ ] Define deterministic fallback conditions (Shruti init/runtime error, timeout, empty transcript, unusable output); do not confuse transcript confidence with intent confidence.
+- [ ] Preserve a short-lived copy of final PCM until Shruti succeeds or Whisper finishes; clear it on success, cancellation, timeout or disposal.
+- [ ] Convert PCM to bounded 16 kHz mono WAV and upload only after Shruti fails; enforce audio duration/size limits and bounded API timeout.
 - [ ] Ensure both STT outputs enter the same normalization and Level 1 resolver.
 - [ ] Test audio buffer cleanup, cancellation, retries and provider failure.
 
@@ -115,7 +117,8 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 
 - Keep Shruti as the local-first primary STT.
 - Do not upload raw audio to Level 3. LLM providers receive only the minimum transcript/context needed.
-- Whisper hosted mode, Gemini and Grok may transmit transcript/audio outside the device depending on the adapter; make the exact data flow explicit.
+- The owner confirmed that ordinary navigation-command audio may be sent to hosted Whisper. The Level 2 fallback sends audio only after Shruti failure; do not send it to Level 3.
+- Groq Free-plan rate limits currently list Whisper at 20 RPM, 2,000 RPD, 7,200 audio seconds/hour and 28,800 audio seconds/day; actual account limits may vary. Paid Developer usage is billed separately. Enforce a small application-side pilot quota and handle HTTP 429 safely.
 - No API keys in frontend bundles, source control, logs or test fixtures. Provider secrets remain server-side.
 - No silent paid dependency. Check actual quotas and pricing; temporary free allowances are not permanent zero-cost guarantees.
 - Never log audio, full transcripts, authorization headers, provider payloads or sensitive business data.
@@ -130,6 +133,7 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 | 2026-11-14 | Audited current speech provider and assistant integration | Shruti is the only registered STT provider; assistant calls deterministic resolver directly |
 | 2026-11-14 | Audited AI-related backend files | `InvoiceExtractionService` uses Gemini only; `ProductFileReader` uses `GroqVisionClient` with Qwen vision as catalogue image/PDF fallback |
 | 2026-11-14 | Owner clarified provider name | Existing integration is Groq, not xAI Grok; it is catalogue extraction only, not voice intent |
+| 2026-11-14 | Owner clarified Level 2 audio-transfer constraint | Hosted Whisper is acceptable for ordinary navigation commands; selected Groq Whisper Turbo as the backup candidate, with free-plan limits and explicit enablement documented |
 | 2026-11-14 | Updated voice research to restore Whisper backup and Level 3 to current scope | Documentation correction in progress |
 
 ## 6. Decision log / open questions
@@ -140,7 +144,8 @@ Provider ordering and retry rules must avoid uncontrolled cascades. Use bounded 
 - **To verify:** Whether a suitable Groq-hosted Qwen text-generation model is available and appropriate for voice intent fallback.
 - **Not assumed:** Existing Qwen vision configuration does not prove text-intent capability. Do not wire it until model/API compatibility is verified.
 - **Confirmed:** Preserve current UI and deterministic route safety.
-- **To measure:** Best viable Whisper backup deployment under the zero-cost/privacy/performance constraints.
+- **Confirmed:** Hosted Whisper is acceptable for ordinary navigation-command audio. Prefer Groq Free-plan use for the pilot; do not upgrade the provider account or enable paid usage without explicit owner approval.
+- **To measure:** Shruti→Whisper failover latency and transcript/navigation accuracy on consented RBOS command audio.
 - **To configure:** Provider keys, quotas, model IDs and environment-specific enablement without committing secrets.
 
 Update this file at every meaningful implementation milestone, provider decision, test result and deployment/acceptance gate. Keep `voice-navigation-research.md` as the evidence/research companion; this file is the execution tracker.
