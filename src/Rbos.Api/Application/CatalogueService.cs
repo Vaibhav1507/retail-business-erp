@@ -7,7 +7,7 @@ using Rbos.Domain;
 
 namespace Rbos.Api.Application;
 
-public sealed record ProductCommand(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool IsActive = true, string? HsnCode = null, decimal? GstRate = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null, int? SourcePage = null)
+public sealed record ProductCommand(string? Name, string? CategoryName, bool IsGeneric, string? BaseUnit, string? Brand, string? Model, Dictionary<string, string>? Attributes, bool IsActive = true, string? HsnCode = null, decimal? GstRate = null, decimal? Mrp = null, Dictionary<string, string>? Specs = null, int? SourcePage = null, string? Barcode = null)
 {
     public ProductInput ToInput() => new(Name, CategoryName, IsGeneric, BaseUnit, Brand, Model, Attributes);
 }
@@ -199,7 +199,14 @@ public sealed class CatalogueService(TenantDb db)
         var first = await NextSkuAsync(s, tid.Value, 1, ct);
         var id = Guid.NewGuid();
         var sku = ProductRules.FormatSku(first);
-        try { await InsertAsync(s, tid.Value, id, cat, sku, m.ToInput(), masterProductId, ct); await SetTaxAsync(s, id, m, ct); await SetCatalogueDataAsync(s, tid.Value, id, m.Brand, m.Mrp, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), ct); }
+        try
+        {
+            await InsertAsync(s, tid.Value, id, cat, sku, m.ToInput(), masterProductId, ct);
+            if (!string.IsNullOrWhiteSpace(m.Barcode) && !await BarcodeService.LinkIfFreeAsync(s, tid.Value, id, m.Barcode, ct))
+                return ServiceResult<object>.Fail("This barcode is already linked to another product.", 409);
+            await SetTaxAsync(s, id, m, ct);
+            await SetCatalogueDataAsync(s, tid.Value, id, m.Brand, m.Mrp, WithCategoryAttributes(m.CategoryName, m.Name, m.Specs), ct);
+        }
         catch (PostgresException e) when (e.SqlState == "23505") { return ServiceResult<object>.Fail("A product with the same name, brand and model already exists.", 409); }
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id, sku });
@@ -297,7 +304,8 @@ public sealed class CatalogueService(TenantDb db)
                     WithCategoryAttributes(row.CategoryName, row.Name, row.Specs),
                     ct);
                 if (docId is not null) await SetSourceAsync(s, tid.Value, pid, docId.Value, row.SourcePage, ct);
-                if (!string.IsNullOrWhiteSpace(row.Barcode)) await BarcodeService.LinkIfFreeAsync(s, tid.Value, pid, row.Barcode, ct);
+                if (!string.IsNullOrWhiteSpace(row.Barcode) && !await BarcodeService.LinkIfFreeAsync(s, tid.Value, pid, row.Barcode, ct))
+                    return ServiceResult<ImportCommitResult>.Fail("A barcode became linked during this import. Preview again to reconcile it.", 409);
                 n++;
             }
             await using var b = s.Command("insert into catalog.import_batch(tenant_id,id,idempotency_key,request_hash,created_by,total_rows,created_count,skipped_count,source_document_id) values (@t,@i,@k,@h,@u,@r,@c,@s,@d)");
