@@ -61,6 +61,9 @@ public static class Endpoints
 			return Results.Ok(result);
 		}).RequireAuthorization();
 
+		api.MapGet("/voice/transcribe/config", (GroqSpeechToTextClient whisper) =>
+			Results.Ok(new { enabled = whisper.Available })).RequireAuthorization();
+
 		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, GroqSpeechToTextClient whisper, CancellationToken ct) =>
 		{
 			if (!whisper.Available) return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
