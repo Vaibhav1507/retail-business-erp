@@ -6,7 +6,7 @@
 **Base branch:** auth/persistent-login-and-network-state  
 **Base SHA:** 4e9a6a72dc24d89bec5417c17b60193b5381b6e8  
 **Implementation head:** 3c208ee3ab0fa0473d7dcd5879823029f002988c  
-**Status:** Implementation committed; PR #34 open/draft/unmerged. CI run #411 failed before runner allocation (no steps executed); tests remain unvalidated. No merge or deployment.
+**Status:** Implementation committed; PR #34 open/draft/unmerged. The latest PR-head CI run #413 failed before runner allocation; frontend and backend jobs have empty step arrays and no tests ran. No merge or deployment.
 
 ## Scope delivered
 
@@ -49,7 +49,7 @@
 
 ## Validation
 
-- Phase 3 CI run #411 ([run](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44100440523)) failed before any job steps started. Both jobs completed in approximately two seconds with `runner_id: 0`, empty step arrays and no downloadable job logs. A retry of failed jobs (attempt 2) reproduced the same runner-allocation failure. This is an Actions runner/infrastructure failure, not evidence of a test assertion or build failure; no Phase 3 test actually ran. Retry once runner allocation is healthy.
+- Initial Phase 3 CI run #411 ([run](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44100440523)) and the later PR-head run #413 ([run](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44100762053)) both failed before job steps started. The latest run has empty frontend/backend step arrays and no downloadable job logs. No Phase 3 build or test executed; this is a runner-allocation failure, not a reported code/test failure.
 - Phase 2 parent PR #33 reports CI run #409 passing on application/test head `ea04d8b46232e5adfc5807c71ea7816c2642d4f5`: frontend TypeScript/Vitest/build, backend Release build, migrations 001–045 on disposable CI PostgreSQL, 112 unit tests and 148 integration tests.
 - Phase 3 must run the full CI including migration 046, tests and Docker build. Do not infer success from Phase 2.
 - No local build/test run or production migration was performed in this implementation slice.
