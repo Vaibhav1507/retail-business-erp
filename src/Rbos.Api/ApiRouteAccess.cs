@@ -163,7 +163,7 @@ public static class ApiRouteAccess
         new("POST", "/api/owner-transactions", ApiAccessKind.Permission, Permissions.FinanceManage),
         new("POST", "/api/loans", ApiAccessKind.Permission, Permissions.FinanceManage),
         new("POST", "/api/loans/{id:guid}/repayments", ApiAccessKind.Permission, Permissions.FinanceManage),
-        new("POST", "/api/stock-adjustments", ApiAccessKind.Permission, Permissions.FinanceManage),
+        new("POST", "/api/stock-adjustments", ApiAccessKind.Permission, Permissions.StockAdjust),
         new("POST", "/api/cash-closings", ApiAccessKind.Permission, Permissions.FinanceManage),
         new("POST", "/api/reconciliation/clear", ApiAccessKind.Permission, Permissions.FinanceManage),
 
