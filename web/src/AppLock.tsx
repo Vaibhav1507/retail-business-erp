@@ -26,6 +26,8 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
   const [locked, setLocked] = useState(true)
   const [pin, setPin] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [changingPin, setChangingPin] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [remaining, setRemaining] = useState(0)
@@ -40,8 +42,10 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
   useEffect(() => { reload() }, [reload])
   useEffect(() => {
     const lock = () => setLocked(true)
+    const change = () => { setChangingPin(true); setLocked(true); setPin(''); setNewPin(''); setConfirm(''); setError('') }
     window.addEventListener('rbos:lock', lock)
-    return () => window.removeEventListener('rbos:lock', lock)
+    window.addEventListener('rbos:change-pin', change)
+    return () => { window.removeEventListener('rbos:lock', lock); window.removeEventListener('rbos:change-pin', change) }
   }, [])
   useEffect(() => {
     if (locked || loading) return
@@ -61,6 +65,20 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
       localStorage.setItem(storageKey, JSON.stringify(next))
       setVerifier(next); setPin(''); setConfirm(''); setLocked(false)
     } catch { setError('This browser cannot create a local PIN. Use sign out and try a supported browser.') }
+    finally { setBusy(false) }
+  }
+
+  async function changePin() {
+    if (!verifier) return
+    if (!/^\d{4}$/.test(pin)) { setError('Enter your current four-digit PIN.'); return }
+    if (!await verify(pin, verifier)) { setPin(''); setError('Current PIN is incorrect.'); return }
+    if (!/^\d{4}$/.test(newPin) || newPin !== confirm) { setError('New PINs must match and contain exactly four digits.'); return }
+    setBusy(true); setError('')
+    try {
+      const next = await makeVerifier(newPin)
+      localStorage.setItem(storageKey, JSON.stringify(next))
+      setVerifier(next); setPin(''); setNewPin(''); setConfirm(''); setChangingPin(false); setLocked(false)
+    } catch { setError('Could not update the local PIN.') }
     finally { setBusy(false) }
   }
 
@@ -91,20 +109,29 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
   if (!verifier || locked) return (
     <main className="access app-lock-screen">
       <section className="app-lock-card">
-        <h1>{verifier ? 'Unlock this device' : 'Set up your app PIN'}</h1>
-        <p>{verifier ? 'Enter your four-digit PIN to reopen the shop workspace.' : 'Set a four-digit PIN for the local privacy lock on this browser.'}</p>
-        <label>{verifier ? 'PIN' : 'Create four-digit PIN'}
+        <h1>{changingPin ? 'Change app PIN' : verifier ? 'Unlock this device' : 'Set up your app PIN'}</h1>
+        <p>{changingPin ? 'Confirm your current PIN, then choose a new one.' : verifier ? 'Enter your four-digit PIN to reopen the shop workspace.' : 'Set a four-digit PIN for the local privacy lock on this browser.'}</p>
+        <label>{changingPin ? 'Current PIN' : verifier ? 'PIN' : 'Create four-digit PIN'}
           <input autoFocus inputMode="numeric" type="password" maxLength={4} autoComplete="off" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} />
         </label>
-        {!verifier && <label>Confirm PIN
+        {changingPin ? <>
+          <label>New four-digit PIN
+            <input inputMode="numeric" type="password" maxLength={4} autoComplete="off" value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+          </label>
+          <label>Confirm new PIN
+            <input inputMode="numeric" type="password" maxLength={4} autoComplete="off" value={confirm} onChange={e => setConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+          </label>
+        </> : !verifier && <label>Confirm PIN
           <input inputMode="numeric" type="password" maxLength={4} autoComplete="off" value={confirm} onChange={e => setConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))} />
         </label>}
         {error && <p role="alert">{error}{remaining > 0 ? ` (${remaining}s)` : ''}</p>}
-        <button type="button" disabled={busy} onClick={() => void (verifier ? unlock() : setup())}>{busy ? 'Please wait…' : verifier ? 'Unlock' : 'Save PIN'}</button>
-        <button type="button" className="secondary" onClick={() => void onSignOut()}>Sign out</button>
+        <button type="button" disabled={busy} onClick={() => void (changingPin ? changePin() : verifier ? unlock() : setup())}>{busy ? 'Please wait…' : changingPin ? 'Save new PIN' : verifier ? 'Unlock' : 'Save PIN'}</button>
+        {changingPin && <button type="button" className="secondary" onClick={() => { setChangingPin(false); setLocked(false); setPin(''); setNewPin(''); setConfirm(''); setError('') }}>Cancel</button>}
+        <button type="button" className="secondary" onClick={() => { void onSignOut().then(() => localStorage.removeItem(storageKey)).catch(() => setError('You are offline. Reconnect before signing out so the server session can be revoked.')) }}>Sign out</button>
         <p className="app-lock-note">This is a local privacy lock, not a second authentication factor. Your server session and API permissions remain the actual security boundary. Do not use this PIN as a password.</p>
       </section>
     </main>
   )
+
   return <>{children}</>
 }
