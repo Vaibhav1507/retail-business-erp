@@ -139,8 +139,8 @@ public static class AuthPasskeyEndpoints
             try { assertion = await signIn.PerformPasskeyAssertionAsync(request.CredentialJson); }
             catch (PasskeyAuthenticationStateException) { return ApiResults.Fail(400, "Passkey sign-in state is missing or expired. Start again."); }
 
-            if (!assertion.Succeeded || !await signIn.CanSignInAsync(assertion.User) ||
-                await users.IsLockedOutAsync(assertion.User))
+            if (!assertion.Succeeded || assertion.User is null) return Results.Unauthorized();
+            if (!await signIn.CanSignInAsync(assertion.User) || await users.IsLockedOutAsync(assertion.User))
                 return Results.Unauthorized();
 
             var updated = await users.AddOrUpdatePasskeyAsync(assertion.User, assertion.Passkey);
