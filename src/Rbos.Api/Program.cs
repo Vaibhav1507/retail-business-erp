@@ -62,7 +62,7 @@ var builder = WebApplication.CreateBuilder(args);
 var passkeyDomain = builder.Configuration["Auth:Passkeys:ServerDomain"]?.Trim();
 if (!string.IsNullOrWhiteSpace(passkeyDomain))
 {
-    if (Uri.CheckHostName(passkeyDomain) == UriHostNameType.Unknown)
+    if (Uri.CheckHostName(passkeyDomain) != UriHostNameType.Dns)
         throw new InvalidOperationException("Auth:Passkeys:ServerDomain must be a valid DNS host name.");
     var allowedHosts = builder.Configuration["AllowedHosts"];
     if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts.Trim() == "*")
