@@ -71,7 +71,16 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
   async function changePin() {
     if (!verifier) return
     if (!/^\d{4}$/.test(pin)) { setError('Enter your current four-digit PIN.'); return }
-    if (!await verify(pin, verifier)) { setPin(''); setError('Current PIN is incorrect.'); return }
+    if (!await verify(pin, verifier)) {
+      const failures = verifier.failures + 1
+      const delay = failures >= 5 ? Math.min(15 * 60_000, 30_000 * 2 ** Math.min(failures - 5, 5)) : 0
+      const updated = { ...verifier, failures, lockedUntil: delay ? Date.now() + delay : 0 }
+      localStorage.setItem(storageKey, JSON.stringify(updated))
+      setVerifier(updated); setPin('')
+      setRemaining(delay ? Math.ceil(delay / 1000) : 0)
+      setError(delay ? 'Too many attempts. Try again later.' : 'Current PIN is incorrect.')
+      return
+    }
     if (!/^\d{4}$/.test(newPin) || newPin !== confirm) { setError('New PINs must match and contain exactly four digits.'); return }
     setBusy(true); setError('')
     try {
