@@ -1,6 +1,6 @@
 # RBOS Authorization, Trusted-Device Login and Offline Operations — Implementation Plan
 
-**Status:** Proposed implementation plan; no application code or database schema changed  
+**Status:** Phases 1–3 have implementation branches; Phase 1 and Phase 2 CI evidence recorded, Phase 3 implementation awaiting its PR CI. Phases 4–6 remain.  
 **Last reviewed:** 2026-11-17  
 **Planning baseline:** `main` after PR #30 merge (`c14f30208ce272ec9797f65f503034041d5ba92e`)  
 **Scope:** API authorization baseline first, then reliable persistent login, trusted devices, PIN/passkeys, and finally offline shop operations
@@ -233,6 +233,8 @@ Tasks:
 
 ### Phase 3 — Trusted device registry and revocation
 
+**Implementation status (2026-11-17):** Implemented on `auth/trusted-device-registry`, stacked on Phase 2 head `4e9a6a72dc24d89bec5417c17b60193b5381b6e8`; implementation head `3c208ee3ab0fa0473d7dcd5879823029f002988c`. Adds migration `046_trusted_device_registry.sql`, user-scoped device registration/list/revocation, session-device linkage and security-event audit, frontend device management, and PostgreSQL integration tests. Dedicated PR #34 is open/draft/unmerged. CI run #411 failed before either job received a runner (`runner_id: 0`, no steps); a retry reproduced the same infrastructure failure, so Phase 3 tests have not run. Do not call the phase validated until the PR workflow passes. Review the migration's legacy-session backfill and device-cookie semantics before production rollout.
+
 Tasks:
 
 1. Design a minimal Identity-schema device/session store. The record should be owned by the user; do not assume a browser installation is a physical hardware identity.
@@ -330,7 +332,7 @@ Tasks:
 | Identity cookie | ASP.NET Identity cookie; 8-hour lifetime | Persistent policy, sliding renewal and absolute age |
 | Password/OTP | Both non-persistent sign-in paths | Parity tests and reauthentication policy |
 | Data Protection | PostgreSQL key persistence migration 037 exists | Restart/multi-instance regression test |
-| Session/device | No trusted-device/session registry found | Identity schema design and migration |
+| Session/device | Phase 2 session table (045) and Phase 3 device registry (046) implemented on stacked branches | Phase 3 PR CI, security review, then supported browser/revocation checks |
 | Passkey | .NET 10 Identity support available | Validate model/table migration, RP domain/origin, browser coverage |
 | App PIN | No current PIN flow | Security design, rate limit and recovery |
 | PWA | Manifest and registration exist; service worker caches nothing | Asset precache/fallback/update design |
@@ -386,13 +388,9 @@ Current CI already runs .NET build, migration validation, .NET tests, TypeScript
 
 Each PR must be focused, run the applicable tests, include an implementation note and update this plan with commit/test evidence. Do not merge multiple phases together merely to reduce PR count.
 
-## 9. First implementation to start
+## 9. Current implementation checkpoint and next work
 
-**Start with sequence 1: fail-closed API authorization.**
-
-Reason: it addresses a present access-control weakness in the central request pipeline and is a dependency for every later session/device/offline capability. The first implementation PR should begin with Phase 0's route inventory, then enforce the approved classification. It should not add PIN, passkeys or offline sync yet.
-
-After this security baseline is merged and verified, the next direct user-visible improvement is persistent login and correct network-error handling. The trusted-device/PIN/passkey experience follows, then offline operations.
+The original sequence-1 recommendation is historical. Current branches now contain Phase 1 fail-closed authorization, Phase 2 persistent login/network-state handling, and Phase 3 trusted-device registration/revocation. PRs remain unmerged by instruction. Phase 4 is next: implement the four-digit local privacy lock and validate .NET 10 Identity passkey support against the actual deployment origin before enabling passkeys. Do not invent a relying-party domain. Phase 5 must follow a documented browser cryptography/storage proof of concept; Phase 6 must retain server-authoritative validation, posting and invoice numbering.
 
 ## 10. Scope guardrails
 

@@ -30,6 +30,7 @@ export function ProfileMenu({ businessName, email, dark, onToggleDark, onLogout 
         <div className="profile-dropdown" role="menu">
           <p className="profile-email">{email}</p>
           <a role="menuitem" href="#/settings" onClick={() => setOpen(false)}>{t('area.settings')}</a>
+          <a role="menuitem" href="#/devices" onClick={() => setOpen(false)}>{t('app.devices')}</a>
           <button type="button" role="menuitem" onClick={run(onToggleDark)}>{dark ? t('theme.light') : t('theme.dark')}</button>
           <button type="button" role="menuitem" onClick={run(onLogout)}>{t('app.signOut')}</button>
         </div>

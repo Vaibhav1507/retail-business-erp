@@ -52,7 +52,7 @@ public static class AuthOtpEndpoints
             return proof is null ? ApiResults.Fail(400, "Wrong or expired code.") : Results.Ok(new { proof });
         }).AllowAnonymous().AddEndpointFilter(RequireOtp);
 
-        api.MapPost("/auth/register", async (RegisterRequest m, UserManager<IdentityUser<Guid>> um, OtpService otp, IConfiguration cfg, CancellationToken ct) =>
+        api.MapPost("/auth/register", async (RegisterRequest m, UserManager<IdentityUser<Guid>> um, OtpService otp, IConfiguration cfg, AuthSessionService sessions, CancellationToken ct) =>
         {
             if (!cfg.GetValue<bool>("Rbos:AllowOpenRegistration") && await um.Users.AnyAsync(ct))
                 return ApiResults.Fail(403, "Registration is closed.");
@@ -69,6 +69,7 @@ public static class AuthOtpEndpoints
                 return ApiResults.Fail(400, string.Join(" ", r.Errors.Select(e => e.Description)));
             }
             if (otpOn) await otp.ConsumeProofAsync(m.OtpProof!.Value, mobile, ct);
+            await sessions.RecordCredentialChangeAsync(user.Id, null, "credential.account_created", ct);
             return Results.Ok();
         }).AllowAnonymous();
 
@@ -94,7 +95,7 @@ public static class AuthOtpEndpoints
             return r.Ok ? Results.Ok(new { sent = true, devCode = r.DevCode }) : ApiResults.Fail(400, r.Error);
         }).RequireAuthorization().AddEndpointFilter(RequireOtp);
 
-        api.MapPost("/profile/mobile/verify", async (ChangeMobileVerify m, ClaimsPrincipal p, UserManager<IdentityUser<Guid>> um, OtpService otp, TenantDb db, CancellationToken ct) =>
+        api.MapPost("/profile/mobile/verify", async (ChangeMobileVerify m, ClaimsPrincipal p, UserManager<IdentityUser<Guid>> um, OtpService otp, TenantDb db, AuthSessionService sessions, CancellationToken ct) =>
         {
             var mobile = Clean(m.Mobile);
             if (mobile is null || string.IsNullOrWhiteSpace(m.Code)) return ApiResults.Fail(400, "Enter the mobile number and code.");
@@ -115,6 +116,7 @@ public static class AuthOtpEndpoints
                 await c.ExecuteNonQueryAsync(ct);
                 await s.CommitAsync(ct);
             }
+            await sessions.RecordCredentialChangeAsync(uid, p, "credential.mobile_changed", ct);
             return Results.Ok(new { mobile });
         }).RequireAuthorization().AddEndpointFilter(RequireOtp);
     }
