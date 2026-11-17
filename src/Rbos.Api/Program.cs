@@ -65,7 +65,7 @@ if (!string.IsNullOrWhiteSpace(passkeyDomain))
     if (Uri.CheckHostName(passkeyDomain) == UriHostNameType.Unknown)
         throw new InvalidOperationException("Auth:Passkeys:ServerDomain must be a valid DNS host name.");
     var allowedHosts = builder.Configuration["AllowedHosts"];
-    if (string.IsNullOrWhiteSpace(allowedHosts))
+    if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts.Trim() == "*")
         builder.WebHost.UseSetting(Microsoft.AspNetCore.Hosting.WebHostDefaults.AllowedHostsKey, passkeyDomain);
     else if (!allowedHosts.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Contains(passkeyDomain, StringComparer.OrdinalIgnoreCase))
