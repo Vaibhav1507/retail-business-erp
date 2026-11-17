@@ -57,7 +57,9 @@ public sealed class ApiAuthorizationTests(ApiFactory factory) : IClassFixture<Ap
     {
         Assert.All(Permissions.All, permission => Assert.True(Permissions.Has("Owner", permission), permission));
         Assert.True(Permissions.Has("Manager", Permissions.CatalogueManage));
+        Assert.True(Permissions.Has("Manager", Permissions.StockAdjust));
         Assert.False(Permissions.Has("Manager", Permissions.FinanceManage));
+        Assert.Equal(Permissions.StockAdjust, ApiRouteAccess.Resolve("POST", "/api/stock-adjustments")?.Permission);
         Assert.True(Permissions.Has("Accountant", Permissions.FinanceManage));
         Assert.False(Permissions.Has("Accountant", Permissions.SalesCreate));
         Assert.True(Permissions.Has("Cashier", Permissions.SalesCreate));
