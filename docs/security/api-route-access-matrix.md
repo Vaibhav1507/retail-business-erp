@@ -27,7 +27,7 @@ A missing method/template classification is **not** an authenticated-member exce
 - `POST /api/auth/login`
 - `POST /api/auth/login/otp`
 - `GET /api/openapi/{documentName}.json`
-- `GET /api/health`
+- `* /api/health`
 - `* /api/{**path}` — the terminal API fallback only returns 404 for unmatched requests; it is outside the API route-group filter.
 
 The WhatsApp provider webhook remains separately mapped at `/webhooks/meta/whatsapp`. Its GET verification-token and POST HMAC signature validation are unchanged; it is not reclassified as a browser-cookie route and does not use the API group's CSRF policy.
@@ -67,7 +67,7 @@ The following routes require an active known business membership, but no additio
 | `sales.return` | Sale return creation |
 | `stock.adjust` | Opening stock posting; stock transfer create; stock count posting; stock adjustment create/history |
 | `finance.manage` | Account create/update/activate; money-account create; expense create; owner transaction create; loan create/repayment;  cash closing create; reconciliation clear |
-| `reports.view` | Report reads (stock verification, trial balance, ledger, profit/loss, balance sheet, receivable/payable ageing, stock valuation, cash flow and WAC verification) and dashboard |
+| `reports.view` | Report reads (stock verification, trial balance, ledger, profit/loss, balance sheet, receivable/payable ageing, stock valuation, cash flow, WAC verification and GST summary) and dashboard |
 | `audit.view` | Audit search |
 | `staff.manage` | Staff role catalogue, staff list, staff create/update |
 
