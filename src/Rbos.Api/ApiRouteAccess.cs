@@ -38,6 +38,8 @@ public static class ApiRouteAccess
         // Identity-only routes must work before business bootstrap and must remain
         // available for logout even when a business membership has been revoked.
         new("POST", "/api/auth/logout", ApiAccessKind.AuthenticatedUser),
+        new("GET",  "/api/auth/devices", ApiAccessKind.AuthenticatedUser),
+        new("POST", "/api/auth/devices/{id:guid}/revoke", ApiAccessKind.AuthenticatedUser),
         new("GET",  "/api/me", ApiAccessKind.AuthenticatedUser),
         new("POST", "/api/bootstrap", ApiAccessKind.AuthenticatedUser),
 
