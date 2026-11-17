@@ -13,6 +13,7 @@ import type { Product } from './Catalogue'
 import './styles.css'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, resetCsrf } from './api'
+import { clearOfflineWorkspace, loadOfflineSnapshot, saveOfflineSnapshot } from './offlineStore'
 import { setLanguage, t, toLang } from './i18n'
 import type { Lang, MessageKey } from './i18n'
 
@@ -87,6 +88,7 @@ function parseRoute() {
 export default function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined)
   const [authError, setAuthError] = useState('')
+  const [offlineMode, setOfflineMode] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
@@ -100,25 +102,53 @@ export default function App() {
     setAuthError('')
     setMe(current => current === null ? undefined : current)
     try {
-      setMe(await api<Me>('GET', '/me'))
+      const current = await api<Me>('GET', '/me')
+      setMe(current)
+      setOfflineMode(false)
+      if (current.tenantId) localStorage.setItem('rbos.offline.identity', JSON.stringify({ email: current.email, tenantId: current.tenantId }))
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        setOfflineMode(false)
         setMe(null)
         return
       }
-      setAuthError('Could not verify your session because the server is unavailable. Check your connection and retry.')
+      try {
+        const identity = JSON.parse(localStorage.getItem('rbos.offline.identity') ?? 'null') as { email?: string; tenantId?: string } | null
+        if (identity?.email && identity.tenantId) {
+          const snapshot = await loadOfflineSnapshot(identity.email.trim().toLowerCase() + ':' + identity.tenantId)
+          if (snapshot) {
+            setMe(snapshot.me)
+            setProducts(snapshot.products as Product[])
+            setLocations(snapshot.locations as Location[])
+            setStock(snapshot.stock as StockRow[])
+            setOfflineMode(true)
+            setAuthError('Offline mode: showing the last saved shop snapshot. New bills remain pending until the server confirms them.')
+            return
+          }
+        }
+      } catch { /* Offline storage unavailable or not provisioned; keep the recoverable connection state. */ }
+      setAuthError('Could not verify your session or open a saved offline workspace. Check your connection and retry.')
     }
   }, [])
   const loadData = useCallback(async () => {
 	const [p, l, s] = await Promise.all([api<Product[]>('GET', '/products'), api<Location[]>('GET', '/locations'), api<StockRow[]>('GET', '/stock')])
 	setProducts(p); setLocations(l); setStock(s)
-  }, [])
+    if (me?.tenantId) {
+      try {
+        await saveOfflineSnapshot(me.email.trim().toLowerCase() + ':' + me.tenantId, {
+          me: { email: me.email, tenantId: me.tenantId, profileComplete: me.profileComplete, businessCategory: me.businessCategory },
+          products: p, locations: l, stock: s
+        })
+      } catch { setAuthError('Shop data is loaded, but this browser could not update its protected offline snapshot.') }
+    }
+  }, [me])
 
   useEffect(() => { loadMe() }, [loadMe])
+  useEffect(() => { const onOnline = () => { void loadMe() }; window.addEventListener('online', onOnline); return () => window.removeEventListener('online', onOnline) }, [loadMe])
   useEffect(() => {
-    if (!me?.tenantId || !me.profileComplete) return
+    if (!me?.tenantId || !me.profileComplete || offlineMode) return
     api<{ businessName: string; language: string }>('GET', '/business-profile').then(p => { setBusinessName(p.businessName); const l = toLang(localStorage.getItem('rbos.lang') ?? p.language); setLanguage(l); setLang(l) }).catch(() => undefined)
-  }, [me?.tenantId, me?.profileComplete])
+  }, [me?.tenantId, me?.profileComplete, offlineMode])
   useEffect(() => { document.documentElement.lang = lang; document.title = t('app.title') }, [lang])
   useEffect(() => {
     const root = document.getElementById('root')
@@ -139,7 +169,7 @@ export default function App() {
     observer.observe(root, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [])
-  useEffect(() => { if (me?.tenantId) loadData().catch(() => undefined) }, [me?.tenantId, loadData])
+  useEffect(() => { if (me?.tenantId && !offlineMode) loadData().catch(() => undefined) }, [me?.tenantId, loadData, offlineMode])
   useEffect(() => {
     let previousHash = window.location.hash
     const protectedRoute = /^#\/(sell\/bill|buy\/receive|stock\/opening)$/
@@ -153,7 +183,7 @@ export default function App() {
   }, [])
 
   function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLanguage(l); setLang(l) }
-  async function logout() { await api('POST', '/auth/logout'); resetCsrf(); window.location.hash = ''; setMe(null) }
+  async function logout() { await api('POST', '/auth/logout'); resetCsrf(); if (me?.tenantId) await clearOfflineWorkspace(me.email.trim().toLowerCase() + ':' + me.tenantId); localStorage.removeItem('rbos.offline.identity'); window.location.hash = ''; setMe(null); setOfflineMode(false) }
 
   if (me === undefined) return <main className="access"><p className="loading" role={authError ? "alert" : undefined}>{authError || t('app.loading')}</p>{authError && <button type="button" onClick={() => { void loadMe() }}>Retry connection</button>}</main>
   if (me === null) return <AccountAccess onDone={loadMe} />
@@ -161,7 +191,7 @@ export default function App() {
   const printMatch = /^#\/print\/(sale|purchase|payment)\/([0-9a-f-]{36})$/i.exec(window.location.hash)
   if (printMatch) return <PrintPage kind={printMatch[1]} id={printMatch[2]} />
 
-  const c = { products, locations, reload: () => { loadData().catch(() => undefined) } }
+  const c = { products, locations, reload: () => { if (!offlineMode) loadData().catch(() => undefined) }, offlineMode, ownerKey: me.email.trim().toLowerCase() + ':' + (me.tenantId ?? '') }
   const { page, tab } = route
   const first = (d: string) => tab || d
   let body: React.ReactNode
