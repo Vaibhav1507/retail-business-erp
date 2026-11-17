@@ -112,7 +112,6 @@ public static class ApiRouteAccess
         new("GET",  "/api/brands", ApiAccessKind.AuthenticatedMember),
 
         // Explicit named permissions. Role bundles remain unchanged.
-        new("PUT",  "/api/profile/mobile/send-otp", ApiAccessKind.Permission, Permissions.SettingsManage),
         new("POST", "/api/profile/mobile/send-otp", ApiAccessKind.Permission, Permissions.SettingsManage),
         new("POST", "/api/profile/mobile/verify", ApiAccessKind.Permission, Permissions.SettingsManage),
         new("PUT",  "/api/business-profile", ApiAccessKind.Permission, Permissions.SettingsManage),
