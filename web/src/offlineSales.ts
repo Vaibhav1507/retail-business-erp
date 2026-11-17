@@ -1,5 +1,5 @@
 import { api, ApiError } from './api'
-import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
+import { deleteOfflineRecord, readOfflineRecords, saveOfflineRecord } from './offlineStore'
 
 export type OfflineSaleBody = {
   customerId: string | null
@@ -39,7 +39,13 @@ export async function queueOfflineSale(ownerKey: string, body: OfflineSaleBody, 
   const encodedSize = new TextEncoder().encode(JSON.stringify(body)).byteLength
   if (encodedSize > 256_000) throw new Error('This offline bill is too large to save on this device.')
   const current = await listOfflineSales(ownerKey)
-  if (current.length >= 100) throw new Error('The offline bill queue is full. Connect and sync bills before creating more.')
+  const active = current.filter(x => x.state !== 'posted')
+  if (active.length >= 100) throw new Error('The offline bill queue is full. Connect and sync bills before creating more.')
+  const posted = current.filter(x => x.state === 'posted').sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  while (posted.length >= 100) {
+    const oldest = posted.shift()
+    if (oldest) await deleteOfflineRecord(ownerKey, oldest.id)
+  }
   const id = 'offline-sale:' + crypto.randomUUID()
   const value: QueuedSale = { idempotencyKey, body, createdAt: new Date().toISOString() }
   await saveOfflineRecord(ownerKey, id, 'sale', 'pending-sync', value)
@@ -97,4 +103,11 @@ export async function syncOfflineSales(ownerKey: string): Promise<void> {
   })()
   activeSync.set(ownerKey, task)
   try { await task } finally { activeSync.delete(ownerKey) }
+}
+
+export async function discardOfflineSale(ownerKey: string, id: string) {
+  const record = (await listOfflineSales(ownerKey)).find(x => x.id === id)
+  if (!record || (record.state !== 'posted' && record.state !== 'needs-attention')) return false
+  await deleteOfflineRecord(ownerKey, id)
+  return true
 }
