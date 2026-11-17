@@ -99,6 +99,44 @@ public sealed class TrustedDeviceTests(ApiFactory factory) : IClassFixture<ApiFa
     }
 
     [Fact]
+    public async Task Shared_browser_profile_keeps_separate_device_records_for_each_employee()
+    {
+        var accountA = new Client(factory);
+        var accountB = new Client(factory);
+        await accountA.Register();
+        await accountB.Register();
+
+        using var sharedHttp = factory.CreateClient();
+        var sharedBrowser = new Client(sharedHttp);
+
+        sharedBrowser.Email = accountA.Email;
+        Assert.Equal(HttpStatusCode.OK, (await sharedBrowser.Send(HttpMethod.Post, "/auth/login",
+            new { email = sharedBrowser.Email, password = Client.Password })).StatusCode);
+        var firstADevices = await sharedBrowser.GetJson("/auth/devices");
+        Assert.Single(firstADevices.EnumerateArray());
+        var deviceAId = firstADevices[0].GetProperty("id").GetGuid();
+        Assert.True(firstADevices[0].GetProperty("isCurrentDevice").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, (await sharedBrowser.Send(HttpMethod.Post, "/auth/logout", new { })).StatusCode);
+
+        sharedBrowser.Email = accountB.Email;
+        Assert.Equal(HttpStatusCode.OK, (await sharedBrowser.Send(HttpMethod.Post, "/auth/login",
+            new { email = sharedBrowser.Email, password = Client.Password })).StatusCode);
+        var devicesB = await sharedBrowser.GetJson("/auth/devices");
+        Assert.Single(devicesB.EnumerateArray());
+        var deviceBId = devicesB[0].GetProperty("id").GetGuid();
+        Assert.NotEqual(deviceAId, deviceBId);
+        Assert.Equal(HttpStatusCode.OK, (await sharedBrowser.Send(HttpMethod.Post, "/auth/logout", new { })).StatusCode);
+
+        sharedBrowser.Email = accountA.Email;
+        Assert.Equal(HttpStatusCode.OK, (await sharedBrowser.Send(HttpMethod.Post, "/auth/login",
+            new { email = sharedBrowser.Email, password = Client.Password })).StatusCode);
+        var secondADevices = await sharedBrowser.GetJson("/auth/devices");
+        Assert.Single(secondADevices.EnumerateArray());
+        Assert.Equal(deviceAId, secondADevices[0].GetProperty("id").GetGuid());
+        Assert.True(secondADevices[0].GetProperty("isCurrentDevice").GetBoolean());
+    }
+
+    [Fact]
     public async Task Device_list_is_scoped_to_the_authenticated_user_even_before_business_setup()
     {
         var first = new Client(factory);
