@@ -109,6 +109,7 @@ export default function App() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setOfflineMode(false)
+        localStorage.removeItem('rbos.offline.identity')
         setMe(null)
         return
       }
@@ -183,7 +184,20 @@ export default function App() {
   }, [])
 
   function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLanguage(l); setLang(l) }
-  async function logout() { await api('POST', '/auth/logout'); resetCsrf(); if (me?.tenantId) await clearOfflineWorkspace(me.email.trim().toLowerCase() + ':' + me.tenantId); localStorage.removeItem('rbos.offline.identity'); window.location.hash = ''; setMe(null); setOfflineMode(false) }
+  async function logout() {
+    await api('POST', '/auth/logout')
+    resetCsrf()
+    try {
+      if (me?.tenantId) await clearOfflineWorkspace(me.email.trim().toLowerCase() + ':' + me.tenantId)
+    } catch {
+      setAuthError('Signed out, but this browser could not clear its encrypted offline records. Keep this device private until storage can be cleared.')
+    } finally {
+      localStorage.removeItem('rbos.offline.identity')
+      window.location.hash = ''
+      setMe(null)
+      setOfflineMode(false)
+    }
+  }
 
   if (me === undefined) return <main className="access"><p className="loading" role={authError ? "alert" : undefined}>{authError || t('app.loading')}</p>{authError && <button type="button" onClick={() => { void loadMe() }}>Retry connection</button>}</main>
   if (me === null) return <AccountAccess onDone={loadMe} />
