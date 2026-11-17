@@ -58,8 +58,9 @@ async function keyFor(ownerKey: string): Promise<CryptoKey> {
   const db = await openDb()
   try {
     const read = db.transaction(KEY_STORE, 'readonly')
+    const readDone = transactionDone(read)
     const existing = await requestValue<{ ownerKey: string; key: CryptoKey } | undefined>(read.objectStore(KEY_STORE).get(ownerKey))
-    await transactionDone(read)
+    await readDone
     if (existing?.key) return existing.key
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
     try {
@@ -71,8 +72,9 @@ async function keyFor(ownerKey: string): Promise<CryptoKey> {
       // Another tab may have created the owner key first. Never overwrite a key
       // that could already be protecting saved records.
       const retry = db.transaction(KEY_STORE, 'readonly')
+      const retryDone = transactionDone(retry)
       const winner = await requestValue<{ ownerKey: string; key: CryptoKey } | undefined>(retry.objectStore(KEY_STORE).get(ownerKey))
-      await transactionDone(retry)
+      await retryDone
       if (winner?.key) return winner.key
       throw new Error('Could not establish the offline encryption key.')
     }
@@ -108,8 +110,9 @@ async function recordsFor(ownerKey: string): Promise<StoredRecord[]> {
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readonly')
+    const done = transactionDone(tx)
     const records = await requestValue<StoredRecord[]>(tx.objectStore(RECORD_STORE).index('ownerKey').getAll(ownerKey))
-    await transactionDone(tx)
+    await done
     return records
   } finally { db.close() }
 }
@@ -149,6 +152,7 @@ export async function updateOfflineRecordState(ownerKey: string, id: string, sta
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readwrite')
+    const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
     const record = await requestValue<StoredRecord | undefined>(store.get(id))
     if (record && record.ownerKey === ownerKey) {
@@ -156,7 +160,7 @@ export async function updateOfflineRecordState(ownerKey: string, id: string, sta
       record.updatedAt = new Date().toISOString()
       store.put(record)
     }
-    await transactionDone(tx)
+    await done
   } finally { db.close() }
 }
 
@@ -164,10 +168,11 @@ export async function deleteOfflineRecord(ownerKey: string, id: string) {
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readwrite')
+    const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
     const record = await requestValue<StoredRecord | undefined>(store.get(id))
     if (record && record.ownerKey === ownerKey) store.delete(id)
-    await transactionDone(tx)
+    await done
   } finally { db.close() }
 }
 
@@ -175,10 +180,11 @@ export async function clearOfflineWorkspace(ownerKey: string) {
   const db = await openDb()
   try {
     const tx = db.transaction([KEY_STORE, RECORD_STORE], 'readwrite')
+    const done = transactionDone(tx)
     tx.objectStore(KEY_STORE).delete(ownerKey)
     const store = tx.objectStore(RECORD_STORE)
     const records = await requestValue<StoredRecord[]>(store.index('ownerKey').getAll(ownerKey))
     records.forEach(record => store.delete(record.id))
-    await transactionDone(tx)
+    await done
   } finally { db.close() }
 }
