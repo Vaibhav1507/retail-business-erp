@@ -188,7 +188,7 @@ export default function App() {
     await api('POST', '/auth/logout')
     resetCsrf()
     try {
-      if (me?.tenantId) await clearOfflineWorkspace(me.email.trim().toLowerCase() + ':' + me.tenantId)
+      if (me?.tenantId) await clearOfflineWorkspace(me.email.trim().toLowerCase() + ':' + me.tenantId, ['sale'])
     } catch {
       setAuthError('Signed out, but this browser could not clear its encrypted offline records. Keep this device private until storage can be cleared.')
     } finally {
