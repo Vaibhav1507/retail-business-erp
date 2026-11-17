@@ -37,15 +37,10 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
 
         try
         {
-            var principal = await signInManager.CreateUserPrincipalAsync(user);
-            if (principal.Identity is not ClaimsIdentity identity)
-                throw new InvalidOperationException("Identity did not create a claims identity.");
-
-            identity.AddClaim(new Claim(SessionClaimType, sessionId.ToString("D")));
-            await context.SignInAsync(
-                IdentityConstants.ApplicationScheme,
-                principal,
-                new AuthenticationProperties { IsPersistent = true, AllowRefresh = true });
+            await signInManager.SignInWithClaimsAsync(
+                user,
+                new AuthenticationProperties { IsPersistent = true, AllowRefresh = true },
+                [new Claim(SessionClaimType, sessionId.ToString("D"))]);
         }
         catch
         {
