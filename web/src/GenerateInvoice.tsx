@@ -97,12 +97,14 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [syncingOffline, setSyncingOffline] = useState(false)
   const refreshOfflineQueue = useCallback(async () => {
     if (!ownerKey) { setOfflineQueue([]); return }
-    setOfflineQueue(await listOfflineSales(ownerKey))
+    try { setOfflineQueue(await listOfflineSales(ownerKey)) }
+    catch { setError('Saved offline bills could not be read. Do not clear this browser storage; reconnect and retry.') }
   }, [ownerKey])
   const syncQueue = useCallback(async () => {
     if (!ownerKey || !navigator.onLine) return
     setSyncingOffline(true)
     try { await syncOfflineSales(ownerKey) }
+    catch { setError('Offline bills could not be synchronized. Your saved drafts have been retained; retry when the connection is stable.') }
     finally { setSyncingOffline(false); await refreshOfflineQueue() }
   }, [ownerKey, refreshOfflineQueue])
   useEffect(() => {
