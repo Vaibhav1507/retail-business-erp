@@ -8,7 +8,7 @@
 
 > **Important positioning correction:** RBOS is not primarily trying to persuade existing Vyapar, myBillBook, Tally or other software users to migrate. Its first target is the large group of small retailers who still run most shop operations through memory, paper registers, handwritten bills, notebooks, basic spreadsheets or disconnected tools. The product's central promise is to make a first digital operating system so simple that a person with low digital confidence, limited literacy, or little technical knowledge can use it with minimal effort.
 
-> **Voice scope clarification:** The current voice assistant is for navigation only. It helps users navigate the application; it does not answer business questions, query sales or stock, provide business intelligence, or execute business transactions by voice. Any future expansion into those capabilities is a separate product decision and must not be advertised as existing functionality.
+> **Voice scope clarification:** The current implementation is navigation-only. The product roadmap explicitly intends to expand the voice assistant into a conversational business assistant that can answer owner questions using authorised RBOS business data (for example, sales, stock, customer dues, supplier balances and business summaries). That future capability is planned, not currently available. Voice-based creation or posting of transactions is a separate, later decision and is not implied by business-question support.
 
 ---
 
@@ -351,16 +351,21 @@ A feature is not "easy" because it has fewer screens. It is easy when the user u
 
 ### 6.3 Voice assistant — current scope and improvement plan
 
-**Current scope:** voice-based application navigation only.
+**Current implementation:** voice-based application navigation only.
 
-It may help users locate screens or navigate to workflows. It does not currently:
-- Answer "how much did I sell today?"
-- Query inventory, customer balances or supplier dues.
-- Explain business performance.
-- Create, edit or post a sale/purchase/collection by voice.
-- Act as an AI business advisor.
+**Planned product scope:** expand the assistant from navigation into a conversational business-information assistant. Once the data, permissions and calculations are trustworthy, an owner should be able to ask questions such as:
+- "How much did I sell today?"
+- "Which products are low in stock?"
+- "How much do customers owe me?"
+- "How much do I need to pay suppliers?"
+- "What were my purchases this week?"
+- "Show me a simple summary of this month's business."
 
-This distinction must be reflected in product copy, demos, documentation and user expectations.
+The assistant should answer from RBOS records, explain the period and meaning of figures in plain language, and navigate to the underlying screen or records so the owner can verify the answer. It should support the languages and mixed-language phrases used by target shop owners.
+
+This is a **planned capability, not current functionality**. Do not advertise business Q&A as available until implemented, validated and enabled for pilot users.
+
+The planned business-question capability does not automatically include creating, editing or posting transactions by voice. Voice-driven actions require a separate design, explicit confirmation, permission checks, auditability and product-owner approval.
 
 Recommended improvements to navigation voice:
 - Support the actual languages and mixed-language phrases used by pilot owners.
@@ -640,10 +645,15 @@ Use plain language. Do not show complex accounting ratios to first-time users.
 - No misleading profit or stock numbers.
 
 **P0.7 Navigation voice usability**
-- Keep voice navigation as the current scope.
+- Keep navigation as the current implemented capability.
+- Add business Q&A to the product roadmap as a planned next capability, not a current feature.
 - Improve language/accent robustness and navigation confirmations.
 - Maintain touch navigation fallback.
-- Measure real usage and failures.
+- Measure real usage and failures for navigation.
+- Before business Q&A is enabled, define supported question types, date-range interpretation, tenant/role permissions, source-data freshness, calculation definitions, answer drill-down, ambiguity handling and refusal behaviour when data is incomplete.
+- Ensure financial answers (profit, margin, stock value and dues) use approved, reconciled business definitions; never fabricate missing values or infer unknown costs.
+- Provide a plain-language explanation and a path to underlying records for every material answer.
+- Keep business Q&A read-only initially. Voice-driven transaction creation or posting is out of scope until separately approved and protected by explicit confirmation and audit controls.
 
 ### P1 — Differentiation and adoption improvements
 
@@ -1003,7 +1013,7 @@ Do not build all verticals in parallel. Choose the next vertical based on actual
 2. **First target:** independent, owner-operated small retailers who currently use paper, memory or disconnected tools.
 3. **Initial vertical:** electronics/appliance-lite, with explicit exclusions for workflows not yet supported.
 4. **Usability over feature count:** prioritise lower effort, clear language and error recovery.
-5. **Voice scope:** navigation only; no business Q&A or voice transactions are currently part of the product.
+5. **Voice scope:** navigation is the current implementation. Conversational business Q&A over authorised RBOS records is an explicit planned product capability. It is not available yet and must pass data-accuracy, permission, usability and pilot validation before being marketed. Voice-driven transaction creation/posting remains a separate future decision.
 6. **Photo extraction:** assist data entry, but require review and confirmation before records are posted.
 7. **GST:** GST billing is optional; both GST and non-GST invoice flows should be supported as configured. Do not claim full GST filing, e-invoicing or e-way bill compliance without separate validated implementation and professional review. IGST presentation remains outside the first pilot scope as previously decided.
 8. **WhatsApp:** only after provider, consent, pricing and end-to-end delivery lifecycle are validated. Do not interfere with an existing WhatsApp Business App number.
