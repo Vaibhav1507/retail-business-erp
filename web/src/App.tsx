@@ -84,6 +84,7 @@ function parseRoute() {
 
 export default function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined)
+  const [authError, setAuthError] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
@@ -94,7 +95,17 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('rbos.theme', dark ? 'dark' : 'light') }, [dark])
 
   const loadMe = useCallback(async () => {
-	try { setMe(await api<Me>('GET', '/me')) } catch { setMe(null) }
+    setAuthError('')
+    setMe(current => current === null ? undefined : current)
+    try {
+      setMe(await api<Me>('GET', '/me'))
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setMe(null)
+        return
+      }
+      setAuthError('Could not verify your session because the server is unavailable. Check your connection and retry.')
+    }
   }, [])
   const loadData = useCallback(async () => {
 	const [p, l, s] = await Promise.all([api<Product[]>('GET', '/products'), api<Location[]>('GET', '/locations'), api<StockRow[]>('GET', '/stock')])
@@ -142,7 +153,7 @@ export default function App() {
   function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLanguage(l); setLang(l) }
   async function logout() { await api('POST', '/auth/logout'); resetCsrf(); window.location.hash = ''; setMe(null) }
 
-  if (me === undefined) return <p className="loading">{t('app.loading')}</p>
+  if (me === undefined) return <main className="access"><p className="loading" role={authError ? "alert" : undefined}>{authError || t('app.loading')}</p>{authError && <button type="button" onClick={() => { void loadMe() }}>Retry connection</button>}</main>
   if (me === null) return <AccountAccess onDone={loadMe} />
   if (!me.tenantId || !me.profileComplete) return <main className="access"><BusinessSetup hasBusiness={!!me.tenantId} onDone={loadMe} /></main>
   const printMatch = /^#\/print\/(sale|purchase|payment)\/([0-9a-f-]{36})$/i.exec(window.location.hash)
@@ -169,6 +180,7 @@ export default function App() {
 	  <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>
+	  {authError && <p role="status" className="connection-warning">{authError} <button type="button" onClick={() => { void loadMe() }}>Retry connection</button></p>}
 	  <main className="content">{body}</main>
       <NavigationAssistant />
 	</div>
