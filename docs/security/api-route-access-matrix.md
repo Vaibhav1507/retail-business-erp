@@ -65,8 +65,8 @@ The following routes require an active known business membership, but no additio
 | `customers.manage` | Customer create/update; customer payment create |
 | `sales.cancel` | Sale cancellation |
 | `sales.return` | Sale return creation |
-| `stock.adjust` | Opening stock posting; stock transfer create; stock count posting |
-| `finance.manage` | Account create/update/activate; money-account create; expense create; owner transaction create; loan create/repayment; finance stock-adjustment create; cash closing create; reconciliation clear |
+| `stock.adjust` | Opening stock posting; stock transfer create; stock count posting; stock adjustment create/history |
+| `finance.manage` | Account create/update/activate; money-account create; expense create; owner transaction create; loan create/repayment;  cash closing create; reconciliation clear |
 | `reports.view` | Report reads (stock verification, trial balance, ledger, profit/loss, balance sheet, receivable/payable ageing, stock valuation, cash flow and WAC verification) and dashboard |
 | `audit.view` | Audit search |
 | `staff.manage` | Staff role catalogue, staff list, staff create/update |
