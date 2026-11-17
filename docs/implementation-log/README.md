@@ -23,6 +23,10 @@ This directory is the durable project handover record. Update it in every implem
   - Branch: offline/pwa-shell-and-local-store
   - Scope: versioned app-shell/static asset cache, API cache exclusion, AES-GCM encrypted IndexedDB snapshot, offline bootstrap and sign-out cleanup.
 
+- [Four-digit app privacy lock and gated passkeys — 2026-11-17](2026-11-17-app-pin-lock.md)
+  - Branch: auth/pin-and-passkey-unlock
+  - Scope: local privacy lock plus ASP.NET Core Identity 10 passkey store, registration, sign-in and device management; activation gated by explicit RP domain/AllowedHosts.
+
 ## Update discipline
 
 For each implementation slice, record:
