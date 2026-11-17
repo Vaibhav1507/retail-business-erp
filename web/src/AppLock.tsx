@@ -7,7 +7,7 @@ const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes))
 const fromBase64 = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0))
 async function derive(pin: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits'])
-  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 }, material, 256))
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: Uint8Array.from(salt).buffer, iterations: 600_000 }, material, 256))
 }
 async function makeVerifier(pin: string): Promise<Verifier> {
   const salt = crypto.getRandomValues(new Uint8Array(16))
