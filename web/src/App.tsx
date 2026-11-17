@@ -83,7 +83,8 @@ function parseRoute() {
 }
 
 export default function App() {
-   const [authError, setAuthError] = useState('')
+  const [me, setMe] = useState<Me | null | undefined>(undefined)
+  const [authError, setAuthError] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
