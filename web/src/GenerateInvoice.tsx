@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError } from './api'
 import './invoice.css'
 import './billing-forms.css'
@@ -6,6 +6,7 @@ import { InvoiceDocument } from './InvoiceDocument'
 import { BarcodeScanner, type ScanResult } from './BarcodeScanner'
 import { t as tr } from './i18n'
 import { whatsappStatusLabel } from './whatsappStatus'
+import { listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
 
 type Opt = { id: string; name: string }
 type Customer = { id: string; name: string; phone: string | null; notes: string | null; isActive: boolean }
@@ -32,8 +33,8 @@ function spreadDiscount(items: Item[], billDisc: number): Item[] {
 const itemTotal = (i: Item) => Math.round(i.quantity * i.unitPrice * 100) / 100 - i.discount
 const msg = (e: unknown) => (e instanceof ApiError && e.status >= 500 ? 'Server error. Retrying is safe.' : e instanceof Error ? e.message : 'Something went wrong')
 
-export function GenerateInvoice({ products, locations, reload }: { products: Opt[]; locations: Opt[]; reload: () => void }) {
-  const [step, setStep] = useState<'form' | 'review' | 'done'>('form')
+export function GenerateInvoice({ products, locations, reload, offlineMode = false, ownerKey = '' }: { products: Opt[]; locations: Opt[]; reload: () => void; offlineMode?: boolean; ownerKey?: string }) {
+  const [step, setStep] = useState<'form' | 'review' | 'done' | 'pending'>('form')
   const [biz, setBiz] = useState<Biz | null>(null)
   const [found, setFound] = useState<Customer[]>([])
   const [showFound, setShowFound] = useState(false)
@@ -71,6 +72,25 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
     const [billDisc, setBillDisc] = useState('')
     const [held, setHeld] = useState<Held[]>(readHeld)
   const skipSearch = useRef(false)
+  const [offlineQueue, setOfflineQueue] = useState<OfflineSaleItem[]>([])
+  const [syncingOffline, setSyncingOffline] = useState(false)
+  const refreshOfflineQueue = useCallback(async () => {
+    if (!ownerKey) { setOfflineQueue([]); return }
+    setOfflineQueue(await listOfflineSales(ownerKey))
+  }, [ownerKey])
+  const syncQueue = useCallback(async () => {
+    if (!ownerKey || !navigator.onLine) return
+    setSyncingOffline(true)
+    try { await syncOfflineSales(ownerKey) }
+    finally { setSyncingOffline(false); await refreshOfflineQueue() }
+  }, [ownerKey, refreshOfflineQueue])
+  useEffect(() => {
+    void refreshOfflineQueue()
+    const onOnline = () => { void syncQueue() }
+    window.addEventListener('online', onOnline)
+    if (navigator.onLine) void syncQueue()
+    return () => window.removeEventListener('online', onOnline)
+  }, [refreshOfflineQueue, syncQueue])
 
   useEffect(() => { api<Biz>('GET', '/business-profile').then(setBiz).catch(() => undefined) }, [])
   const [prodRates, setProdRates] = useState<Record<string, number>>({})
@@ -147,34 +167,76 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
 
   async function confirm() {
     setBusy(true); setError('')
+    let saleBody: OfflineSaleBody | null = null
+    let queued = false
     try {
-      let cid = customerId
-      const notes = [address, city, state, pin].every(x => !x) ? null : [address, city, state, pin].join(' | ')
-      if (cid) {
-        await api('PUT', '/customers/' + cid, { name: name.trim(), phone: phone.trim() || null, notes })
-      } else if (name.trim()) {
-        const c = await api<{ id: string }>('POST', '/customers', { name: name.trim(), phone: phone.trim() || null, notes })
-        cid = c.id
-      }
-      const lines = []
-      for (const i of effItems) {
-        let pid = i.productId
-        if (!pid) {
-          const p = await api<{ id: string }>('POST', '/products', { name: i.name, categoryName: 'Uncategorised', isGeneric: true, baseUnit: 'pcs' })
-          pid = p.id
+      if (offlineMode || !navigator.onLine) {
+        if (!ownerKey) throw new Error('This device has no provisioned offline workspace. Connect and sign in before creating offline bills.')
+        if (effItems.some(item => !item.productId)) throw new Error('Offline bills can use only products already in your saved catalogue. Add new products when you are online.')
+        if (!customerId && (name.trim() || phone.trim() || address.trim() || city.trim() || state.trim() || pin.trim())) {
+          throw new Error('Offline bills can use an existing selected customer or walk-in only. New customer creation requires a connection.')
         }
-        lines.push({ productId: pid, quantity: i.quantity, unitPrice: i.unitPrice, discount: i.discount, serials: i.serials })
+      }
+
+      let cid = customerId
+      if (!offlineMode && navigator.onLine) {
+        const notes = [address, city, state, pin].every(x => !x) ? null : [address, city, state, pin].join(' | ')
+        if (cid) {
+          await api('PUT', '/customers/' + cid, { name: name.trim(), phone: phone.trim() || null, notes })
+        } else if (name.trim()) {
+          const customer = await api<{ id: string }>('POST', '/customers', { name: name.trim(), phone: phone.trim() || null, notes })
+          cid = customer.id
+        }
+      }
+
+      const lines = []
+      for (const item of effItems) {
+        let productId = item.productId
+        if (!productId) {
+          if (offlineMode || !navigator.onLine) throw new Error('New products can be added to a bill only while online.')
+          const product = await api<{ id: string }>('POST', '/products', { name: item.name, categoryName: 'Uncategorised', isGeneric: true, baseUnit: 'pcs' })
+          productId = product.id
+        }
+        lines.push({ productId, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount, serials: item.serials })
       }
       const credit = mode === 'Credit'
       const part = Number(paid || 0)
       const part2 = Number(paid2 || 0)
       const payments = credit && part2 > 0 ? [{ method: payMethod, amount: part }, { method: payMethod2, amount: part2 }].filter(x => x.amount > 0) : undefined
-      const body = { customerId: cid || null, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null }
-      const r = await api<{ id: string; serialWarnings?: string[] }>('POST', '/sales', body, key)
-      const d = await api<{ sale: { number: number; whatsappStatus: string } }>('GET', '/sales/' + r.id)
-      setWarn(r.serialWarnings?.length ? 'Warning: serial/IMEI ' + r.serialWarnings.join(', ') + ' was sold before.' : ''); setInvNo('INV-' + String(d.sale.number).padStart(6, '0')); setWhatsappStatus(d.sale.whatsappStatus); setKey(crypto.randomUUID()); setStep('done'); reload()
+      saleBody = { customerId: cid || null, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null }
+
+      if (offlineMode || !navigator.onLine) {
+        await queueOfflineSale(ownerKey, saleBody, key)
+        queued = true
+        setKey(crypto.randomUUID())
+        setStep('pending')
+        await refreshOfflineQueue()
+        return
+      }
+
+      const result = await api<{ id: string; serialWarnings?: string[] }>('POST', '/sales', saleBody, key)
+      const detail = await api<{ sale: { number: number; whatsappStatus: string } }>('GET', '/sales/' + result.id)
+      setWarn(result.serialWarnings?.length ? 'Warning: serial/IMEI ' + result.serialWarnings.join(', ') + ' was sold before.' : '')
+      setInvNo('INV-' + String(detail.sale.number).padStart(6, '0'))
+      setWhatsappStatus(detail.sale.whatsappStatus)
+      setKey(crypto.randomUUID())
+      setStep('done')
+      reload()
       setTimeout(() => window.print(), 300)
-    } catch (e) { setError(msg(e)) } finally { setBusy(false) }
+    } catch (e) {
+      const temporaryFailure = e instanceof TypeError || !navigator.onLine || (e instanceof ApiError && e.status >= 500)
+      if (saleBody && ownerKey && temporaryFailure && !queued) {
+        try {
+          await queueOfflineSale(ownerKey, saleBody, key)
+          queued = true
+          setKey(crypto.randomUUID())
+          setStep('pending')
+          await refreshOfflineQueue()
+        } catch { setError('The server could not confirm this bill and local storage also failed. Keep this screen open and retry; do not create a second bill.') }
+      } else if (!queued) {
+        setError(msg(e))
+      }
+    } finally { setBusy(false) }
   }
 
   function clearForm() {
@@ -207,6 +269,15 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
     clearForm(); setPayMethod('Cash'); setInvNo(''); setWarn(''); setError(''); setStep('form')
   }
 
+  if (step === 'pending') return (
+    <section className="invoice-wrap" aria-label="Pending offline invoice">
+      <h2>Bill saved on this device</h2>
+      <p role="status"><strong>Pending sync</strong> — this is a draft, not a posted invoice. It has no official invoice number yet.</p>
+      <p>When the connection returns, RBOS will submit it using the same idempotency key. The server will recheck stock, tax, prices, permissions and accounting rules before assigning an invoice number.</p>
+      <button type="button" onClick={() => setStep('form')}>Back to billing</button>
+    </section>
+  )
+
   if (step !== 'form') {
     const showGst = gst
     return (
@@ -225,6 +296,14 @@ export function GenerateInvoice({ products, locations, reload }: { products: Opt
     <section aria-label="Generate invoice" className="billing-page">
       <h2>Generate Invoice</h2>
             {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => resume(h)}>Resume</button> <button type="button" className="secondary" onClick={() => discardHeld(h.id)}>Discard</button></li>)}</ul></div>}
+      {offlineQueue.length > 0 && <div className="billing-card" aria-label="Offline bill queue">
+        <h3>Offline bills and sync status</h3>
+        <p>{offlineQueue.filter(x => x.state === 'pending-sync' || x.state === 'syncing').length} waiting to sync · {offlineQueue.filter(x => x.state === 'needs-attention').length} need attention · {offlineQueue.filter(x => x.state === 'posted').length} posted</p>
+        <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
+        <ul>{offlineQueue.slice(0, 10).map(item => <li key={item.id}>
+          {new Date(item.createdAt).toLocaleString('en-IN')} — {item.state === 'posted' ? 'Posted as INV-' + String(item.value.invoiceNumber ?? '').padStart(6, '0') : item.state === 'needs-attention' ? 'Needs attention: ' + (item.value.lastError ?? 'Server rejected this draft') : item.state === 'syncing' ? 'Syncing…' : 'Pending sync'}
+        </li>)}</ul>
+      </div>}
       {error && <p role="alert" className="billing-err">{error}</p>}
 
       <div className="billing-card">
