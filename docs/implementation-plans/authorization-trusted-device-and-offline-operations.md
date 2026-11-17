@@ -255,7 +255,7 @@ Tasks:
 
 ### Phase 4 — PIN lock and optional passkey/biometric unlock
 
-**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented on `auth/pin-and-passkey-unlock`. The lock is explicitly a UI privacy feature only; it does not replace Identity authentication, authorize APIs, or cryptographically protect browser data. It is not tamper-resistant because a local user can clear or alter browser storage. Passkey enrollment/sign-in is not implemented: the deployment runbook has no approved production RP domain/origin, and enabling WebAuthn with a guessed domain would be unsafe. Phase 4 remains partially complete until an RP domain and passkey implementation/browser tests are supplied.
+**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented. ASP.NET Core Identity 10 passkey persistence, registration, listing/removal and passkey sign-in are also implemented behind an explicit RP-domain configuration gate; no guessed hostname or host-header-derived RP scope is used. Passkeys remain disabled until the owner supplies the production HTTPS hostname in `Auth:Passkeys:ServerDomain` and the same exact hostname is allowed by `AllowedHosts`. Phase 4 code is implemented; migration 047, CI and supported-browser acceptance remain pending. The PIN remains a UI privacy feature only; it does not replace Identity authentication or cryptographically protect browser data.
 
 #### 4.1 PIN
 
