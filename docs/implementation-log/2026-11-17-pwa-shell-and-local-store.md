@@ -13,7 +13,7 @@
 - AES-GCM uses a fresh 96-bit IV and additional authenticated data binding owner key, record ID and record kind.
 - After successful online load, the app stores an encrypted snapshot of the user's business identity summary, products, locations and stock snapshot.
 - When /api/me cannot be reached, the app can restore that previously provisioned snapshot and display a clear offline-mode banner.
-- Explicit successful sign-out deletes that account/tenant's offline records and local CryptoKey.
+- Explicit successful sign-out clears the saved snapshot and other non-preserved local records. The encryption key is removed when no records remain. Phase 6 extends this policy to preserve unsynced sales across sign-out.
 - Concurrent first-time key creation avoids overwriting a key that may already protect records.
 
 ## Security boundary
