@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Identity;
 namespace Rbos.Api;
 
 public sealed record PasskeyCredentialRequest(string CredentialJson, string? Name = null);
+public sealed record PasskeyRegistrationStartRequest(string Password);
+public sealed record PasskeyRemovalRequest(string Password);
 
 public static class AuthPasskeyEndpoints
 {
@@ -16,6 +18,7 @@ public static class AuthPasskeyEndpoints
             Results.Ok(new { enabled = IsEnabled(configuration) })).AllowAnonymous();
 
         api.MapPost("/auth/passkeys/creation-options", async (
+            PasskeyRegistrationStartRequest request,
             ClaimsPrincipal principal,
             UserManager<IdentityUser<Guid>> users,
             SignInManager<IdentityUser<Guid>> signIn,
@@ -25,6 +28,9 @@ public static class AuthPasskeyEndpoints
             if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             var user = await users.GetUserAsync(principal);
             if (user is null) return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(request.Password)) return Results.Unauthorized();
+            var passwordCheck = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+            if (!passwordCheck.Succeeded) return Results.Unauthorized();
             var userId = await users.GetUserIdAsync(user);
             var name = user.UserName ?? user.Email ?? "RBOS user";
             var options = await signIn.MakePasskeyCreationOptionsAsync(new PasskeyUserEntity
@@ -88,13 +94,18 @@ public static class AuthPasskeyEndpoints
 
         api.MapDelete("/auth/passkeys/{credentialId}", async (
             string credentialId,
+            PasskeyRemovalRequest request,
             ClaimsPrincipal principal,
             UserManager<IdentityUser<Guid>> users,
+            SignInManager<IdentityUser<Guid>> signIn,
             IConfiguration configuration) =>
         {
             if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             var user = await users.GetUserAsync(principal);
             if (user is null) return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(request.Password)) return Results.Unauthorized();
+            var passwordCheck = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
+            if (!passwordCheck.Succeeded) return Results.Unauthorized();
             byte[] id;
             try { id = Decode(credentialId); }
             catch (FormatException) { return ApiResults.Fail(400, "Invalid passkey identifier."); }
