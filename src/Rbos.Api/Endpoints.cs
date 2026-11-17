@@ -111,6 +111,7 @@ public static class Endpoints
 
 		AuthOtpEndpoints.Map(api);
 		AuthDeviceEndpoints.Map(api);
+		AuthPasskeyEndpoints.Map(api);
 
 		api.MapPost("/auth/login", async (Credentials m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, IWebHostEnvironment env, AuthSessionService sessions, HttpContext context, CancellationToken ct) =>
 		{
