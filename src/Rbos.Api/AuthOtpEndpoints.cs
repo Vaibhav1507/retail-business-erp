@@ -72,7 +72,7 @@ public static class AuthOtpEndpoints
             return Results.Ok();
         }).AllowAnonymous();
 
-        api.MapPost("/auth/login/otp", async (OtpLoginRequest m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, OtpService otp, CancellationToken ct) =>
+        api.MapPost("/auth/login/otp", async (OtpLoginRequest m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, OtpService otp, AuthSessionService sessions, HttpContext context, CancellationToken ct) =>
         {
             var bad = ApiResults.Fail(401, "Wrong or expired code.");
             var mobile = Clean(m.Mobile);
@@ -80,7 +80,7 @@ public static class AuthOtpEndpoints
             var u = await um.Users.FirstOrDefaultAsync(x => x.PhoneNumber == mobile && x.PhoneNumberConfirmed, ct);
             if (u is null || await um.IsLockedOutAsync(u)) return bad;
             if (await otp.VerifyAsync(mobile, "login", m.Code, ct) is null) return bad;
-            await sm.SignInAsync(u, isPersistent: false);
+            await sessions.SignInAsync(context, u, sm, ct);
             return Results.Ok();
         }).AllowAnonymous().AddEndpointFilter(RequireOtp);
 
