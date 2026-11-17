@@ -183,6 +183,7 @@ public static class Endpoints
 
 		ProfileEndpoints.Map(api);
 		CatalogueEndpoints.Map(api);
+		BrandEndpoints.Map(api);
 		BarcodeEndpoints.Map(api);
 		ProcurementEndpoints.Map(api);
         SalesEndpoints.Map(api);

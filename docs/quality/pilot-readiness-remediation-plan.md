@@ -56,7 +56,7 @@ Priority definitions:
 
 | ID | Priority | Finding / required outcome | Primary evidence |
 |---|---|---|---|
-| PR-01 | P0 | Register the missing Brand and Reminder endpoint modules and define their permissions | `Endpoints.cs`, `BrandEndpoints.cs`, `ReminderEndpoints.cs`, frontend callers |
+| PR-01 | P0 | Register missing Brand endpoints and define explicit route access; verify the already-registered Reminder access | `Endpoints.cs`, `BrandEndpoints.cs`, `ReminderEndpoints.cs`, frontend callers |
 | PR-02 | P0 | Make stock verification and WAC replay alias-aware after migration 044 | `FinanceService.cs`, `StockInsightsService.cs`, migration 044 |
 | PR-03 | P0 | Resolve the documented six-decimal vs implemented four-decimal WAC precision mismatch | `CostAndJournal.cs`, posting services, valuation policy |
 | PR-04 | P0 | Audit every API route for explicit read/write permission coverage; prevent unreviewed mutations from becoming member-accessible by omission | `Permissions.cs`, `PermissionFilter.cs`, all endpoint modules |
