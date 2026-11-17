@@ -7,6 +7,7 @@ const en = {
 
   'app.title': 'Retail Business OS',
   'app.signOut': 'Sign out',
+  'app.devices': 'Devices',
   'app.loading': 'Loading...',
   'nav.home': 'Home',
   'nav.sell': 'Sell',
@@ -193,6 +194,7 @@ const hi: Record<MessageKey, string> = {
   'navigation.leave': 'इस स्क्रीन पर आपका काम सेव नहीं हुआ हो सकता है। बिना सेव किए आगे बढ़ें?',
   'app.title': 'रिटेल बिज़नेस OS',
   'app.signOut': 'साइन आउट',
+  'app.devices': 'डिवाइस',
   'app.loading': 'लोड हो रहा है...',
   'nav.home': 'होम',
   'nav.sell': 'बिक्री',
