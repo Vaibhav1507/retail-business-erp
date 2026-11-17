@@ -289,6 +289,8 @@ Official implementation guide: https://learn.microsoft.com/aspnet/core/security/
 
 ### Phase 5 — Offline application shell and protected local store
 
+**Implementation checkpoint (2026-11-17):** Added versioned PWA shell caching (navigation fallback and same-origin static assets only; /api, authorization-bearing requests and non-GET requests are excluded) and an IndexedDB store using AES-GCM with a non-extractable per-user/tenant CryptoKey. The app provisions an encrypted product/location/stock snapshot after a successful online load and can restore it after a network failure. Explicit sign-out clears the local workspace/key. This is at-rest protection against casual database inspection, not an XSS or compromised-browser boundary; the same-origin app can use the key. Offline sales outbox is Phase 6. Draft PR/CI and browser storage/eviction testing remain pending.
+
 Tasks:
 
 1. Add a versioned service-worker strategy for immutable hashed assets, app shell fallback and safe updates.
@@ -392,7 +394,7 @@ Each PR must be focused, run the applicable tests, include an implementation not
 
 ## 9. Current implementation checkpoint and next work
 
-The original sequence-1 recommendation is historical. Branches now contain Phases 1–3 and a Phase 4 local privacy lock. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phases 5 and 6 are being delivered on separate stacked branches. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
+The original sequence-1 recommendation is historical. Branches contain Phases 1–3, the Phase 4 local privacy lock, and the Phase 5 PWA shell/encrypted local snapshot. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phase 6 offline sales outbox is the next stacked branch. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
 
 ## 10. Scope guardrails
 
