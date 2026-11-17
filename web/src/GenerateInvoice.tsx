@@ -6,7 +6,7 @@ import { InvoiceDocument } from './InvoiceDocument'
 import { BarcodeScanner, type ScanResult } from './BarcodeScanner'
 import { t as tr } from './i18n'
 import { whatsappStatusLabel } from './whatsappStatus'
-import { listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
+import { discardOfflineSale, listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
 import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
 
 type Opt = { id: string; name: string }
@@ -107,6 +107,14 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     catch { setError('Offline bills could not be synchronized. Your saved drafts have been retained; retry when the connection is stable.') }
     finally { setSyncingOffline(false); await refreshOfflineQueue() }
   }, [ownerKey, refreshOfflineQueue])
+  async function removeQueueItem(item: OfflineSaleItem) {
+    const label = item.state === 'posted' ? 'Remove this already-posted bill from this device?' : 'Discard this rejected offline draft?'
+    if (!window.confirm(label)) return
+    try {
+      await discardOfflineSale(ownerKey, item.id)
+      await refreshOfflineQueue()
+    } catch { setError('Could not remove this offline bill from local storage.') }
+  }
   useEffect(() => {
     void refreshOfflineQueue()
     const onOnline = () => { void syncQueue() }
@@ -325,6 +333,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue()}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
         <ul>{offlineQueue.slice(0, 10).map(item => <li key={item.id}>
           {new Date(item.createdAt).toLocaleString('en-IN')} — {item.state === 'posted' ? (item.value.invoiceNumber ? 'Posted as INV-' + String(item.value.invoiceNumber).padStart(6, '0') : 'Posted; invoice details are still loading') : item.state === 'needs-attention' ? 'Needs attention: ' + (item.value.lastError ?? 'Server rejected this draft') : item.state === 'syncing' ? 'Syncing…' : 'Pending sync'}
+          {(item.state === 'posted' || item.state === 'needs-attention') && <button type="button" className="secondary" onClick={() => { void removeQueueItem(item) }}>Remove from device</button>}
         </li>)}</ul>
       </div>}
       {error && <p role="alert" className="billing-err">{error}</p>}
