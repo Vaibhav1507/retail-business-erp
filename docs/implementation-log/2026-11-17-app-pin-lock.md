@@ -10,6 +10,8 @@
 - First authenticated use of a browser profile requires a four-digit numeric PIN setup and confirmation.
 - PIN verifier is derived with PBKDF2-HMAC-SHA-256 (600,000 iterations) and a random 128-bit salt; plaintext PIN is not persisted.
 - Local retry delay increases after five failed attempts, with a bounded maximum delay.
+- User can change the PIN from the profile menu after confirming the current PIN.
+- Successful online sign-out removes the local PIN verifier so the next authenticated sign-in can set a new PIN; encrypted unsynced sales are preserved by the offline-store sign-out policy.
 - Manual lock action is available from the profile menu.
 - Five-minute inactivity lock is applied while the app is active.
 - Local verifier is scoped by signed-in email so multiple accounts in a shared browser profile do not share one PIN.
@@ -25,6 +27,10 @@ This is a local UI privacy lock, not an online authentication factor, device att
 - Passkeys are disabled unless `Auth:Passkeys:ServerDomain` is explicitly configured. When enabled, the app requires the same exact host in `AllowedHosts`, sets Identity `ServerDomain`, requires user verification and resident credentials, and never derives RP scope from an arbitrary Host header.
 - The repository deployment runbook has no owner-approved production hostname. The code is ready behind the configuration gate, but passkeys cannot be activated until the owner supplies the HTTPS hostname and browser acceptance is performed.
 - ASP.NET Core 10 Identity supports this flow through `SignInManager`/`UserManager`; the implementation uses those framework handlers rather than a custom WebAuthn cryptography implementation.
+
+## References
+- Microsoft ASP.NET Core 10 passkey guide: https://learn.microsoft.com/aspnet/core/security/authentication/passkeys?view=aspnetcore-10.0
+- Identity EF model/schema versioning: https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity-primary-key-configuration?view=aspnetcore-10.0
 
 ## Validation
 CI is triggered by the draft PR. No local build or browser acceptance is claimed. Require frontend TypeScript/Vitest/build and backend build/test/migration CI. Manual acceptance still required for Android Chrome and desktop browsers, inactivity lock, shared-browser account isolation and local retry behavior.
