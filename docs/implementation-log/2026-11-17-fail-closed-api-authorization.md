@@ -1,7 +1,7 @@
 # Implementation log — fail-closed API authorization
 
 **Last updated:** 2026-11-17  
-**Status:** PR #32 open; GitHub Actions CI run #387 is in progress at the latest observed check  
+**Status:** PR #32 open; implementation head `6a983bdb523c98a4360df03b3d945fdf19478642` passed GitHub Actions CI run #393  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Implementation branch:** `security/fail-closed-api-authorization`  
 **Base branch:** `main`  
@@ -120,43 +120,52 @@ All commits are on `security/fail-closed-api-authorization` and descend from `c1
 | `c9f42ac` | Record proposed authorization matrix limitation |
 | `0e7b88c` | Update pilot-readiness remediation tracker |
 | `26cf260` | Correct stock adjustment to retain `stock.adjust` |
+| `84fbc18` | Update route matrix for stock adjustment policy |
+| `a3ec863` | Assert Manager stock-adjust permission explicitly |
+| `d21454d` | Classify health and GST summary routes after CI found omissions |
+| `99a624b` | Update route matrix for health and GST summary routes |
+| `6a983bd` | Record CI failure/correction evidence and latest checkpoint |
+| `26cf260` | Correct stock adjustment to retain `stock.adjust` |
 | `84fbc18` | Update route access matrix for stock adjustment policy |
 | `a3ec863` | Assert Manager stock-adjust permission explicitly |
 
-**Last recorded implementation commit before PR creation:** `d57fd0e4155f272bfce34c1187217ea0464545d0`. Subsequent policy correction commits are listed above; the current branch head must be refreshed from PR #32 before resuming.
+**Initial PR head:** `d57fd0e4155f272bfce34c1187217ea0464545d0`. **Code/test head validated by CI run #393:** `6a983bdb523c98a4360df03b3d945fdf19478642`.
 
-## 6. Validation status — do not overstate
+## 6. Validation status
 
-- Local build/tests: not run in this session because implementation was authored through the connected GitHub repository workflow.
-- PR: [#32](https://github.com/Vaibhav1507/retail-business-erp/pull/32), open and targeting `main`.
-- CI: [run #387](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44073372206), run ID `44073372206`, for head SHA `d57fd0e4155f272bfce34c1187217ea0464545d0`. Latest observed state was `in_progress`; frontend job passed; backend build was running. Migration validation and integration tests had not yet completed at that observation.
-- Route inventory: 140 explicit method/template entries, no duplicate method/template keys found by static inspection. The runtime route-inventory test is added but must be confirmed by CI.
-- First PR run #387 (`44073372206`) on `d57fd0e`:
-  - Backend Release build: passed (0 errors; 4 existing warnings).
-  - Test migration validation: passed; migrations 001–044 applied to the throwaway CI test DB.
-  - Unit tests: 112 passed.
-  - Integration tests: 142 passed, 2 failed out of 144.
-  - Failures: route inventory found unclassified `* /api/health` and `GET /api/reports/gst-summary`; existing GST summary test expected 200 but received 403 because the route was omitted from the new catalogue.
-  - Frontend: TypeScript, Vitest and Vite build passed; dependency audit is report-only.
-  - This run exposed catalogue omissions; those are being fixed in the next commit. It is **not** a passing run.
-- Follow-up correction: the health endpoint uses unconstrained method metadata, so its access entry now uses `*`; GST summary is explicitly assigned `reports.view`. Re-run latest head CI to verify. 
-- No claim is made that the implementation is complete or CI-green until a successful run is recorded.
+- **PR:** [#32](https://github.com/Vaibhav1507/retail-business-erp/pull/32), open, targeting `main`; not merged.
+- **Validated implementation head:** `6a983bdb523c98a4360df03b3d945fdf19478642`.
+- **Passing CI:** [run #393](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44073997444), run ID `44073997444`, head SHA `6a983bdb523c98a4360df03b3d945fdf19478642`, conclusion `success`.
+- **Frontend job:** passed. `npm ci`, TypeScript check, Vitest and Vite production build completed successfully. The dependency audit step is report-only and is not a blocking security gate.
+- **Backend job:** passed.
+  - Release build succeeded with zero errors.
+  - Test database migration validation succeeded; migrations 001–044 applied on the throwaway CI PostgreSQL database.
+  - Unit tests: 112 passed, 0 failed.
+  - Integration tests: 144 passed, 0 failed. This includes route inventory, pre-business membership, Brand registration and existing security/tenant test coverage.
+  - Docker deployment image build completed successfully; image was not pushed.
+- **Failed-run history retained:** first run #387 (`44073372206`, head `d57fd0e`) passed build and migration validation but failed two integration tests because `* /api/health` and `GET /api/reports/gst-summary` were missing from the route catalogue. Both routes were classified explicitly, the GST summary was assigned `reports.view`, and run #393 passed all tests. The stock-adjustment route was also corrected to `stock.adjust` and included in tested code.
+- **Local tests:** not run locally in this connected GitHub workflow session; GitHub Actions is the recorded validation source.
+- **Production:** no production deployment or migration was performed. No schema migration, production secret, production configuration, real shop data or paid AI dependency changed.
+
+Run #393 validates the PR head above. Any later commit to this branch must be validated separately before merge.
 
 ## 7. Known review items / next actions
 
-1. Inspect latest CI after the health/GST classification correction; treat any route-inventory or regression failure as a blocker.
-2. Confirm Brand endpoint integration test passes against real PostgreSQL.
-3. Confirm the pre-business user, revoked-membership, anonymous OTP/login and webhook tests pass.
-4. Read the complete PR diff and verify that only this authorization slice and its records changed.
-5. Update this file with final head SHA, CI run IDs, job outcomes, failures and fixes.
-6. Keep PR #31 open and separate unless the owner explicitly asks to merge it; this implementation branch is based on main and includes the relevant decisions.
-7. Do not begin Phase 2 (persistent login) until this authorization PR is reviewed and merged.
+1. Complete human review of PR #32 and its security boundaries before merging.
+2. Decide/approve the final Owner, Manager, Accountant and Cashier read matrix. Some existing finance reads remain authenticated-member routes to preserve current behaviour; this conflicts with parts of the Proposed matrix.
+3. Review DTO/field exposure for cost, WAC, margin, inventory value and financial balances. Route-level classification is not field-level response masking.
+4. Run/retain role-specific API access tests as the role matrix is formally approved; no role bundle was widened by this slice.
+5. Keep PR #31 open and separate unless the owner explicitly asks to merge it.
+6. Do not begin Phase 2 (persistent login) until this authorization PR is reviewed and merged.
 
 ## 8. Recovery checkpoint
 
 To resume safely:
 - Open this file first.
-- Check branch `security/fail-closed-api-authorization` and its current head.
-- Check the implementation PR and latest workflow run.
-- Start with outstanding route-inventory/CI failures in section 7.
-- Do not repeat the baseline research unless new code has landed on main.
+- Repository: `Vaibhav1507/retail-business-erp`.
+- Implementation branch: `security/fail-closed-api-authorization`.
+- Implementation PR: [#32](https://github.com/Vaibhav1507/retail-business-erp/pull/32), open/not merged.
+- Last validated code/test head: `6a983bdb523c98a4360df03b3d945fdf19478642`.
+- Last passing CI: [run #393](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44073997444).
+- If the branch has later commits, inspect the latest PR head and workflow run before treating it as validated.
+- Start with the outstanding policy review in section 7; do not repeat baseline research unless new code has landed on main.
