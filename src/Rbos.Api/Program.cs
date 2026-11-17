@@ -59,17 +59,17 @@ if (args.Contains("--migrate"))
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 QuestPDF.Settings.UseSystemFonts = true;
 var builder = WebApplication.CreateBuilder(args);
-var passkeyDomain = builder.Configuration["Auth:Passkeys:ServerDomain"]?.Trim();
+var passkeyDomain = builder.Configuration["Auth:Passkeys:ServerDomain"]?.Trim().ToLowerInvariant();
 if (!string.IsNullOrWhiteSpace(passkeyDomain))
 {
     if (Uri.CheckHostName(passkeyDomain) != UriHostNameType.Dns)
         throw new InvalidOperationException("Auth:Passkeys:ServerDomain must be a valid DNS host name.");
     var allowedHosts = builder.Configuration["AllowedHosts"];
-    if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts.Trim() == "*")
+    var configuredHosts = allowedHosts?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+    if (configuredHosts.Length == 0 || (configuredHosts.Length == 1 && configuredHosts[0] == "*"))
         builder.Configuration["AllowedHosts"] = passkeyDomain;
-    else if (!allowedHosts.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Contains(passkeyDomain, StringComparer.OrdinalIgnoreCase))
-        throw new InvalidOperationException("AllowedHosts must explicitly include Auth:Passkeys:ServerDomain before passkeys can be enabled.");
+    else if (configuredHosts.Length != 1 || !configuredHosts[0].Equals(passkeyDomain, StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("When passkeys are enabled, AllowedHosts must contain only the exact Auth:Passkeys:ServerDomain host. Wildcards and alternate hosts are not allowed.");
     builder.Services.Configure<IdentityPasskeyOptions>(options =>
     {
         options.ServerDomain = passkeyDomain;
