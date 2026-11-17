@@ -1,12 +1,12 @@
 # Implementation log — persistent login and network-state handling
 
 **Last updated:** 2026-11-17  
-**Status:** Phase 2 implementation on feature branch; CI validation pending  
+**Status:** Phase 2 implementation on feature branch; CI run #409 passed on the recorded head  
 **Repository:** Vaibhav1507/retail-business-erp  
 **Branch:** auth/persistent-login-and-network-state  
 **Base branch:** security/fail-closed-api-authorization  
 **Base commit:** dbfc693d2b3047d413d294f49c70a7e5ce7ed984  
-**Implementation PR:** pending creation after branch changes and review
+**Implementation PR:** [#33 — persistent login and reliable session state](https://github.com/Vaibhav1507/retail-business-erp/pull/33), open as draft and unmerged
 
 ## Scope
 
@@ -49,8 +49,11 @@ PIN decision correction for the later Phase 4:
 
 ## Validation
 
-- No local build/tests have been run in this connected GitHub editing session.
-- A PR-triggered CI run is required; attach the final run URL and job/test counts here after the branch PR is created.
+- **Passing CI:** [run #409](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44079164598), run ID 44079164598, head SHA ea04d8b46232e5adfc5807c71ea7816c2642d4f5, conclusion success.
+- Frontend passed: npm ci, TypeScript, Vitest, Vite production build; dependency audit remains report-only.
+- Backend Release build passed; migration validation applied migrations 001–045 on throwaway CI PostgreSQL; unit tests 112 passed; integration tests 148 passed; Docker deployment image build passed without a push.
+- Earlier CI attempts caught and corrected missing Program.cs imports, frontend state/workspace rendering regressions, an HTTP JSON test import, and two test-fixture assumptions. The final #409 run validates the corrected branch head.
+- Tests were executed by GitHub Actions; no separate local build/test run was performed.
 - No production migration or deployment was run.
 - Migration 045 has only been added to the branch; it has not been applied to any database.
 - No production secrets, customer data, paid AI settings or company resources were used.
@@ -61,10 +64,9 @@ PIN decision correction for the later Phase 4:
 2. Verify password and OTP cookies both have 30-day persistent expiry with unchanged security flags.
 3. Verify the server rejects a session at absolute expiry even if its cookie is renewed.
 4. Verify logout revokes the server session.
-5. Review cookie validation + Identity security-stamp event composition on the actual ASP.NET Core 10 runtime.
-6. Add/verify regression for no cookie, invalid session claim and revoked session.
-7. Verify frontend real 401 vs HTTP 5xx vs fetch network rejection behavior.
-8. Confirm app restart/renewal and cross-instance behavior with persisted Data Protection keys.
+5. Complete human security review of cookie validation + Identity security-stamp event composition on the actual ASP.NET Core 10 runtime.
+6. The suite now covers unauthenticated requests, absolute expiry, logout revocation and frontend 401 vs 503 retry. Add a focused invalid-session-claim regression if the review identifies a gap.
+7. Browser restart and multi-instance renewal were not exercised by an automated browser E2E test; verify these before Phase 2 is considered production-ready. Data Protection keys continue to use the existing PostgreSQL persistence.
 
 ## Recovery checkpoint
 
