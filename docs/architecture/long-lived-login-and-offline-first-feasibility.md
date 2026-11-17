@@ -198,6 +198,22 @@ The authenticated cookie should carry a server-issued session/device identifier.
 
 The existing ASP.NET Identity tables remain the source for users/password credentials. Do not introduce JWT access/refresh token storage as part of this cookie-authentication improvement.
 
+### 4.7 Passkey dependency check
+
+The repository currently targets .NET 10 and references ASP.NET Core Identity 10.x packages. ASP.NET Core Identity in .NET 10 provides built-in WebAuthn/passkey registration and authentication APIs, including challenge creation, attestation/assertion verification and session establishment. Therefore, the first implementation choice should be the built-in Identity capability, not a third-party FIDO library.
+
+Official implementation guidance: https://learn.microsoft.com/aspnet/core/security/authentication/passkeys?view=aspnetcore-10.0
+
+Before implementation, verify:
+- The current `RbosIdentityDbContext` and `IdentityUser<Guid>` model expose the passkey store and identify the exact table/schema required.
+- The handwritten migration system provisions the passkey persistence table and required constraints/indexes; do not assume an EF migration is automatically applied.
+- Production uses HTTPS and a fixed `ServerDomain` / allowed-origin policy; do not rely on an unvalidated Host header.
+- The browser client can safely serialize WebAuthn credential buffers and invoke `navigator.credentials.create/get`.
+- Acceptance covers Android Chrome (including installed PWA), desktop Chrome/Edge and any other explicitly supported browser.
+- A passkey's user-verification prompt may use biometric or the device's screen-lock PIN, depending on platform configuration. RBOS cannot force a particular biometric modality or assume every device has a fingerprint sensor.
+
+The built-in Identity feature is scoped to passkey authentication. It is not a general-purpose API for releasing a locally encrypted offline database key, so offline biometric unlock remains a separate proof-of-concept.
+
 ### 4.6 Required implementation changes
 
 1. Make both password and OTP login paths issue persistent cookies consistently.
@@ -206,7 +222,7 @@ The existing ASP.NET Identity tables remain the source for users/password creden
 4. Add trusted-device/session persistence, registration, last-used tracking, revocation and server-side cookie validation.
 5. Add explicit **Lock** and **Sign out** actions. Lock hides the app and stops background UI work without deleting the server session; Sign out revokes/signs out and clears local business state safely.
 6. Add app-PIN setup/change/verify/lockout and recovery only after the security design is approved.
-7. Add passkey/WebAuthn only after selecting a maintained .NET implementation and confirming supported Android Chrome, desktop Chrome/Edge and installed-PWA behaviour.
+7. Evaluate the built-in ASP.NET Core Identity passkey/WebAuthn support already available in this repository's .NET 10 stack before considering any third-party library. Confirm the exact Identity EF model and add/validate the corresponding SQL migration because this repository manages schema through handwritten SQL migrations. Configure an explicit passkey RP domain, HTTPS, host/origin validation and supported-browser acceptance tests. Passkeys are for online authentication; they do not by themselves unlock IndexedDB data offline.
 8. Keep the existing CSRF, SameSite, HttpOnly, Secure and server-side tenant/permission checks.
 9. Ensure password changes, mobile/OTP changes, account disablement, security-stamp changes and owner revocation invalidate the right sessions.
 10. Add integration tests for persistence across browser/client restarts, absolute expiry, sliding renewal, OTP/password parity, revoked sessions, logout, security-stamp changes and network-failure handling.
