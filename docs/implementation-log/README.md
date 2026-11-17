@@ -19,7 +19,11 @@ This directory is the durable project handover record. Update it in every implem
   - Scope: user-scoped device registry, server session linkage, list/revoke endpoints, security-event audit and device-management UI.
   - Current stage: implementation and recovery log committed; [PR #34](https://github.com/Vaibhav1507/retail-business-erp/pull/34) open/draft/unmerged. CI #411 failed before runner allocation (no test steps executed); retry once Actions runner allocation is healthy.
 
-- [Four-digit app privacy lock — 2026-11-17](2026-11-17-app-pin-lock.md)\n  - Branch: `auth/pin-and-passkey-unlock`\n  - Scope: local four-digit privacy lock, manual lock and five-minute inactivity lock; passkeys remain gated on an approved RP domain.\n\n## Update discipline
+- [Four-digit app privacy lock — 2026-11-17](2026-11-17-app-pin-lock.md)\n  - Branch: `auth/pin-and-passkey-unlock`\n  - Scope: local four-digit privacy lock, manual lock and five-minute inactivity lock; passkeys remain gated on an approved RP domain.\n\n- [Four-digit app privacy lock and gated passkeys — 2026-11-17](2026-11-17-app-pin-lock.md)
+  - Branch: auth/pin-and-passkey-unlock
+  - Scope: local privacy lock plus ASP.NET Core Identity 10 passkey store, registration, sign-in and device management; activation gated by explicit RP domain/AllowedHosts.
+
+## Update discipline
 
 For each implementation slice, record:
 1. Goal, scope and explicit non-goals.
