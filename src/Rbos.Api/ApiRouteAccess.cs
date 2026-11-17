@@ -180,8 +180,8 @@ public static class ApiRouteAccess
         new("GET",  "/api/dashboard", ApiAccessKind.Permission, Permissions.ReportsView),
         new("GET",  "/api/audit", ApiAccessKind.Permission, Permissions.AuditView),
 
-        // These two operations keep their prior authenticated-member behaviour:
-        // one records an export event; it does not return the exported report itself.
+        // This operation keeps its prior authenticated-member behaviour: it records
+        // an export event; it does not return the exported report itself.
         new("POST", "/api/exports/audit", ApiAccessKind.AuthenticatedMember),
 
         // All staff directory and staff role catalogue operations require staff.manage.
