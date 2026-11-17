@@ -7,7 +7,7 @@ This directory is the durable project handover record. Update it in every implem
 - [Fail-closed API authorization — 2026-11-17](2026-11-17-fail-closed-api-authorization.md)
   - Branch: `security/fail-closed-api-authorization`
   - Scope: exact route/method access catalogue, fail-closed API filter, Brand endpoint registration and authorization tests.
-  - Current stage: implementation committed to branch; CI/PR review pending.
+  - Current stage: implementation and recovery log committed; implementation head passed CI run #393; PR #32 remains open for review.
 
 ## Update discipline
 
