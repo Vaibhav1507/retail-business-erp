@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
+using Rbos.Api;
 using System.Security.Claims;
 using Rbos.Api.Persistence;
 using Rbos.Api.Application;
