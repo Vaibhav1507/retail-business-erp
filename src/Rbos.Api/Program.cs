@@ -66,7 +66,7 @@ if (!string.IsNullOrWhiteSpace(passkeyDomain))
         throw new InvalidOperationException("Auth:Passkeys:ServerDomain must be a valid DNS host name.");
     var allowedHosts = builder.Configuration["AllowedHosts"];
     if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts.Trim() == "*")
-        builder.WebHost.UseSetting(Microsoft.AspNetCore.Hosting.WebHostDefaults.AllowedHostsKey, passkeyDomain);
+        builder.Configuration["AllowedHosts"] = passkeyDomain;
     else if (!allowedHosts.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Contains(passkeyDomain, StringComparer.OrdinalIgnoreCase))
         throw new InvalidOperationException("AllowedHosts must explicitly include Auth:Passkeys:ServerDomain before passkeys can be enabled.");
