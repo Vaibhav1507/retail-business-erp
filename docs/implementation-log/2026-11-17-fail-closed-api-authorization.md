@@ -119,8 +119,11 @@ All commits are on `security/fail-closed-api-authorization` and descend from `c1
 | `a2a39fb` | Add API route access matrix document |
 | `c9f42ac` | Record proposed authorization matrix limitation |
 | `0e7b88c` | Update pilot-readiness remediation tracker |
+| `26cf260` | Correct stock adjustment to retain `stock.adjust` |
+| `84fbc18` | Update route access matrix for stock adjustment policy |
+| `a3ec863` | Assert Manager stock-adjust permission explicitly |
 
-**Last recorded implementation commit before PR creation:** `0e7b88c2a292aa36a7943cf39e90b6db05b8941a`.
+**Last recorded implementation commit before PR creation:** `d57fd0e4155f272bfce34c1187217ea0464545d0`. Subsequent policy correction commits are listed above; the current branch head must be refreshed from PR #32 before resuming.
 
 ## 6. Validation status — do not overstate
 
@@ -128,18 +131,26 @@ All commits are on `security/fail-closed-api-authorization` and descend from `c1
 - PR: [#32](https://github.com/Vaibhav1507/retail-business-erp/pull/32), open and targeting `main`.
 - CI: [run #387](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44073372206), run ID `44073372206`, for head SHA `d57fd0e4155f272bfce34c1187217ea0464545d0`. Latest observed state was `in_progress`; frontend job passed; backend build was running. Migration validation and integration tests had not yet completed at that observation.
 - Route inventory: 140 explicit method/template entries, no duplicate method/template keys found by static inspection. The runtime route-inventory test is added but must be confirmed by CI.
+- First PR run #387 (`44073372206`) on `d57fd0e`:
+  - Backend Release build: passed (0 errors; 4 existing warnings).
+  - Test migration validation: passed; migrations 001–044 applied to the throwaway CI test DB.
+  - Unit tests: 112 passed.
+  - Integration tests: 142 passed, 2 failed out of 144.
+  - Failures: route inventory found unclassified `* /api/health` and `GET /api/reports/gst-summary`; existing GST summary test expected 200 but received 403 because the route was omitted from the new catalogue.
+  - Frontend: TypeScript, Vitest and Vite build passed; dependency audit is report-only.
+  - This run exposed catalogue omissions; those are being fixed in the next commit. It is **not** a passing run.
+- Follow-up correction: the health endpoint uses unconstrained method metadata, so its access entry now uses `*`; GST summary is explicitly assigned `reports.view`. Re-run latest head CI to verify. 
 - No claim is made that the implementation is complete or CI-green until a successful run is recorded.
 
 ## 7. Known review items / next actions
 
-1. Inspect CI run #387 until it completes. Treat compile errors, integration failures and route-inventory omissions as blockers.
-2. Correct every unclassified route reported by the route-inventory test. Do not add a broad wildcard route rule except for the terminal 404 fallback.
-3. Confirm Brand endpoint integration test passes against real PostgreSQL.
-4. Confirm the pre-business user, revoked-membership, anonymous OTP/login and webhook tests pass.
-5. Read the complete PR diff and verify that only this authorization slice and its records changed.
-6. Update this file with the final head SHA, CI run IDs, job outcomes, failures and fixes.
-7. Keep PR #31 open and separate unless the owner explicitly asks to merge it; this implementation branch is based on main and includes the relevant decisions.
-8. Do not begin Phase 2 (persistent login) until this authorization PR is reviewed and merged.
+1. Inspect latest CI after the health/GST classification correction; treat any route-inventory or regression failure as a blocker.
+2. Confirm Brand endpoint integration test passes against real PostgreSQL.
+3. Confirm the pre-business user, revoked-membership, anonymous OTP/login and webhook tests pass.
+4. Read the complete PR diff and verify that only this authorization slice and its records changed.
+5. Update this file with final head SHA, CI run IDs, job outcomes, failures and fixes.
+6. Keep PR #31 open and separate unless the owner explicitly asks to merge it; this implementation branch is based on main and includes the relevant decisions.
+7. Do not begin Phase 2 (persistent login) until this authorization PR is reviewed and merged.
 
 ## 8. Recovery checkpoint
 
