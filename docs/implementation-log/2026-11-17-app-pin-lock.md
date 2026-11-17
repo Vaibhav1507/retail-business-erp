@@ -22,7 +22,8 @@ This is a local UI privacy lock, not an online authentication factor, device att
 
 ## Passkey implementation and activation gate
 - Enabled ASP.NET Core Identity 10's native passkey store using `IdentityUserPasskey<Guid>` and migration `047_identity_passkeys.sql`.
-- Added passkey creation/attestation, list/remove, discoverable request options and assertion sign-in endpoints. Successful passkey sign-in creates the same server-authoritative session/device record as password/OTP sign-in.
+- Added passkey creation/attestation, list/remove, discoverable request options and assertion sign-in endpoints.
+- Registering or removing a passkey requires the current account password with Identity lockout-on-failure handling; a stolen active cookie alone cannot silently add or remove a credential. Successful passkey sign-in creates the same server-authoritative session/device record as password/OTP sign-in.
 - Added browser WebAuthn serialization helpers, passkey sign-in on the account screen, and passkey registration/removal in device settings.
 - Passkeys are disabled unless `Auth:Passkeys:ServerDomain` is explicitly configured. When enabled, the app requires the same exact host in `AllowedHosts`, sets Identity `ServerDomain`, requires user verification and resident credentials, and never derives RP scope from an arbitrary Host header.
 - The repository deployment runbook has no owner-approved production hostname. The code is ready behind the configuration gate, but passkeys cannot be activated until the owner supplies the HTTPS hostname and browser acceptance is performed.
