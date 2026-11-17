@@ -55,7 +55,7 @@ public sealed class ApiAuthorizationTests(ApiFactory factory) : IClassFixture<Ap
     [Fact]
     public void Existing_role_bundles_are_preserved_without_implicit_permission_widening()
     {
-        Assert.True(Permissions.Has("Owner", Permissions.All[0]));
+        Assert.All(Permissions.All, permission => Assert.True(Permissions.Has("Owner", permission), permission));
         Assert.True(Permissions.Has("Manager", Permissions.CatalogueManage));
         Assert.False(Permissions.Has("Manager", Permissions.FinanceManage));
         Assert.True(Permissions.Has("Accountant", Permissions.FinanceManage));
