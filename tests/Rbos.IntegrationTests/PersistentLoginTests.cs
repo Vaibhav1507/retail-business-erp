@@ -89,6 +89,11 @@ public sealed class PersistentLoginTests(ApiFactory factory) : IClassFixture<Api
                 connection);
             command.Parameters.AddWithValue("name", client.Email.ToUpperInvariant());
             mobile = (string)(await command.ExecuteScalarAsync())!;
+            await using var agePreviousChallenge = new NpgsqlCommand(
+                "update identity.otp_challenge set created_at = now() - interval '2 minutes' where mobile = @mobile",
+                connection);
+            agePreviousChallenge.Parameters.AddWithValue("mobile", mobile);
+            await agePreviousChallenge.ExecuteNonQueryAsync();
         }
 
         var sent = await client.Send(HttpMethod.Post, "/auth/otp/send", new { mobile, purpose = "login" });
@@ -119,7 +124,7 @@ public sealed class PersistentLoginTests(ApiFactory factory) : IClassFixture<Api
         {
             await connection.OpenAsync();
             await using var command = new NpgsqlCommand(
-                "update identity.auth_session set expires_at = now() - interval '1 second' where id = @id",
+                "update identity.auth_session set authenticated_at = now() - interval '2 minutes', expires_at = now() - interval '1 minute' where id = @id",
                 connection);
             command.Parameters.AddWithValue("id", session.Id);
             Assert.Equal(1, await command.ExecuteNonQueryAsync());
