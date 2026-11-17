@@ -99,3 +99,5 @@
     width: 100%;
   }
 }
+
+.passkey-panel{margin-top:24px;padding:18px;border:1px solid var(--line,#ddd);border-radius:12px}.passkey-panel h2{margin-top:0}.passkey-panel li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line,#ddd)}.passkey-panel li button{margin-left:auto}
