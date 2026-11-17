@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Rbos.Api;
 
@@ -94,7 +95,7 @@ public static class AuthPasskeyEndpoints
 
         api.MapDelete("/auth/passkeys/{credentialId}", async (
             string credentialId,
-            PasskeyRemovalRequest request,
+            [FromBody] PasskeyRemovalRequest request,
             ClaimsPrincipal principal,
             UserManager<IdentityUser<Guid>> users,
             SignInManager<IdentityUser<Guid>> signIn,
