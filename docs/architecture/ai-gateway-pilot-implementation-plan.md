@@ -148,19 +148,32 @@ Official references:
 - https://docs.x.ai/developers/rate-limits
 - https://docs.x.ai/developers/pricing
 
-### 5.4 Credential-pool selection
+### 5.4 Credential-pool selection — round-robin on every request
 
-Do not blindly rotate keys on every request. Implement quota-aware selection:
+**The requested pilot behaviour is round-robin credential rotation: each new request should use the next eligible configured credential, rather than repeatedly using the first key.** Implement this as a deterministic, concurrency-safe round-robin cursor for each provider/model-compatible credential pool.
 
-1. Identify eligible credentials for the requested provider/model/task.
-2. Exclude disabled, invalid, unhealthy, budget-blocked or cooling-down credentials.
-3. Prefer a credential with available observed capacity.
-4. Apply per-credential concurrency limits.
-5. On a confirmed quota response, mark that credential/project as cooling down for the relevant quota window.
-6. Try another eligible credential only when it represents genuinely independent, authorised capacity.
-7. If no credential is eligible, move to an approved alternate provider or return a controlled unavailable response.
+Example with five configured Gemini credentials:
 
-Keep credential pool behaviour configurable. It must be possible to disable multi-credential routing without code changes.
+- Request 1 → Credential 1
+- Request 2 → Credential 2
+- Request 3 → Credential 3
+- Request 4 → Credential 4
+- Request 5 → Credential 5
+- Request 6 → Credential 1, continuing cyclically
+
+Apply these rules:
+
+1. Rotate to the next eligible credential on every new request. Do not wait for a rate-limit error before rotating.
+2. Keep provider, model capability, environment, data-handling policy and budget eligibility as filters before a credential enters the rotation pool.
+3. **Group credentials by their real quota boundary.** Multiple keys from the same Gemini project may rotate between requests, but they still share one project quota bucket; key rotation within that group does not increase capacity.
+4. Credentials from distinct projects/accounts may be separate quota candidates only where provider terms, account eligibility and billing arrangements permit their use. Do not assume that separate Gmail accounts guarantee independent or additive quotas.
+5. Maintain a separate round-robin cursor for each eligible provider/model pool. Make cursor advancement safe under concurrent requests (for example, an atomic counter or equivalent concurrency-safe mechanism).
+6. On a 429/quota response, mark the relevant quota bucket (project-level for Gemini, and the applicable team/provider scope for other providers) as cooling down. Skip every credential mapped to that same exhausted quota bucket until its cooldown expires or provider guidance indicates recovery.
+7. Continue round-robin selection among remaining eligible independent quota buckets. If none remain, use an approved alternate provider or return a controlled unavailable response.
+8. Invalid/disabled credentials are removed from rotation until corrected. Do not retry them on every request.
+9. Keep rotation configurable and observable: record a non-secret credential identifier, quota-bucket identifier, selection reason and failover outcome.
+
+This is **round-robin across configured credentials**, not a promise that every credential represents additional quota. It must never be used to evade provider limits or terms. Keep the pool configurable and make it possible to disable multi-credential routing without code changes.
 
 ## 6. Request contract and feature integration
 
@@ -378,7 +391,7 @@ Before coding:
 - Add configurable credential entries.
 - Track project identity separately from key identity.
 - Implement project-aware quota cooldown.
-- Add round-robin or least-recently-used selection among eligible independent projects, not among keys in the same project as if they were separate quotas.
+- Implement concurrency-safe round-robin selection so each new request advances to the next eligible configured credential. Group same-project Gemini keys under one shared quota bucket; on quota exhaustion, skip all keys in that bucket and rotate among remaining eligible independent quota buckets.
 - Add optional Grok adapter.
 - Add provider-level circuit breaker and capability-aware fallback.
 - Add feature flags to disable credential pooling/provider failover.
@@ -418,9 +431,11 @@ Preserve local voice navigation. Do not migrate it to a cloud provider as part o
 ### Credential pool
 - [ ] Multiple credentials can be configured without committing secrets.
 - [ ] Credential metadata includes provider and project/team identity.
-- [ ] Multiple keys in one Gemini project map to one shared quota bucket.
+- [ ] Every new request advances the concurrency-safe round-robin cursor to the next eligible configured credential.
+- [ ] Multiple keys in one Gemini project may rotate per request but map to one shared quota bucket and are never counted as separate quota capacity.
 - [ ] Distinct project credentials can be selected independently only where their use is authorised and permitted.
-- [ ] Quota errors cool down the correct project/credential bucket.
+- [ ] A 429/quota response cools down the entire applicable quota bucket, not just one API key; other keys in the same exhausted project are skipped.
+- [ ] When a quota bucket is cooling down, requests rotate among remaining eligible independent buckets or use an approved provider fallback.
 - [ ] No infinite rotation, unbounded retry or claim of unlimited capacity.
 - [ ] A provider/credential can be disabled through configuration.
 
@@ -467,7 +482,7 @@ Preserve local voice navigation. Do not migrate it to a cloud provider as part o
 
 1. Central gateway is the only supported integration point for application AI calls.
 2. Gemini is the initial default candidate; Grok is an optional independent fallback.
-3. Multiple Gemini credentials/projects are supported as a configurable credential pool, but same-project keys share quota.
+3. Every request rotates round-robin to the next eligible configured credential. Multiple Gemini credentials/projects are supported, but same-project keys share one quota bucket and do not multiply quota; a 429 cools down that whole bucket.
 4. Multi-account/project quota pooling is experimental and must not be used to circumvent provider limits or terms.
 5. Paid API use is budget-controlled; no automatic top-ups.
 6. Local voice navigation remains local.
