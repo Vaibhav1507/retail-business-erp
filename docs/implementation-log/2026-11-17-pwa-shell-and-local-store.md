@@ -27,7 +27,7 @@
 No offline sales outbox, sale creation or automatic sync is included in this branch. Other writes remain online-only. Offline app shell/snapshot is not a claim that the full app is offline-capable.
 
 ## Validation and acceptance still required
-- Draft PR CI must pass frontend TypeScript/Vitest/build and backend regression.
+- CI run #483 (https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44107223788) failed before either job received a runner (runner_id 0, empty step arrays). No frontend/backend step ran. Retry when GitHub Actions runner allocation is healthy.
 - Android Chrome installed PWA and desktop Chrome/Edge offline launch.
 - Repeat install, service-worker update and old-cache cleanup.
 - IndexedDB quota/eviction, browser restart, storage denial and CryptoKey structured-clone support.
