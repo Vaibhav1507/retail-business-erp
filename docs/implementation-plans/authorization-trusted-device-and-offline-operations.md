@@ -255,7 +255,7 @@ Tasks:
 
 ### Phase 4 — PIN lock and optional passkey/biometric unlock
 
-**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented. ASP.NET Core Identity 10 passkey persistence, registration, listing/removal and passkey sign-in are also implemented behind an explicit RP-domain configuration gate. Registration and removal require current-password confirmation; no guessed hostname or host-header-derived RP scope is used. Passkeys remain disabled until the owner supplies the production HTTPS hostname in `Auth:Passkeys:ServerDomain` and the same exact hostname is allowed by `AllowedHosts`. Phase 4 code is implemented; migration 047, CI and supported-browser acceptance remain pending. The PIN remains a UI privacy feature only; it does not replace Identity authentication or cryptographically protect browser data.
+**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented. ASP.NET Core Identity 10 passkey persistence, registration, listing/removal and passkey sign-in are also implemented behind an explicit RP-domain configuration gate. Registration and removal require current-password confirmation; no guessed hostname or host-header-derived RP scope is used. Passkeys remain disabled until the owner supplies the production HTTPS hostname in `Auth:Passkeys:ServerDomain` and the same exact hostname is allowed by `AllowedHosts`. Phase 4 code and migration 047 are implemented on PR #35. CI run #482 failed before runner allocation (runner ID 0, no steps); no build/test ran. Supported-browser acceptance remains pending. The PIN remains a UI privacy feature only; it does not replace Identity authentication or cryptographically protect browser data.
 
 #### 4.1 PIN
 
@@ -288,6 +288,8 @@ Official implementation guide: https://learn.microsoft.com/aspnet/core/security/
 **Acceptance tests:** mandatory PIN setup after enrollment; PIN retry/lockout/recovery; manual lock and inactivity lock; passkey create/sign-in/revoke; challenge expiry and replay protection; origin/RP ID validation; browser coverage; no PIN/private key/secret in localStorage; no bypass of server permission enforcement.
 
 ### Phase 5 — Offline application shell and protected local store
+
+**Implementation checkpoint (2026-11-17):** Added versioned PWA shell caching (navigation fallback and same-origin static assets only; /api, authorization-bearing requests and non-GET requests are excluded) and an IndexedDB store using AES-GCM with a non-extractable per-user/tenant CryptoKey. The app provisions an encrypted product/location/stock snapshot after a successful online load and can restore it after a network failure. Explicit sign-out clears the local workspace/key. This is at-rest protection against casual database inspection, not an XSS or compromised-browser boundary; the same-origin app can use the key. Offline sales outbox is Phase 6. Draft PR #38 is open. CI run #483 failed before runner allocation (runner ID 0, no steps); no build/test ran. Browser storage/eviction testing remains pending.
 
 Tasks:
 
@@ -392,7 +394,7 @@ Each PR must be focused, run the applicable tests, include an implementation not
 
 ## 9. Current implementation checkpoint and next work
 
-The original sequence-1 recommendation is historical. Branches now contain Phases 1–3 and a Phase 4 local privacy lock. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phases 5 and 6 are being delivered on separate stacked branches. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
+The original sequence-1 recommendation is historical. Branches contain Phases 1–3, the Phase 4 local privacy lock, and the Phase 5 PWA shell/encrypted local snapshot. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phase 6 offline sales outbox is the next stacked branch. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
 
 ## 10. Scope guardrails
 

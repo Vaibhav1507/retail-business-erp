@@ -34,7 +34,7 @@ This is a local UI privacy lock, not an online authentication factor, device att
 - Identity EF model/schema versioning: https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity-primary-key-configuration?view=aspnetcore-10.0
 
 ## Validation
-CI run #482 (https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44107217871) failed before either job received a runner (runner_id 0, empty step arrays). No build or test executed. This is a GitHub Actions runner-allocation failure, not evidence of a code/test failure. No local build or browser acceptance is claimed. Require frontend TypeScript/Vitest/build and backend build/test/migration CI. Manual acceptance still required for Android Chrome and desktop browsers, inactivity lock, shared-browser account isolation and local retry behavior.
+CI is triggered by the draft PR. No local build or browser acceptance is claimed. Require frontend TypeScript/Vitest/build and backend build/test/migration CI. Manual acceptance still required for Android Chrome and desktop browsers, inactivity lock, shared-browser account isolation and local retry behavior.
 
 ## Recovery
 Start from this branch and inspect the latest PR workflow. Passkey work requires a separate owner-approved RP domain and a WebAuthn implementation using the .NET 10 Identity passkey store and strict origin validation.
