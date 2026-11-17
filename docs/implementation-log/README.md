@@ -12,7 +12,7 @@ This directory is the durable project handover record. Update it in every implem
 - [Persistent login and network-state handling — 2026-11-17](2026-11-17-persistent-login.md)
   - Branch: auth/persistent-login-and-network-state
   - Scope: persistent/sliding login cookie, server-side absolute session expiry, logout revocation and retryable auth-state UX.
-  - Current stage: implementation committed on stacked feature branch; CI and review pending.
+  - Current stage: implementation committed on stacked feature branch; CI run #409 passed; PR #33 remains open as draft and unmerged.
 
 ## Update discipline
 
