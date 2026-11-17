@@ -299,7 +299,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       {offlineQueue.length > 0 && <div className="billing-card" aria-label="Offline bill queue">
         <h3>Offline bills and sync status</h3>
         <p>{offlineQueue.filter(x => x.state === 'pending-sync' || x.state === 'syncing').length} waiting to sync · {offlineQueue.filter(x => x.state === 'needs-attention').length} need attention · {offlineQueue.filter(x => x.state === 'posted').length} posted</p>
-        <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
+        <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue()}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
         <ul>{offlineQueue.slice(0, 10).map(item => <li key={item.id}>
           {new Date(item.createdAt).toLocaleString('en-IN')} — {item.state === 'posted' ? 'Posted as INV-' + String(item.value.invoiceNumber ?? '').padStart(6, '0') : item.state === 'needs-attention' ? 'Needs attention: ' + (item.value.lastError ?? 'Server rejected this draft') : item.state === 'syncing' ? 'Syncing…' : 'Pending sync'}
         </li>)}</ul>
