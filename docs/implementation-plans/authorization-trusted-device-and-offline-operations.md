@@ -233,7 +233,7 @@ Tasks:
 
 ### Phase 3 — Trusted device registry and revocation
 
-**Implementation status (2026-11-17):** Implemented on `auth/trusted-device-registry`, stacked on Phase 2 head `4e9a6a72dc24d89bec5417c17b60193b5381b6e8`; implementation head `3c208ee3ab0fa0473d7dcd5879823029f002988c`. Adds migration `046_trusted_device_registry.sql`, user-scoped device registration/list/revocation, session-device linkage and security-event audit, frontend device management, and PostgreSQL integration tests. Dedicated PR and CI validation are pending; do not call the phase validated until the PR workflow passes. Review the migration's legacy-session backfill and device-cookie semantics before production rollout.
+**Implementation status (2026-11-17):** Implemented on `auth/trusted-device-registry`, stacked on Phase 2 head `4e9a6a72dc24d89bec5417c17b60193b5381b6e8`; implementation head `3c208ee3ab0fa0473d7dcd5879823029f002988c`. Adds migration `046_trusted_device_registry.sql`, user-scoped device registration/list/revocation, session-device linkage and security-event audit, frontend device management, and PostgreSQL integration tests. Dedicated PR #34 is open/draft/unmerged. CI run #411 failed before either job received a runner (`runner_id: 0`, no steps); a retry reproduced the same infrastructure failure, so Phase 3 tests have not run. Do not call the phase validated until the PR workflow passes. Review the migration's legacy-session backfill and device-cookie semantics before production rollout.
 
 Tasks:
 
