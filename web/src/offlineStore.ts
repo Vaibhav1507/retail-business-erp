@@ -141,7 +141,7 @@ export async function saveOfflineRecord<T>(ownerKey: string, id: string, kind: s
 
 export async function readOfflineRecords<T>(ownerKey: string, kind: string): Promise<{ id: string; state: string; value: T; createdAt: string; updatedAt: string }[]> {
   const records = (await recordsFor(ownerKey)).filter(x => x.kind === kind)
-  const result = []
+  const result: { id: string; state: string; value: T; createdAt: string; updatedAt: string }[] = []
   for (const record of records) {
     result.push({ id: record.id, state: record.state, value: await read<T>(record), createdAt: record.createdAt, updatedAt: record.updatedAt })
   }
