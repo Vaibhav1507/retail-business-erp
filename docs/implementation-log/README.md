@@ -14,6 +14,11 @@ This directory is the durable project handover record. Update it in every implem
   - Scope: persistent/sliding login cookie, server-side absolute session expiry, logout revocation and retryable auth-state UX.
   - Current stage: implementation committed on stacked feature branch; CI run #409 passed; PR #33 remains open as draft and unmerged.
 
+- [Trusted-device registry and revocation — 2026-11-17](2026-11-17-trusted-device-registry.md)
+  - Branch: `auth/trusted-device-registry`
+  - Scope: user-scoped device registry, server session linkage, list/revoke endpoints, security-event audit and device-management UI.
+  - Current stage: implementation committed at `3c208ee3ab0fa0473d7dcd5879823029f002988c`; dedicated PR/CI validation pending.
+
 ## Update discipline
 
 For each implementation slice, record:
