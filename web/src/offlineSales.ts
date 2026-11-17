@@ -54,8 +54,8 @@ export async function syncOfflineSales(ownerKey: string): Promise<void> {
     for (const item of queue.filter(x => x.state === 'pending-sync' || x.state === 'syncing' || (x.state === 'posted' && !x.value.invoiceNumber))) {
       if (!navigator.onLine) break
       await saveOfflineRecord(ownerKey, item.id, 'sale', 'syncing', item.value)
+      let serverSaleId = item.value.serverSaleId
       try {
-        let serverSaleId = item.value.serverSaleId
         if (!serverSaleId) {
           const posted = await api<{ id: string; serialWarnings?: string[] }>('POST', '/sales', item.value.body, item.value.idempotencyKey)
           serverSaleId = posted.id
@@ -67,11 +67,11 @@ export async function syncOfflineSales(ownerKey: string): Promise<void> {
           ...item.value, serverSaleId, invoiceNumber: detail.sale.number, lastError: undefined
         })
       } catch (error) {
-        if (item.value.serverSaleId) {
+        if (serverSaleId) {
           // The sale is already posted; a detail-fetch failure must never turn it
           // back into a pending POST or create a duplicate invoice.
           await saveOfflineRecord(ownerKey, item.id, 'sale', 'posted', {
-            ...item.value, lastError: error instanceof Error ? error.message : 'Invoice details are temporarily unavailable'
+            ...item.value, serverSaleId, lastError: error instanceof Error ? error.message : 'Invoice details are temporarily unavailable'
           })
           continue
         }
