@@ -187,7 +187,7 @@ export default function App() {
 	
 	  <main className="content">{body}</main>
       <NavigationAssistant />
-	</div>
+	</div></AppLockGate>
   )
 }
 
