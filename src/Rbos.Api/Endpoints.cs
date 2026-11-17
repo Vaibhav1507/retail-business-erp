@@ -111,21 +111,21 @@ public static class Endpoints
 
 		AuthOtpEndpoints.Map(api);
 
-		api.MapPost("/auth/login", async (Credentials m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, IWebHostEnvironment env) =>
+		api.MapPost("/auth/login", async (Credentials m, UserManager<IdentityUser<Guid>> um, SignInManager<IdentityUser<Guid>> sm, IWebHostEnvironment env, AuthSessionService sessions, HttpContext context, CancellationToken ct) =>
 		{
 			var u = await um.FindByNameAsync(m.Email?.Trim() ?? "");
 			if (u is null) return ApiResults.Fail(401, "Invalid credentials.");
 			// TEMPORARY (testing only): passwordless demo login, Development environment only. Remove before release.
 			if (env.IsDevelopment() && string.IsNullOrEmpty(m.Password) && u.UserName == "demo.electronics@example.test")
-			{ await sm.SignInAsync(u, isPersistent: false); return Results.Ok(); }
+			{ await sessions.SignInAsync(context, u, sm, ct); return Results.Ok(); }
 			var r = await sm.CheckPasswordSignInAsync(u, m.Password ?? "", lockoutOnFailure: true);
 			if (!r.Succeeded)
 				return ApiResults.Fail(401, "Invalid credentials.");
-			await sm.SignInAsync(u, isPersistent: false);
+			await sessions.SignInAsync(context, u, sm, ct);
 			return Results.Ok();
 		}).AllowAnonymous();
 
-		api.MapPost("/auth/logout", async (SignInManager<IdentityUser<Guid>> sm) => { await sm.SignOutAsync(); return Results.Ok(); }).RequireAuthorization();
+		api.MapPost("/auth/logout", async (SignInManager<IdentityUser<Guid>> sm, AuthSessionService sessions, HttpContext context, CancellationToken ct) => { await sessions.RevokeCurrentAsync(context.User, ct); await sm.SignOutAsync(); return Results.Ok(); }).RequireAuthorization();
 
 		api.MapGet("/me", async (ClaimsPrincipal p, TenantDb db, CancellationToken ct) =>
 		{

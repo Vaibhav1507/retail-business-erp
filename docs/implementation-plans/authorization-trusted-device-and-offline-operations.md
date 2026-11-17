@@ -255,7 +255,7 @@ Tasks:
 
 #### 4.1 PIN
 
-1. First successful online sign-in and device registration leads to mandatory setup of a four-digit app PIN.
+1. First successful online sign-in and device registration leads to mandatory setup of a four-digit app PIN. Accept exactly four numeric digits (0000–9999); never require six digits.
 2. PIN confirmation is required; allow the user to change it later after reauthentication.
 3. Apply rate limits, progressive delay/lockout, privacy-safe recovery and audit.
 4. Do not save the PIN, a reversible PIN, or an unprotected encryption key in browser storage.

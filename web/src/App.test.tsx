@@ -40,6 +40,23 @@ describe('App', () => {
     expect(await screen.findByRole('form', { name: 'Business profile' })).toBeInTheDocument()
   })
 
+  it('shows a retry state instead of signing out during a temporary server outage', async () => {
+    let attempts = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/me') {
+        attempts++
+        if (attempts === 1) return new Response(JSON.stringify({ error: 'Temporarily unavailable' }), { status: 503 })
+        return new Response(JSON.stringify({ email: 'a@example.test', tenantId: null, profileComplete: false, businessCategory: null }), { status: 200 })
+      }
+      return new Response('', { status: 404 })
+    }))
+    render(<App />)
+    const retry = await screen.findByRole('button', { name: 'Retry connection' })
+    expect(screen.queryByRole('form', { name: 'Sign in' })).not.toBeInTheDocument()
+    await userEvent.click(retry)
+    expect(await screen.findByRole('form', { name: 'Business profile' })).toBeInTheDocument()
+  })
+
   it('clears tenant-specific data after sign out', async () => {
     mock({ ...signedIn, '/api/auth/logout': () => ({}) })
     render(<App />)
