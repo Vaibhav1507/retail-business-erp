@@ -57,6 +57,14 @@ describe('App', () => {
     expect(await screen.findByRole('form', { name: 'Business profile' })).toBeInTheDocument()
   })
 
+  it('shows the signed-in device management screen', async () => {
+    window.location.hash = '#/devices'
+    mock({ ...signedIn, '/api/auth/devices': () => ({ body: [] }) })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Signed-in devices' })).toBeInTheDocument()
+    expect(screen.getByText(/No devices have been registered/)).toBeInTheDocument()
+  })
+
   it('clears tenant-specific data after sign out', async () => {
     mock({ ...signedIn, '/api/auth/logout': () => ({}) })
     render(<App />)

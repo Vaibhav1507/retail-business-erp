@@ -23,6 +23,7 @@ public sealed class Client
 {
 	readonly HttpClient http;
 	public Client(ApiFactory f) => http = f.CreateClient();
+	public Client(HttpClient client) => http = client;
 	public string Email = $"user-{Guid.NewGuid():N}@example.test";
 	public const string Password = "Synthetic#Pass123";
 

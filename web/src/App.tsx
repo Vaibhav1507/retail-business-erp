@@ -5,6 +5,7 @@ import { StockPage } from './Stock'
 import { HomePage, BusinessSettings } from './Home'
 import { AccountAccess } from './AccountAccess'
 import { ProfileMenu } from './ProfileMenu'
+import { DevicesPage } from './Devices'
 import { NavigationAssistant } from './NavigationAssistant'
 import { BusinessSetup } from './BusinessSetup'
 import type { Product } from './Catalogue'
@@ -167,6 +168,7 @@ export default function App() {
 	case 'sell': body = <SellPage tab={first('menu')} c={c} />; break
 	case 'buy': body = <BuyPage tab={first('receive')} c={c} />; break
 	case 'stock': body = <StockPage tab={first('current')} c={c} rows={stock} opening={<OpeningStock products={products} locations={locations} reload={c.reload} />} businessCategory={me.businessCategory} />; break
+	case 'devices': body = <DevicesPage onCurrentDeviceRevoked={loadMe} />; break
 	case 'settings': body = <BusinessSettings onSaved={loadMe} onLanguage={chooseLang} />; break
 	case 'parties': body = <PartiesPage tab={first('customers')} c={c} />; break
 	case 'money': body = <MoneyPage tab={first('cash')} />; break
