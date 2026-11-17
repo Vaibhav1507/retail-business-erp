@@ -109,6 +109,7 @@ export default function App() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setOfflineMode(false)
+        localStorage.removeItem('rbos.offline.identity')
         setMe(null)
         return
       }
