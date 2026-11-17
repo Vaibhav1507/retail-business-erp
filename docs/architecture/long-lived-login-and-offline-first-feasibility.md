@@ -122,32 +122,94 @@ Offline PIN/biometric unlock is a local device-unlock mechanism. It must not min
 
 This is a separate improvement: the browser keeps a persistent, HttpOnly, Secure cookie for a configured duration and the app renews it while active. It improves normal use but cannot guarantee a live server session when the internet is down.
 
-## 4. Recommended login experience
+## 4. Recommended trusted-device login experience
 
-### 4.1 Proposed policy
+### 4.1 Product-owner recommendation
 
-For the one-shop pilot, recommended starting policy:
+Use a **trusted-device model**, not an indefinitely valid server login.
 
-- Persistent cookie for **30 days**, with sliding renewal while actively used.
-- Add an explicit **Remember this device** choice, default enabled only on a personally/owner-controlled device. Shared shop devices should use a shorter remembered session or require local unlock.
-- Reauthentication required after logout, password/mobile credential change, account disablement, membership revocation, security-stamp change, or other server-side security event.
-- Provide an owner-visible way to revoke remembered devices/sessions.
-- Provide explicit logout and an optional local lock action. Local lock should lock the app without destroying the remembered online session.
-- Do not store passwords, OTPs, Identity cookies, refresh tokens or session secrets in localStorage/IndexedDB.
-- Keep the authentication cookie HttpOnly, Secure in production, SameSite as currently appropriate, and CSRF protection enabled.
-- Preserve server-side membership/role/tenant checks on every online API request.
+- First sign-in on a device: authenticate with the existing password or approved OTP flow, then register the device.
+- Quick return: keep the server session persistent and show a device-unlock experience when the app has been explicitly locked or has been inactive.
+- Quick authentication: offer a platform passkey/WebAuthn prompt where supported. The operating system may verify the user with fingerprint, face recognition or the device's screen-lock PIN.
+- App PIN: support a six-digit device PIN as a convenient local privacy/unlock option, but do not treat a JavaScript-only PIN screen as a strong authorisation boundary.
+- Offline: a previously enrolled device may unlock its locally encrypted offline workspace. This is separate from server authentication and must not authorise online API requests.
+- Device management: let the account owner inspect and revoke registered devices. A revoked device must be rejected on its next server contact.
 
-Thirty days is a proposed pilot default, not a hard-coded permanent policy. Add configuration so the owner can tune it.
+This avoids forcing a password or SMS OTP at every visit while preserving server-side authorisation.
 
-### 4.2 Required code changes
+### 4.2 Session and reauthentication policy
 
-1. Set cookie expiry via configuration (e.g. `Auth:PersistentCookieDays`, default 30 for the pilot).
-2. Set `IsPersistent=true` only when the user chooses Remember this device; implement consistently for password and OTP login.
-3. Explicitly configure `SlidingExpiration=true`.
-4. Add a server-side session/device record if the product needs per-device revocation, last-seen tracking and a list of trusted devices. Do not assume cookie expiry alone provides device management.
-5. Review ASP.NET Identity security-stamp validation interval and ensure sensitive changes invalidate remembered sessions promptly.
-6. Update frontend startup error handling: distinguish 401 (not authenticated) from network failure (unknown/offline). A network failure must not automatically clear the remembered identity or show a misleading sign-in form.
-7. Add tests for cookie persistence, renewal, logout, revocation and offline/network failure states.
+Recommended pilot defaults:
+
+| Setting | Proposed policy |
+|---|---|
+| Cookie | Persistent, HttpOnly, Secure in production, SameSite Strict |
+| Cookie sliding lifetime | 30 days, configurable |
+| Maximum continuous authentication age | 90 days, enforced server-side |
+| Reauthentication after | 90 days, logout, password/mobile credential change, security-stamp change, account disablement or membership/device revocation |
+| Device registration | Remains registered until revoked or removed |
+| App inactivity lock | 5 minutes initially; configurable |
+| Quick unlock | Passkey/platform authenticator where supported; six-digit app PIN as a convenience option |
+| Offline local unlock | PIN-first, only after encrypted-storage proof of concept passes |
+| Shared device | Must not inherit another user's identity; separate user sign-in/profile is required |
+
+The 30-day sliding cookie and 90-day absolute authentication age serve different purposes. Sliding renewal keeps an active user signed in across normal visits; the absolute age prevents a session from renewing forever. Enforce the absolute age with a server-side session/device record or equivalent trusted timestamp, not with a client clock.
+
+Do not make server authentication permanent. A device can remain registered indefinitely, but its server authentication must be renewed periodically. Ninety days is the recommended starting point; evaluate six months only after pilot security review and usage evidence.
+
+### 4.3 First-time enrollment and returning-device flow
+
+1. User authenticates online using the current password or approved OTP flow.
+2. Server creates a trusted-device/session record and issues the persistent authentication cookie.
+3. App asks the user to name the device (for example, "Shop billing phone"). A browser/device label is descriptive only; user-agent data is not proof of device identity.
+4. User configures a six-digit app PIN or registers a passkey/platform authenticator. Offer biometric/passkey setup as optional when supported.
+5. On a later visit, the persistent cookie restores the server session. If the app was locked, the quick-unlock screen is shown before business UI is displayed.
+6. After 90 days, or a security event, require password/OTP or a verified passkey assertion to renew the server session. The trusted-device registration can remain in place.
+7. When a device is revoked, invalidate its active session on the server and reject its device/session identifier on subsequent requests.
+
+Do not promise that a first-time login or OTP can work offline. Enrollment requires connectivity.
+
+### 4.4 PIN, passkey and biometric security model
+
+These are related but not interchangeable capabilities:
+
+- **App PIN:** A six-digit PIN can protect casual access to the app and can be used in a specifically designed offline unlock flow. Do not store the PIN in plaintext, localStorage or IndexedDB. Do not store a reversible PIN. Enforce attempt limits, progressive delay, recovery and device revocation. A front-end-only PIN gate is a convenience/privacy feature, not a replacement for backend authorisation: browser-held code can be inspected or bypassed.
+- **Passkey/WebAuthn:** Prefer this for strong online quick reauthentication. The authenticator signs a server challenge; the server verifies the assertion before renewing the authentication session. A platform authenticator may prompt for fingerprint, face or the operating-system device PIN. Do not build a biometric feature by merely detecting a sensor.
+- **Offline PIN:** Must only unlock the local encrypted workspace and its device-protected key. It must never mint an Identity cookie, create an online session or bypass membership checks.
+- **Offline biometric:** Do not promise this in the first release. Browser support for securely releasing a local encryption key through a platform authenticator is not uniform; investigate WebAuthn PRF/platform support in a proof of concept before selecting it.
+- **Recovery:** Lost PIN/passkey recovery must require a fresh online password/OTP or owner-controlled recovery process. Never provide a universal support PIN.
+
+For any app-lock implementation, stop background UI activity/sync while locked and clear sensitive in-memory views. Online API authorisation remains enforced by the server; a client-side screen lock alone does not revoke a live HttpOnly cookie.
+
+### 4.5 Data model and server dependencies
+
+No trusted-device or session table currently exists in the reviewed migrations. Add a migration (next available migration number must be confirmed immediately before implementation) for a tenant-safe identity device/session model.
+
+At minimum, record:
+- Server-generated device/session ID.
+- User ID and, where applicable, tenant/membership context.
+- Device display name and non-authoritative platform/browser metadata.
+- Created, last-used, last-authenticated and absolute-expiry timestamps.
+- Revoked/disabled state, revocation timestamp and reason.
+- Passkey credential metadata in a separate credential table or approved Identity/WebAuthn store; never store a private authenticator key.
+- Audit events for registration, unlock/reauthentication, logout, credential change and revocation.
+
+The authenticated cookie should carry a server-issued session/device identifier. Validate its status and absolute expiry in the server authentication pipeline, with a bounded cache only if revocation latency is explicitly accepted. Device listing and revocation endpoints must be authenticated, CSRF-protected, permission-checked and tenant-safe. A device ID supplied by the browser is not proof of trust.
+
+The existing ASP.NET Identity tables remain the source for users/password credentials. Do not introduce JWT access/refresh token storage as part of this cookie-authentication improvement.
+
+### 4.6 Required implementation changes
+
+1. Make both password and OTP login paths issue persistent cookies consistently.
+2. Configure cookie sliding lifetime from configuration (initially 30 days) and enforce a separate 90-day absolute authentication age.
+3. Fix frontend startup handling so HTTP 401 means unauthenticated, while network/5xx failures mean authentication state is unknown/offline—not automatically logged out.
+4. Add trusted-device/session persistence, registration, last-used tracking, revocation and server-side cookie validation.
+5. Add explicit **Lock** and **Sign out** actions. Lock hides the app and stops background UI work without deleting the server session; Sign out revokes/signs out and clears local business state safely.
+6. Add app-PIN setup/change/verify/lockout and recovery only after the security design is approved.
+7. Add passkey/WebAuthn only after selecting a maintained .NET implementation and confirming supported Android Chrome, desktop Chrome/Edge and installed-PWA behaviour.
+8. Keep the existing CSRF, SameSite, HttpOnly, Secure and server-side tenant/permission checks.
+9. Ensure password changes, mobile/OTP changes, account disablement, security-stamp changes and owner revocation invalidate the right sessions.
+10. Add integration tests for persistence across browser/client restarts, absolute expiry, sliding renewal, OTP/password parity, revoked sessions, logout, security-stamp changes and network-failure handling.
 
 ## 5. Recommended offline-first architecture
 
