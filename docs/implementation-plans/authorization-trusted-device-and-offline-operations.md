@@ -306,6 +306,8 @@ Tasks:
 
 ### Phase 6 — Offline invoice drafts and sync
 
+**Implementation checkpoint (2026-11-17):** Added an encrypted IndexedDB sales outbox for existing-catalogue products and either a selected existing customer or walk-in sale. Draft is persisted before showing success, carries one stable command/idempotency key, and is visibly Pending sync (never an official invoice). Reconnect/manual sync posts through the existing /sales endpoint and server idempotency path; server ID is persisted before invoice-detail retrieval to avoid duplicate posting. Server assigns the invoice number. Rejected 4xx drafts are retained as Needs attention; transient/network/5xx failures remain Pending sync. Offline queue capped at 100 bills, 100 lines per bill and 256 KB payload per bill. New products/customer creation, purchases, returns, stock adjustments, attachments and multi-device conflict resolution remain online-only/deferred. Draft PR/CI and real-browser offline acceptance pending.
+
 Tasks:
 
 1. Persist a bill draft locally before showing it as saved.
@@ -394,7 +396,7 @@ Each PR must be focused, run the applicable tests, include an implementation not
 
 ## 9. Current implementation checkpoint and next work
 
-The original sequence-1 recommendation is historical. Branches contain Phases 1–3, the Phase 4 local privacy lock, and the Phase 5 PWA shell/encrypted local snapshot. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phase 6 offline sales outbox is the next stacked branch. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
+The original sequence-1 recommendation is historical. Branches contain Phases 1–3, Phase 4 local privacy lock, Phase 5 PWA shell/encrypted local snapshot, and Phase 6 offline sales outbox/sync. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. All PRs remain unmerged by instruction. Complete CI and supported-browser/manual pilot acceptance before considering these phases validated. Retain server-authoritative validation, posting and invoice numbering.
 
 ## 10. Scope guardrails
 
