@@ -19,8 +19,8 @@ create table identity.auth_device (
     constraint ck_auth_device_revocation check (revoked_at is null or revoked_at >= created_at)
 );
 
-create unique index ux_auth_device_user_key
-    on identity.auth_device (user_id, device_key_hash)
+create index ix_auth_device_user_key
+    on identity.auth_device (user_id, device_key_hash, last_seen_at desc)
     where device_key_hash is not null;
 
 -- At most one legacy placeholder device per user, for session rows created before
