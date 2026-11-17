@@ -28,11 +28,11 @@
 - Browser storage may be evicted or lost if the browser profile/app is removed. No backup of unsynced offline drafts is promised.
 
 ## Validation
-- Draft PR CI must pass TypeScript, Vitest, frontend build, backend build/tests, migration validation and Docker build.
+- CI run #484 ([run](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44107239288)) failed before either job received a runner (`runner_id: 0`, empty step arrays). No TypeScript, Vitest, backend build/test, migration validation or Docker step ran. Retry when GitHub Actions runner allocation is healthy.
 - Unit test source added at web/src/offlineSales.test.ts; no local test run is claimed.
 - Manual acceptance required: create bill offline, reload browser, restore draft queue, reconnect, retry, confirm exactly one server sale, server invoice number, conflict/permission failure and retained Needs attention state.
 - Multi-tab sync relies on server idempotency to prevent duplicate posting; test this under concurrent tabs.
 - Android Chrome installed PWA and desktop Chrome/Edge acceptance still required.
 
 ## Recovery
-Start from this branch. Offline drafts are records of kind sale in the rbos-offline-v1 IndexedDB database. The encrypted payload contains the full SaleRequest body and stable idempotency key. Do not alter or regenerate an existing key when retrying a draft. State transitions: pending-sync -> syncing -> posted or needs-attention; temporary failure returns to pending-sync. If a record already has serverSaleId, never POST it again; only retrieve authoritative invoice details.
+Start from this branch. Offline drafts are records of kind sale in the rbos-offline-v1 IndexedDB database. The encrypted payload contains the full SaleRequest body and stable idempotency key. The IndexedDB owner/tenant scope is SHA-256 hashed; no raw email or tenant key is stored in record metadata. Do not alter or regenerate an existing key when retrying a draft. State transitions: pending-sync -> syncing -> posted or needs-attention; temporary failure returns to pending-sync. If a record already has serverSaleId, never POST it again; only retrieve authoritative invoice details.
