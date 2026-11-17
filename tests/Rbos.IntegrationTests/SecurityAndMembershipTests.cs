@@ -159,8 +159,8 @@ public class MembershipIsolationTests(ApiFactory f) : IClassFixture<ApiFactory>
             await using (var d = new NpgsqlCommand("alter table core.tenant_membership force row level security", m, tx)) await d.ExecuteNonQueryAsync();
             await tx.CommitAsync();
         }
-        Assert.Equal(HttpStatusCode.Conflict, (await c.Raw("/products")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.Raw("/products")).StatusCode);
         var body = await c.Send(HttpMethod.Post, "/products", new { name = "x", categoryName = "c", isGeneric = true, baseUnit = "pcs" });
-        Assert.Equal(HttpStatusCode.Conflict, body.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, body.StatusCode);
     }
 }
