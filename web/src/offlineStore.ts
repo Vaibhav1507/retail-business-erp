@@ -62,10 +62,20 @@ async function keyFor(ownerKey: string): Promise<CryptoKey> {
     await transactionDone(read)
     if (existing?.key) return existing.key
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
-    const write = db.transaction(KEY_STORE, 'readwrite')
-    write.objectStore(KEY_STORE).put({ ownerKey, key })
-    await transactionDone(write)
-    return key
+    try {
+      const write = db.transaction(KEY_STORE, 'readwrite')
+      write.objectStore(KEY_STORE).add({ ownerKey, key })
+      await transactionDone(write)
+      return key
+    } catch {
+      // Another tab may have created the owner key first. Never overwrite a key
+      // that could already be protecting saved records.
+      const retry = db.transaction(KEY_STORE, 'readonly')
+      const winner = await requestValue<{ ownerKey: string; key: CryptoKey } | undefined>(retry.objectStore(KEY_STORE).get(ownerKey))
+      await transactionDone(retry)
+      if (winner?.key) return winner.key
+      throw new Error('Could not establish the offline encryption key.')
+    }
   } finally { db.close() }
 }
 
