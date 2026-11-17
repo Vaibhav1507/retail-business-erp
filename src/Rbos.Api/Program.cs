@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
+using Rbos.Api;
+using System.Security.Claims;
 using Rbos.Api.Persistence;
 using Rbos.Api.Application;
 
@@ -65,6 +69,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 	o.KnownProxies.Clear();
 });
 builder.Services.AddDataProtection();
+builder.Services.AddSingleton<AuthSessionService>();
 builder.Services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>>(sp =>
 	new Microsoft.Extensions.Options.ConfigureOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>(o => o.XmlRepository = new Rbos.Api.Persistence.PgXmlRepository(sp.GetRequiredService<Npgsql.NpgsqlDataSource>())));
 builder.Services.AddScoped<Rbos.Api.Persistence.TenantDb>();
@@ -109,7 +114,33 @@ builder.Services.ConfigureApplicationCookie(o =>
 	o.Cookie.HttpOnly = true;
 	o.Cookie.SameSite = SameSiteMode.Strict;
 	o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
-	o.ExpireTimeSpan = TimeSpan.FromHours(8);
+	o.ExpireTimeSpan = TimeSpan.FromDays(Math.Clamp(builder.Configuration.GetValue("Auth:PersistentCookieDays", 30), 1, 90));
+    o.SlidingExpiration = true;
+    o.Events.OnValidatePrincipal = async context =>
+    {
+        // Keep Identity's normal security-stamp validation. It may rebuild the
+        // principal, so preserve this cookie's server-issued session ID afterward.
+        var originalSessionId = context.Principal?.FindFirst(AuthSessionService.SessionClaimType)?.Value;
+        await SecurityStampValidator.ValidatePrincipalAsync(context);
+        var principal = context.Principal;
+        if (principal?.Identity?.IsAuthenticated != true) return;
+
+        var hasSessionId = Guid.TryParse(originalSessionId, out var sessionId);
+        if (hasSessionId && principal.Identity is ClaimsIdentity identity &&
+            identity.FindFirst(AuthSessionService.SessionClaimType) is null)
+        {
+            identity.AddClaim(new Claim(AuthSessionService.SessionClaimType, sessionId.ToString("D")));
+        }
+
+        var hasUserId = Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId);
+        var sessions = context.HttpContext.RequestServices.GetRequiredService<AuthSessionService>();
+        if (!hasSessionId || !hasUserId ||
+            !await sessions.IsActiveAsync(sessionId, userId, context.HttpContext.RequestAborted))
+        {
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+        }
+    };
 	o.Events.OnRedirectToLogin = c => { c.Response.StatusCode = 401; return Task.CompletedTask; };
 	o.Events.OnRedirectToAccessDenied = c => { c.Response.StatusCode = 403; return Task.CompletedTask; };
 });

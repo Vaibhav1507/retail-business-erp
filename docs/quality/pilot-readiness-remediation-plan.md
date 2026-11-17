@@ -75,23 +75,23 @@ Priority definitions:
 
 ## 3. P0 — Must-fix engineering work
 
-### PR-01 — Register missing Brand endpoints and verify Reminder access
+### PR-01 — Register missing endpoints
 
-**Observed (rechecked against `main` on 2026-11-17):** `BrandEndpoints` exists and its frontend callers exist, but `BrandEndpoints.Map(api)` is absent from `src/Rbos.Api/Endpoints.cs`. `ReminderEndpoints.Map(api)` is already registered there; do not add it a second time. Reminder access still needs explicit classification in the route-to-permission matrix.
+**Observed:** `BrandEndpoints` and `ReminderEndpoints` exist, and their frontend callers exist, but neither module is included in the endpoint registration list in `src/Rbos.Api/Endpoints.cs`.
 
 **Required work**
 
-- Register `BrandEndpoints.Map(api)` in the correct route group.
-- Define permission mapping for brand writes. Brand create/update must require `catalogue.manage`; reads must have an explicit approved tenant-read policy.
-- Verify the already-registered reminder endpoint is tenant-scoped and explicitly classified as either an authenticated-member read or a named permission. Do not assume that omission from the permission map is an intentional policy.
+- Register `BrandEndpoints.Map(api)` and `ReminderEndpoints.Map(api)` in the correct route group.
+- Define permission mapping for brand writes. Brand create/update must require `catalogue.manage`; reads may follow the approved tenant read policy.
+- Define and test the read permission for reminders. Do not make a report/reminder route available to every role by accidental omission.
 - Check that the frontend shows a useful error or empty state when the service is unavailable; do not silently hide all API failures.
 
 **Acceptance**
 
-- `GET /api/brands` returns only the active tenant's brands.
+- `GET /api/brands` returns the active tenant's brands.
 - An authorised Owner/Manager can create and update a brand.
 - A Cashier cannot create/update brands.
-- `GET /api/reminders` returns only the active tenant's reminders and follows its explicitly documented access policy.
+- `GET /api/reminders` returns only the active tenant's reminders and enforces the agreed role policy.
 - Endpoint registration and role tests run in CI.
 
 ### PR-02 — Make stock verification alias-aware
@@ -138,18 +138,16 @@ Priority definitions:
 
 ### PR-04 — Complete route-to-permission audit
 
-**Observed (rechecked against `main` on 2026-11-17):** `Permissions.Required(method, path)` returns `null` both for routes intentionally open to any signed-in member and for routes/methods it does not recognise. `PermissionFilter` currently calls the next handler when the result is `null`; it also calls the next handler when the user ID cannot be parsed or no membership role is found. Therefore, the filter itself does not fail closed for an unclassified protected route. Endpoint registration also shows `ReminderEndpoints.Map(api)` is present, while `BrandEndpoints.Map(api)` is absent. The role matrix remains marked Proposed and must be reconciled with the implemented role bundles.
+**Observed:** `Permissions.Required(method, path)` maps known routes to permissions, but returns `null` for unmatched routes. A route omitted from the mapping may therefore be accessible to any authenticated tenant member. The brand endpoint is also not currently mapped.
 
 **Required work**
 
-- Inventory every registered API route by HTTP method and route template from all endpoint modules, including read, create, update, delete, export and download operations. Inventory public identity routes and separately mapped webhooks as explicit exceptions.
-- Create an explicit access classification for every route/method: anonymous/public with a specific reason, authenticated-member, or a named permission. Do not encode both "intentionally no extra role permission" and "unknown route" as the same `null` result.
-- Create and approve a route-to-permission matrix covering Owner, Manager, Accountant and Cashier. Reconcile it with the actual `src/Rbos.Domain/Permissions.cs` role bundles and `docs/security/authorization-matrix.md`.
-- Map every mutating business route to an explicit permission or a documented authenticated-member exception. Unknown registered routes/methods must fail closed; preferably validate the route inventory at startup/test time as well as at request time.
-- For protected routes, fail closed when the authenticated user ID is invalid or the required active membership/role cannot be resolved. Do not let a missing role silently bypass the permission check.
-- Replace or constrain broad string-prefix path matching so route classification is exact by method and route template; parameterised routes and overlapping prefixes must have deterministic tests.
-- Register the missing Brand endpoint and classify its routes. Verify Reminder remains registered and receives an explicit access classification.
-- Ensure webhooks remain separately authenticated using their provider signature/verification contract; do not force browser cookie/CSRF semantics onto them. Keep anonymous login/registration/OTP/CSRF routes explicit and preserve CSRF on unsafe browser operations.
+- Inventory every route from all endpoint modules, including read, create, update, delete, export, webhook and worker-facing operations.
+- Create a route-to-permission matrix covering Owner, Manager, Accountant and Cashier.
+- Map every mutating business route to an explicit permission.
+- Treat a route that intentionally has no additional permission as an explicit exception with a test and documented reason.
+- Prefer fail-closed behaviour for unclassified mutating API routes.
+- Ensure webhooks remain separately authenticated using their provider signature/verification contract; do not force browser cookie/CSRF semantics onto them.
 - Test both direct API calls and the UI. Hiding a button is not an authorization control.
 
 **Acceptance**
