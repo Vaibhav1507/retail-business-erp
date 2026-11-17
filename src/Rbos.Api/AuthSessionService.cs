@@ -126,24 +126,31 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
 
     public async Task<IReadOnlyList<AuthDeviceSummary>> GetDevicesAsync(
         Guid userId,
-        HttpContext context,
+        ClaimsPrincipal principal,
         CancellationToken cancellationToken = default)
     {
-        var token = GetDeviceToken(context);
-        var currentHash = token is null ? null : HashDeviceToken(token);
+        var currentSessionId = Guid.TryParse(principal.FindFirstValue(SessionClaimType), out var sessionId)
+            ? sessionId
+            : (Guid?)null;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
-            select id, device_label, browser, platform, created_at, last_seen_at,
-                   last_authenticated_at, expires_at, revoked_at,
-                   (device_key_hash = @current_hash and @current_hash is not null) as is_current
-            from identity.auth_device
-            where user_id = @user_id
-            order by (revoked_at is null and expires_at > now()) desc, last_seen_at desc
+            select d.id, d.device_label, d.browser, d.platform, d.created_at, d.last_seen_at,
+                   d.last_authenticated_at, d.expires_at, d.revoked_at,
+                   exists (
+                       select 1 from identity.auth_session s
+                       where s.id = @current_session_id
+                         and s.user_id = @user_id
+                         and s.device_id = d.id
+                         and s.revoked_at is null
+                   ) as is_current
+            from identity.auth_device d
+            where d.user_id = @user_id
+            order by (d.revoked_at is null and d.expires_at > now()) desc, d.last_seen_at desc
             """, connection);
         command.Parameters.AddWithValue("user_id", userId);
-        command.Parameters.Add(new NpgsqlParameter("current_hash", NpgsqlDbType.Bytea)
+        command.Parameters.Add(new NpgsqlParameter("current_session_id", NpgsqlDbType.Uuid)
         {
-            Value = currentHash is null ? DBNull.Value : currentHash
+            Value = currentSessionId.HasValue ? currentSessionId.Value : DBNull.Value
         });
 
         var devices = new List<AuthDeviceSummary>();
@@ -245,7 +252,7 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
         {
             var tokenHash = HashDeviceToken(token);
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-            await using (var update = new NpgsqlCommand("""
+            await using var update = new NpgsqlCommand("""
                 update identity.auth_device
                 set last_seen_at = now(),
                     last_authenticated_at = now(),
@@ -254,41 +261,29 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
                     browser = @browser,
                     platform = @platform,
                     user_agent = @user_agent
-                where user_id = @user_id
-                  and device_key_hash = @key_hash
-                  and revoked_at is null
-                  and expires_at > now()
-                returning id
-                """, connection))
-            {
-                update.Parameters.AddWithValue("days", DeviceCookieDays);
-                update.Parameters.AddWithValue("label", label);
-                update.Parameters.AddWithValue("browser", browser);
-                update.Parameters.AddWithValue("platform", platform);
-                update.Parameters.AddWithValue("user_agent", string.IsNullOrEmpty(userAgent) ? DBNull.Value : userAgent);
-                update.Parameters.AddWithValue("user_id", userId);
-                update.Parameters.AddWithValue("key_hash", tokenHash);
-                var existing = await update.ExecuteScalarAsync(cancellationToken);
-                if (existing is Guid existingId)
-                {
-                    context.Response.Cookies.Append(DeviceCookieName, token, DeviceCookieOptions(context));
-                    return existingId;
-                }
-            }
-
-            // A token not yet associated with this user is reusable on a shared shop
-            // computer. A token belonging to this user's revoked/expired device is not.
-            await using (var invalidated = new NpgsqlCommand("""
-                select exists (
-                    select 1 from identity.auth_device
-                    where user_id = @user_id and device_key_hash = @key_hash
+                where id = (
+                    select id from identity.auth_device
+                    where user_id = @user_id
+                      and device_key_hash = @key_hash
+                      and revoked_at is null
+                      and expires_at > now()
+                    order by last_seen_at desc
+                    limit 1
                 )
-                """, connection))
+                returning id
+                """, connection);
+            update.Parameters.AddWithValue("days", DeviceCookieDays);
+            update.Parameters.AddWithValue("label", label);
+            update.Parameters.AddWithValue("browser", browser);
+            update.Parameters.AddWithValue("platform", platform);
+            update.Parameters.AddWithValue("user_agent", string.IsNullOrEmpty(userAgent) ? DBNull.Value : userAgent);
+            update.Parameters.AddWithValue("user_id", userId);
+            update.Parameters.AddWithValue("key_hash", tokenHash);
+            var existing = await update.ExecuteScalarAsync(cancellationToken);
+            if (existing is Guid existingId)
             {
-                invalidated.Parameters.AddWithValue("user_id", userId);
-                invalidated.Parameters.AddWithValue("key_hash", tokenHash);
-                if ((bool)(await invalidated.ExecuteScalarAsync(cancellationToken))!)
-                    token = null;
+                context.Response.Cookies.Append(DeviceCookieName, token, DeviceCookieOptions(context));
+                return existingId;
             }
         }
 
