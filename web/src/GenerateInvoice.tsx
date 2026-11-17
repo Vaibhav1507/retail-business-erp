@@ -301,7 +301,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <p>{offlineQueue.filter(x => x.state === 'pending-sync' || x.state === 'syncing').length} waiting to sync · {offlineQueue.filter(x => x.state === 'needs-attention').length} need attention · {offlineQueue.filter(x => x.state === 'posted').length} posted</p>
         <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue()}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
         <ul>{offlineQueue.slice(0, 10).map(item => <li key={item.id}>
-          {new Date(item.createdAt).toLocaleString('en-IN')} — {item.state === 'posted' ? 'Posted as INV-' + String(item.value.invoiceNumber ?? '').padStart(6, '0') : item.state === 'needs-attention' ? 'Needs attention: ' + (item.value.lastError ?? 'Server rejected this draft') : item.state === 'syncing' ? 'Syncing…' : 'Pending sync'}
+          {new Date(item.createdAt).toLocaleString('en-IN')} — {item.state === 'posted' ? (item.value.invoiceNumber ? 'Posted as INV-' + String(item.value.invoiceNumber).padStart(6, '0') : 'Posted; invoice details are still loading') : item.state === 'needs-attention' ? 'Needs attention: ' + (item.value.lastError ?? 'Server rejected this draft') : item.state === 'syncing' ? 'Syncing…' : 'Pending sync'}
         </li>)}</ul>
       </div>}
       {error && <p role="alert" className="billing-err">{error}</p>}
