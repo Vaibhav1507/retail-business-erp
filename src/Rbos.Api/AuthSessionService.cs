@@ -235,7 +235,7 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
         Guid userId,
         CancellationToken cancellationToken)
     {
-        var userAgent = context.Request.Headers.UserAgent.ToString();
+        var userAgent = context.Request.Headers["User-Agent"].ToString();
         if (userAgent.Length > 512) userAgent = userAgent[..512];
         var (browser, platform) = DescribeClient(userAgent);
         var label = $"{browser} on {platform}";
@@ -269,7 +269,11 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
                 update.Parameters.AddWithValue("user_id", userId);
                 update.Parameters.AddWithValue("key_hash", tokenHash);
                 var existing = await update.ExecuteScalarAsync(cancellationToken);
-                if (existing is Guid existingId) return existingId;
+                if (existing is Guid existingId)
+                {
+                    context.Response.Cookies.Append(DeviceCookieName, token, DeviceCookieOptions(context));
+                    return existingId;
+                }
             }
 
             // A token not yet associated with this user is reusable on a shared shop
@@ -289,14 +293,10 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
         }
 
         if (token is null)
-        {
             token = CreateDeviceToken();
-            context.Response.Cookies.Append(DeviceCookieName, token, DeviceCookieOptions(context));
-        }
-        else if (!context.Request.Cookies.ContainsKey(DeviceCookieName))
-        {
-            context.Response.Cookies.Append(DeviceCookieName, token, DeviceCookieOptions(context));
-        }
+
+        // Renew the non-authenticating device identifier whenever the user signs in.
+        context.Response.Cookies.Append(DeviceCookieName, token, DeviceCookieOptions(context));
 
         var newDeviceId = Guid.NewGuid();
         await using (var connection = await dataSource.OpenConnectionAsync(cancellationToken))
