@@ -372,6 +372,32 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
         return (browser, platform);
     }
 
+    public async Task RecordCredentialChangeAsync(
+        Guid userId,
+        ClaimsPrincipal? principal,
+        string eventType,
+        CancellationToken cancellationToken = default)
+    {
+        Guid? sessionId = null;
+        Guid? deviceId = null;
+        if (principal is not null
+            && Guid.TryParse(principal.FindFirstValue(SessionClaimType), out var currentSessionId))
+        {
+            sessionId = currentSessionId;
+            await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+            await using var command = new NpgsqlCommand("""
+                select device_id from identity.auth_session
+                where id = @session_id and user_id = @user_id
+                """, connection);
+            command.Parameters.AddWithValue("session_id", currentSessionId);
+            command.Parameters.AddWithValue("user_id", userId);
+            var value = await command.ExecuteScalarAsync(cancellationToken);
+            if (value is Guid currentDeviceId) deviceId = currentDeviceId;
+        }
+
+        await RecordSecurityEventAsync(userId, deviceId, sessionId, eventType, cancellationToken);
+    }
+
     private async Task RecordSecurityEventAsync(
         Guid userId,
         Guid? deviceId,
