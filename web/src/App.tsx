@@ -83,8 +83,7 @@ function parseRoute() {
 }
 
 export default function App() {
-  const [me, setMe] = useState<Me | null | undefined>(undefined)
-  const [authError, setAuthError] = useState('')
+   const [authError, setAuthError] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [stock, setStock] = useState<StockRow[]>([])
@@ -181,7 +180,7 @@ export default function App() {
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>
 	  {authError && <p role="status" className="connection-warning">{authError} <button type="button" onClick={() => { void loadMe() }}>Retry connection</button></p>}
-	  <main className="content">{body}</main>
+	
       <NavigationAssistant />
 	</div>
   )
