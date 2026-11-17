@@ -59,7 +59,7 @@ public static class AuthPasskeyEndpoints
 
             PasskeyAttestationResult attestation;
             try { attestation = await signIn.PerformPasskeyAttestationAsync(request.CredentialJson); }
-            catch (PasskeyAuthenticationStateException) { return ApiResults.Fail(400, "Passkey registration state is missing or expired. Start again."); }
+            catch (InvalidOperationException) { return ApiResults.Fail(400, "Passkey registration state is missing or expired. Start again."); }
 
             if (!attestation.Succeeded ||
                 !string.Equals(await users.GetUserIdAsync(user), attestation.UserEntity.Id, StringComparison.Ordinal))
@@ -137,7 +137,7 @@ public static class AuthPasskeyEndpoints
 
             PasskeyAssertionResult<IdentityUser<Guid>> assertion;
             try { assertion = await signIn.PerformPasskeyAssertionAsync(request.CredentialJson); }
-            catch (PasskeyAuthenticationStateException) { return ApiResults.Fail(400, "Passkey sign-in state is missing or expired. Start again."); }
+            catch (InvalidOperationException) { return ApiResults.Fail(400, "Passkey sign-in state is missing or expired. Start again."); }
 
             if (!assertion.Succeeded || assertion.User is null) return Results.Unauthorized();
             if (!await signIn.CanSignInAsync(assertion.User) || await users.IsLockedOutAsync(assertion.User))
