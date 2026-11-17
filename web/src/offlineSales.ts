@@ -33,6 +33,13 @@ export type OfflineSaleItem = {
 const activeSync = new Map<string, Promise<void>>()
 
 export async function queueOfflineSale(ownerKey: string, body: OfflineSaleBody, idempotencyKey: string) {
+  if (!ownerKey || !idempotencyKey || !body.locationId || !body.lines.length || body.lines.length > 100) {
+    throw new Error('This offline bill is missing required data or exceeds the 100-line limit.')
+  }
+  const encodedSize = new TextEncoder().encode(JSON.stringify(body)).byteLength
+  if (encodedSize > 256_000) throw new Error('This offline bill is too large to save on this device.')
+  const current = await listOfflineSales(ownerKey)
+  if (current.length >= 100) throw new Error('The offline bill queue is full. Connect and sync bills before creating more.')
   const id = 'offline-sale:' + crypto.randomUUID()
   const value: QueuedSale = { idempotencyKey, body, createdAt: new Date().toISOString() }
   await saveOfflineRecord(ownerKey, id, 'sale', 'pending-sync', value)
