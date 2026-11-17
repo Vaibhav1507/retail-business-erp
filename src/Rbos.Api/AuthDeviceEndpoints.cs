@@ -9,7 +9,7 @@ public static class AuthDeviceEndpoints
         api.MapGet("/auth/devices", async (ClaimsPrincipal principal, AuthSessionService sessions, HttpContext context, CancellationToken ct) =>
         {
             var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            return Results.Ok(await sessions.GetDevicesAsync(userId, context, ct));
+            return Results.Ok(await sessions.GetDevicesAsync(userId, context.User, ct));
         }).RequireAuthorization();
 
         api.MapPost("/auth/devices/{id:guid}/revoke", async (Guid id, ClaimsPrincipal principal, AuthSessionService sessions, CancellationToken ct) =>
