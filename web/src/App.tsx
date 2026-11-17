@@ -13,7 +13,7 @@ import type { Product } from './Catalogue'
 import './styles.css'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, resetCsrf } from './api'
-import { loadOfflineSnapshot, saveOfflineSnapshot } from './offlineStore'
+import { clearOfflineWorkspace, loadOfflineSnapshot, saveOfflineSnapshot } from './offlineStore'
 import { setLanguage, t, toLang } from './i18n'
 import type { Lang, MessageKey } from './i18n'
 
@@ -183,7 +183,7 @@ export default function App() {
   }, [])
 
   function chooseLang(l: Lang) { localStorage.setItem('rbos.lang', l); setLanguage(l); setLang(l) }
-  async function logout() { await api('POST', '/auth/logout'); resetCsrf(); window.location.hash = ''; setMe(null) }
+  async function logout() { await api('POST', '/auth/logout'); resetCsrf(); if (me?.tenantId) await clearOfflineWorkspace(me.email.trim().toLowerCase() + ':' + me.tenantId); localStorage.removeItem('rbos.offline.identity'); window.location.hash = ''; setMe(null); setOfflineMode(false) }
 
   if (me === undefined) return <main className="access"><p className="loading" role={authError ? "alert" : undefined}>{authError || t('app.loading')}</p>{authError && <button type="button" onClick={() => { void loadMe() }}>Retry connection</button>}</main>
   if (me === null) return <AccountAccess onDone={loadMe} />
