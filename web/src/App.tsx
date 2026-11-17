@@ -182,6 +182,7 @@ export default function App() {
 	  </nav>
 	  {authError && <p role="status" className="connection-warning">{authError} <button type="button" onClick={() => { void loadMe() }}>Retry connection</button></p>}
 	
+	  <main className="content">{body}</main>
       <NavigationAssistant />
 	</div>
   )
