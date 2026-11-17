@@ -101,7 +101,7 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
         </label>}
         {error && <p role="alert">{error}{remaining > 0 ? ` (${remaining}s)` : ''}</p>}
         <button type="button" disabled={busy} onClick={() => void (verifier ? unlock() : setup())}>{busy ? 'Please wait…' : verifier ? 'Unlock' : 'Save PIN'}</button>
-        <button type="button" className="secondary" onClick={() => void onSignOut()}>Sign out</button>
+        <button type="button" className="secondary" onClick={() => { void onSignOut().catch(() => setError('You are offline. Reconnect before signing out so the server session can be revoked.')) }}>Sign out</button>
         <p className="app-lock-note">This is a local privacy lock, not a second authentication factor. Your server session and API permissions remain the actual security boundary. Do not use this PIN as a password.</p>
       </section>
     </main>
