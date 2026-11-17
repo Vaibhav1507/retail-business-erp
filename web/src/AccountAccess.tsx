@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, otpEnabled, resetCsrf } from './api'
 import { BusinessSetup } from './BusinessSetup'
+import { passkeyEnabled, signInWithPasskey } from './passkeys'
 
 const MOBILE_RE = /^[6-9][0-9]{9}$/
 
@@ -14,7 +15,8 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [otp, setOtp] = useState(false)
-  useEffect(() => { otpEnabled().then(setOtp) }, [])
+  const [passkeyAvailable, setPasskeyAvailable] = useState(false)
+  useEffect(() => { otpEnabled().then(setOtp); passkeyEnabled().then(setPasskeyAvailable) }, [])
 
   const value = id.trim()
   const isMobile = otp && /^[0-9]+$/.test(value)
@@ -43,6 +45,17 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
 	} catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong') } finally { setBusy(false) }
   }
 
+  async function passkeySubmit() {
+    setError('')
+    setBusy(true)
+    try {
+      await signInWithPasskey()
+      resetCsrf()
+      onDone()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Passkey sign-in failed') }
+    finally { setBusy(false) }
+  }
+
   if (register) return (
 	<main className="access">
 	  <h1>Retail Business OS</h1>
@@ -63,6 +76,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
 		  {dev && <p className="hint wide">Development code: {dev}</p>}
 		</>}
 		<button type="submit" className="wide" disabled={busy}>{isMobile ? (sent ? 'Verify and sign in' : 'Send code') : 'Sign in'}</button>
+		{passkeyAvailable && <button type="button" className="secondary wide" disabled={busy} onClick={() => { void passkeySubmit() }}>Sign in with passkey</button>}
 		<button type="button" className="secondary wide" onClick={() => { setRegister(true); setError('') }}>Create an account</button>
 		{error && <p role="alert" className="wide">{error}</p>}
 	  </form>
