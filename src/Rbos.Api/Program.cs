@@ -121,6 +121,7 @@ builder.Services.AddScoped<Rbos.Api.Application.AuditHistoryService>();
 builder.Services.AddDbContext<RbosIdentityDbContext>(o => o.UseNpgsql(appCs));
 builder.Services.AddIdentity<Microsoft.AspNetCore.Identity.IdentityUser<Guid>, Microsoft.AspNetCore.Identity.IdentityRole<Guid>>(o =>
 {
+    o.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
 	o.Password.RequiredLength = 12;
 	o.Lockout.MaxFailedAccessAttempts = 5;
 	o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
