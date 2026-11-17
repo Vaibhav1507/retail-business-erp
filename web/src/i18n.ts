@@ -25,7 +25,7 @@ const en = {
   'devices.confirmOther': 'Revoke this device? Its next request to RBOS will require sign-in again.',
   'devices.loadError': 'Could not load signed-in devices. Check your connection and retry.',
   'devices.revokeError': 'Could not revoke this device. Please retry.',
-  'devices.note': 'A device label describes a browser profile; it does not prove the physical identity of a phone or computer. A device that is offline cannot receive revocation until it reconnects.'
+  'devices.note': 'A device label describes a browser profile; it does not prove the physical identity of a phone or computer. A device that is offline cannot receive revocation until it reconnects.',
   'app.loading': 'Loading...',
   'nav.home': 'Home',
   'nav.sell': 'Sell',
@@ -230,7 +230,7 @@ const hi: Record<MessageKey, string> = {
   'devices.confirmOther': 'क्या इस डिवाइस को रद्द करें? RBOS से अगली बार जुड़ने पर उसे फिर साइन-इन करना होगा।',
   'devices.loadError': 'डिवाइस लोड नहीं हो सके। कनेक्शन जाँचकर फिर कोशिश करें।',
   'devices.revokeError': 'डिवाइस रद्द नहीं हो सका। कृपया फिर कोशिश करें।',
-  'devices.note': 'डिवाइस का नाम केवल ब्राउज़र प्रोफ़ाइल बताता है; यह फ़ोन या कंप्यूटर की भौतिक पहचान का प्रमाण नहीं है। ऑफ़लाइन डिवाइस दोबारा जुड़ने तक रद्द करने का बदलाव प्राप्त नहीं कर सकता।'
+  'devices.note': 'डिवाइस का नाम केवल ब्राउज़र प्रोफ़ाइल बताता है; यह फ़ोन या कंप्यूटर की भौतिक पहचान का प्रमाण नहीं है। ऑफ़लाइन डिवाइस दोबारा जुड़ने तक रद्द करने का बदलाव प्राप्त नहीं कर सकता।',
   'app.loading': 'लोड हो रहा है...',
   'nav.home': 'होम',
   'nav.sell': 'बिक्री',
