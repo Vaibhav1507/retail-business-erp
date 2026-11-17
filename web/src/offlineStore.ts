@@ -53,6 +53,10 @@ function transactionDone(tx: IDBTransaction) {
 }
 const encode = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes))
 const decode = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0))
+async function scopeKey(ownerKey: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ownerKey))
+  return encode(new Uint8Array(digest))
+}
 
 async function keyFor(ownerKey: string): Promise<CryptoKey> {
   const db = await openDb()
@@ -82,13 +86,14 @@ async function keyFor(ownerKey: string): Promise<CryptoKey> {
 }
 
 async function save<T>(ownerKey: string, id: string, kind: string, state: string, value: T): Promise<void> {
-  const key = await keyFor(ownerKey)
+  const scope = await scopeKey(ownerKey)
+  const key = await keyFor(scope)
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const aad = new TextEncoder().encode(ownerKey + ':' + id + ':' + kind)
+  const aad = new TextEncoder().encode(scope + ':' + id + ':' + kind)
   const plain = new TextEncoder().encode(JSON.stringify(value))
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, plain)
   const record: StoredRecord = {
-    id, ownerKey, kind, state, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    id, ownerKey: scope, kind, state, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     iv: encode(iv), ciphertext: encode(new Uint8Array(encrypted))
   }
   const db = await openDb()
@@ -107,11 +112,12 @@ async function read<T>(record: StoredRecord): Promise<T> {
 }
 
 async function recordsFor(ownerKey: string): Promise<StoredRecord[]> {
+  const scope = await scopeKey(ownerKey)
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readonly')
     const done = transactionDone(tx)
-    const records = await requestValue<StoredRecord[]>(tx.objectStore(RECORD_STORE).index('ownerKey').getAll(ownerKey))
+    const records = await requestValue<StoredRecord[]>(tx.objectStore(RECORD_STORE).index('ownerKey').getAll(scope))
     await done
     return records
   } finally { db.close() }
@@ -149,13 +155,14 @@ export async function readOfflineRecords<T>(ownerKey: string, kind: string): Pro
 }
 
 export async function updateOfflineRecordState(ownerKey: string, id: string, state: string) {
+  const scope = await scopeKey(ownerKey)
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readwrite')
     const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
     const record = await requestValue<StoredRecord | undefined>(store.get(id))
-    if (record && record.ownerKey === ownerKey) {
+    if (record && record.ownerKey === scope) {
       record.state = state
       record.updatedAt = new Date().toISOString()
       store.put(record)
@@ -165,27 +172,29 @@ export async function updateOfflineRecordState(ownerKey: string, id: string, sta
 }
 
 export async function deleteOfflineRecord(ownerKey: string, id: string) {
+  const scope = await scopeKey(ownerKey)
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readwrite')
     const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
     const record = await requestValue<StoredRecord | undefined>(store.get(id))
-    if (record && record.ownerKey === ownerKey) store.delete(id)
+    if (record && record.ownerKey === scope) store.delete(id)
     await done
   } finally { db.close() }
 }
 
 export async function clearOfflineWorkspace(ownerKey: string, preserveKinds: string[] = []) {
+  const scope = await scopeKey(ownerKey)
   const db = await openDb()
   try {
     const tx = db.transaction([KEY_STORE, RECORD_STORE], 'readwrite')
     const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
-    const records = await requestValue<StoredRecord[]>(store.index('ownerKey').getAll(ownerKey))
+    const records = await requestValue<StoredRecord[]>(store.index('ownerKey').getAll(scope))
     const retained = records.filter(record => preserveKinds.includes(record.kind))
     records.filter(record => !preserveKinds.includes(record.kind)).forEach(record => store.delete(record.id))
-    if (retained.length === 0) tx.objectStore(KEY_STORE).delete(ownerKey)
+    if (retained.length === 0) tx.objectStore(KEY_STORE).delete(scope)
     await done
   } finally { db.close() }
 }
