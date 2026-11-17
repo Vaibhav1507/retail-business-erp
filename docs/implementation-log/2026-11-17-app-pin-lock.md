@@ -18,8 +18,13 @@
 ## Security boundary
 This is a local UI privacy lock, not an online authentication factor, device attestation, hardware-backed key, or cryptographic protection for future offline data. Browser storage can be cleared or modified, and a local attacker may attempt offline PIN guessing. The PIN must not be reused as an account password. Do not claim that it protects business data from a determined device/profile attacker. Phase 5 must separately protect stored records and document the remaining same-origin/XSS/OS-profile threat boundary.
 
-## Passkey status / blocker
-The backend targets ASP.NET Core Identity 10, but the deployment runbook does not establish an approved production HTTPS hostname/RP ID. Passkey registration and assertion are intentionally not enabled until the owner confirms the RP domain/origin and supported browser matrix. Do not derive RP scope from arbitrary request Host headers.
+## Passkey implementation and activation gate
+- Enabled ASP.NET Core Identity 10's native passkey store using `IdentityUserPasskey<Guid>` and migration `047_identity_passkeys.sql`.
+- Added passkey creation/attestation, list/remove, discoverable request options and assertion sign-in endpoints. Successful passkey sign-in creates the same server-authoritative session/device record as password/OTP sign-in.
+- Added browser WebAuthn serialization helpers, passkey sign-in on the account screen, and passkey registration/removal in device settings.
+- Passkeys are disabled unless `Auth:Passkeys:ServerDomain` is explicitly configured. When enabled, the app requires the same exact host in `AllowedHosts`, sets Identity `ServerDomain`, requires user verification and resident credentials, and never derives RP scope from an arbitrary Host header.
+- The repository deployment runbook has no owner-approved production hostname. The code is ready behind the configuration gate, but passkeys cannot be activated until the owner supplies the HTTPS hostname and browser acceptance is performed.
+- ASP.NET Core 10 Identity supports this flow through `SignInManager`/`UserManager`; the implementation uses those framework handlers rather than a custom WebAuthn cryptography implementation.
 
 ## Validation
 CI is triggered by the draft PR. No local build or browser acceptance is claimed. Require frontend TypeScript/Vitest/build and backend build/test/migration CI. Manual acceptance still required for Android Chrome and desktop browsers, inactivity lock, shared-browser account isolation and local retry behavior.
