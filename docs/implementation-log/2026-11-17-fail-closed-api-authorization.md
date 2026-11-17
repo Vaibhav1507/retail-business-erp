@@ -1,7 +1,7 @@
 # Implementation log — fail-closed API authorization
 
 **Last updated:** 2026-11-17  
-**Status:** Branch implementation committed; pull request and CI validation pending  
+**Status:** PR #32 open; GitHub Actions CI run #387 is in progress at the latest observed check  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Implementation branch:** `security/fail-closed-api-authorization`  
 **Base branch:** `main`  
@@ -124,22 +124,22 @@ All commits are on `security/fail-closed-api-authorization` and descend from `c1
 
 ## 6. Validation status — do not overstate
 
-- Local build/tests: not run in this session because the implementation is being authored through the connected GitHub repository workflow.
-- GitHub Actions: not yet observed for this implementation branch; a PR must be opened to run the repository's PR CI.
-- Route-inventory test: added, but not yet executed. The first CI result must be checked carefully; if ASP.NET route patterns differ from the assumed group-prefixed templates, fix the catalogue/test based on the actual reported templates.
-- No claim is made that this implementation is complete or CI-green until a successful run is recorded.
+- Local build/tests: not run in this session because implementation was authored through the connected GitHub repository workflow.
+- PR: [#32](https://github.com/Vaibhav1507/retail-business-erp/pull/32), open and targeting `main`.
+- CI: [run #387](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44073372206), run ID `44073372206`, for head SHA `d57fd0e4155f272bfce34c1187217ea0464545d0`. Latest observed state was `in_progress`; frontend job passed; backend build was running. Migration validation and integration tests had not yet completed at that observation.
+- Route inventory: 140 explicit method/template entries, no duplicate method/template keys found by static inspection. The runtime route-inventory test is added but must be confirmed by CI.
+- No claim is made that the implementation is complete or CI-green until a successful run is recorded.
 
 ## 7. Known review items / next actions
 
-1. Open a focused PR from `security/fail-closed-api-authorization` to `main`.
-2. Run and inspect all CI jobs. Treat compile errors, integration failures and route-inventory omissions as blockers.
-3. Correct every unclassified route reported by the route-inventory test. Do not add a broad wildcard route rule except for the terminal 404 fallback.
-4. Confirm Brand endpoint integration test passes against real PostgreSQL.
-5. Confirm the unaffiliated-user, revoked-membership, anonymous OTP/login and webhook tests pass.
-6. Read the complete PR diff and verify that only this authorization slice and its records changed.
-7. Update this file with the PR number, final head SHA, CI run IDs, job outcomes, failed attempts and fixes.
-8. Keep PR #31 open and separate unless the owner explicitly asks to merge it; this implementation branch is based on main and includes the relevant decisions.
-9. Do not begin Phase 2 (persistent login) until this authorization PR is reviewed and merged.
+1. Inspect CI run #387 until it completes. Treat compile errors, integration failures and route-inventory omissions as blockers.
+2. Correct every unclassified route reported by the route-inventory test. Do not add a broad wildcard route rule except for the terminal 404 fallback.
+3. Confirm Brand endpoint integration test passes against real PostgreSQL.
+4. Confirm the pre-business user, revoked-membership, anonymous OTP/login and webhook tests pass.
+5. Read the complete PR diff and verify that only this authorization slice and its records changed.
+6. Update this file with the final head SHA, CI run IDs, job outcomes, failures and fixes.
+7. Keep PR #31 open and separate unless the owner explicitly asks to merge it; this implementation branch is based on main and includes the relevant decisions.
+8. Do not begin Phase 2 (persistent login) until this authorization PR is reviewed and merged.
 
 ## 8. Recovery checkpoint
 
