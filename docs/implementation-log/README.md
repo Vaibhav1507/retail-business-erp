@@ -17,7 +17,7 @@ This directory is the durable project handover record. Update it in every implem
 - [Trusted-device registry and revocation — 2026-11-17](2026-11-17-trusted-device-registry.md)
   - Branch: `auth/trusted-device-registry`
   - Scope: user-scoped device registry, server session linkage, list/revoke endpoints, security-event audit and device-management UI.
-  - Current stage: implementation committed at `3c208ee3ab0fa0473d7dcd5879823029f002988c`; dedicated PR/CI validation pending.
+  - Current stage: implementation and recovery log committed; [PR #34](https://github.com/Vaibhav1507/retail-business-erp/pull/34) open/draft/unmerged. CI #411 failed before runner allocation (no test steps executed); retry once Actions runner allocation is healthy.
 
 ## Update discipline
 
