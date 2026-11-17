@@ -101,7 +101,7 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
               </div>
               <div className="device-card-action">
                 <button type="button" className="device-revoke" disabled={revoked || expired || busyId === device.id} onClick={() => { void revoke(device) }}>
-                  {busyId === device.id ? t('devices.revoking') : revoked ? 'Revoked' : expired ? 'Expired' : t('devices.revoke')}
+                  {busyId === device.id ? t('devices.revoking') : revoked ? t('devices.revoked') : expired ? t('devices.expired') : t('devices.revoke')}
                 </button>
               </div>
             </article>
