@@ -51,16 +51,30 @@ export async function syncOfflineSales(ownerKey: string): Promise<void> {
   if (existing) return existing
   const task = (async () => {
     const queue = await listOfflineSales(ownerKey)
-    for (const item of queue.filter(x => x.state === 'pending-sync' || x.state === 'syncing')) {
+    for (const item of queue.filter(x => x.state === 'pending-sync' || x.state === 'syncing' || (x.state === 'posted' && !x.value.invoiceNumber))) {
       if (!navigator.onLine) break
       await saveOfflineRecord(ownerKey, item.id, 'sale', 'syncing', item.value)
       try {
-        const posted = await api<{ id: string; serialWarnings?: string[] }>('POST', '/sales', item.value.body, item.value.idempotencyKey)
-        const detail = await api<{ sale: { number: number } }>('GET', '/sales/' + posted.id)
+        let serverSaleId = item.value.serverSaleId
+        if (!serverSaleId) {
+          const posted = await api<{ id: string; serialWarnings?: string[] }>('POST', '/sales', item.value.body, item.value.idempotencyKey)
+          serverSaleId = posted.id
+          // Persist the authoritative server ID before requesting the invoice details.
+          await saveOfflineRecord(ownerKey, item.id, 'sale', 'posted', { ...item.value, serverSaleId })
+        }
+        const detail = await api<{ sale: { number: number } }>('GET', '/sales/' + serverSaleId)
         await saveOfflineRecord(ownerKey, item.id, 'sale', 'posted', {
-          ...item.value, serverSaleId: posted.id, invoiceNumber: detail.sale.number, lastError: undefined
+          ...item.value, serverSaleId, invoiceNumber: detail.sale.number, lastError: undefined
         })
       } catch (error) {
+        if (item.value.serverSaleId) {
+          // The sale is already posted; a detail-fetch failure must never turn it
+          // back into a pending POST or create a duplicate invoice.
+          await saveOfflineRecord(ownerKey, item.id, 'sale', 'posted', {
+            ...item.value, lastError: error instanceof Error ? error.message : 'Invoice details are temporarily unavailable'
+          })
+          continue
+        }
         if (error instanceof ApiError && [400, 401, 403, 404, 409, 422].includes(error.status)) {
           await saveOfflineRecord(ownerKey, item.id, 'sale', 'needs-attention', {
             ...item.value, lastError: error.message
