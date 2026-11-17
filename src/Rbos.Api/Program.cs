@@ -59,6 +59,24 @@ if (args.Contains("--migrate"))
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 QuestPDF.Settings.UseSystemFonts = true;
 var builder = WebApplication.CreateBuilder(args);
+var passkeyDomain = builder.Configuration["Auth:Passkeys:ServerDomain"]?.Trim();
+if (!string.IsNullOrWhiteSpace(passkeyDomain))
+{
+    if (Uri.CheckHostName(passkeyDomain) == UriHostNameType.Unknown)
+        throw new InvalidOperationException("Auth:Passkeys:ServerDomain must be a valid DNS host name.");
+    var allowedHosts = builder.Configuration["AllowedHosts"];
+    if (string.IsNullOrWhiteSpace(allowedHosts))
+        builder.WebHost.UseSetting(Microsoft.AspNetCore.Hosting.WebHostDefaults.AllowedHostsKey, passkeyDomain);
+    else if (!allowedHosts.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Contains(passkeyDomain, StringComparer.OrdinalIgnoreCase))
+        throw new InvalidOperationException("AllowedHosts must explicitly include Auth:Passkeys:ServerDomain before passkeys can be enabled.");
+    builder.Services.Configure<IdentityPasskeyOptions>(options =>
+    {
+        options.ServerDomain = passkeyDomain;
+        options.UserVerificationRequirement = "required";
+        options.ResidentKeyRequirement = "required";
+    });
+}
 var dbKey = (builder.Configuration["Rbos:Database"] ?? "dev") switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
 var appCs = builder.Configuration[dbKey] ?? throw new InvalidOperationException($"Missing secret {dbKey}");
 builder.Services.AddSingleton(Npgsql.NpgsqlDataSource.Create(appCs));
