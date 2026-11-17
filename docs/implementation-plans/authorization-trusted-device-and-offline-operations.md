@@ -127,7 +127,7 @@ These are proposed defaults for the controlled pilot. Treat them as configuratio
 | Persistent cookie | HttpOnly, Secure in production, SameSite Strict; 30-day sliding lifetime |
 | Maximum continuous server authentication age | 90 days initially; reauthenticate after that |
 | Device registration lifetime | Until revoked/removed; it can outlive an individual server session |
-| Quick unlock | Six-digit app PIN configured during first device enrolment |
+| Quick unlock | four-digit app PIN configured during first device enrolment |
 | Biometrics | Optional passkey/platform-authenticator flow; the OS may use fingerprint, face or device screen-lock PIN |
 | Inactivity lock | Five minutes as an initial configurable default, plus manual Lock |
 | Lost device | Owner can revoke it; revocation is enforced on the next server contact |
@@ -255,7 +255,7 @@ Tasks:
 
 #### 4.1 PIN
 
-1. First successful online sign-in and device registration leads to mandatory setup of a six-digit app PIN.
+1. First successful online sign-in and device registration leads to mandatory setup of a four-digit app PIN.
 2. PIN confirmation is required; allow the user to change it later after reauthentication.
 3. Apply rate limits, progressive delay/lockout, privacy-safe recovery and audit.
 4. Do not save the PIN, a reversible PIN, or an unprotected encryption key in browser storage.
@@ -380,7 +380,7 @@ Current CI already runs .NET build, migration validation, .NET tests, TypeScript
 | 1 | `security/fail-closed-api-authorization` | Complete route catalogue, explicit access metadata, fail-closed enforcement, role matrix tests, Brand registration | Phase 0 |
 | 2 | `auth/persistent-login-and-network-state` | 30-day sliding cookie, 90-day absolute age, password/OTP parity, 401 vs network UX | PR 1 |
 | 3 | `auth/trusted-device-registry` | Device/session records, registration/list/revoke, audit | PR 2 |
-| 4 | `auth/pin-and-passkey-unlock` | Mandatory six-digit PIN setup, app lock, optional .NET 10 Identity passkey | PR 3 |
+| 4 | `auth/pin-and-passkey-unlock` | Mandatory four-digit PIN setup, app lock, optional .NET 10 Identity passkey | PR 3 |
 | 5 | `offline/pwa-shell-and-local-store` | Versioned service-worker cache, IndexedDB and protected tenant snapshot | PR 4 and security POC |
 | 6 | `offline/sales-outbox-and-sync` | Pending invoice drafts, outbox, attachment sync and server-authoritative posting | PR 5 |
 
