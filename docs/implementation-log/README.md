@@ -23,6 +23,10 @@ This directory is the durable project handover record. Update it in every implem
   - Branch: offline/pwa-shell-and-local-store
   - Scope: versioned app-shell/static asset cache, API cache exclusion, AES-GCM encrypted IndexedDB snapshot, offline bootstrap and sign-out cleanup.
 
+- [Offline sales outbox and synchronization — 2026-11-17](2026-11-17-offline-sales-outbox.md)
+  - Branch: offline/sales-outbox-and-sync
+  - Scope: encrypted pending-sale drafts, stable idempotency keys, server-authoritative sync, posted/needs-attention states and queue limits.
+
 ## Update discipline
 
 For each implementation slice, record:
