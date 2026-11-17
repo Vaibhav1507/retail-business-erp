@@ -6,6 +6,7 @@ const memory = vi.hoisted(() => ({
 }))
 
 vi.mock('./offlineStore', () => ({
+  deleteOfflineRecord: vi.fn(async (ownerKey: string, id: string) => { memory.records = memory.records.filter(x => x.ownerKey !== ownerKey || x.id !== id) }),
   saveOfflineRecord: vi.fn(async (ownerKey: string, id: string, kind: string, state: string, value: unknown) => {
     const old = memory.records.findIndex(x => x.ownerKey === ownerKey && x.id === id)
     const record = { ownerKey, id, kind, state, value, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
@@ -69,6 +70,30 @@ describe('offline sales outbox', () => {
     expect(queue).toHaveLength(1)
     expect(queue[0].state).toBe('needs-attention')
     expect(queue[0].value.lastError).toBe('Stock is no longer available.')
+  })
+
+  it('does not post twice when the server accepted the bill but invoice details are temporarily unavailable', async () => {
+    await queueOfflineSale(ownerKey, body, 'stable-command-key')
+    memory.api.mockResolvedValueOnce({ id: 'server-sale-2' }).mockRejectedValueOnce(new ApiError(500, 'Temporary detail failure'))
+    await syncOfflineSales(ownerKey)
+    let queue = await listOfflineSales(ownerKey)
+    expect(queue[0].state).toBe('posted')
+    expect(queue[0].value.serverSaleId).toBe('server-sale-2')
+    memory.api.mockResolvedValueOnce({ sale: { number: 43 } })
+    await syncOfflineSales(ownerKey)
+    queue = await listOfflineSales(ownerKey)
+    expect(memory.api.mock.calls.filter(call => call[0] === 'POST')).toHaveLength(1)
+    expect(queue[0].state).toBe('posted')
+    expect(queue[0].value.invoiceNumber).toBe(43)
+  })
+
+  it('does not attempt synchronization while the browser is offline', async () => {
+    await queueOfflineSale(ownerKey, body, 'stable-command-key')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await syncOfflineSales(ownerKey)
+    expect(memory.api).not.toHaveBeenCalled()
+    const queue = await listOfflineSales(ownerKey)
+    expect(queue[0].state).toBe('pending-sync')
   })
 
   it('rejects an oversized or unprovisioned offline queue entry', async () => {
