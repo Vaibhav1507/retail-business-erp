@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
+import { getLanguage, t } from './i18n'
 import './devices.css'
 
 type Device = {
@@ -18,7 +19,8 @@ type Device = {
 type Props = { onCurrentDeviceRevoked: () => Promise<void> }
 
 function dateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  const locale = getLanguage() === 'hi' ? 'hi-IN' : 'en-IN'
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
 export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
@@ -33,7 +35,7 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
     try {
       setDevices(await api<Device[]>('GET', '/auth/devices'))
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : 'Could not load signed-in devices. Check your connection and retry.')
+      setError(reason instanceof ApiError ? reason.message : t('devices.loadError'))
     } finally {
       setLoading(false)
     }
@@ -43,8 +45,8 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
 
   async function revoke(device: Device) {
     const message = device.isCurrentDevice
-      ? 'Revoke this device? You will be signed out on this browser.'
-      : 'Revoke this device? Its next request to RBOS will require sign-in again.'
+      ? t('devices.confirmCurrent')
+      : t('devices.confirmOther')
     if (!window.confirm(message)) return
 
     setBusyId(device.id)
@@ -57,7 +59,7 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
       }
       await load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : 'Could not revoke this device. Please retry.')
+      setError(reason instanceof ApiError ? reason.message : t('devices.revokeError'))
     } finally {
       setBusyId(null)
     }
@@ -67,15 +69,15 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
     <section className="devices-page" aria-labelledby="devices-title">
       <header className="devices-heading">
         <div>
-          <h1 id="devices-title">Signed-in devices</h1>
-          <p>Review the browsers used to access this account. Revoking a device blocks its saved sessions the next time they contact RBOS.</p>
+          <h1 id="devices-title">{t('devices.title')}</h1>
+          <p>{t('devices.intro')}</p>
         </div>
-        <button type="button" onClick={() => { void load() }} disabled={loading}>Refresh</button>
+        <button type="button" onClick={() => { void load() }} disabled={loading}>{t('devices.refresh')}</button>
       </header>
 
       {error && <p role="alert" className="devices-error">{error}</p>}
-      {loading && <p role="status">Loading devices…</p>}
-      {!loading && devices.length === 0 && <p>No devices have been registered for this account yet.</p>}
+      {loading && <p role="status">{t('devices.loading')}</p>}
+      {!loading && devices.length === 0 && <p>{t('devices.empty')}</p>}
 
       <div className="device-list">
         {devices.map(device => {
@@ -86,27 +88,27 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
               <div className="device-card-main">
                 <div className="device-card-title">
                   <h2>{device.label}</h2>
-                  {device.isCurrentDevice && <span className="device-current">This device</span>}
-                  {revoked && <span className="device-status">Revoked</span>}
-                  {!revoked && expired && <span className="device-status">Expired</span>}
+                  {device.isCurrentDevice && <span className="device-current">{t('devices.this')}</span>}
+                  {revoked && <span className="device-status">{t('devices.revoked')}</span>}
+                  {!revoked && expired && <span className="device-status">{t('devices.expired')}</span>}
                 </div>
                 <p>{device.browser} · {device.platform}</p>
                 <dl>
-                  <div><dt>Last activity</dt><dd>{dateTime(device.lastSeenAt)}</dd></div>
-                  <div><dt>Last sign-in</dt><dd>{dateTime(device.lastAuthenticatedAt)}</dd></div>
-                  <div><dt>Registered</dt><dd>{dateTime(device.createdAt)}</dd></div>
+                  <div><dt>{t('devices.lastActivity')}</dt><dd>{dateTime(device.lastSeenAt)}</dd></div>
+                  <div><dt>{t('devices.lastSignin')}</dt><dd>{dateTime(device.lastAuthenticatedAt)}</dd></div>
+                  <div><dt>{t('devices.registered')}</dt><dd>{dateTime(device.createdAt)}</dd></div>
                 </dl>
               </div>
               <div className="device-card-action">
                 <button type="button" className="device-revoke" disabled={revoked || expired || busyId === device.id} onClick={() => { void revoke(device) }}>
-                  {busyId === device.id ? 'Revoking…' : revoked ? 'Revoked' : expired ? 'Expired' : 'Revoke device'}
+                  {busyId === device.id ? t('devices.revoking') : revoked ? 'Revoked' : expired ? 'Expired' : t('devices.revoke')}
                 </button>
               </div>
             </article>
           )
         })}
       </div>
-      <p className="devices-note">A device label describes a browser profile; it does not prove the physical identity of a phone or computer. A device that is offline cannot receive revocation until it reconnects.</p>
+      <p className="devices-note">{t('devices.note')}</p>
     </section>
   )
 }
