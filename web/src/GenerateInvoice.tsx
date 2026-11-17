@@ -7,6 +7,7 @@ import { BarcodeScanner, type ScanResult } from './BarcodeScanner'
 import { t as tr } from './i18n'
 import { whatsappStatusLabel } from './whatsappStatus'
 import { listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
+import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
 
 type Opt = { id: string; name: string }
 type Customer = { id: string; name: string; phone: string | null; notes: string | null; isActive: boolean }
@@ -17,8 +18,7 @@ const GST_RATES = [0, 3, 5, 12, 18, 28]
 const money = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const HELD_KEY = 'rbos.heldBills'
 type Held = { id: string; label: string; data: Record<string, any> } // eslint-disable-line @typescript-eslint/no-explicit-any
-const readHeld = (): Held[] => { try { return JSON.parse(localStorage.getItem(HELD_KEY) ?? '[]') as Held[] } catch { return [] } }
-const writeHeld = (h: Held[]) => localStorage.setItem(HELD_KEY, JSON.stringify(h))
+const readLegacyHeld = (): Held[] => { try { return JSON.parse(localStorage.getItem(HELD_KEY) ?? '[]') as Held[] } catch { return [] } }
 function spreadDiscount(items: Item[], billDisc: number): Item[] {
   const gross = items.reduce((s, i) => s + itemTotal(i), 0)
   if (!(billDisc > 0) || !(gross > 0)) return items
@@ -70,8 +70,29 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [scanning, setScanning] = useState(false)
   const [warn, setWarn] = useState('')
     const [billDisc, setBillDisc] = useState('')
-    const [held, setHeld] = useState<Held[]>(readHeld)
+    const [held, setHeld] = useState<Held[]>([])
   const skipSearch = useRef(false)
+  useEffect(() => {
+    if (!ownerKey) return
+    let active = true
+    void (async () => {
+      try {
+        const records = await readOfflineRecords<Held[]>(ownerKey, 'held-bills')
+        const saved = records.find(x => x.id === 'held-bills')
+        if (saved) {
+          if (active) setHeld(saved.value)
+          return
+        }
+        const legacy = readLegacyHeld()
+        if (legacy.length) {
+          await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', legacy)
+          localStorage.removeItem(HELD_KEY)
+          if (active) setHeld(legacy)
+        }
+      } catch { /* Existing held bills remain in the form; offline outbox storage reports its own errors. */ }
+    })()
+    return () => { active = false }
+  }, [ownerKey])
   const [offlineQueue, setOfflineQueue] = useState<OfflineSaleItem[]>([])
   const [syncingOffline, setSyncingOffline] = useState(false)
   const refreshOfflineQueue = useCallback(async () => {
@@ -243,26 +264,26 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems([]); setBillDisc(''); setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
-  function hold() {
-    if (!items.length) return
+  async function hold() {
+    if (!items.length || !ownerKey) return
     const data = { customerId, phone, name, address, city, state, pin, date, mode, paid, payMethod, paid2, payMethod2, gst, rate, items, billDisc }
     const label = (name.trim() || phone.trim() || 'Walk-in') + ' - ' + items.length + ' item(s)'
     const next = [{ id: crypto.randomUUID(), label, data }, ...held].slice(0, 20)
-    writeHeld(next); setHeld(next); clearForm()
+    await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next); clearForm()
   }
 
-  function resume(h: Held) {
+  async function resume(h: Held) {
     const d = h.data
     skipSearch.current = true
     setCustomerId(d.customerId); setPhone(d.phone); setName(d.name); setAddress(d.address); setCity(d.city); setState(d.state); setPin(d.pin)
     setDate(d.date); setMode(d.mode); setPaid(d.paid); setPayMethod(d.payMethod); setPaid2(d.paid2); setPayMethod2(d.payMethod2)
     setGst(d.gst); setRate(d.rate); setItems(d.items); setBillDisc(d.billDisc ?? '')
-    const next = held.filter(x => x.id !== h.id); writeHeld(next); setHeld(next)
+    const next = held.filter(x => x.id !== h.id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
-  function discardHeld(id: string) {
+  async function discardHeld(id: string) {
     if (!window.confirm('Discard this held bill?')) return
-    const next = held.filter(x => x.id !== id); writeHeld(next); setHeld(next)
+    const next = held.filter(x => x.id !== id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
   function reset() {
@@ -295,7 +316,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   return (
     <section aria-label="Generate invoice" className="billing-page">
       <h2>Generate Invoice</h2>
-            {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => resume(h)}>Resume</button> <button type="button" className="secondary" onClick={() => discardHeld(h.id)}>Discard</button></li>)}</ul></div>}
+            {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => { void resume(h) }}>Resume</button> <button type="button" className="secondary" onClick={() => { void discardHeld(h.id) }}>Discard</button></li>)}</ul></div>}
       {offlineQueue.length > 0 && <div className="billing-card" aria-label="Offline bill queue">
         <h3>Offline bills and sync status</h3>
         <p>{offlineQueue.filter(x => x.state === 'pending-sync' || x.state === 'syncing').length} waiting to sync · {offlineQueue.filter(x => x.state === 'needs-attention').length} need attention · {offlineQueue.filter(x => x.state === 'posted').length} posted</p>
@@ -371,7 +392,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <div className="billing-field"><label htmlFor="billing-bill-disc">{tr('bill.billDisc')}</label><input id="billing-bill-disc" inputMode="decimal" value={billDisc} onChange={e => setBillDisc(e.target.value)} /></div>
         <div className="billing-total">{tr('bill.total')} <strong>{money(total)} INR</strong>{gst && <small> incl. GST {money(tax)}</small>}</div>
         <button type="button" onClick={review}>{tr('bill.generate')}</button>
-        <button type="button" className="secondary" onClick={hold} disabled={!items.length}>{tr('bill.hold')}</button>
+        <button type="button" className="secondary" onClick={() => { void hold() }} disabled={!items.length}>{tr('bill.hold')}</button>
       </div>
     </section>
   )
