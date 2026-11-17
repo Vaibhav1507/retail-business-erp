@@ -26,6 +26,12 @@ Set as environment variables or secrets (see `.env.example`). Never commit real 
 - `Otp__Enabled=false`
 - `ConnectionStrings__RbosProdApp=<rbos_app connection string, SSL Mode=Require>`
 Do not set Gemini or SMS secrets unless explicitly approved.
+
+Optional passkeys (disabled unless explicitly configured):
+- `Auth__Passkeys__ServerDomain=<exact HTTPS application hostname>`
+- `AllowedHosts=<same exact hostname>`
+
+Set both only after the final production hostname is chosen and DNS/TLS are working. The app rejects passkey activation if the RP domain is invalid or is not included in `AllowedHosts`. Do not use `*`, a wildcard RP domain, a temporary Cloud Run URL or an unverified host. Keep both unset to leave passkeys disabled. Passkey registration requires a browser with WebAuthn support and a secure context.
 Do not put the migrator connection string in Cloud Run.
 
 ## 3A. Optional AI and voice configuration
