@@ -38,3 +38,11 @@ Legend: ✔ allowed · ✖ denied · ◐ allowed within a tenant setting or limi
 - Staff never see purchase cost, WAC, margin or stock value.
 - All denials return 403 for in-tenant actions and 404 for foreign-tenant resources.
 - Every ◐ setting change is audited.
+
+## 2026-11-17 enforcement note
+
+The matrix above remains **Proposed**, not approved business policy. The fail-closed API route classification is documented separately in [api-route-access-matrix.md](api-route-access-matrix.md) and implemented in `src/Rbos.Api/ApiRouteAccess.cs`.
+
+The implementation makes every registered API method/template explicit, but it does not silently turn this proposed matrix into a new production role policy. Known routes that previously relied on the old authenticated-member default remain explicitly available to active members until the owner approves a stricter read matrix. This includes several finance read endpoints that conflict with the proposal above. The mismatch is recorded as an open pilot-security decision; do not interpret the new route inventory as field-level or complete data-shaping enforcement.
+
+The four existing permission bundles are unchanged. Before enabling real staff accounts or real business data, approve the final role matrix and review response payloads for cost, WAC, margin, ledger and stock-value exposure.
