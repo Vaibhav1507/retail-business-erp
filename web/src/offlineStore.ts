@@ -176,15 +176,15 @@ export async function deleteOfflineRecord(ownerKey: string, id: string) {
   } finally { db.close() }
 }
 
-export async function clearOfflineWorkspace(ownerKey: string) {
+export async function clearOfflineWorkspace(ownerKey: string, preserveKinds: string[] = []) {
   const db = await openDb()
   try {
     const tx = db.transaction([KEY_STORE, RECORD_STORE], 'readwrite')
     const done = transactionDone(tx)
-    tx.objectStore(KEY_STORE).delete(ownerKey)
     const store = tx.objectStore(RECORD_STORE)
     const records = await requestValue<StoredRecord[]>(store.index('ownerKey').getAll(ownerKey))
-    records.forEach(record => store.delete(record.id))
+    records.filter(record => !preserveKinds.includes(record.kind)).forEach(record => store.delete(record.id))
+    if (preserveKinds.length === 0) tx.objectStore(KEY_STORE).delete(ownerKey)
     await done
   } finally { db.close() }
 }
