@@ -9,6 +9,11 @@ This directory is the durable project handover record. Update it in every implem
   - Scope: exact route/method access catalogue, fail-closed API filter, Brand endpoint registration and authorization tests.
   - Current stage: implementation and recovery log committed; implementation head passed CI run #393; PR #32 remains open for review.
 
+- [Persistent login and network-state handling — 2026-11-17](2026-11-17-persistent-login.md)
+  - Branch: auth/persistent-login-and-network-state
+  - Scope: persistent/sliding login cookie, server-side absolute session expiry, logout revocation and retryable auth-state UX.
+  - Current stage: implementation committed on stacked feature branch; CI and review pending.
+
 ## Update discipline
 
 For each implementation slice, record:
