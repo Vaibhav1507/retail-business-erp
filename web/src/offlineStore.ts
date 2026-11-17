@@ -183,8 +183,9 @@ export async function clearOfflineWorkspace(ownerKey: string, preserveKinds: str
     const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
     const records = await requestValue<StoredRecord[]>(store.index('ownerKey').getAll(ownerKey))
+    const retained = records.filter(record => preserveKinds.includes(record.kind))
     records.filter(record => !preserveKinds.includes(record.kind)).forEach(record => store.delete(record.id))
-    if (preserveKinds.length === 0) tx.objectStore(KEY_STORE).delete(ownerKey)
+    if (retained.length === 0) tx.objectStore(KEY_STORE).delete(ownerKey)
     await done
   } finally { db.close() }
 }
