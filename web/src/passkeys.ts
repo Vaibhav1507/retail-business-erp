@@ -92,9 +92,9 @@ export async function signInWithPasskey(): Promise<void> {
   resetCsrf()
 }
 
-export async function registerPasskey(name: string): Promise<void> {
+export async function registerPasskey(name: string, password: string): Promise<void> {
   ensureSupported()
-  const raw = await api<JsonCreationOptions>('POST', '/auth/passkeys/creation-options', {})
+  const raw = await api<JsonCreationOptions>('POST', '/auth/passkeys/creation-options', { password })
   const credential = await navigator.credentials.create({ publicKey: decodeCreationOptions(raw) })
   if (!(credential instanceof PublicKeyCredential)) throw new Error('Passkey registration was cancelled or not completed.')
   await api('POST', '/auth/passkeys/register', { credentialJson: credentialJson(credential), name })
@@ -110,4 +110,4 @@ export type PasskeySummary = {
 }
 
 export const listPasskeys = () => api<PasskeySummary[]>('GET', '/auth/passkeys')
-export const removePasskey = (credentialId: string) => api('DELETE', '/auth/passkeys/' + encodeURIComponent(credentialId))
+export const removePasskey = (credentialId: string, password: string) => api('DELETE', '/auth/passkeys/' + encodeURIComponent(credentialId), { password })
