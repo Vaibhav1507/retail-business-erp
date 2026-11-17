@@ -97,7 +97,7 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
                 returning d.id
             )
             select exists (select 1 from valid_session)
-            """, connection));
+            """, connection);
         command.Parameters.AddWithValue("id", sessionId);
         command.Parameters.AddWithValue("user_id", userId);
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
