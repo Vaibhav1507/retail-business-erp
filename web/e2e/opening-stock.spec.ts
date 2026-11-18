@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, saveNewProduct } from './signup'
 import { expect, request as pwRequest, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Synthetic data only. Unique suffix per run so the test is repeatable against the same database.
@@ -27,9 +27,8 @@ async function addProduct(page: Page, name: string, generic: boolean, brand = ''
   await chooseCategory(s, 'Cables')
   const box = s.getByLabel('Generic / unbranded')
   if ((await box.isChecked()) !== generic) await box.setChecked(generic)
-  if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model', { exact: true }).fill(model) }
-  await s.getByRole('button', { name: 'Add product' }).click()
-  await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name, exact: true })).toBeVisible()
+  if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model number', { exact: true }).fill(model) }
+  await saveNewProduct(page, s, name)
 }
 
 async function addLine(page: Page, product: string, qty: string, cost: string) {
