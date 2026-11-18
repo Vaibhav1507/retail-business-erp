@@ -298,7 +298,7 @@ public sealed class ItemTagCaptureService(
             duplicate = await SqlHelpers.Scalar<bool>(s,
                 "select exists(select 1 from inventory.serial_unit where upper(btrim(serial))=upper(btrim(@s)) union all select 1 from sales.sale_line l,unnest(l.serials) u where upper(btrim(u))=upper(btrim(@s)))",
                 ct, ("s", review.Serial));
-        var updated = await SqlHelpers.Exec(s, ct, @"
+        var updated = await SqlHelpers.ExecCount(s, ct, @"
             update sales.item_tag_capture
             set status='Reviewed',product_id=@p,confirmed_name=@n,confirmed_brand=@b,confirmed_model=@m,
                 confirmed_barcode=@bc,barcode_symbology=@bs,serial=@sr,imei1=@i1,imei2=@i2,mrp=@mrp,hsn_code=@hsn,
@@ -328,7 +328,7 @@ public sealed class ItemTagCaptureService(
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("Capture not found.", 404);
         await using var s = await db.BeginAsync(uid, tid, ct);
-        var removed = await SqlHelpers.Exec(s, ct,
+        var removed = await SqlHelpers.ExecCount(s, ct,
             "delete from sales.item_tag_capture where id=@i and sale_id is null and status <> 'Attached'", ("i", id));
         if (removed == 0) return ServiceResult<object>.Fail("Capture was not found or is already attached to a sale.", 404);
         await SqlHelpers.Exec(s, ct, @"
