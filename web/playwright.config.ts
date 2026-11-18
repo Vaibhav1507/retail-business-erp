@@ -16,7 +16,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: { baseURL: WEB, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
-  projects: [{ name: 'mobile-390x844', use: { channel: 'msedge', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } }],
+  projects: [{ name: 'mobile-390x844', use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } }],
   webServer: [
     {
       command: 'dotnet run --project ../src/Rbos.Api --no-launch-profile --urls http://localhost:5082',
