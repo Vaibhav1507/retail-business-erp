@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: './e2e',
   // CI runs only deterministic, synthetic-data specs. The invoice-extraction/demo specs
   // exercise external AI/document providers and remain manual, opt-in acceptance tests.
-  ...(process.env.CI ? { testMatch: ['api-contract.spec.ts', 'collections.spec.ts', 'opening-stock.spec.ts', 'sales.spec.ts', 'ui-audit.spec.ts'] } : {}),
+  ...(process.env.CI ? { testMatch: ['api-contract.spec.ts', 'collections.spec.ts', 'opening-stock.spec.ts', 'sales.spec.ts', 'first-shop-onboarding.spec.ts', 'ui-audit.spec.ts'] } : {}),
   timeout: 90_000,
   fullyParallel: false,
   workers: 1,

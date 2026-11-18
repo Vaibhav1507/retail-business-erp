@@ -27,7 +27,7 @@ async function addProduct(page: Page, name: string, generic: boolean, brand = ''
   await chooseCategory(s, 'Cables')
   const box = s.getByLabel('Generic / unbranded')
   if ((await box.isChecked()) !== generic) await box.setChecked(generic)
-  if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model', { exact: true }).fill(model) }
+  if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model number', { exact: true }).fill(model) }
   await s.getByRole('button', { name: 'Add product' }).click()
   await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name, exact: true })).toBeVisible()
 }
@@ -38,8 +38,8 @@ async function addLine(page: Page, product: string, qty: string, cost: string) {
   const value = await s.getByLabel('Product').locator('option', { hasText: product }).getAttribute('value')
   await s.getByLabel('Product').selectOption(value!)
   await s.getByLabel('Quantity').fill(qty)
-  await s.getByLabel('Unit cost (INR)').fill(cost)
-  await s.getByRole('button', { name: 'Add line' }).click()
+  await s.getByLabel('Cost for one item (₹)').fill(cost)
+  await s.getByRole('button', { name: 'Add item' }).click()
 }
 
 test('owner sets up business, posts opening stock once, and is isolated from another tenant', async ({ page, browser, baseURL }) => {
@@ -59,7 +59,8 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
 
   // 8. Post
   const stockForm = page.getByRole('region', { name: 'Opening stock' })
-  await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
+  await stockForm.getByRole('button', { name: 'Review starting stock' }).click()
+  await stockForm.getByRole('button', { name: 'Confirm & post opening stock' }).click()
   await expect(stockForm.getByRole('status')).toContainText('355.00 INR')
 
   // 9. Current quantity and value
@@ -75,7 +76,8 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
 
   // 11-12. Repeat the posting: must be blocked, and nothing changes
   await addLine(page, cableName, '1', '1')
-  await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
+  await stockForm.getByRole('button', { name: 'Review starting stock' }).click()
+  await stockForm.getByRole('button', { name: 'Confirm & post opening stock' }).click()
   await expect(stockForm.getByRole('alert')).toContainText('already posted')
   await page.goto('/#/stock/current')
   await expect(cableRow).toContainText('255.00')

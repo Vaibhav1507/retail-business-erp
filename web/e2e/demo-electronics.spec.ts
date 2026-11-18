@@ -64,7 +64,9 @@ test('1. upload all 8 supplier invoices, create suppliers and products from the 
     const use = up.getByRole('button', { name: /^Use \d+ lines?$/ })
     await expect(use).toBeEnabled({ timeout: 30_000 })
     await use.click()
-    await page.getByRole('button', { name: 'Post receipt' }).click()
+    await page.getByRole('button', { name: 'Review purchase' }).click()
+    await expect(page.getByRole('region', { name: 'Review purchase' })).toBeVisible()
+    await page.getByRole('region', { name: 'Review purchase' }).getByRole('button', { name: 'Post receipt' }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Receipt posted' })).toBeVisible({ timeout: 30_000 })
     bought[inv.label] = inv.lines
     await page.waitForTimeout(3000)

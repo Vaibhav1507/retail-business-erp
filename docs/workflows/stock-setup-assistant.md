@@ -74,3 +74,10 @@ Creates in one transaction: opening-stock document (Posted), stock movements, pr
 | Wrong unit | Conversion shown in words; base quantity column in preview | Detect |
 | Commit with unread warnings | Commit disabled until warnings acknowledged | Prevent |
 | Generic merged with branded | No automatic merge path exists | Prevent |
+
+
+## PR C first-shop integration (2026-11-18)
+
+The Home guide links into the existing catalogue and opening-stock experiences; it does not implement a parallel importer or product editor. Catalogue completion is based on saved tenant products, not on opening the importer. Existing CSV/Excel mapping, editable preview, duplicate suggestions and commit-once semantics remain authoritative. Potential matches still require owner confirmation; similar names never overwrite an existing product silently.
+
+Opening stock now has a clearer review stage before the existing `POST /opening-stock` command. The editable list shows product, unit, quantity, unit cost and line value and allows a line to be removed before review. Posting requires a second explicit confirmation. Missing or zero cost remains a blocking validation error; costs are never inferred, MRP is not treated as cost, and the API's financial/stock invariants are not bypassed. The server remains authoritative for the posted total and idempotency. Existing supported multi-line entry remains the bulk-entry path; no new importer or stock engine is introduced.

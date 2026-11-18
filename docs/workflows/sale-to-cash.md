@@ -49,3 +49,8 @@ Payment document from customer → allocations to open invoices (oldest-first su
 ## Printing
 
 Browser print routes: A4 invoice, 80 mm receipt. Content: business name/address/contact, GST details if registered, document type label, number, date, customer details where required, lines (description, qty, unit, rate, discount), tax breakdown where applicable, totals, paid, outstanding, payment status. Exact mandatory fields are subject to official verification (PR-07). No claim of universal printer compatibility.
+
+
+## PR C first-sale guidance (2026-11-18)
+
+The existing Generate Invoice screen remains the only sales implementation. The new guidance asks the owner to search or scan the catalogue item and explicitly enter the selling price they charge. MRP remains a reference field and is not used as a selling-price default. Existing quantity, discount, customer/walk-in, payment, barcode, serial/item-tag capture, invoice review, final confirmation, print/share and API permission rules are unchanged. No sale is posted by the onboarding guide.

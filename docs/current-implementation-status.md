@@ -145,3 +145,31 @@ The discovery report and knowledge-transfer system snapshots are historical inve
 4. Build a consented, anonymised Hindi/Hinglish/Bundelkhandi/Indian-English command audio set before making accuracy claims about Shruti or Whisper.
 5. Keep hosted voice and invoice fallback switches off until provider quotas/cost tier and pilot approval are confirmed.
 6. Verify production migration and WhatsApp invoice delivery gates using the latest workflow and test-sender round trip before activating a real sender.
+
+
+---
+
+## 2026-11-18 — merged P0 baseline and PR C status correction
+
+### Pilot Readiness PR #47
+
+- **Merged:** yes. PR [#47](https://github.com/Vaibhav1507/retail-business-erp/pull/47) merged to `main` as `eadee5d6151cc355abf90f0e4dbdc62e12212f2c`.
+- **Main baseline for PR C:** `eadee5d6151cc355abf90f0e4dbdc62e12212f2c`.
+- **Post-merge CI run:** [run #603](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44347681867). Frontend passed TypeScript, unit tests, lint, build and dependency audit. Backend Release build, disposable PostgreSQL migration and .NET tests passed. Synthetic one-shop Playwright failed three E2E specs: collections and sales failed the product-row visibility assertion after product creation; opening-stock timed out looking for the obsolete `Model` label (the current catalogue label is `Model number`). Deployment-container build was skipped after the E2E failure. Do not record this run as fully green.
+- **Professional/manual acceptance:** CA approval of the WAC precision/valuation policy and consolidated owner acceptance (GST/non-GST invoice print plus financial statement assertions) were not evidenced by the merge or this CI run. These remain unverified.
+- **Deployment:** PR #47 did not deploy or change production data.
+
+### PR C — guided first-shop onboarding
+
+- **Branch:** `feat/guided-first-shop-onboarding`.
+- **Base:** merged `main` SHA above.
+- **State:** implementation being prepared; PR C CI, review and manual acceptance pending. Not merged or deployed.
+- **Reused components:** `BusinessSetup.tsx`, `SetupAssistant.tsx`, catalogue/product and barcode components, opening-stock form and existing `POST /opening-stock`, `Procurement.tsx` and existing purchase receipt APIs, `GenerateInvoice.tsx` including existing barcode/item-tag and confirmation behaviour, and `Home.tsx` with trusted dashboard values.
+- **New experience:** five persisted-state steps (shop details, catalogue, starting stock, first purchase, first sale); GST help and a non-posting sample invoice; opening-stock and purchase review checkpoints; first-sale guidance; mobile progress and recovery; Hindi draft message keys.
+- **Persistence/API/database:** progress derives from tenant-scoped `GET /business-profile`, `/products`, `/stock`, `/purchases` and `/sales`; no new API, database table, migration or localStorage progress state.
+- **Test work:** unit tests for derived persisted progress and offline suppression; synthetic Playwright first-shop journey; regression selector updates for opening stock, purchase, collections and sales. Results are pending exact PR-head CI.
+- **Merged / deployed / manually accepted:** no / no / no.
+
+### Language and demo qualification
+
+English remains the verified default. New Hindi onboarding and guidance strings are editable entries in the existing typed catalogue but remain draft translations pending a native Hindi speaker's review; this increment does not establish complete Hindi coverage. CI onboarding scenarios use synthetic tenants and disposable test data. The Development-only demo login is not an isolated in-app production demo; PR C does not introduce a production demo mode. No live shop data or AI provider credentials are used by the deterministic onboarding guide.

@@ -23,6 +23,9 @@ const signedIn = {
   '/api/products': () => ({ body: [product] }),
   '/api/locations': () => ({ body: [location] }),
   '/api/stock': () => ({ body: [] }),
+  '/api/business-profile': () => ({ body: { exists: true, businessName: 'Test Shop', businessCategory: 'electronics_mobile', onboardingCompleted: true, language: 'en' } }),
+  '/api/purchases': () => ({ body: [] }),
+  '/api/sales': () => ({ body: [] }),
 }
 
 beforeEach(() => { resetCsrf(); vi.unstubAllGlobals(); window.location.hash = '' })
@@ -87,17 +90,17 @@ describe('Opening stock form', () => {
 
   it('disables posting until a line is added', async () => {
     const s = await open()
-    expect(within(s).getByRole('button', { name: 'Post opening stock' })).toBeDisabled()
+    expect(within(s).getByRole('button', { name: 'Review starting stock' })).toBeDisabled()
   })
 
   it('rejects zero cost and zero quantity lines client-side', async () => {
     const s = await open()
     await userEvent.selectOptions(within(s).getByLabelText('Product'), 'p1')
     await userEvent.type(within(s).getByLabelText('Quantity'), '5')
-    await userEvent.type(within(s).getByLabelText('Unit cost (INR)'), '0')
-    await userEvent.click(within(s).getByRole('button', { name: 'Add line' }))
+    await userEvent.type(within(s).getByLabelText('Cost for one item (₹)'), '0')
+    await userEvent.click(within(s).getByRole('button', { name: 'Add item' }))
     expect(await within(s).findByRole('alert')).toHaveTextContent('unit cost > 0')
-    expect(within(s).getByRole('button', { name: 'Post opening stock' })).toBeDisabled()
+    expect(within(s).getByRole('button', { name: 'Review starting stock' })).toBeDisabled()
   })
 
   it('posts a line with an idempotency key and shows the server total', async () => {
@@ -108,9 +111,11 @@ describe('Opening stock form', () => {
     await waitFor(() => expect(within(s).getByRole('option', { name: 'Test Cable (SKU-1)' })).toBeInTheDocument())
     await userEvent.selectOptions(within(s).getByLabelText('Product'), 'p1')
     await userEvent.type(within(s).getByLabelText('Quantity'), '10')
-    await userEvent.type(within(s).getByLabelText('Unit cost (INR)'), '25.5')
-    await userEvent.click(within(s).getByRole('button', { name: 'Add line' }))
-    await userEvent.click(within(s).getByRole('button', { name: 'Post opening stock' }))
+    await userEvent.type(within(s).getByLabelText('Cost for one item (₹)'), '25.5')
+    await userEvent.click(within(s).getByRole('button', { name: 'Add item' }))
+    await userEvent.click(within(s).getByRole('button', { name: 'Review starting stock' }))
+    expect(await within(s).findByRole('region', { name: 'Review opening stock' })).toBeInTheDocument()
+    await userEvent.click(within(s).getByRole('button', { name: 'Confirm & post opening stock' }))
     expect(await within(s).findByRole('status')).toHaveTextContent('255.00 INR')
     const post = posts.find(p => p.url === '/api/opening-stock')!
     expect(post.headers['Idempotency-Key']).toMatch(/.{8,}/)
@@ -126,9 +131,10 @@ describe('Opening stock form', () => {
     await waitFor(() => expect(within(s).getByRole('option', { name: 'Test Cable (SKU-1)' })).toBeInTheDocument())
     await userEvent.selectOptions(within(s).getByLabelText('Product'), 'p1')
     await userEvent.type(within(s).getByLabelText('Quantity'), '1')
-    await userEvent.type(within(s).getByLabelText('Unit cost (INR)'), '1')
-    await userEvent.click(within(s).getByRole('button', { name: 'Add line' }))
-    await userEvent.click(within(s).getByRole('button', { name: 'Post opening stock' }))
+    await userEvent.type(within(s).getByLabelText('Cost for one item (₹)'), '1')
+    await userEvent.click(within(s).getByRole('button', { name: 'Add item' }))
+    await userEvent.click(within(s).getByRole('button', { name: 'Review starting stock' }))
+    await userEvent.click(within(s).getByRole('button', { name: 'Confirm & post opening stock' }))
     expect(await within(s).findByRole('alert')).toHaveTextContent('already posted')
   })
 })
