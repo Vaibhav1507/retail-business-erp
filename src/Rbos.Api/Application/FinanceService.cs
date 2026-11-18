@@ -447,12 +447,16 @@ public sealed class FinanceService(TenantDb db)
     static async Task<List<object>> ReplayFlagsAsync(TenantSession s, CancellationToken ct)
     {
         var replay = new List<object>();
-        var moves = await Rows(s, @"select coalesce(a.canonical_product_id, m.product_id) as product_id,
-                    p.name, m.id, m.quantity_delta, m.value_delta
+
+        // Migration 044 intentionally preserves original product IDs on historical
+        // stock movements. Those outbound values were calculated using each source
+        // product's own WAC before duplicate products were consolidated. Replay the
+        // original product streams independently; canonicalise only the current
+        // aggregate comparison in StockVerificationAsync above.
+        var moves = await Rows(s, @"select m.product_id, p.name, m.id, m.quantity_delta, m.value_delta
                 from inventory.stock_movement m
-                left join catalog.product_alias a on a.tenant_id=m.tenant_id and a.alias_product_id=m.product_id
-                join catalog.product p on p.tenant_id=m.tenant_id and p.id=coalesce(a.canonical_product_id, m.product_id)
-                order by coalesce(a.canonical_product_id, m.product_id), m.effective_date, m.occurred_at, m.id", ct);
+                join catalog.product p on p.tenant_id=m.tenant_id and p.id=m.product_id
+                order by m.product_id, m.effective_date, m.occurred_at, m.id", ct);
         Guid? current = null; decimal qty = 0m, val = 0m; var flagged = false;
         foreach (var mv in moves)
         {

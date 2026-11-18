@@ -223,8 +223,11 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         }
 
         var healthy = await c.GetJson("/reports/stock-verification");
-        Assert.True(healthy.GetProperty("ok").GetBoolean());
-        Assert.DoesNotContain(healthy.GetProperty("items").EnumerateArray(), x => x.GetProperty("productId").GetGuid() == retired);
+        Assert.True(
+            healthy.GetProperty("ok").GetBoolean(),
+            $"Expected migrated alias projections to reconcile and original-product replay to remain valid. Details: {healthy.GetRawText()}");
+        Assert.Empty(healthy.GetProperty("items").EnumerateArray());
+        Assert.Empty(healthy.GetProperty("replay").EnumerateArray());
 
         // Corrupt the projection through the same isolated test-fixture connection.
         await using (var tx = await connection.BeginTransactionAsync())
