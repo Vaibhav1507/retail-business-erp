@@ -1,6 +1,6 @@
 # Invoice Item-Tag Photo Capture — Product Requirements and Implementation Plan
 
-**Status:** PR B implementation committed; automated validation and review pending  
+**Status:** PR B implementation and GitHub Actions validation passed; review pending  
 **Planning target:** Controlled pilot  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Implementation branch:** `feat/invoice-item-tag-photo-capture`  
@@ -667,7 +667,7 @@ Migration `049_invoice_item_tag_captures.sql` adds `sales.item_tag_capture`. Ima
 - `web/src/ItemTagCapture.test.tsx`: camera/gallery controls, image upload, review/add, unsupported image feedback and offline-disabled controls.
 - `ApiAuthorizationTests` continues to inventory all registered API routes against the fail-closed access registry.
 
-These are test sources added to the branch. Local build/test execution and CI results must be read from the actual runner output; they are not represented as passed here.
+GitHub Actions run [#566](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44330825072) passed on the PR B head: .NET Release build, migrations 001–049, 126 unit tests, 160 integration tests, frontend TypeScript, frontend tests, frontend production build, dependency audit and deployment-container build without pushing an image. One pre-existing CA1416 platform-compatibility warning remains in `PdfPageReader.cs`. These results are CI evidence; no local execution is claimed.
 
 ### 20.6 Explicit limitations / decisions still open
 
