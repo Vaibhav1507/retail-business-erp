@@ -14,7 +14,8 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     {
         var response = await client.SendBytes(
             "/sales/item-tag-captures", bytes ?? Jpeg, "image/jpeg", key ?? Key());
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.StatusCode == HttpStatusCode.OK,
+            $"Upload returned {(int)response.StatusCode} {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
     }
 
@@ -192,7 +193,9 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     public async Task Capture_routes_require_authentication()
     {
         var client = new Client(factory);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await client.Raw("/sales/item-tag-captures/" + Guid.NewGuid())).StatusCode);
+        var response = await client.Raw("/sales/item-tag-captures/" + Guid.NewGuid());
+        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized,
+            $"Expected 401, got {(int)response.StatusCode} {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
         var upload = await client.SendBytes("/sales/item-tag-captures", Jpeg, "image/jpeg", Key());
         Assert.Equal(HttpStatusCode.Unauthorized, upload.StatusCode);
     }
