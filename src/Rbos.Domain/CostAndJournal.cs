@@ -12,12 +12,19 @@ public readonly record struct CostState(decimal TotalQuantity, decimal Inventory
 /// </summary>
 public static class WeightedAverageCostCalculator
 {
+    /// <summary>Interim persisted WAC scale: inventory.item_cost.wac is numeric(18,4).
+    /// This engineering convention is not CA approval of the valuation policy.</summary>
+    public const int WacDecimalPlaces = 4;
+
+    public static decimal RoundWac(decimal value) =>
+        decimal.Round(value, WacDecimalPlaces, MidpointRounding.AwayFromZero);
+
 	public static CostState ApplyReceipt(CostState current, Quantity quantity, UnitCost unitCost)
 	{
 		var value = Money.Of(quantity.Value * unitCost.Value).Amount;
 		var totalQuantity = current.TotalQuantity + quantity.Value;
 		var inventoryValue = current.InventoryValue + value;
-		var wac = decimal.Round(inventoryValue / totalQuantity, 4, MidpointRounding.AwayFromZero);
+		var wac = RoundWac(inventoryValue / totalQuantity);
 		return new CostState(totalQuantity, inventoryValue, wac);
 	}
 }
