@@ -110,7 +110,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         await client.SignUpAndBootstrap();
 
         var unsupported = await client.SendBytes("/sales/item-tag-captures", Jpeg, "application/octet-stream", Key());
-        Assert.Equal(HttpStatusCode.BadRequest, unsupported.StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, unsupported.StatusCode);
 
         var wrongSignature = await client.SendBytes("/sales/item-tag-captures", [0, 1, 2, 3], "image/jpeg", Key());
         Assert.Equal(HttpStatusCode.BadRequest, wrongSignature.StatusCode);
@@ -118,7 +118,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var oversized = new byte[8 * 1024 * 1024 + 1];
         oversized[0] = 0xFF; oversized[1] = 0xD8; oversized[2] = 0xFF; oversized[3] = 0xD9;
         var tooLarge = await client.SendBytes("/sales/item-tag-captures", oversized, "image/jpeg", Key());
-        Assert.Equal(HttpStatusCode.BadRequest, tooLarge.StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, tooLarge.StatusCode);
     }
 
     [Fact]
