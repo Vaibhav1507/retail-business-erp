@@ -44,7 +44,7 @@ The added integration suite `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs`
 
 The migration adds RLS ENABLE+FORCE, an active-membership policy, composite product/sale-line foreign keys and a tenant-scoped unique idempotency key. Image bytes are returned only from the authenticated image route with private/no-store and nosniff headers. No public object URL or path traversal input is accepted.
 
-These are source-level test additions. PostgreSQL integration execution, CI evidence and independent penetration testing remain pending until actually run.
+GitHub Actions run [#566](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44330825072) executed the PostgreSQL integration suite successfully: 160/160 integration tests passed, including the item-tag capture tenant-isolation and lifecycle cases. The full backend unit suite also passed (126/126). Independent penetration testing and real-device camera testing remain outside this CI run.
 
 
 The global `SecurityMiddleware` also has a narrow exception for `POST /api/sales/item-tag-captures`: it raises the request-body cap to 8 MiB and accepts only JPEG, PNG or WebP media types (case-insensitive). All other non-GET API requests remain JSON-only and retain their existing body limits. The item-tag endpoint independently enforces the same 8 MiB bound and verifies the file signature before persistence.
