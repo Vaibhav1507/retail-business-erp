@@ -13,7 +13,7 @@ import type { Product } from './Catalogue'
 import './styles.css'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, resetCsrf } from './api'
-import { clearOfflineWorkspace, loadOfflineSnapshot, saveOfflineSnapshot } from './offlineStore'
+import { clearOfflineWorkspace, describeOfflineStorageError, loadOfflineSnapshot, saveOfflineSnapshot } from './offlineStore'
 import { setLanguage, t, toLang } from './i18n'
 import type { Lang, MessageKey } from './i18n'
 
@@ -113,6 +113,7 @@ export default function App() {
         setMe(null)
         return
       }
+      let offlineStorageError: unknown
       try {
         const identity = JSON.parse(localStorage.getItem('rbos.offline.identity') ?? 'null') as { email?: string; tenantId?: string } | null
         if (identity?.email && identity.tenantId) {
@@ -127,8 +128,12 @@ export default function App() {
             return
           }
         }
-      } catch { /* Offline storage unavailable or not provisioned; keep the recoverable connection state. */ }
-      setAuthError('Could not verify your session or open a saved offline workspace. Check your connection and retry.')
+      } catch (storageError) {
+        offlineStorageError = storageError
+      }
+      setAuthError(offlineStorageError
+        ? `Could not open the protected offline workspace (${describeOfflineStorageError(offlineStorageError)}). Check browser site-storage permissions, then retry.`
+        : 'Could not verify your session or find a saved offline workspace. Connect to the internet and retry.')
     }
   }, [])
   const loadData = useCallback(async () => {
@@ -140,7 +145,9 @@ export default function App() {
           me: { email: me.email, tenantId: me.tenantId, profileComplete: me.profileComplete, businessCategory: me.businessCategory },
           products: p, locations: l, stock: s
         })
-      } catch { setAuthError('Shop data is loaded, but this browser could not update its protected offline snapshot.') }
+      } catch (error) {
+        setAuthError(`Shop data is loaded, but the protected offline snapshot could not be saved (${describeOfflineStorageError(error)}). Keep this device online until the snapshot is saved successfully.`)
+      }
     }
   }, [me])
 
