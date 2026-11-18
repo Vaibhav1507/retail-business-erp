@@ -186,9 +186,9 @@ public class WeightedAverageCostTests
 	[Fact]
 	public void Repeated_high_precision_receipts_use_the_same_persisted_wac_rule()
 	{
-		var s = Receive(CostState.Empty, 1m, 1.0001m);
-		s = Receive(s, 1m, 1.0002m);
-		Assert.Equal(2.00m, s.InventoryValue);
+		var s = Receive(CostState.Empty, 100m, 1.0001m);
+		s = Receive(s, 100m, 1.0002m);
+		Assert.Equal(200.03m, s.InventoryValue);
 		Assert.Equal(1.0002m, s.Wac);
 	}
 
