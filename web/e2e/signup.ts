@@ -38,6 +38,12 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByRole('button', { name: 'Review' }).click()
   await page.getByRole('button', { name: 'Create account' }).click()
+  // A new browser must complete the app's local privacy-lock setup before workspace routes are available.
+  await expect(page.getByRole('heading', { name: 'Set up your app PIN' })).toBeVisible()
+  await page.getByLabel('Create four-digit PIN').fill('1234')
+  await page.getByLabel('Confirm PIN').fill('1234')
+  await page.getByRole('button', { name: 'Save PIN' }).click()
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
 }
 
 /** Opens the Add product form from the Products list (the form is not shown by default). */
