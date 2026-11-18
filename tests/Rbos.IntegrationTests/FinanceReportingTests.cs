@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
 using Microsoft.Extensions.DependencyInjection;
 using Rbos.Api.Persistence;
 
@@ -157,30 +159,52 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         var uid = (await users.FindByNameAsync(c.Email))!.Id;
         var db = scope.ServiceProvider.GetRequiredService<TenantDb>();
         var tenant = (await db.FindTenantAsync(uid, default))!.Value;
-        await using (var session = await db.BeginAsync(uid, tenant, default))
+
+        // This is deliberate fixture-level projection corruption/merge setup. Use the
+        // dedicated migrator connection, not rbos_app: runtime grants must not permit
+        // arbitrary stock_balance deletes. FORCE ROW LEVEL SECURITY still applies.
+        var config = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
+        var migratorConnectionString = config["ConnectionStrings:RbosTestMigrator"];
+        Assert.False(string.IsNullOrWhiteSpace(migratorConnectionString));
+        await using var connection = new NpgsqlConnection(migratorConnectionString);
+        await connection.OpenAsync();
+        await using (var tx = await connection.BeginTransactionAsync())
         {
-            await using (var alias = session.Command("insert into catalog.product_alias(tenant_id,alias_product_id,canonical_product_id) values (@t,@a,@c)"))
+            await using (var context = new NpgsqlCommand(
+                "select set_config('app.user_id', @u, true), set_config('app.tenant_id', @t, true)", connection, tx))
             {
-                alias.Parameters.AddWithValue("t", tenant); alias.Parameters.AddWithValue("a", retired); alias.Parameters.AddWithValue("c", canonical);
-                await alias.ExecuteNonQueryAsync();
+                context.Parameters.AddWithValue("u", uid.ToString());
+                context.Parameters.AddWithValue("t", tenant.ToString());
+                await context.ExecuteNonQueryAsync();
             }
-            await using (var mergeBalance = session.Command(@"insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity)
+
+            async Task Execute(string sql, Action<NpgsqlCommand>? configure = null)
+            {
+                await using var command = new NpgsqlCommand(sql, connection, tx);
+                configure?.Invoke(command);
+                await command.ExecuteNonQueryAsync();
+            }
+
+            await Execute(
+                "insert into catalog.product_alias(tenant_id,alias_product_id,canonical_product_id) values (@t,@a,@c)",
+                command => { command.Parameters.AddWithValue("t", tenant); command.Parameters.AddWithValue("a", retired); command.Parameters.AddWithValue("c", canonical); });
+            await Execute(@"insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity)
                 select tenant_id,@c,location_id,quantity from inventory.stock_balance where product_id=@a
-                on conflict (tenant_id,product_id,location_id) do update set quantity=inventory.stock_balance.quantity+excluded.quantity"))
-            { mergeBalance.Parameters.AddWithValue("c", canonical); mergeBalance.Parameters.AddWithValue("a", retired); await mergeBalance.ExecuteNonQueryAsync(); }
-            await using (var removeBalance = session.Command("delete from inventory.stock_balance where product_id=@a"))
-            { removeBalance.Parameters.AddWithValue("a", retired); await removeBalance.ExecuteNonQueryAsync(); }
-            await using (var mergeCost = session.Command(@"insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac)
+                on conflict (tenant_id,product_id,location_id) do update set quantity=inventory.stock_balance.quantity+excluded.quantity",
+                command => { command.Parameters.AddWithValue("c", canonical); command.Parameters.AddWithValue("a", retired); });
+            await Execute("delete from inventory.stock_balance where product_id=@a",
+                command => command.Parameters.AddWithValue("a", retired));
+            await Execute(@"insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac)
                 select tenant_id,@c,total_quantity,inventory_value,wac from inventory.item_cost where product_id=@a
                 on conflict (tenant_id,product_id) do update set total_quantity=inventory.item_cost.total_quantity+excluded.total_quantity,
                   inventory_value=inventory.item_cost.inventory_value+excluded.inventory_value,
-                  wac=round((inventory.item_cost.inventory_value+excluded.inventory_value)/nullif(inventory.item_cost.total_quantity+excluded.total_quantity,0),4)"))
-            { mergeCost.Parameters.AddWithValue("c", canonical); mergeCost.Parameters.AddWithValue("a", retired); await mergeCost.ExecuteNonQueryAsync(); }
-            await using (var removeCost = session.Command("delete from inventory.item_cost where product_id=@a"))
-            { removeCost.Parameters.AddWithValue("a", retired); await removeCost.ExecuteNonQueryAsync(); }
-            await using (var retire = session.Command("update catalog.product set is_active=false where id=@a"))
-            { retire.Parameters.AddWithValue("a", retired); await retire.ExecuteNonQueryAsync(); }
-            await session.CommitAsync(default);
+                  wac=round((inventory.item_cost.inventory_value+excluded.inventory_value)/nullif(inventory.item_cost.total_quantity+excluded.total_quantity,0),4)",
+                command => { command.Parameters.AddWithValue("c", canonical); command.Parameters.AddWithValue("a", retired); });
+            await Execute("delete from inventory.item_cost where product_id=@a",
+                command => command.Parameters.AddWithValue("a", retired));
+            await Execute("update catalog.product set is_active=false where id=@a",
+                command => command.Parameters.AddWithValue("a", retired));
+            await tx.CommitAsync();
         }
 
         // Historical sale and receipt documents still refer to the retired product ID.
@@ -191,11 +215,26 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         var healthy = await c.GetJson("/reports/stock-verification");
         Assert.True(healthy.GetProperty("ok").GetBoolean());
         Assert.DoesNotContain(healthy.GetProperty("items").EnumerateArray(), x => x.GetProperty("productId").GetGuid() == retired);
-        await using (var session = await db.BeginAsync(uid, tenant, default))
+
+        // Corrupt the projection through the same isolated test-fixture connection.
+        await using (var tx = await connection.BeginTransactionAsync())
         {
-            await using var corrupt = session.Command("update inventory.stock_balance set quantity=quantity+1 where product_id=@p");
-            corrupt.Parameters.AddWithValue("p", canonical); await corrupt.ExecuteNonQueryAsync(); await session.CommitAsync(default);
+            await using (var context = new NpgsqlCommand(
+                "select set_config('app.user_id', @u, true), set_config('app.tenant_id', @t, true)", connection, tx))
+            {
+                context.Parameters.AddWithValue("u", uid.ToString());
+                context.Parameters.AddWithValue("t", tenant.ToString());
+                await context.ExecuteNonQueryAsync();
+            }
+            await using (var corrupt = new NpgsqlCommand(
+                "update inventory.stock_balance set quantity=quantity+1 where product_id=@p", connection, tx))
+            {
+                corrupt.Parameters.AddWithValue("p", canonical);
+                Assert.Equal(1, await corrupt.ExecuteNonQueryAsync());
+            }
+            await tx.CommitAsync();
         }
+
         var damaged = await c.GetJson("/reports/stock-verification");
         Assert.False(damaged.GetProperty("ok").GetBoolean());
         Assert.Contains(damaged.GetProperty("items").EnumerateArray(), x => x.GetProperty("productId").GetGuid() == canonical);
