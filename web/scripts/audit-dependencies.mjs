@@ -24,11 +24,18 @@ try {
   process.exit(1)
 }
 const findings = Object.entries(report.vulnerabilities ?? {}).filter(([, v]) => ['high', 'critical'].includes(v.severity))
-const unexpected = findings.filter(([name, v]) => {
-  if (!exceptionPackages.has(name)) return true
-  const via = Array.isArray(v.via) ? v.via : []
-  return !via.some(x => x === 'picomatch' || (typeof x === 'object' && x.url === advisory))
-})
+if (report.error || !report.metadata) {
+  console.error('npm audit returned an error or incomplete report.')
+  process.exit(1)
+}
+const rootedInPicomatch = (name, seen = new Set()) => {
+  if (name === 'picomatch') return true
+  if (seen.has(name) || !exceptionPackages.has(name)) return false
+  seen.add(name)
+  const via = report.vulnerabilities?.[name]?.via ?? []
+  return via.some(x => typeof x === 'object' && x.url === advisory || typeof x === 'string' && rootedInPicomatch(x, seen))
+}
+const unexpected = findings.filter(([name]) => !exceptionPackages.has(name) || !rootedInPicomatch(name))
 if (unexpected.length) {
   console.error('Unexpected high/critical dependency vulnerabilities:', unexpected.map(([name]) => name).join(', '))
   process.exit(1)
