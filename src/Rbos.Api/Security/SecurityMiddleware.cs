@@ -7,6 +7,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
     public const long MaxInvoiceBodyBytes = 12 * 1024 * 1024;
     /// <summary>Catalogue import carries a 12 MB file as base64 inside JSON (4/3 overhead) plus a small envelope.</summary>
     public const long MaxCatalogueImportBodyBytes = 12L * 1024 * 1024 / 3 * 4 + 16 * 1024;
+    public const long MaxItemTagPhotoBodyBytes = 8L * 1024 * 1024;
 
     public async Task InvokeAsync(HttpContext ctx)
     {
@@ -24,7 +25,11 @@ public sealed class SecurityMiddleware(RequestDelegate next)
 
             if (!HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method))
             {
-                var limit = ctx.Request.Path.Equals("/api/purchases/extract") ? MaxInvoiceBodyBytes : ctx.Request.Path.Equals("/api/products/import/read") ? MaxCatalogueImportBodyBytes : MaxBodyBytes;
+                var isItemTagPhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/item-tag-captures");
+                var limit = isItemTagPhotoUpload ? MaxItemTagPhotoBodyBytes
+                    : ctx.Request.Path.Equals("/api/purchases/extract") ? MaxInvoiceBodyBytes
+                    : ctx.Request.Path.Equals("/api/products/import/read") ? MaxCatalogueImportBodyBytes
+                    : MaxBodyBytes;
                 if (ctx.Request.ContentLength > limit)
                 {
                     ctx.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
