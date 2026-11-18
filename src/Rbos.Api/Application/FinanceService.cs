@@ -220,7 +220,7 @@ public sealed class FinanceService(TenantDb db)
             await Exec(s!, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + @dq",
                 ("t", t), ("p", m.ProductId), ("l", m.LocationId), ("q", Math.Max(signedQ, 0m)), ("dq", signedQ));
             var nq = tq + signedQ; var nv = tv + signedV;
-            await Exec(s!, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", nq), ("v", nv), ("w", nq == 0 ? wac : decimal.Round(nv / nq, 4)), ("p", m.ProductId));
+            await Exec(s!, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", nq), ("v", nv), ("w", nq == 0 ? wac : WeightedAverageCostCalculator.RoundWac(nv / nq)), ("p", m.ProductId));
             await Exec(s!, ct, "insert into inventory.stock_adjustment(tenant_id,id,product_id,location_id,adjust_date,quantity_delta,unit_cost,value_delta,reason,note,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@p,@l,@d,@q,@c,@v,@r,@n,@k,@h,@j,@u)",
                 ("t", t), ("i", id), ("p", m.ProductId), ("l", m.LocationId), ("d", m.Date), ("q", signedQ), ("c", wac), ("v", signedV), ("r", m.Reason), ("n", Blank(m.Note)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
             await s!.CommitAsync(ct);
