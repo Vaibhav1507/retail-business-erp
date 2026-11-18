@@ -69,7 +69,7 @@ function OpeningStock({ products, locations, reload }: { products: Product[]; lo
 		  </select>
 		</label>
 		<label>Quantity <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
-		<label>Unit cost (INR — actual or owner-estimated) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
+		<label>Unit cost (INR) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
 		<button type="button" onClick={addLine}>Add line</button>
 	  </div>
 	  <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}</li>)}</ul>
