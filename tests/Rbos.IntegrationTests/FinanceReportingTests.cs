@@ -140,7 +140,6 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    [Fact]
     public async Task Stock_verification_resolves_migration_044_aliases_and_detects_corrupt_projections()
     {
         var c = new Client(f); await c.SignUpAndBootstrap();
@@ -199,6 +198,7 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.DoesNotContain(isolated.GetProperty("items").EnumerateArray(), x => x.GetProperty("name").GetString() == "Alias canonical cable");
     }
 
+    [Fact]
     public async Task Gst_summary_splits_tax_by_rate_and_validates_range()
     {
         var c = new Client(f); await c.SignUpAndBootstrap();
