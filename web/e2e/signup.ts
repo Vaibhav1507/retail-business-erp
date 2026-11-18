@@ -79,3 +79,20 @@ export async function postInvoice(page: Page, o: { product: string; qty: string;
   await bill.getByRole('button', { name: 'Generate invoice' }).click()
   await page.getByRole('button', { name: 'Confirm & print' }).click()
 }
+
+/** Submit a new product and preserve the server/UI error when creation fails. */
+export async function saveNewProduct(page: Page, form: Locator, name: string) {
+  const responsePromise = page.waitForResponse(response => {
+    const url = new URL(response.url())
+    return url.pathname === '/api/products' && response.request().method() === 'POST'
+  })
+  await form.getByRole('button', { name: 'Add product', exact: true }).click()
+  const response = await responsePromise
+  const responseBody = await response.text()
+  expect(response.ok(), `POST /api/products failed (${response.status()}): ${responseBody}`).toBeTruthy()
+  await expect(form, 'The product form should close after a successful save').toBeHidden()
+  await expect(
+    page.getByRole('region', { name: 'Products' }).getByRole('cell', { name, exact: true }),
+    'The saved product should appear in the Products list',
+  ).toBeVisible({ timeout: 15000 })
+}
