@@ -31,6 +31,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install synthetic E2E dependencies and browser
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps msedge
       - name: Create roles and databases (throwaway CI database, synthetic passwords)
         run: |
           psql -h localhost -U postgres -d postgres -f scripts/database/bootstrap-postgresql.sql
@@ -38,6 +48,13 @@ jobs:
       - run: dotnet build RetailBusinessOs.slnx --nologo -c Release
       - run: dotnet run --project src/Rbos.Api -c Release --no-build -- --migrate test
       - run: dotnet test RetailBusinessOs.slnx --nologo -c Release --no-build
+      - name: Run synthetic one-shop browser E2E against disposable test database
+        working-directory: web
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          Rbos__Database: test
+          Rbos__AllowOpenRegistration: 'true'
+        run: npm run test:e2e
       - name: Build deployment container (no push)
         run: docker build --pull -t retail-business-os:ci .
 
@@ -56,7 +73,7 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm test
+      - run: npm run lint
       - run: npm run build
-      - name: Dependency audit (report only)
+      - name: Dependency audit (high and critical vulnerabilities fail CI)
         run: npm audit --audit-level=high
-        continue-on-error: true
