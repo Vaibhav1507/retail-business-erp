@@ -3,7 +3,7 @@ name: rbos-ci
 on:
   pull_request:
   push:
-    branches: [main, feature/whatsapp-invoice-pilot]
+    branches: [main, feature/whatsapp-invoice-pilot, fix/e2e-product-creation-diagnostics]
 
 permissions:
   contents: read
