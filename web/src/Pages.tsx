@@ -22,7 +22,7 @@ import './launcher.css'
 import { t as tr } from './i18n'
 
 export type Opt = { id: string; name: string; sku?: string }
-export type Common = { products: Opt[]; locations: Opt[]; reload: () => void }
+export type Common = { products: Opt[]; locations: Opt[]; reload: () => void; offlineMode?: boolean; ownerKey?: string }
 
 export const NAV = [
   { key: 'home', label: 'Home', ico: '\u{1F3E0}' },
