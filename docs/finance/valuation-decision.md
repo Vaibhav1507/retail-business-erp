@@ -66,8 +66,15 @@ Replay movements per canonical variant ordered by `(effective_date, occurred_at,
 
 A reversal movement uses exactly the value of the movement it reverses (not current W), so the reversal nets to zero in value and quantity.
 
-## 10. Interim engineering precision decision (2026-11-18)\n\nThe repository's current `inventory.item_cost.wac` and stock-movement unit-cost columns persist four decimal places; `Quantity` allows three decimal places; `Money` stores INR at two decimal places using half-away-from-zero. The application therefore keeps WAC at four decimals consistently across receipt calculation, stock adjustment, sale/return/cancellation replay and persistence. This preserves the current database contract and avoids silently truncating a six-decimal calculation on write.\n\nThis is **not CA approval** of four-decimal WAC or of the broader valuation policy. The six-decimal proposal is not implemented. Do not change the database scale or represent the policy as approved until a qualified CA records the decision; any later precision change must include a migration, backfill/reconciliation analysis, API/report review and regression evidence. Currency amounts remain two decimals.\n\n## 11. Policy abstraction
+## 10. Interim engineering precision decision (2026-11-18)
+
+The repository's current `inventory.item_cost.wac` and stock-movement unit-cost columns persist four decimal places; `Quantity` allows three decimal places; `Money` stores INR at two decimal places using half-away-from-zero. The application therefore keeps WAC at four decimals consistently across receipt calculation, stock adjustment, sale/return/cancellation replay and persistence. This preserves the current database contract and avoids silently truncating a six-decimal calculation on write.
+
+This is **not CA approval** of four-decimal WAC or of the broader valuation policy. The six-decimal proposal is not implemented. Do not change the database scale or represent the policy as approved until a qualified CA records the decision; any later precision change must include a migration, backfill/reconciliation analysis, API/report review and regression evidence. Currency amounts remain two decimals.
+
+## 11. Policy abstraction
 
 A `IValuationPolicy` boundary is designed so FIFO or specific identification could be added later. Only WAC is implemented.
 
-Worked examples: `valuation-worked-examples.md`.\n
+Worked examples: `valuation-worked-examples.md`.
+
