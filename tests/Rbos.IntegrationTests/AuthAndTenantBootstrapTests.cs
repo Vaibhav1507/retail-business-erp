@@ -40,6 +40,19 @@ public sealed class Client
 		return await http.SendAsync(req);
 	}
 
+	public async Task<HttpResponseMessage> SendBytes(string path, byte[] bytes, string contentType, string idempotencyKey, string? detectedBarcode = null, string? detectedSymbology = null)
+	{
+		var token = await http.GetFromJsonAsync<JsonElement>("/api/csrf");
+		using var req = new HttpRequestMessage(HttpMethod.Post, "/api" + path);
+		req.Headers.Add("X-CSRF-TOKEN", token.GetProperty("token").GetString());
+		req.Headers.Add("Idempotency-Key", idempotencyKey);
+		if (!string.IsNullOrWhiteSpace(detectedBarcode)) req.Headers.Add("X-RBOS-Detected-Barcode", detectedBarcode);
+		if (!string.IsNullOrWhiteSpace(detectedSymbology)) req.Headers.Add("X-RBOS-Detected-Symbology", detectedSymbology);
+		req.Content = new ByteArrayContent(bytes);
+		req.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+		return await http.SendAsync(req);
+	}
+
 	public async Task Register()
 	{
 		var mobile = "9" + Random.Shared.NextInt64(100_000_000, 999_999_999).ToString();

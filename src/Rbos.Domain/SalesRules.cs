@@ -1,8 +1,8 @@
 namespace Rbos.Domain;
 
-public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount, List<string>? Serials = null);
+public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount, List<string>? Serials = null, List<Guid>? CaptureIds = null);
 
-public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal, string[]? Serials = null);
+public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal, string[]? Serials = null, Guid[]? CaptureIds = null);
 
 /// <summary>Pure rules for customer sales (Slice 4): validation, totals and the balanced journal.</summary>
 public static class SalesRules
@@ -40,7 +40,13 @@ public static class SalesRules
             if (serials.Length > q.Value) return Fail("A line cannot have more serial numbers than its quantity.", out error);
             if (serials.Any(x => x.Length is < 4 or > 40 || x.Any(char.IsWhiteSpace))) return Fail("Each serial number must be 4 to 40 characters with no spaces.", out error);
             if (serials.Distinct().Count() != serials.Length) return Fail("The same serial number is entered twice on a line.", out error);
-            list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount, serials.Length == 0 ? null : serials));
+            var captureIds = (l.CaptureIds ?? []).ToArray();
+            if (captureIds.Any(id => id == Guid.Empty) || captureIds.Distinct().Count() != captureIds.Length)
+                return Fail("Item-tag photo references must be valid and unique.", out error);
+            if (captureIds.Length > 0 && (decimal.Truncate(q.Value) != q.Value || captureIds.Length > q.Value))
+                return Fail("There cannot be more item-tag photos than physical units on a whole-number quantity line.", out error);
+            list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount,
+                serials.Length == 0 ? null : serials, captureIds.Length == 0 ? null : captureIds));
         }
         total = list.Aggregate(Money.Zero, (a, l) => a + Money.Of(l.LineTotal));
         if (total.Amount <= 0) return Fail("Sale total must be greater than zero.", out error);

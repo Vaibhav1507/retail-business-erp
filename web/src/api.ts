@@ -36,8 +36,10 @@ export async function api<T>(method: string, path: string, body?: unknown, idemp
   return data as T
 }
 
-export async function apiBinary<T>(path: string, body: Blob, signal?: AbortSignal): Promise<T> {
+export async function apiBinary<T>(path: string, body: Blob, signal?: AbortSignal, idempotencyKey?: string, extraHeaders?: Record<string, string>): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': body.type || 'application/octet-stream', 'X-CSRF-TOKEN': await token() }
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey
+  if (extraHeaders) Object.assign(headers, extraHeaders)
   const r = await fetch(`/api${path}`, { method: 'POST', headers, credentials: 'same-origin', body, signal })
   if (r.status === 400) csrf = null
   const text = await r.text()

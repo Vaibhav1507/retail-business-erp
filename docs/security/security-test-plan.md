@@ -36,3 +36,15 @@ Status: **Partly implemented.** Tenant-isolation, RLS, role, header/cookie, CSRF
 ## Exit criteria per slice
 
 All suites applicable to the slice pass locally; any failure blocks slice completion. Results are recorded as actually observed, never assumed.
+
+
+## PR B — item-tag photo security cases
+
+The added integration suite `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs` covers upload replay/conflict, MIME/signature/size rejection, authenticated retrieval, deletion before attachment, tenant A/B metadata/image/review/delete isolation, reviewed sale attachment and rejection of unreviewed evidence. The API route inventory also classifies upload/review/delete as `sales.create` and reads as authenticated-member routes.
+
+The migration adds RLS ENABLE+FORCE, an active-membership policy, composite product/sale-line foreign keys and a tenant-scoped unique idempotency key. Image bytes are returned only from the authenticated image route with private/no-store and nosniff headers. No public object URL or path traversal input is accepted.
+
+GitHub Actions run [#566](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44330825072) executed the PostgreSQL integration suite successfully: 160/160 integration tests passed, including the item-tag capture tenant-isolation and lifecycle cases. The full backend unit suite also passed (126/126). Independent penetration testing and real-device camera testing remain outside this CI run.
+
+
+The global `SecurityMiddleware` also has a narrow exception for `POST /api/sales/item-tag-captures`: it raises the request-body cap to 8 MiB and accepts only JPEG, PNG or WebP media types (case-insensitive). All other non-GET API requests remain JSON-only and retain their existing body limits. The item-tag endpoint independently enforces the same 8 MiB bound and verifies the file signature before persistence.

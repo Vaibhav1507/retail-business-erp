@@ -132,13 +132,16 @@ public sealed class SalesService(TenantDb db)
                         }
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
-        await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials
-            from sales.sale_line l join catalog.product p on p.id=l.product_id where l.sale_id=@i order by p.name"))
+        await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
+            coalesce((select array_agg(tc.id) from sales.item_tag_capture tc
+                      where tc.tenant_id=l.tenant_id and tc.sale_id=l.sale_id and tc.sale_product_id=l.product_id), array[]::uuid[])
+            from sales.sale_line l join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
+            where l.sale_id=@i order by p.name"))
         {
             c.Parameters.AddWithValue("i", id);
             await using var r = await c.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
-                lines.Add(new { product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2), unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5), serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6) });
+                lines.Add(new { product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2), unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5), serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6), captureIds = r.GetFieldValue<Guid[]>(7) });
         }
         return ServiceResult<object>.Ok(new { sale = head, lines });
     }
@@ -229,8 +232,11 @@ public sealed class SalesService(TenantDb db)
             return ServiceResult<object>.Fail(err!);
         var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
         if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
+        var allCaptureIds = lines.SelectMany(l => l.CaptureIds ?? []).ToArray();
+        if (allCaptureIds.Distinct().Count() != allCaptureIds.Length)
+            return ServiceResult<object>.Fail("An item-tag photo can be attached to only one sale line.");
         var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}"))) + splitKey);
+            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{string.Join(',', l.CaptureIds ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -252,6 +258,25 @@ public sealed class SalesService(TenantDb db)
             {
                 q.Parameters.AddWithValue("i", ids);
                 if ((long)(await q.ExecuteScalarAsync(ct))! != ids.Length) return ServiceResult<object>.Fail("Unknown or inactive product.");
+            }
+
+            // Lock and validate every reviewed photo before any ledger or stock mutation.
+            // The database row is tenant-scoped and the sale-line association is committed atomically below.
+            foreach (var line in lines.Where(x => x.CaptureIds is { Length: > 0 }))
+            {
+                var found = new List<(Guid Id, Guid ProductId)>();
+                await using var captures = s.Command(@"
+                    select id,product_id from sales.item_tag_capture
+                    where id=any(@ids) and status='Reviewed' and sale_id is null
+                    for update");
+                captures.Parameters.AddWithValue("ids", line.CaptureIds!);
+                await using (var reader = await captures.ExecuteReaderAsync(ct))
+                    while (await reader.ReadAsync(ct))
+                        found.Add((reader.GetGuid(0), reader.GetGuid(1)));
+                if (found.Count != line.CaptureIds!.Length ||
+                    found.Any(x => x.ProductId != line.ProductId) ||
+                    line.CaptureIds.Any(id => found.All(x => x.Id != id)))
+                    return ServiceResult<object>.Fail("One or more item-tag photos are unavailable, not reviewed, or belong to a different product. Review the photos again.", 409);
             }
 
             var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next)>();
@@ -291,6 +316,17 @@ public sealed class SalesService(TenantDb db)
             {
                 await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr)",
                     ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials));
+                if (l.CaptureIds is { Length: > 0 })
+                {
+                    var attached = await SqlHelpers.ExecCount(s, ct, @"
+                        update sales.item_tag_capture
+                        set status='Attached',sale_id=@s,sale_product_id=@p,attached_at=now()
+                        where tenant_id=@t and id=any(@ids) and product_id=@p
+                          and status='Reviewed' and sale_id is null",
+                        ("t", tenantId), ("s", id), ("p", l.ProductId), ("ids", l.CaptureIds));
+                    if (attached != l.CaptureIds.Length)
+                        return ServiceResult<object>.Fail("The item-tag photo could not be attached. The sale was not posted.", 409);
+                }
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'Sale',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
                 await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", l.ProductId), ("l", m.LocationId));
@@ -320,7 +356,11 @@ public sealed class SalesService(TenantDb db)
                       select jsonb_agg(jsonb_build_object(
                         'name', p.name, 'sku', p.internal_sku, 'quantity', sl.quantity,
                         'unitPrice', sl.unit_price, 'discount', sl.discount,
-                        'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials)
+                        'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials),
+                        'itemTagCaptureIds', coalesce((
+                          select to_jsonb(array_agg(tc.id)) from sales.item_tag_capture tc
+                          where tc.tenant_id=sl.tenant_id and tc.sale_id=sl.sale_id and tc.sale_product_id=sl.product_id
+                        ), '[]'::jsonb)
                       ) order by p.name)
                       from sales.sale_line sl
                       join catalog.product p on p.tenant_id=sl.tenant_id and p.id=sl.product_id

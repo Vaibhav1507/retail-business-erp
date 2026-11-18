@@ -9,7 +9,7 @@ export type OfflineSaleBody = {
   amountPaid: number | null
   payMethod: string | null
   payments?: { method: string; amount: number }[]
-  lines: { productId: string; quantity: number; unitPrice: number; discount: number; serials: string[] }[]
+  lines: { productId: string; quantity: number; unitPrice: number; discount: number; serials: string[]; captureIds?: string[] }[]
   gstRate: number | null
   placeOfSupply: string | null
 }

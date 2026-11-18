@@ -29,6 +29,13 @@ internal static class SqlHelpers
         await c.ExecuteNonQueryAsync(ct);
     }
 
+    public static async Task<int> ExecCount(TenantSession s, CancellationToken ct, string sql, params (string, object?)[] ps)
+    {
+        await using var c = s.Command(sql);
+        foreach (var (n, v) in ps) c.Parameters.AddWithValue(n, v ?? DBNull.Value);
+        return await c.ExecuteNonQueryAsync(ct);
+    }
+
     public static async Task<T?> Scalar<T>(TenantSession s, string sql, CancellationToken ct, params (string, object?)[] ps)
     {
         await using var c = s.Command(sql);

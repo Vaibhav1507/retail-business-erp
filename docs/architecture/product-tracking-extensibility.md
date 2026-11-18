@@ -49,3 +49,8 @@ Tracked and non-tracked stock use the same movement table, the same projections 
 - `tracking_mode` column with CHECK = 'none'.
 - Movement line has a stable `line_id` that future tracking rows can reference.
 No other tracking tables are created in 1A.
+
+
+## PR B boundary — tag evidence is not inventory unit tracking
+
+PR B adds `sales.item_tag_capture` as a photo/extraction evidence record associated with a product and, after posting, a sale line. It can preserve serial and IMEI values from an individual product tag. It does **not** change `product_variant.tracking_mode`, populate `inventory.serial_unit`, make serial tracking mandatory, or change stock movement/WAC rules. Those remain separate tracking-policy work and must be implemented with their own receipt, sale, return and stock-availability lifecycle.
