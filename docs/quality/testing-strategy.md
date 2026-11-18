@@ -66,7 +66,7 @@ Gaps against the original plan: no browser tests for catalogue import or procure
 A library of synthetic end-to-end scripts ("Day in the shop") posts a fixed sequence and asserts: TB balances, BS equation holds, all reconciliations zero, stock rebuild matches. Reused across slices as scope grows.
 
 
-## PR B — invoice item-tag photo coverage (added; execution pending)
+## PR B — invoice item-tag photo coverage (CI passed)
 
 The PR B branch adds these suites without changing the historical test inventory above:
 
@@ -77,4 +77,5 @@ The PR B branch adds these suites without changing the historical test inventory
 | Frontend component | `web/src/ItemTagCapture.test.tsx` | Camera/gallery input attributes, upload/review/add callback, unsupported image message and offline-disabled controls |
 | Route inventory | `tests/Rbos.IntegrationTests/ApiAuthorizationTests.cs` | All new API route method/template pairs have an explicit fail-closed policy |
 
-Run `dotnet test` (including real PostgreSQL integration tests), `npm test`, `npm run build` and `npm run lint` from the repository's documented locations. Do not update the inventory counts or claim results until the relevant commands/CI jobs have actually completed. Mobile-browser camera permission, orientation and retake behaviour still need real-device acceptance.
+
+**Executed evidence:** GitHub Actions run [#566](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44330825072) passed: 126/126 .NET unit tests, 160/160 PostgreSQL integration tests, frontend TypeScript, frontend tests, frontend production build, dependency audit, and container build (no push). Release build and migrations 001–049 also passed. The CI workflow does not run a separate `npm run lint` command. Mobile-browser camera permission, orientation and retake behaviour still need real-device acceptance.
