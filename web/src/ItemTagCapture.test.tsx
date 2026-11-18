@@ -62,7 +62,7 @@ describe('ItemTagCapture', () => {
 
     expect(await screen.findByText(/Photo saved|Photo ready/)).toBeInTheDocument()
     expect(await screen.findByAltText('Captured product tag preview')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Test Cable')).toBeInTheDocument()
+    expect(screen.getAllByDisplayValue('Test Cable')).toHaveLength(2)
     await screen.findByRole('button', { name: 'Confirm details & add item' })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm details & add item' }))
 
