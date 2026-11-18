@@ -93,3 +93,17 @@ The P0 remediation adds/extends the following coverage beyond the historical Sli
 **Latest-head evidence at this documentation update:** CI run [#589](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44338877280), commit `5253435c873de34512700ba3283e2c9c2a293a59`. Frontend job passed TypeScript, unit tests, lint, build and the audit checker. Backend Release build and disposable PostgreSQL migration passed; .NET tests were still running. Synthetic Playwright and container build were pending. This is an in-progress snapshot, not a final green CI claim.
 
 **Known acceptance gap:** the separate focused suites are not equivalent to one consolidated 25-step financial end-to-end journey. GST profile setup, GST and non-GST invoice print modes, full P&L/balance-sheet assertions and product-owner manual acceptance remain outstanding. CA approval of the valuation policy also remains outstanding. A CI pass or PR merge does not by itself make the pilot ready.
+
+
+### CI follow-up — run #589 (2026-11-18)
+
+Run [#589](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44338877280), on code commit `5253435c873de34512700ba3283e2c9c2a293a59`, completed with **failure**:
+- Release build: passed (one existing CA1416 platform-compatibility warning in `PdfPageReader.cs`).
+- Disposable PostgreSQL migration chain 001–049: passed.
+- Unit tests: 129/129 passed.
+- Integration tests: 162/163 passed.
+- Sole failure: `FinanceReportingTests.Stock_verification_resolves_migration_044_aliases_and_detects_corrupt_projections` attempted a direct delete from `inventory.stock_balance` using the restricted `rbos_app` test role and received PostgreSQL `42501 permission denied`. The production role's restriction is expected; correct the test setup to use an appropriately privileged test-only fixture path or an allowed application operation, without weakening production grants.
+- Synthetic Playwright and container build were skipped because the backend test step failed.
+- Frontend job passed typecheck, tests, lint, build and dependency audit checker.
+
+Do not report backend CI as green until the alias regression test is corrected and the complete latest-head workflow passes. The one-shop consolidated financial journey and manual/CA acceptance gaps remain separate.
