@@ -460,7 +460,7 @@ public sealed class FinanceService(TenantDb db)
             var dq = (decimal)mv[3]; var dv = (decimal)mv[4];
             if (dq < 0m && !flagged)
             {
-                var expected = qty <= 0m ? 0m : -Money.Round(-dq * val / qty);
+                var expected = qty <= 0m ? 0m : -Money.Round(-dq * WeightedAverageCostCalculator.RoundWac(val / qty));
                 if (qty + dq < 0m || expected != dv)
                 {
                     flagged = true;
