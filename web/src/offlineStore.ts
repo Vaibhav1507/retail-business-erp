@@ -1,5 +1,5 @@
 const DB_NAME = 'rbos-offline-v1'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const KEY_STORE = 'keys'
 const RECORD_STORE = 'records'
 
@@ -26,8 +26,12 @@ function openDb(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const db = request.result
       if (!db.objectStoreNames.contains(KEY_STORE)) db.createObjectStore(KEY_STORE, { keyPath: 'ownerKey' })
-      if (!db.objectStoreNames.contains(RECORD_STORE)) {
-        const store = db.createObjectStore(RECORD_STORE, { keyPath: 'id' })
+      const store = db.objectStoreNames.contains(RECORD_STORE)
+        ? request.transaction!.objectStore(RECORD_STORE)
+        : db.createObjectStore(RECORD_STORE, { keyPath: 'id' })
+      // Ensure older installations receive the index too. The version bump
+      // makes this upgrade run even when the records store already exists.
+      if (!store.indexNames.contains('ownerKey')) {
         store.createIndex('ownerKey', 'ownerKey', { unique: false })
       }
     }
@@ -39,6 +43,18 @@ function openDb(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error ?? new Error('Could not open offline storage.'))
     request.onblocked = () => reject(new Error('Offline storage upgrade is blocked by another open tab.'))
   })
+}
+
+export function describeOfflineStorageError(error: unknown): string {
+  if (error instanceof DOMException) {
+    const detail = error.message ? `: ${error.message}` : ''
+    return `${error.name}${detail}`
+  }
+  if (error instanceof Error) {
+    const detail = error.message ? `: ${error.message}` : ''
+    return `${error.name}${detail}`
+  }
+  return 'Unknown browser storage error'
 }
 
 function requestValue<T>(request: IDBRequest<T>): Promise<T> {
@@ -82,7 +98,7 @@ async function keyFor(ownerKey: string): Promise<CryptoKey> {
       write.objectStore(KEY_STORE).add({ ownerKey, key })
       await transactionDone(write)
       return key
-    } catch {
+    } catch (writeError) {
       // Another tab may have created the owner key first. Never overwrite a key
       // that could already be protecting saved records.
       const retry = db.transaction(KEY_STORE, 'readonly')
@@ -90,7 +106,7 @@ async function keyFor(ownerKey: string): Promise<CryptoKey> {
       const winner = await requestValue<{ ownerKey: string; key: CryptoKey } | undefined>(retry.objectStore(KEY_STORE).get(ownerKey))
       await retryDone
       if (winner?.key) return winner.key
-      throw new Error('Could not establish the offline encryption key.')
+      throw new Error(`Could not persist the offline encryption key (${describeOfflineStorageError(writeError)}).`, { cause: writeError })
     }
   } finally { db.close() }
 }
