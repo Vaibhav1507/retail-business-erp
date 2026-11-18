@@ -40,7 +40,19 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                 if (feature is { IsReadOnly: false }) feature.MaxRequestBodySize = limit;
 
                 var hasBody = ctx.Request.ContentLength is > 0 || ctx.Request.Headers.ContainsKey("Transfer-Encoding");
-                if (hasBody && !ctx.Request.HasJsonContentType())
+                if (hasBody && isItemTagPhotoUpload)
+                {
+                    var contentType = ctx.Request.ContentType?.Split(';')[0].Trim();
+                    if (!string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ctx.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
+                        await ctx.Response.WriteAsJsonAsync(new { error = "Choose a JPEG, PNG or WebP photo." });
+                        return;
+                    }
+                }
+                else if (hasBody && !ctx.Request.HasJsonContentType())
                 {
                     ctx.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
                     await ctx.Response.WriteAsJsonAsync(new { error = "Content-Type must be application/json." });
