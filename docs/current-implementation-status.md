@@ -79,7 +79,7 @@ Durable recovery records:
 
 **Branch:** `feat/central-ai-gateway`  
 **Base commit:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
-**State:** Draft PR #45 is open; frontend checks passed. The first backend build failed on two invalid rounding enum references; the fix is in the follow-up commit and CI rerun is pending. Not merged or deployed.
+**State:** Draft PR #45 is open. Frontend checks and backend Release build/migration validation passed on the second CI attempt; unit tests then exposed a paid-cost gate test, voice numeric validation and missing forced RLS on the usage table. Those fixes are in the latest commits; CI rerun is pending. Not merged or deployed.
 
 The provider-call table above describes the current `main` baseline. PR A consolidates those paths behind one internal `AiGateway`.
 
@@ -88,7 +88,7 @@ The provider-call table above describes the current `main` baseline. PR A consol
 | Gateway | Provider-neutral contracts, Gemini/Groq adapters, feature/provider kill switches, bounded attempts, timeout and structured validation | Follow-up Release build, tests and review |
 | Credential pool | Concurrent round-robin; Gemini project and Groq team quota buckets; 429 cooldown; invalid-key suppression; circuit breaker | CI concurrency/failure-path evidence |
 | Cost control | Unknown billing fails closed; paid calls require explicit opt-in, pricing and cost estimate; monthly global/per-tenant hard limits | Migration execution and database-backed evidence |
-| Usage ledger | Migration 048, serialized reservation/settlement, metadata-only events | Validate forced-RLS membership policy and query access |
+| Usage ledger | Migration 048, serialized reservation/settlement, metadata-only events | Validate forced-RLS membership and usage-event policies and query access |
 | Invoice extraction | Gateway-backed Gemini extraction and opt-in Groq fallback; output remains an unsaved draft | Regression tests and CI |
 | Catalogue extraction | Gateway-backed Gemini/Groq photo/PDF extraction; local OCR/manual mapping recovery retained | Regression tests and CI |
 | Voice intent | Gateway-backed Gemini/Groq classification with the existing destination allowlist | Regression tests and CI |

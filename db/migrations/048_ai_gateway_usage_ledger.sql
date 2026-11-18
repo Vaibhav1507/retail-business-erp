@@ -30,6 +30,17 @@ create table ai_gateway.usage_event (
 );
 create index ix_ai_gateway_usage_month on ai_gateway.usage_event (created_at);
 create index ix_ai_gateway_usage_tenant_month on ai_gateway.usage_event (tenant_id, created_at);
+
+-- Every tenant-scoped table is forced through RLS. The application role has no
+-- direct table grants; only the trusted migration/security-definer owner role
+-- can access ledger rows so the global budget calculation can aggregate safely.
+alter table ai_gateway.usage_event enable row level security;
+alter table ai_gateway.usage_event force row level security;
+create policy ai_gateway_usage_event_migrator_all
+ on ai_gateway.usage_event
+ for all to rbos_migrator
+ using (true)
+ with check (true);
 revoke all on ai_gateway.usage_event from public, rbos_app;
 
 create or replace function ai_gateway.reserve_attempt(

@@ -510,7 +510,7 @@ Provider limits, model availability, prices and terms change. Re-check official 
 **Workstream:** Central AI Gateway  
 **Implementation branch:** `feat/central-ai-gateway`  
 **Base:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
-**State:** Draft PR #45 is open. First CI attempt: frontend passed; backend compilation caught two invalid rounding enum references. Those references have been corrected in the follow-up; CI rerun is pending. Not merged or deployed.
+**State:** Draft PR #45 is open. The first CI attempt caught two compile errors; the second passed Release build, migration validation and frontend checks but exposed three unit-test failures and the missing forced-RLS policy on the new usage table. The compile, pricing-gate and numeric-validation fixes are in the latest commit; migration 048 now forces RLS on usage_event. CI rerun is pending. Not merged or deployed.
 
 ### Investigation completed
 
@@ -548,8 +548,8 @@ Provider limits, model availability, prices and terms change. Re-check official 
 ### Remaining work before PR A is ready
 
 - [x] Finish source-level review and remove superseded direct provider clients/tests.
-- [ ] Run the .NET Release build and unit tests.
-- [ ] Run full CI migration validation, frontend checks and deployment-container build.
+- [ ] Re-run the .NET Release build and unit tests after the latest fixes.
+- [ ] Re-run full CI migration validation, frontend checks and deployment-container build.
 - [ ] Fix every implementation or CI issue found and rerun relevant checks.
 - [ ] Update this plan/status document with final CI evidence and PR #45 link.
 - [ ] Open one combined PR for PR A. Do not merge or deploy without explicit owner approval.
