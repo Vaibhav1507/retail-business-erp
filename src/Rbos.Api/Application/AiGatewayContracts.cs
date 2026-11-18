@@ -112,7 +112,8 @@ public sealed class AiProviderCredential
         if (request.Media.Any(m => m.MimeType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) && m.PageCount is null)) return false;
         if (request.Audio is not null)
             return request.AudioDurationSeconds is > 0 && AudioCostPerMinuteInr is > 0;
-        if (request.Media.Count > 0 && ImageCostPerImageInr is not > 0 && InputCostPerMillionInr is not > 0)
+        if (request.Media.Count > 0 && ImageCostPerImageInr is not > 0 &&
+            (InputCostPerMillionInr is not > 0 || request.EstimatedInputTokens is null))
             return false;
         return EstimateCost(request) > 0;
     }
@@ -120,9 +121,12 @@ public sealed class AiProviderCredential
     public decimal EstimateCost(AiGatewayRequest request)
     {
         if (BillingMode == AiBillingMode.Free) return 0m;
-        var mediaTokens = request.Media.Sum(m => Math.Clamp(m.PageCount ?? 1, 1, 100) * 2048);
-        var input = request.EstimatedInputTokens ??
-            Math.Clamp((request.Prompt.Length + (request.InputText?.Length ?? 0)) / 4 + mediaTokens, 1, 100_000);
+        var mediaTokens = request.Media.Sum(m => Math.Clamp(m.PageCount ?? 1, 1, 100) * 8192);
+        var promptCharacters = request.Prompt.Length + (request.SystemPrompt?.Length ?? 0)
+            + (request.InputText?.Length ?? 0) + (request.AudioPrompt?.Length ?? 0)
+            + (request.ResponseSchema?.ToJsonString().Length ?? 0);
+        var conservativeTextTokens = Math.Clamp((int)Math.Ceiling(promptCharacters / 3d) + mediaTokens, 1, 1_000_000);
+        var input = Math.Max(request.EstimatedInputTokens ?? 0, conservativeTextTokens);
         var output = Math.Clamp(request.MaxOutputTokens, 1, 32_000);
         var estimate = input * (InputCostPerMillionInr ?? 0m) / 1_000_000m
             + output * (OutputCostPerMillionInr ?? 0m) / 1_000_000m;
@@ -130,7 +134,7 @@ public sealed class AiProviderCredential
             estimate += request.Media.Sum(m => Math.Clamp(m.PageCount ?? 1, 1, 100)) * (ImageCostPerImageInr ?? 0m);
         if (request.Audio is not null && request.AudioDurationSeconds is > 0)
             estimate += (decimal)(request.AudioDurationSeconds.Value / 60d) * (AudioCostPerMinuteInr ?? 0m);
-        return decimal.Round(estimate, 6, MidpointRounding.Ceiling);
+        return decimal.Ceiling(Math.Max(0m, estimate) * 1.25m * 1_000_000m) / 1_000_000m;
     }
 
     public decimal? ActualCost(int? inputTokens, int? outputTokens, AiGatewayRequest request)
@@ -143,7 +147,7 @@ public sealed class AiProviderCredential
         if (request.Media.Count > 0) cost += request.Media.Sum(m => Math.Clamp(m.PageCount ?? 1, 1, 100)) * (ImageCostPerImageInr ?? 0m);
         if (request.Audio is not null && request.AudioDurationSeconds is > 0)
             cost += (decimal)(request.AudioDurationSeconds.Value / 60d) * (AudioCostPerMinuteInr ?? 0m);
-        return decimal.Round(cost, 6, MidpointRounding.Ceiling);
+        return decimal.Ceiling(Math.Max(0m, cost) * 1_000_000m) / 1_000_000m;
     }
 
     public override string ToString() => $"{Provider}:{Id} ({QuotaBucketId})";

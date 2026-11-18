@@ -510,7 +510,7 @@ Provider limits, model availability, prices and terms change. Re-check official 
 **Workstream:** Central AI Gateway  
 **Implementation branch:** `feat/central-ai-gateway`  
 **Base:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
-**State:** Implementation assembled in draft; not yet validated by CI and not merged or deployed.
+**State:** Draft PR #45 is open. First CI attempt: frontend passed; backend compilation caught two invalid rounding enum references. Those references have been corrected in the follow-up; CI rerun is pending. Not merged or deployed.
 
 ### Investigation completed
 
@@ -547,11 +547,11 @@ Provider limits, model availability, prices and terms change. Re-check official 
 
 ### Remaining work before PR A is ready
 
-- [ ] Finish source-level review and confirm all superseded direct provider clients/tests are removed.
+- [x] Finish source-level review and remove superseded direct provider clients/tests.
 - [ ] Run the .NET Release build and unit tests.
 - [ ] Run full CI migration validation, frontend checks and deployment-container build.
 - [ ] Fix every implementation or CI issue found and rerun relevant checks.
-- [ ] Update this plan/status document with final CI evidence and PR link.
+- [ ] Update this plan/status document with final CI evidence and PR #45 link.
 - [ ] Open one combined PR for PR A. Do not merge or deploy without explicit owner approval.
 
 ### PR B sequencing gate

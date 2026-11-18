@@ -99,7 +99,7 @@ public sealed class AiGateway(
                         if (reservation.BlockReason is "monthly_budget_exceeded" or "paid_provider_disabled")
                         {
                             paidBudgetBlocked = true;
-                            continue;
+                            break;
                         }
                         return null;
                     }

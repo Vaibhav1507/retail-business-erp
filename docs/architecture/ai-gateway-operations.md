@@ -59,7 +59,7 @@ Round-robin cursors, invalid-key suppression, circuit-breaker state and quota co
 
 Paid use requires owner approval and explicit `AiGateway:AllowPaidProviders=true`, an enabled provider switch, credential `BillingMode=Paid`, verified positive INR pricing, a calculable estimate and available global/per-tenant budget.
 
-Pricing fields per credential are `InputCostPerMillionInr`, `OutputCostPerMillionInr`, optional `ImageCostPerImageInr` and `AudioCostPerMinuteInr`. Paid text/image/document calls require both input and output token prices; page-based input estimates are used for media. A paid audio call requires an audio-per-minute price. Paid PDF calls are blocked if page count cannot be estimated. Paid calls are blocked if the estimate is missing or non-positive.
+Pricing fields per credential are `InputCostPerMillionInr`, `OutputCostPerMillionInr`, optional `ImageCostPerImageInr` and `AudioCostPerMinuteInr`. Paid text/image/document calls require both input and output token prices; page-based input estimates are used for media, with a 25% cost-estimate contingency before reservation. A paid audio call requires an audio-per-minute price. Paid PDF calls are blocked if page count cannot be estimated. Paid calls are blocked if the estimate is missing or non-positive.
 
 Defaults are ₹1,500 global/month and ₹50 per tenant/month, with a 75% warning threshold. These are hard ceilings, not a spend target. No automatic top-ups or billing upgrades exist. Keep paid use disabled for the free-first pilot.
 

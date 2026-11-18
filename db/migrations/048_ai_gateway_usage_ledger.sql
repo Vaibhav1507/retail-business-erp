@@ -79,6 +79,7 @@ create or replace function ai_gateway.finish_attempt(
 returns boolean language plpgsql security definer set search_path = pg_catalog, ai_gateway, core as $$
 declare v_updated integer;
 begin
+ perform pg_advisory_xact_lock(7272742);
  if core.current_user_id() is distinct from p_actor or core.current_tenant_id() is distinct from p_tenant
     or not core.is_active_member(p_tenant) then
   raise exception 'AI usage context is not authorized' using errcode = '42501';
