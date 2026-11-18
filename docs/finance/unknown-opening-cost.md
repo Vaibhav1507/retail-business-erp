@@ -39,3 +39,8 @@ Rule: unknown cost is never silently converted to zero.
 ### Validation
 
 Measure in the shop validation (V2/P1): proportion of items with unknown cost, and how often the shortcut is needed. If the owner finds it obstructive, revisit (decision PD-11).
+
+
+## Current Phase 1 pilot behaviour (2026-11-18)
+
+The proposed draft-quantity-only workflow above is **not implemented in the current pilot**. The pilot requires a positive, explicitly entered unit cost before opening stock can be posted. The owner may enter an actual cost or an estimate; RBOS does not infer a value, silently substitute zero, or include a missing-cost item in posted stock/financial reports. This is the minimum safe pilot behaviour and does not introduce a quantity-only inventory ledger or provisional valuation architecture. Product-owner acceptance of this wording and CA review of estimated-cost disclosure remain outstanding.
