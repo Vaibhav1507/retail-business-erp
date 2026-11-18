@@ -185,6 +185,12 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
                 await command.ExecuteNonQueryAsync();
             }
 
+            // FORCE RLS also applies to the table owner. Add a tenant-scoped,
+            // transaction-only policy for the migrator fixture role, then remove it.
+            // This keeps runtime rbos_app grants and production policies unchanged.
+            foreach (var table in new[] { "catalog.product_alias", "inventory.stock_balance", "inventory.item_cost", "catalog.product" })
+                await Execute($"create policy rbos_test_fixture_tenant_access on {table} for all to rbos_migrator using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid) with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)");
+
             await Execute(
                 "insert into catalog.product_alias(tenant_id,alias_product_id,canonical_product_id) values (@t,@a,@c)",
                 command => { command.Parameters.AddWithValue("t", tenant); command.Parameters.AddWithValue("a", retired); command.Parameters.AddWithValue("c", canonical); });
@@ -204,6 +210,8 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
                 command => command.Parameters.AddWithValue("a", retired));
             await Execute("update catalog.product set is_active=false where id=@a",
                 command => command.Parameters.AddWithValue("a", retired));
+            foreach (var table in new[] { "catalog.product_alias", "inventory.stock_balance", "inventory.item_cost", "catalog.product" })
+                await Execute($"drop policy rbos_test_fixture_tenant_access on {table}");
             await tx.CommitAsync();
         }
 
@@ -226,12 +234,18 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
                 context.Parameters.AddWithValue("t", tenant.ToString());
                 await context.ExecuteNonQueryAsync();
             }
+            await using (var policy = new NpgsqlCommand(
+                "create policy rbos_test_fixture_tenant_access on inventory.stock_balance for all to rbos_migrator using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid) with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)", connection, tx))
+                await policy.ExecuteNonQueryAsync();
             await using (var corrupt = new NpgsqlCommand(
                 "update inventory.stock_balance set quantity=quantity+1 where product_id=@p", connection, tx))
             {
                 corrupt.Parameters.AddWithValue("p", canonical);
                 Assert.Equal(1, await corrupt.ExecuteNonQueryAsync());
             }
+            await using (var dropPolicy = new NpgsqlCommand(
+                "drop policy rbos_test_fixture_tenant_access on inventory.stock_balance", connection, tx))
+                await dropPolicy.ExecuteNonQueryAsync();
             await tx.CommitAsync();
         }
 
