@@ -153,7 +153,7 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
         {!passkeysEnabled
           ? <p>Passkeys are not currently enabled by this app's server configuration, or this browser does not support WebAuthn in its current context. Setting your app PIN does not register a passkey. Once enabled on the production HTTPS hostname, return here and choose Add a passkey to register this phone's fingerprint, face unlock or device PIN.</p>
           : <p>Use your phone or computer's built-in authenticator (fingerprint, face unlock or device PIN) to sign in. Your password remains available as a recovery method.</p>}
-        <button type="button" disabled={passkeyBusy} onClick={() => { void addPasskey() }}>{passkeyBusy ? 'Please wait…' : 'Add a passkey on this device'}</button>
+        <button type="button" disabled={!passkeysEnabled || passkeyBusy} onClick={() => { void addPasskey() }}>{passkeyBusy ? 'Please wait…' : 'Add a passkey on this device'}</button>
         {passkeysEnabled && passkeyAction && <form className="passkey-confirm" onSubmit={confirmPasskeyAction}>
           <label>Confirm account password
             <input type="password" autoComplete="current-password" required value={passkeyPassword} onChange={e => setPasskeyPassword(e.target.value)} />
@@ -164,8 +164,8 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
         {passkeysEnabled && (passkeys.length === 0 ? <p>No passkeys registered.</p> : <ul>{passkeys.map(passkey => <li key={passkey.credentialId}>
           <strong>{passkey.name || 'Passkey'}</strong> · Added {dateTime(passkey.createdAt)}{passkey.isBackedUp ? ' · Synced backup' : ''}
           <button type="button" className="device-revoke" disabled={passkeyBusy} onClick={() => { void deletePasskey(passkey) }}>Remove</button>
-        </li>)}</ul>}
-      </section>}
+        </li>)}</ul>)}
+      </section>
       <p className="devices-note">{t('devices.note')}</p>
     </section>
   )
