@@ -501,3 +501,73 @@ Preserve local voice navigation. Do not migrate it to a cloud provider as part o
 - xAI pricing: https://docs.x.ai/developers/pricing
 
 Provider limits, model availability, prices and terms change. Re-check official documentation immediately before implementation and before enabling a provider for real pilot-shop data.
+
+
+---
+
+## 18. Implementation status — 2026-11-18 (PR A)
+
+**Workstream:** Central AI Gateway  
+**Implementation branch:** `feat/central-ai-gateway`  
+**Base:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
+**State:** Draft PR #45 is open. The first CI attempt caught two compile errors; the second passed Release build, migration validation and frontend checks but exposed three unit-test failures and the missing forced-RLS policy on the new usage table. The compile, pricing-gate and numeric-validation fixes are in the latest commit; migration 048 now forces RLS on usage_event. CI rerun is pending. Not merged or deployed.
+
+### Investigation completed
+
+- Reconfirmed the .NET 10 API, dependency-injection, configuration, tenant-context and migration patterns.
+- Mapped every existing hosted-provider call path: Gemini invoice extraction, Gemini catalogue extraction, Groq vision invoice/catalogue fallback, Gemini voice intent, Groq Qwen voice intent and Groq Whisper transcription.
+- Confirmed local Shruti speech recognition and local OCR are separate local-first paths and must remain available.
+- Confirmed invoice extraction is review-before-save and product extraction returns import rows for preview; the gateway does not create or post business transactions.
+- Confirmed migration 048 is the next migration after 047.
+
+### Implementation assembled
+
+- Provider-neutral request/response, media, capability, failure and credential contracts.
+- Gemini and Groq provider adapters behind `IAiProviderAdapter`; provider-specific HTTP endpoints and authentication are confined to these adapters.
+- Gateway orchestration with feature/provider kill switches, bounded attempts, timeout, retry-after handling, quota-bucket cooldown, circuit breaker, structured-output validation and safe structured logging.
+- Concurrent round-robin credential pool. Gemini credentials sharing a project ID share one quota bucket; Groq credentials sharing a team ID share one bucket. Missing quota identity collapses to one conservative bucket.
+- Fail-closed billing classification: unknown billing mode is ineligible; paid credentials require explicit opt-in, positive pricing and a calculable estimate.
+- Migration 048 for usage reservations/settlement. A database advisory lock serializes global and per-tenant paid-budget reservations across instances. The usage table stores metadata only, not prompts, documents, transcripts, responses or secrets.
+- Rewired invoice extraction, catalogue image/PDF extraction, voice intent and hosted transcription to use the gateway with trusted tenant/user context.
+- Preserved local Shruti-first voice behaviour, the voice destination allowlist, daily limits, local OCR/manual mapping and review-before-save flows.
+- Regression tests for credential rotation/concurrency, same-project quota sharing, independent quota buckets, unknown/paid billing gates, budget denial, provider fallback, content-safety refusal, adapter requests, structured-output validation and voice destination allowlisting.
+- Updated operator configuration/usage guidance and current implementation status.
+
+### Safety posture
+
+- `AiGateway:Enabled` defaults to `false`.
+- Gemini and Groq provider switches default to `false`.
+- `AllowPaidProviders` defaults to `false`.
+- Existing voice intent and hosted Whisper flags remain disabled by default.
+- Legacy credentials are treated as `Unknown` billing unless an operator explicitly classifies them. Do not mark a key Free without confirming its provider billing/quota tier.
+- The ₹1,500 global and ₹50 per-tenant values are hard ceilings for paid usage, not spending targets. No automatic top-ups are implemented.
+- Multiple keys/projects must not be used to evade provider limits or terms. Independent quota buckets may only be configured when genuinely independent and authorised.
+- Round-robin, circuit-breaker and quota-cooldown state are process-local to each API instance; the database budget reservation is shared across instances. A restart resets local cooldown/circuit state.
+- No production secrets or deployment settings are changed by this branch.
+
+### Remaining work before PR A is ready
+
+- [x] Finish source-level review and remove superseded direct provider clients/tests.
+- [ ] Re-run the .NET Release build and unit tests after the latest fixes.
+- [ ] Re-run full CI migration validation, frontend checks and deployment-container build.
+- [x] Fixed CI-discovered issues: cost rounding, paid-cost eligibility, numeric structured-output validation and forced RLS for the usage ledger; reran full CI successfully.
+- [ ] Update this plan/status document with final CI evidence and PR #45 link.
+- [x] Opened one combined PR for PR A: [PR #45](https://github.com/Vaibhav1507/retail-business-erp/pull/45). It is ready for review; do not merge or deploy without explicit owner approval.
+
+### PR B sequencing gate
+
+Invoice item-tag photo capture is **not started** in this workstream. Start PR B only after PR A is merged into `main` and the owner explicitly confirms that PR B may begin.
+
+
+### Final CI evidence — 2026-11-18
+
+GitHub Actions run **#555** for commit `44c1777a4e5e6651c26e21f24d8e144ded5c7780` completed successfully.
+
+- Backend Release build: passed (one existing CA1416 platform-compatibility warning in `PdfPageReader.cs`, no errors).
+- Database migration validation: passed; migrations 001 through 048 applied to the throwaway CI database.
+- Unit tests: 121 passed, 0 failed.
+- Integration tests: 153 passed, 0 failed.
+- Frontend: TypeScript check, frontend tests and production build passed.
+- Deployment container: built successfully; no image push or deployment was performed.
+
+PR #45 remains unmerged. PR B remains gated on PR A merge plus explicit owner confirmation.

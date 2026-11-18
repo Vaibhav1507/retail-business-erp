@@ -47,7 +47,7 @@ public static class Endpoints
 		api.MapGet("/voice/intent/config", (VoiceNavigationIntentService intent) =>
 			Results.Ok(new { enabled = intent.Available })).RequireAuthorization();
 
-		api.MapPost("/voice/intent", async (VoiceIntentRequest body, ClaimsPrincipal principal, VoiceNavigationIntentService intent, CancellationToken ct) =>
+		api.MapPost("/voice/intent", async (VoiceIntentRequest body, ClaimsPrincipal principal, TenantDb db, VoiceNavigationIntentService intent, CancellationToken ct) =>
 		{
 			if (!intent.Available) return ApiResults.Fail(503, "AI navigation intent is not enabled.");
 			if (string.IsNullOrWhiteSpace(body.Transcript) || body.Transcript.Trim().Length > 500)
@@ -57,16 +57,33 @@ public static class Endpoints
 			var usage = VoiceIntentDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
 			if (usage.Count > MaxVoiceIntentRequestsPerUserPerDay)
 				return ApiResults.Fail(429, "Daily AI navigation limit reached. Use the basic navigation commands and try again tomorrow.");
-			var result = await intent.ClassifyAsync(body, ct);
+			var tenantId = await db.FindTenantAsync(userId, ct);
+			var result = tenantId is null
+				? new VoiceIntentResult("not-understood", null, [], 0, "no-business")
+				: await intent.ClassifyAsync(tenantId.Value, userId, body, ct);
 			return Results.Ok(result);
 		}).RequireAuthorization();
 
-		api.MapGet("/voice/transcribe/config", (GroqSpeechToTextClient whisper) =>
-			Results.Ok(new { enabled = whisper.Available })).RequireAuthorization();
-
-		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, GroqSpeechToTextClient whisper, CancellationToken ct) =>
+		api.MapGet("/voice/transcribe/config", (AiGateway gateway, IConfiguration cfg) =>
 		{
-			if (!whisper.Available) return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
+			var models = new Dictionary<AiProviderKind, IReadOnlyList<string>>
+			{
+				[AiProviderKind.Groq] = [cfg["Groq:WhisperModel"] ?? "whisper-large-v3-turbo"]
+			};
+			var enabled = cfg.GetValue("Groq:WhisperEnabled", false) &&
+				gateway.IsFeatureAvailable("VoiceTranscription", [AiProviderKind.Groq], AiCapability.AudioTranscription, models);
+			return Results.Ok(new { enabled });
+		}).RequireAuthorization();
+
+		api.MapPost("/voice/transcribe", async (HttpRequest request, ClaimsPrincipal principal, TenantDb db, AiGateway gateway, IConfiguration cfg, CancellationToken ct) =>
+		{
+			var models = new Dictionary<AiProviderKind, IReadOnlyList<string>>
+			{
+				[AiProviderKind.Groq] = [cfg["Groq:WhisperModel"] ?? "whisper-large-v3-turbo"]
+			};
+			if (!cfg.GetValue("Groq:WhisperEnabled", false) ||
+				!gateway.IsFeatureAvailable("VoiceTranscription", [AiProviderKind.Groq], AiCapability.AudioTranscription, models))
+				return ApiResults.Fail(503, "Hosted speech fallback is not enabled.");
 			if (request.ContentLength is <= 44 or > 640_044) return ApiResults.Fail(400, "Voice command audio must be a WAV under 1 MB.");
 			await using var buffer = new MemoryStream();
 			var chunk = new byte[81920];
@@ -89,14 +106,33 @@ public static class Endpoints
 				BitConverter.ToUInt32(wav, 40) != (uint)(wav.Length - 44))
 				return ApiResults.Fail(400, "Voice command audio must be mono 16 kHz PCM WAV.");
 			var userId = UserId(principal);
+			var tenantId = await db.FindTenantAsync(userId, ct);
+			if (tenantId is null) return ApiResults.Fail(409, "Set up a business before using hosted speech fallback.");
 			var today = DateOnly.FromDateTime(DateTime.UtcNow);
 			var usage = WhisperDailyUsage.AddOrUpdate(userId, _ => (today, 1), (_, current) => current.Day == today ? (today, current.Count + 1) : (today, 1));
 			if (usage.Count > MaxWhisperRequestsPerUserPerDay) return ApiResults.Fail(429, "Daily voice backup limit reached. Please type the command and try again tomorrow.");
 			try
 			{
-				var transcript = await whisper.TranscribeWavAsync(wav, ct);
-				return string.IsNullOrWhiteSpace(transcript) ? ApiResults.Fail(422, "Speech could not be transcribed.") : Results.Ok(new { text = transcript });
+				var gatewayResponse = await gateway.ExecuteAsync(new AiGatewayRequest
+				{
+					TenantId = tenantId.Value,
+					ActorUserId = userId,
+					Feature = "VoiceTranscription",
+					Task = AiTaskKind.AudioTranscription,
+					Prompt = "Transcribe the short navigation command. Speech may mix Hindi, Romanised Hindi, Bundelkhandi and English. Do not interpret or answer the command.",
+					Audio = wav,
+					AudioMimeType = "audio/wav",
+					AudioPrompt = "Short navigation command for an Indian retail business app. Speech may mix Hindi, Romanised Hindi, Bundelkhandi and English. Common terms include bill, purchase, stock, customer, supplier, payment, kharcha and udhari.",
+					AudioDurationSeconds = Math.Max(0.1, (wav.Length - 44) / 32000d),
+					ProviderOrder = [AiProviderKind.Groq],
+					Models = models,
+					MaxAttemptsPerProvider = 1
+				}, ct);
+				var transcript = gatewayResponse?.Text;
+				return string.IsNullOrWhiteSpace(transcript) ? ApiResults.Fail(503, "Speech backup is temporarily unavailable. Please type the command or try again later.") : Results.Ok(new { text = transcript });
 			}
+			catch (AiProviderException e) when (e.Category == AiFailureCategory.ContentSafetyRefusal)
+			{ return ApiResults.Fail(503, "Speech backup declined this request. Please type the command instead."); }
 			catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
 			{ return ApiResults.Fail(429, "Speech backup limit reached. Please type the command or try again later."); }
 			catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)

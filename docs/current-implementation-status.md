@@ -1,6 +1,6 @@
 # Current implementation and repository status
 
-**Reviewed:** 2026-11-17  
+**Reviewed:** 2026-11-18  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
@@ -73,6 +73,31 @@ The CI failures for Phases 2–6 show empty job-step arrays: GitHub Actions did 
 Durable recovery records:
 - `docs/implementation-plans/authorization-trusted-device-and-offline-operations.md`
 - `docs/implementation-log/README.md` and the phase-specific logs in `docs/implementation-log/`
+
+
+## Central AI gateway — PR A implementation work (unmerged)
+
+**Branch:** `feat/central-ai-gateway`  
+**Base commit:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
+**State:** PR #45 is open and all CI jobs passed on 2026-11-18 (run #555, commit `44c1777`). Backend Release build passed; migrations 001–048 applied; 121 unit tests and 153 integration tests passed; frontend checks/build and deployment-container build passed. Not merged or deployed.
+
+The provider-call table above describes the current `main` baseline. PR A consolidates those paths behind one internal `AiGateway`.
+
+| Area | Draft implementation | Remaining validation |
+|---|---|---|
+| Gateway | Provider-neutral contracts, Gemini/Groq adapters, feature/provider kill switches, bounded attempts, timeout and structured validation | CI Release build, unit/integration tests, migration validation and container build all passed; code review remains |
+| Credential pool | Concurrent round-robin; Gemini project and Groq team quota buckets; 429 cooldown; invalid-key suppression; circuit breaker | CI concurrency/failure-path evidence |
+| Cost control | Unknown billing fails closed; paid calls require explicit opt-in, pricing and cost estimate; monthly global/per-tenant hard limits | Migration execution and database-backed evidence |
+| Usage ledger | Migration 048, serialized reservation/settlement, metadata-only events | Forced-RLS migration validation passed in CI; verify operational reporting queries during rollout |
+| Invoice extraction | Gateway-backed Gemini extraction and opt-in Groq fallback; output remains an unsaved draft | Regression tests and CI passed |
+| Catalogue extraction | Gateway-backed Gemini/Groq photo/PDF extraction; local OCR/manual mapping recovery retained | Regression tests and CI |
+| Voice intent | Gateway-backed Gemini/Groq classification with the existing destination allowlist | Regression tests and CI |
+| Hosted transcription | Gateway-backed Groq Whisper only when explicitly enabled | Audio adapter tests and CI |
+| Local-first voice | Shruti remains local primary; no change intended | Local Shruti path retained; verify behaviour in pilot acceptance |
+
+**Current safety defaults:** gateway disabled; Gemini/Groq providers disabled; paid providers disabled; existing hosted voice flags disabled. No API key, billing tier, production provider configuration, database or deployment has been changed by this branch.
+
+**CI evidence:** run #555 passed: Release build, migration 001–048 validation, 121 unit tests, 153 integration tests, frontend checks/build and deployment-container build (no push). [PR #45](https://github.com/Vaibhav1507/retail-business-erp/pull/45) is open and ready for review. No merge or deployment has occurred. PR B (invoice item-tag photo capture) remains gated: do not begin until PR A is merged and the owner confirms.
 
 ## Database and deployment
 

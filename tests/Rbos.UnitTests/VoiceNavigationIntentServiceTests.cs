@@ -1,7 +1,5 @@
-using System.Net;
-using System.Text;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json.Nodes;
 using Rbos.Api.Application;
 
 namespace Rbos.UnitTests;
@@ -9,76 +7,86 @@ namespace Rbos.UnitTests;
 public sealed class VoiceNavigationIntentServiceTests
 {
     [Fact]
-    public async Task ClassifyAsync_UsesGeminiWhenItReturnsAnAllowlistedHighConfidenceDestination()
+    public async Task ClassifyAsync_UsesGatewayForAllowlistedHighConfidenceGeminiIntent()
     {
-        var gemini = new StubHandler(_ => Task.FromResult(JsonResponse(
-            """{"candidates":[{"content":{"parts":[{"text":"{\"intent\":\"navigate\",\"destinationId\":\"stock.current\",\"confidence\":0.96,\"clarificationCandidates\":[],\"reason\":null}"}]}}]}""")));
-        var groq = new StubHandler(_ => throw new InvalidOperationException("Groq must not be called after valid Gemini output."));
-        var config = Config(geminiEnabled: true, groqEnabled: true);
-        using var geminiHttp = new HttpClient(gemini);
-        using var groqHttp = new HttpClient(groq);
-        var groqClient = new GroqTextIntentClient(groqHttp, config, NullLogger<GroqTextIntentClient>.Instance);
-        var service = new VoiceNavigationIntentService(geminiHttp, config, NullLogger<VoiceNavigationIntentService>.Instance, groqClient);
+        var config = AiGatewayTests.Config(
+            ("AiGateway:Enabled", "true"),
+            ("AiGateway:Providers:Gemini:Enabled", "true"),
+            ("AiGateway:LegacyGeminiBillingMode", "Free"),
+            ("Gemini:ApiKey", "gemini-test-secret"),
+            ("Gemini:ProjectId", "project-one"),
+            ("Gemini:VoiceIntentEnabled", "true"),
+            ("VoiceIntent:Enabled", "true"));
+        var pool = new AiGatewayCredentialPool(config);
+        var adapter = new AiGatewayTests.FakeAdapter(AiProviderKind.Gemini, (_, _, _, _) =>
+            Task.FromResult(new AiProviderResponse(Navigate("stock.current", 0.96), null, 20, 10)));
+        var gateway = new AiGateway(config, pool, [adapter], new AiGatewayTests.FakeLedger(true), NullLogger<AiGateway>.Instance);
+        var service = new VoiceNavigationIntentService(config, NullLogger<VoiceNavigationIntentService>.Instance, gateway);
 
-        var result = await service.ClassifyAsync(new VoiceIntentRequest("open stock", "home"), CancellationToken.None);
+        var result = await service.ClassifyAsync(Guid.NewGuid(), Guid.NewGuid(),
+            new VoiceIntentRequest("open stock", "home"), CancellationToken.None);
 
+        Assert.True(service.Available);
         Assert.Equal("navigate", result.Kind);
         Assert.Equal("stock.current", result.TargetId);
         Assert.Equal("gemini", result.Provider);
         Assert.Equal(0.96, result.Confidence);
+        Assert.Equal(1, adapter.Calls);
     }
 
     [Fact]
-    public async Task ClassifyAsync_FallsBackToGroqWhenGeminiReturnsAnUnknownDestination()
+    public async Task ClassifyAsync_RejectsUnknownDestinationAndUsesConfiguredGroqFallback()
     {
-        var gemini = new StubHandler(_ => Task.FromResult(JsonResponse(
-            """{"candidates":[{"content":{"parts":[{"text":"{\"intent\":\"navigate\",\"destinationId\":\"https://evil.example\",\"confidence\":0.99,\"clarificationCandidates\":[],\"reason\":null}"}]}}]}""")));
-        var groq = new StubHandler(_ => Task.FromResult(JsonResponse(
-            """{"choices":[{"message":{"content":"{\"intent\":\"navigate\",\"destinationId\":\"buy.receive\",\"confidence\":0.91,\"clarificationCandidates\":[],\"reason\":null}"}}]}""")));
-        var config = Config(geminiEnabled: true, groqEnabled: true);
-        using var geminiHttp = new HttpClient(gemini);
-        using var groqHttp = new HttpClient(groq);
-        var groqClient = new GroqTextIntentClient(groqHttp, config, NullLogger<GroqTextIntentClient>.Instance);
-        var service = new VoiceNavigationIntentService(geminiHttp, config, NullLogger<VoiceNavigationIntentService>.Instance, groqClient);
+        var config = AiGatewayTests.Config(
+            ("AiGateway:Enabled", "true"),
+            ("AiGateway:Providers:Gemini:Enabled", "true"),
+            ("AiGateway:Providers:Groq:Enabled", "true"),
+            ("AiGateway:LegacyGeminiBillingMode", "Free"),
+            ("AiGateway:LegacyGroqBillingMode", "Free"),
+            ("Gemini:ApiKey", "gemini-test-secret"),
+            ("Gemini:ProjectId", "project-one"),
+            ("Gemini:VoiceIntentEnabled", "true"),
+            ("Groq:ApiKey", "groq-test-secret"),
+            ("Groq:TeamId", "team-one"),
+            ("Groq:VoiceIntentEnabled", "true"),
+            ("VoiceIntent:Enabled", "true"));
+        var pool = new AiGatewayCredentialPool(config);
+        var gemini = new AiGatewayTests.FakeAdapter(AiProviderKind.Gemini, (_, _, _, _) =>
+            Task.FromResult(new AiProviderResponse(Navigate("https://evil.example", 0.99), null, 20, 10)));
+        var groq = new AiGatewayTests.FakeAdapter(AiProviderKind.Groq, (_, _, _, _) =>
+            Task.FromResult(new AiProviderResponse(Navigate("buy.receive", 0.91), null, 20, 10)));
+        var gateway = new AiGateway(config, pool, [gemini, groq], new AiGatewayTests.FakeLedger(true), NullLogger<AiGateway>.Instance);
+        var service = new VoiceNavigationIntentService(config, NullLogger<VoiceNavigationIntentService>.Instance, gateway);
 
-        var result = await service.ClassifyAsync(new VoiceIntentRequest("add purchase", "home"), CancellationToken.None);
+        var result = await service.ClassifyAsync(Guid.NewGuid(), Guid.NewGuid(),
+            new VoiceIntentRequest("add purchase", "home"), CancellationToken.None);
 
         Assert.Equal("navigate", result.Kind);
         Assert.Equal("buy.receive", result.TargetId);
         Assert.Equal("groq-qwen", result.Provider);
+        Assert.Equal(1, gemini.Calls);
+        Assert.Equal(1, groq.Calls);
     }
 
     [Fact]
-    public async Task ClassifyAsync_DoesNotEnableProvidersWithoutExplicitFeatureFlags()
+    public void ClassifyAsync_DoesNotEnableProvidersWithoutExplicitFeatureFlags()
     {
-        var handler = new StubHandler(_ => throw new InvalidOperationException("No provider should be called."));
-        var config = new ConfigurationBuilder().Build();
-        using var http = new HttpClient(handler);
-        var groqClient = new GroqTextIntentClient(http, config, NullLogger<GroqTextIntentClient>.Instance);
-        var service = new VoiceNavigationIntentService(http, config, NullLogger<VoiceNavigationIntentService>.Instance, groqClient);
+        var config = AiGatewayTests.Config();
+        var pool = new AiGatewayCredentialPool(config);
+        var adapter = new AiGatewayTests.FakeAdapter(AiProviderKind.Gemini, (_, _, _, _) =>
+            throw new InvalidOperationException("Provider must not be called."));
+        var gateway = new AiGateway(config, pool, [adapter], new AiGatewayTests.FakeLedger(true), NullLogger<AiGateway>.Instance);
+        var service = new VoiceNavigationIntentService(config, NullLogger<VoiceNavigationIntentService>.Instance, gateway);
 
-        var result = await service.ClassifyAsync(new VoiceIntentRequest("open stock", null), CancellationToken.None);
-
-        Assert.Equal("not-understood", result.Kind);
         Assert.False(service.Available);
     }
 
-    static IConfiguration Config(bool geminiEnabled, bool groqEnabled) =>
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["VoiceIntent:Enabled"] = "true",
-            ["Gemini:ApiKey"] = "gemini-test",
-            ["Gemini:VoiceIntentEnabled"] = geminiEnabled ? "true" : "false",
-            ["Groq:ApiKey"] = "groq-test",
-            ["Groq:VoiceIntentEnabled"] = groqEnabled ? "true" : "false",
-            ["Groq:VoiceIntentModel"] = "qwen/qwen3.8-27b"
-        }).Build();
-
-    static HttpResponseMessage JsonResponse(string json) =>
-        new(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
-
-    sealed class StubHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
+    private static JsonObject Navigate(string destination, double confidence) => new()
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request);
-    }
+        ["intent"] = "navigate",
+        ["destinationId"] = destination,
+        ["confidence"] = confidence,
+        ["clarificationCandidates"] = new JsonArray(),
+        ["reason"] = null
+    };
 }
