@@ -1,23 +1,23 @@
 # Current implementation and repository status
 
-**Reviewed:** 2026-11-18  
+**Reviewed:** 2026-11-18 (PR #47 documentation refresh)  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
 
-## Focused pilot-readiness P0 remediation — PR #47 open (draft)
+## Focused pilot-readiness P0 remediation — PR #47 (merge status pending at last documentation update)
 
 **Baseline:** `main` at `fb56331eac368ba00db8b70503f20d504ec57fef` (2026-11-18). **Branch:** `fix/pilot-readiness-p0-remediation`. This section records implementation evidence for the five requested P0 items only; it does not imply pilot acceptance.
 
 | Requested item | Current branch implementation | Evidence / remaining gate |
 |---|---|---|
-| P0.1 Alias-aware stock verification and replay | Implemented tenant-scoped alias canonicalisation in verification aggregation and replay; deterministic ordering uses actual `effective_date, occurred_at, id` columns. Added migrated-alias and corrupted-projection integration coverage. | CI must pass. Historical return/cancellation source-reference scenarios and a full migrated production-like fixture still require review. |
+| P0.1 Alias-aware stock verification and replay | Implemented tenant-scoped alias canonicalisation in verification aggregation and replay; deterministic ordering uses actual `effective_date, occurred_at, id` columns. Added migrated-alias and corrupted-projection integration coverage. | Latest-head CI run #589 (`5253435c873de34512700ba3283e2c9c2a293a59`): Release build and disposable PostgreSQL migration passed; .NET tests were running at documentation update. Synthetic Playwright and container build had not started. Historical return/cancellation source-reference scenarios and a full migrated production-like fixture still require review. |
 | P0.2 WAC precision | Centralised persisted WAC rounding at four decimals, matching current schema. Money remains two decimals, half-away-from-zero. Six decimals are not implemented. | CA approval remains outstanding; this is an interim engineering/storage convention, not an approved accounting policy. CI precision/replay evidence required. |
 | P0.3 Opening-stock cost | Backend already requires a positive explicitly supplied cost; UI now explains actual or owner-estimated cost and that RBOS will not infer or post zero. | Existing opening-stock integration/E2E tests; owner must manually accept copy and actual/estimated cost policy. |
-| P0.4 CI gates | Added lint, strict high/critical npm audit, Playwright browser installation and deterministic synthetic E2E in CI. CI E2E excludes provider-dependent invoice extraction/demo specs. | PR CI result pending; dependency audit must be reviewed, not waived silently. |
+| P0.4 CI gates | Added lint, strict high/critical npm audit, Playwright browser installation and deterministic synthetic E2E in CI. CI E2E excludes provider-dependent invoice extraction/demo specs. | Latest-head frontend job passed TypeScript, unit tests, lint, build and the documented time-bound audit checker (run #589). Backend job was still executing .NET tests; Playwright and container build were pending. The development-only picomatch advisory exception is documented and expires 2026-12-02. |
 | P0.5 One-shop financial E2E | Existing synthetic integration/E2E suites cover opening stock, sales, collections, returns/cancellation, stock verification, tenant isolation, idempotency and negative-stock rejection across focused tests. | Not yet a single repeatable 25-step end-to-end scenario. GST profile setup, both invoice print modes and complete P&L/balance-sheet assertions need explicit consolidated acceptance. Do not mark pilot-accepted. |
 
-No migration was added. No production database, secret, deployment or AI provider was accessed. Manual acceptance and CA review remain separate from CI.
+No application schema migration was added by this P0 remediation. CI migration validation targets a disposable synthetic PostgreSQL database only. No production database, secret, deployment or AI provider was accessed. Manual acceptance and CA review remain separate from CI. The one-shop consolidated financial journey is still an acceptance gap; do not infer pilot readiness from merging this PR.
 
 ## Product and pilot status
 
