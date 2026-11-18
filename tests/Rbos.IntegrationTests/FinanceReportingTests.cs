@@ -148,7 +148,9 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         var retired = await c.AddProduct("Alias duplicate cable");
         var supplier = await Id(await c.Send(HttpMethod.Post, "/suppliers", new { name = "Alias test supplier" }));
         await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = canonical, quantity = 5m, unitCost = 100m } } }, K()));
-        await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = retired, quantity = 10m, unitCost = 200m } } }, K()));
+        var retiredReceipt = await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = retired, quantity = 10m, unitCost = 200m } } }, K()));
+        var cancelSale = await Id(await c.Send(HttpMethod.Post, "/sales", new { locationId = location, saleDate = Today, saleType = "Cash", amountPaid = 300m, payMethod = "Cash", lines = new[] { new { productId = retired, quantity = 1m, unitPrice = 300m, discount = 0m } } }, K()));
+        var returnSale = await Id(await c.Send(HttpMethod.Post, "/sales", new { locationId = location, saleDate = Today, saleType = "Cash", amountPaid = 300m, payMethod = "Cash", lines = new[] { new { productId = retired, quantity = 1m, unitPrice = 300m, discount = 0m } } }, K()));
 
         using var scope = f.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser<Guid>>>();
@@ -180,6 +182,11 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
             { retire.Parameters.AddWithValue("a", retired); await retire.ExecuteNonQueryAsync(); }
             await session.CommitAsync(default);
         }
+
+        // Historical sale and receipt documents still refer to the retired product ID.
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, $"/sales/{cancelSale}/cancel", new { reason = "Alias replay regression" }, K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sale-returns", new { saleId = returnSale, returnDate = Today, reason = "Alias return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/purchase-returns", new { receiptId = retiredReceipt, returnDate = Today, reason = "Alias supplier return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
 
         var healthy = await c.GetJson("/reports/stock-verification");
         Assert.True(healthy.GetProperty("ok").GetBoolean());
