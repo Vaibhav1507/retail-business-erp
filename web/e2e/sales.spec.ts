@@ -1,4 +1,4 @@
-import { signUp, randomMobile, openAddProduct, chooseCategory, postInvoice } from './signup'
+import { signUp, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
