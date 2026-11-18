@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from './api'
 import { getLanguage, t } from './i18n'
+import { listPasskeys, passkeyEnabled, registerPasskey, removePasskey, type PasskeySummary } from './passkeys'
 import './devices.css'
 
 type Device = {
@@ -28,6 +29,11 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [passkeys, setPasskeys] = useState<PasskeySummary[]>([])
+  const [passkeysEnabled, setPasskeysEnabled] = useState(false)
+  const [passkeyBusy, setPasskeyBusy] = useState(false)
+  const [passkeyAction, setPasskeyAction] = useState<{ kind: 'register'; name: string } | { kind: 'remove'; credentialId: string } | null>(null)
+  const [passkeyPassword, setPasskeyPassword] = useState('')
 
   const load = useCallback(async () => {
     setError('')
@@ -42,6 +48,40 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
   }, [])
 
   useEffect(() => { void load() }, [load])
+  const loadPasskeys = useCallback(async () => {
+    if (!passkeysEnabled) return
+    try { setPasskeys(await listPasskeys()) }
+    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Could not load passkeys.') }
+  }, [passkeysEnabled])
+  useEffect(() => { void passkeyEnabled().then(enabled => setPasskeysEnabled(enabled)) }, [])
+  useEffect(() => { if (passkeysEnabled) void loadPasskeys() }, [passkeysEnabled, loadPasskeys])
+
+  async function addPasskey() {
+    const name = window.prompt('Name this passkey', 'My phone')
+    if (name === null) return
+    setPasskeyAction({ kind: 'register', name: name.trim() || 'This device' })
+    setPasskeyPassword('')
+  }
+
+  async function deletePasskey(passkey: PasskeySummary) {
+    if (!window.confirm('Remove this passkey? You can still sign in with your password.')) return
+    setPasskeyAction({ kind: 'remove', credentialId: passkey.credentialId })
+    setPasskeyPassword('')
+  }
+
+  async function confirmPasskeyAction(event: FormEvent) {
+    event.preventDefault()
+    if (!passkeyAction || !passkeyPassword) return
+    setPasskeyBusy(true); setError('')
+    try {
+      if (passkeyAction.kind === 'register') await registerPasskey(passkeyAction.name, passkeyPassword)
+      else await removePasskey(passkeyAction.credentialId, passkeyPassword)
+      setPasskeyAction(null); setPasskeyPassword('')
+      await loadPasskeys()
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : reason instanceof Error ? reason.message : 'Passkey operation failed.')
+    } finally { setPasskeyBusy(false) }
+  }
 
   async function revoke(device: Device) {
     const message = device.isCurrentDevice
@@ -108,6 +148,22 @@ export function DevicesPage({ onCurrentDeviceRevoked }: Props) {
           )
         })}
       </div>
+      {passkeysEnabled && <section className="passkey-panel" aria-labelledby="passkeys-title">
+        <h2 id="passkeys-title">Passkeys</h2>
+        <p>Use your phone or computer's built-in authenticator (fingerprint, face unlock or device PIN) to sign in. Your password remains available as a recovery method.</p>
+        <button type="button" disabled={passkeyBusy} onClick={() => { void addPasskey() }}>{passkeyBusy ? 'Please wait…' : 'Add a passkey on this device'}</button>
+        {passkeyAction && <form className="passkey-confirm" onSubmit={confirmPasskeyAction}>
+          <label>Confirm account password
+            <input type="password" autoComplete="current-password" required value={passkeyPassword} onChange={e => setPasskeyPassword(e.target.value)} />
+          </label>
+          <button type="submit" disabled={passkeyBusy || !passkeyPassword}>{passkeyBusy ? 'Please wait…' : 'Confirm'}</button>
+          <button type="button" className="secondary" disabled={passkeyBusy} onClick={() => { setPasskeyAction(null); setPasskeyPassword('') }}>Cancel</button>
+        </form>}
+        {passkeys.length === 0 ? <p>No passkeys registered.</p> : <ul>{passkeys.map(passkey => <li key={passkey.credentialId}>
+          <strong>{passkey.name || 'Passkey'}</strong> · Added {dateTime(passkey.createdAt)}{passkey.isBackedUp ? ' · Synced backup' : ''}
+          <button type="button" className="device-revoke" disabled={passkeyBusy} onClick={() => { void deletePasskey(passkey) }}>Remove</button>
+        </li>)}</ul>}
+      </section>}
       <p className="devices-note">{t('devices.note')}</p>
     </section>
   )

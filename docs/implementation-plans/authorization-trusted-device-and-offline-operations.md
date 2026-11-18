@@ -1,6 +1,6 @@
 # RBOS Authorization, Trusted-Device Login and Offline Operations — Implementation Plan
 
-**Status:** Phases 1–3 have implementation branches; Phase 1 and Phase 2 CI evidence recorded, Phase 3 implementation awaiting its PR CI. Phases 4–6 remain.  
+**Status:** Phases 1–3 have implementation branches. Phase 4 local privacy lock is implemented on `auth/pin-and-passkey-unlock`; passkey registration is blocked pending an owner-approved HTTPS RP domain and supported-browser acceptance. Phases 5–6 remain in progress on subsequent stacked branches.  
 **Last reviewed:** 2026-11-17  
 **Planning baseline:** `main` after PR #30 merge (`c14f30208ce272ec9797f65f503034041d5ba92e`)  
 **Scope:** API authorization baseline first, then reliable persistent login, trusted devices, PIN/passkeys, and finally offline shop operations
@@ -255,10 +255,12 @@ Tasks:
 
 ### Phase 4 — PIN lock and optional passkey/biometric unlock
 
+**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented. ASP.NET Core Identity 10 passkey persistence, registration, listing/removal and passkey sign-in are also implemented behind an explicit RP-domain configuration gate. Registration and removal require current-password confirmation; no guessed hostname or host-header-derived RP scope is used. Passkeys remain disabled until the owner supplies the production HTTPS hostname in `Auth:Passkeys:ServerDomain` and the same exact hostname is allowed by `AllowedHosts`. Phase 4 code is implemented; migration 047, CI and supported-browser acceptance remain pending. The PIN remains a UI privacy feature only; it does not replace Identity authentication or cryptographically protect browser data.
+
 #### 4.1 PIN
 
 1. First successful online sign-in and device registration leads to mandatory setup of a four-digit app PIN. Accept exactly four numeric digits (0000–9999); never require six digits.
-2. PIN confirmation is required; allow the user to change it later after reauthentication.
+2. PIN confirmation is required; allow the user to change it after entering the current PIN. If forgotten, require online sign-out/re-authentication before resetting the local verifier.
 3. Apply rate limits, progressive delay/lockout, privacy-safe recovery and audit.
 4. Do not save the PIN, a reversible PIN, or an unprotected encryption key in browser storage.
 5. Decide whether the online app-lock PIN is merely a local privacy lock or a server-verified reauthentication factor. Do not present a front-end-only check as strong authentication.
@@ -390,7 +392,7 @@ Each PR must be focused, run the applicable tests, include an implementation not
 
 ## 9. Current implementation checkpoint and next work
 
-The original sequence-1 recommendation is historical. Current branches now contain Phase 1 fail-closed authorization, Phase 2 persistent login/network-state handling, and Phase 3 trusted-device registration/revocation. PRs remain unmerged by instruction. Phase 4 is next: implement the four-digit local privacy lock and validate .NET 10 Identity passkey support against the actual deployment origin before enabling passkeys. Do not invent a relying-party domain. Phase 5 must follow a documented browser cryptography/storage proof of concept; Phase 6 must retain server-authoritative validation, posting and invoice numbering.
+The original sequence-1 recommendation is historical. Branches now contain Phases 1–3 and a Phase 4 local privacy lock. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phases 5 and 6 are being delivered on separate stacked branches. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
 
 ## 10. Scope guardrails
 

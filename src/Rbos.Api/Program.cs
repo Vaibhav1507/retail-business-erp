@@ -59,6 +59,24 @@ if (args.Contains("--migrate"))
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 QuestPDF.Settings.UseSystemFonts = true;
 var builder = WebApplication.CreateBuilder(args);
+var passkeyDomain = builder.Configuration["Auth:Passkeys:ServerDomain"]?.Trim().ToLowerInvariant();
+if (!string.IsNullOrWhiteSpace(passkeyDomain))
+{
+    if (Uri.CheckHostName(passkeyDomain) != UriHostNameType.Dns)
+        throw new InvalidOperationException("Auth:Passkeys:ServerDomain must be a valid DNS host name.");
+    var allowedHosts = builder.Configuration["AllowedHosts"];
+    var configuredHosts = allowedHosts?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+    if (configuredHosts.Length == 0 || (configuredHosts.Length == 1 && configuredHosts[0] == "*"))
+        builder.Configuration["AllowedHosts"] = passkeyDomain;
+    else if (configuredHosts.Length != 1 || !configuredHosts[0].Equals(passkeyDomain, StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException("When passkeys are enabled, AllowedHosts must contain only the exact Auth:Passkeys:ServerDomain host. Wildcards and alternate hosts are not allowed.");
+    builder.Services.Configure<IdentityPasskeyOptions>(options =>
+    {
+        options.ServerDomain = passkeyDomain;
+        options.UserVerificationRequirement = "required";
+        options.ResidentKeyRequirement = "required";
+    });
+}
 var dbKey = (builder.Configuration["Rbos:Database"] ?? "dev") switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
 var appCs = builder.Configuration[dbKey] ?? throw new InvalidOperationException($"Missing secret {dbKey}");
 builder.Services.AddSingleton(Npgsql.NpgsqlDataSource.Create(appCs));
@@ -103,6 +121,7 @@ builder.Services.AddScoped<Rbos.Api.Application.AuditHistoryService>();
 builder.Services.AddDbContext<RbosIdentityDbContext>(o => o.UseNpgsql(appCs));
 builder.Services.AddIdentity<Microsoft.AspNetCore.Identity.IdentityUser<Guid>, Microsoft.AspNetCore.Identity.IdentityRole<Guid>>(o =>
 {
+    o.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
 	o.Password.RequiredLength = 12;
 	o.Lockout.MaxFailedAccessAttempts = 5;
 	o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);

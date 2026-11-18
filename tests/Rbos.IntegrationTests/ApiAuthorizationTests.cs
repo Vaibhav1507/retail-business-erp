@@ -92,6 +92,22 @@ public sealed class ApiAuthorizationTests(ApiFactory factory) : IClassFixture<Ap
     }
 
     [Fact]
+    public async Task Passkeys_are_disabled_without_an_explicit_rp_domain_and_public_routes_fail_closed()
+    {
+        var client = new Client(factory);
+        var config = await client.Raw("/auth/passkeys/config");
+        Assert.Equal(HttpStatusCode.OK, config.StatusCode);
+        var json = await config.Content.ReadAsStringAsync();
+        Assert.Contains("\"enabled\":false", json, StringComparison.OrdinalIgnoreCase);
+
+        var options = await client.Send(HttpMethod.Post, "/auth/passkeys/request-options", new { });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, options.StatusCode);
+
+        var registration = await client.Send(HttpMethod.Post, "/auth/passkeys/creation-options", new { });
+        Assert.Equal(HttpStatusCode.Unauthorized, registration.StatusCode);
+    }
+
+    [Fact]
     public async Task Brand_endpoints_are_registered_and_owner_can_create_a_brand()
     {
         var client = new Client(factory);
