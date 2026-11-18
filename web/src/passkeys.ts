@@ -83,10 +83,20 @@ export async function passkeyEnabled(): Promise<boolean> {
   } catch { return false }
 }
 
-export async function signInWithPasskey(): Promise<void> {
+// Fetch the challenge before the user taps the button. Waiting for a network
+// request after the tap can consume Android Chrome's transient user activation,
+// causing credentials.get() to fail without showing the credential chooser.
+export async function preparePasskeySignIn(): Promise<PublicKeyCredentialRequestOptions> {
   ensureSupported()
   const raw = await api<JsonRequestOptions>('POST', '/auth/passkeys/request-options', {})
-  const credential = await navigator.credentials.get({ publicKey: decodeRequestOptions(raw) })
+  return decodeRequestOptions(raw)
+}
+
+export async function signInWithPasskey(options: PublicKeyCredentialRequestOptions): Promise<void> {
+  ensureSupported()
+  // Invoke the browser prompt immediately in the click's user-activation turn.
+  const credentialPromise = navigator.credentials.get({ publicKey: options })
+  const credential = await credentialPromise
   if (!(credential instanceof PublicKeyCredential)) throw new Error('Passkey sign-in was cancelled or not completed.')
   await api('POST', '/auth/passkeys/sign-in', { credentialJson: credentialJson(credential) })
   resetCsrf()

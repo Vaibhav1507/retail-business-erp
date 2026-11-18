@@ -70,7 +70,18 @@ function transactionDone(tx: IDBTransaction) {
     tx.onerror = () => reject(tx.error ?? new Error('Offline storage transaction failed.'))
   })
 }
-const encode = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes))
+// Avoid spreading a large encrypted catalogue into function arguments. Android
+// browsers can throw RangeError once the snapshot grows beyond the call-stack limit.
+export function encodeOfflineBytes(bytes: Uint8Array): string {
+  const chunkSize = 0x8000
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length))
+    binary += String.fromCharCode(...chunk)
+  }
+  return btoa(binary)
+}
+const encode = encodeOfflineBytes
 const decode = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0))
 async function scopeKey(ownerKey: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ownerKey))

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, otpEnabled, resetCsrf } from './api'
 import { BusinessSetup } from './BusinessSetup'
-import { passkeyEnabled, signInWithPasskey } from './passkeys'
+import { passkeyEnabled, preparePasskeySignIn, signInWithPasskey } from './passkeys'
 
 const MOBILE_RE = /^[6-9][0-9]{9}$/
 
@@ -16,7 +16,17 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [otp, setOtp] = useState(false)
   const [passkeyAvailable, setPasskeyAvailable] = useState(false)
-  useEffect(() => { otpEnabled().then(setOtp); passkeyEnabled().then(setPasskeyAvailable) }, [])
+  const [passkeyOptions, setPasskeyOptions] = useState<PublicKeyCredentialRequestOptions | null>(null)
+  useEffect(() => {
+    otpEnabled().then(setOtp)
+    passkeyEnabled().then(async enabled => {
+      setPasskeyAvailable(enabled)
+      if (enabled) {
+        try { setPasskeyOptions(await preparePasskeySignIn()) }
+        catch { setPasskeyAvailable(false) }
+      }
+    })
+  }, [])
 
   const value = id.trim()
   const isMobile = otp && /^[0-9]+$/.test(value)
@@ -49,10 +59,18 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
     setError('')
     setBusy(true)
     try {
-      await signInWithPasskey()
+      if (!passkeyOptions) throw new Error('Passkey sign-in is still preparing. Please try again in a moment.')
+      await signInWithPasskey(passkeyOptions)
       resetCsrf()
       onDone()
-    } catch (err) { setError(err instanceof Error ? err.message : 'Passkey sign-in failed') }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setError('No passkey was selected. If this is your first sign-in on this phone, sign in with your password first, then register a passkey under More → Devices.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Passkey sign-in failed')
+      }
+      try { setPasskeyOptions(await preparePasskeySignIn()) } catch { setPasskeyOptions(null) }
+    }
     finally { setBusy(false) }
   }
 
@@ -76,7 +94,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
 		  {dev && <p className="hint wide">Development code: {dev}</p>}
 		</>}
 		<button type="submit" className="wide" disabled={busy}>{isMobile ? (sent ? 'Verify and sign in' : 'Send code') : 'Sign in'}</button>
-		{passkeyAvailable && <button type="button" className="secondary wide" disabled={busy} onClick={() => { void passkeySubmit() }}>Sign in with passkey</button>}
+		{passkeyAvailable && <button type="button" className="secondary wide" disabled={busy || !passkeyOptions} onClick={() => { void passkeySubmit() }}>{passkeyOptions ? 'Sign in with passkey' : 'Preparing passkey sign-in…'}</button>}
 		<button type="button" className="secondary wide" onClick={() => { setRegister(true); setError('') }}>Create an account</button>
 		{error && <p role="alert" className="wide">{error}</p>}
 	  </form>
