@@ -419,13 +419,24 @@ public sealed class FinanceService(TenantDb db)
     {
         var (s, _, err) = await OpenAsync(uid, ct); if (err is not null) return err;
         await using var __ = s!;
-        var rows = await Rows(s!, @"select p.id, p.name, c.total_quantity, c.inventory_value, c.wac,
-                coalesce(m.q,0), coalesce(m.v,0), coalesce(b.q,0)
+        var rows = await Rows(s!, @"with movement as (
+                select m.tenant_id, coalesce(a.canonical_product_id, m.product_id) as product_id,
+                       sum(m.quantity_delta) as q, sum(m.value_delta) as v
+                from inventory.stock_movement m
+                left join catalog.product_alias a on a.tenant_id=m.tenant_id and a.alias_product_id=m.product_id
+                group by m.tenant_id, coalesce(a.canonical_product_id, m.product_id)
+            ), balance as (
+                select tenant_id, product_id, sum(quantity) as q from inventory.stock_balance group by tenant_id, product_id
+            )
+            select p.id, p.name, c.total_quantity, c.inventory_value, c.wac,
+                   coalesce(m.q,0), coalesce(m.v,0), coalesce(b.q,0)
             from catalog.product p
-            left join inventory.item_cost c on c.product_id=p.id and c.tenant_id=p.tenant_id
-            left join (select tenant_id, product_id, sum(quantity_delta) q, sum(value_delta) v from inventory.stock_movement group by tenant_id, product_id) m on m.product_id=p.id and m.tenant_id=p.tenant_id
-            left join (select tenant_id, product_id, sum(quantity) q from inventory.stock_balance group by tenant_id, product_id) b on b.product_id=p.id and b.tenant_id=p.tenant_id
-            where coalesce(c.total_quantity,0) <> coalesce(m.q,0) or abs(coalesce(c.inventory_value,0) - coalesce(m.v,0)) > 0.05 or coalesce(c.total_quantity,0) <> coalesce(b.q,0)
+            left join inventory.item_cost c on c.tenant_id=p.tenant_id and c.product_id=p.id
+            left join movement m on m.tenant_id=p.tenant_id and m.product_id=p.id
+            left join balance b on b.tenant_id=p.tenant_id and b.product_id=p.id
+            where p.is_active and (coalesce(c.total_quantity,0) <> coalesce(m.q,0)
+                or abs(coalesce(c.inventory_value,0) - coalesce(m.v,0)) > 0.01
+                or coalesce(c.total_quantity,0) <> coalesce(b.q,0))
             order by p.name limit 200", ct);
         var items = rows.Select(r => new { productId = r[0], name = r[1], costQuantity = r[2] is DBNull ? 0m : (decimal)r[2], costValue = r[3] is DBNull ? 0m : (decimal)r[3], wac = r[4] is DBNull ? 0m : (decimal)r[4], movementQuantity = (decimal)r[5], movementValue = (decimal)r[6], balanceQuantity = (decimal)r[7] }).ToList();
         var replay = await ReplayFlagsAsync(s!, ct); return ServiceResult<object>.Ok(new { ok = items.Count == 0 && replay.Count == 0, items, replay });
@@ -435,7 +446,12 @@ public sealed class FinanceService(TenantDb db)
     static async Task<List<object>> ReplayFlagsAsync(TenantSession s, CancellationToken ct)
     {
         var replay = new List<object>();
-        var moves = await Rows(s, "select m.product_id, p.name, m.id, m.quantity_delta, m.value_delta from inventory.stock_movement m join catalog.product p on p.id=m.product_id and p.tenant_id=m.tenant_id order by m.product_id, m.occurred_at, m.id", ct);
+        var moves = await Rows(s, @"select coalesce(a.canonical_product_id, m.product_id) as product_id,
+                    p.name, m.id, m.quantity_delta, m.value_delta
+                from inventory.stock_movement m
+                left join catalog.product_alias a on a.tenant_id=m.tenant_id and a.alias_product_id=m.product_id
+                join catalog.product p on p.tenant_id=m.tenant_id and p.id=coalesce(a.canonical_product_id, m.product_id)
+                order by coalesce(a.canonical_product_id, m.product_id), m.effective_date, m.occurred_at, m.id", ct);
         Guid? current = null; decimal qty = 0m, val = 0m; var flagged = false;
         foreach (var mv in moves)
         {
@@ -444,7 +460,7 @@ public sealed class FinanceService(TenantDb db)
             var dq = (decimal)mv[3]; var dv = (decimal)mv[4];
             if (dq < 0m && !flagged)
             {
-                var expected = qty <= 0m ? 0m : -decimal.Round(-dq * val / qty, 2);
+                var expected = qty <= 0m ? 0m : -Money.Round(-dq * val / qty);
                 if (qty + dq < 0m || Math.Abs(expected - dv) > 0.05m)
                 {
                     flagged = true;
