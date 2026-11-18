@@ -447,12 +447,12 @@ public sealed class FinanceService(TenantDb db)
     static async Task<List<object>> ReplayFlagsAsync(TenantSession s, CancellationToken ct)
     {
         var replay = new List<object>();
-        var moves = await Rows(s, @"select m.product_id, p.name, m.id, m.quantity_delta, m.value_delta
+        var moves = await Rows(s, @"select coalesce(a.canonical_product_id, m.product_id) as product_id,
+                    p.name, m.id, m.quantity_delta, m.value_delta
                 from inventory.stock_movement m
-                join catalog.product p on p.tenant_id=m.tenant_id and p.id=m.product_id
-                -- Historical issue values were calculated against the original product's WAC.
-                -- Alias consolidation changes current projections, not the cost basis of past movements.
-                order by m.product_id, m.effective_date, m.occurred_at, m.id", ct);
+                left join catalog.product_alias a on a.tenant_id=m.tenant_id and a.alias_product_id=m.product_id
+                join catalog.product p on p.tenant_id=m.tenant_id and p.id=coalesce(a.canonical_product_id, m.product_id)
+                order by coalesce(a.canonical_product_id, m.product_id), m.effective_date, m.occurred_at, m.id", ct);
         Guid? current = null; decimal qty = 0m, val = 0m; var flagged = false;
         foreach (var mv in moves)
         {
