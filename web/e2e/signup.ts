@@ -91,8 +91,12 @@ export async function saveNewProduct(page: Page, form: Locator, name: string) {
   const responseBody = await response.text()
   expect(response.ok(), `POST /api/products failed (${response.status()}): ${responseBody}`).toBeTruthy()
   await expect(form, 'The product form should close after a successful save').toBeHidden()
+  const productRow = page
+    .getByRole('region', { name: 'Products' })
+    .getByRole('row')
+    .filter({ hasText: name })
   await expect(
-    page.getByRole('region', { name: 'Products' }).getByRole('cell', { name, exact: true }),
+    productRow,
     'The saved product should appear in the Products list',
   ).toBeVisible({ timeout: 15000 })
 }
