@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeOfflineStorageError, offlineRecordStorageId } from './offlineStore'
+import { describeOfflineStorageError, encodeOfflineBytes, offlineRecordStorageId } from './offlineStore'
 
 describe('offline record ownership keys', () => {
   it('keeps the same logical record ID isolated between user/tenant scopes', () => {
@@ -25,5 +25,16 @@ describe('offline storage diagnostics', () => {
   it('handles non-Error failures without leaking object contents', () => {
     expect(describeOfflineStorageError({ secret: 'must not be displayed' }))
       .toBe('Unknown browser storage error')
+  })
+})
+
+
+describe('offline byte encoding', () => {
+  it('encodes snapshots larger than the JavaScript argument limit safely', () => {
+    const bytes = new Uint8Array(512 * 1024)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = i % 251
+    const encoded = encodeOfflineBytes(bytes)
+    const decoded = Uint8Array.from(atob(encoded), char => char.charCodeAt(0))
+    expect(decoded).toEqual(bytes)
   })
 })
