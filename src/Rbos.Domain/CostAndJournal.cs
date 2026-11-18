@@ -7,8 +7,8 @@ public readonly record struct CostState(decimal TotalQuantity, decimal Inventory
 }
 
 /// <summary>
-/// Weighted average cost for the Slice 1 subset only: receipts at a known positive cost.
-/// Sales, returns, cost correction and revaluation are not implemented.
+/// Weighted average cost calculation and persisted precision shared by inventory posting paths.
+/// WAC uses four decimal places until a CA-approved policy and schema change otherwise.
 /// </summary>
 public static class WeightedAverageCostCalculator
 {
