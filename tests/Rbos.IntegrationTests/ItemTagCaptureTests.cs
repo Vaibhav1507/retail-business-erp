@@ -19,18 +19,16 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
     }
 
-    static async Task Review(Client client, Guid id, Guid productId)
-    {
-        var response = await client.Send(HttpMethod.Put, "/sales/item-tag-captures/" + id + "/review",
+    static async Task<HttpResponseMessage> Review(
+        Client client, Guid id, Guid productId, string? barcode = null)
+        => await client.Send(HttpMethod.Put, "/sales/item-tag-captures/" + id + "/review",
             new
             {
                 productId, productName = "RBOS Test Cable", brand = (string?)null, model = (string?)null,
-                barcode = (string?)null, barcodeSymbology = (string?)null,
+                barcode, barcodeSymbology = barcode is null ? null : "EAN_13",
                 serial = (string?)null, imei1 = (string?)null, imei2 = (string?)null,
                 mrp = (decimal?)null, hsnCode = (string?)null
             });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
 
     static async Task<(Client Client, Guid LocationId, Guid ProductId)> Stocked(ApiFactory factory)
     {
@@ -102,6 +100,50 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal("ReadyForReview", body.GetProperty("status").GetString());
         Assert.Equal(code, body.GetProperty("extraction").GetProperty("barcode").GetString());
         Assert.Equal(productId, body.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
+    }
+
+    [Fact]
+    public async Task Confirmed_barcode_is_learned_for_existing_product_and_reused_on_future_scans()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        var productId = await client.AddProduct("Existing LG Television");
+        const string code = "4006381333931";
+
+        var captureId = await Upload(client);
+        var review = await Review(client, captureId, productId, code);
+        Assert.Equal(HttpStatusCode.OK, review.StatusCode);
+
+        var lookup = await client.GetJson("/products/by-barcode?code=" + code);
+        Assert.Equal(productId, lookup.GetProperty("productId").GetGuid());
+
+        var repeated = await Review(client, captureId, productId, code);
+        Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
+        var list = await client.GetJson("/products/" + productId + "/barcodes");
+        Assert.Single(list.GetProperty("barcodes").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Confirmed_barcode_cannot_be_reassigned_from_another_product()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        const string code = "4006381333931";
+        var original = await client.Send(HttpMethod.Post, "/products", new
+        {
+            name = "Original barcode owner", categoryName = "Accessories", isGeneric = true,
+            baseUnit = "pcs", barcode = code
+        });
+        Assert.Equal(HttpStatusCode.OK, original.StatusCode);
+        var originalId = (await original.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var otherProduct = await client.AddProduct("Different product");
+
+        var captureId = await Upload(client);
+        var conflict = await Review(client, captureId, otherProduct, code);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+
+        var lookup = await client.GetJson("/products/by-barcode?code=" + code);
+        Assert.Equal(originalId, lookup.GetProperty("productId").GetGuid());
     }
 
     [Fact]

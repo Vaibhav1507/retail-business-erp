@@ -299,6 +299,14 @@ public sealed class ItemTagCaptureService(
         if (captureStatus is not ("ReadyForReview" or "NeedsAttention" or "Reviewed"))
             return ServiceResult<object>.Fail("Capture is no longer available for review.", 409);
 
+        // A confirmed product barcode is catalogue data, not just photo metadata.
+        // Link it in this transaction so the next scan resolves locally. Existing mappings
+        // to this product are idempotent; mappings owned by another product are never moved.
+        if (barcode is not null &&
+            !await BarcodeService.LinkOrConfirmAsync(s, tid.Value, review.ProductId, barcode,
+                BarcodeRules.CleanSymbology(review.BarcodeSymbology), ct))
+            return ServiceResult<object>.Fail("This barcode is already linked to a different product. Review the product selection or manage the barcode from the catalogue.", 409);
+
         var duplicate = false;
         if (!string.IsNullOrWhiteSpace(review.Serial))
             duplicate = await SqlHelpers.Scalar<bool>(s,

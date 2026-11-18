@@ -106,6 +106,46 @@ public sealed class BarcodeService(TenantDb db)
         return ServiceResult<object>.Ok(new { id, code = norm, packQuantity = pack });
     }
 
+    /// <summary>
+    /// Adds a confirmed product barcode, or confirms that it is already mapped to the
+    /// same product. A barcode owned by another product is never reassigned.
+    /// Must be called inside the caller's tenant-scoped transaction.
+    /// </summary>
+    public static async Task<bool> LinkOrConfirmAsync(
+        TenantSession s, Guid tid, Guid productId, string code, string? symbology, CancellationToken ct)
+    {
+        var (norm, err) = BarcodeRules.Normalize(code);
+        if (err is not null) return false;
+
+        await using (var existing = s.Command(
+            "select product_id from catalog.product_barcode where tenant_id=@t and code=@c"))
+        {
+            existing.Parameters.AddWithValue("t", tid);
+            existing.Parameters.AddWithValue("c", norm!);
+            var owner = await existing.ExecuteScalarAsync(ct);
+            if (owner is Guid ownerId) return ownerId == productId;
+        }
+
+        await using (var insert = s.Command(@"
+            insert into catalog.product_barcode(tenant_id,id,product_id,code,symbology,pack_quantity)
+            values (@t,@i,@p,@c,@y,1) on conflict do nothing"))
+        {
+            insert.Parameters.AddWithValue("t", tid);
+            insert.Parameters.AddWithValue("i", Guid.NewGuid());
+            insert.Parameters.AddWithValue("p", productId);
+            insert.Parameters.AddWithValue("c", norm!);
+            insert.Parameters.AddWithValue("y", (object?)symbology ?? DBNull.Value);
+            if (await insert.ExecuteNonQueryAsync(ct) == 1) return true;
+        }
+
+        // A concurrent request may have inserted the mapping after the first read.
+        await using var verify = s.Command(
+            "select product_id from catalog.product_barcode where tenant_id=@t and code=@c");
+        verify.Parameters.AddWithValue("t", tid);
+        verify.Parameters.AddWithValue("c", norm!);
+        return await verify.ExecuteScalarAsync(ct) is Guid finalOwner && finalOwner == productId;
+    }
+
 	/// <summary>Links a barcode to a product inside an existing session; skips codes already mapped (never re-points a mapping).</summary>
 	public static async Task<bool> LinkIfFreeAsync(TenantSession s, Guid tid, Guid productId, string code, CancellationToken ct)
 	{
