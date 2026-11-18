@@ -53,6 +53,23 @@ export async function openAddProduct(page: Page) {
   return products.getByRole('form', { name: 'Add product' })
 }
 
+/** Submit the product, expose API rejections, then verify it through catalogue search. */
+export async function createProductAndVerify(page: Page, form: Locator, name: string) {
+  const products = page.getByRole('region', { name: 'Products' })
+  const responsePromise = page.waitForResponse(response =>
+    response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/products'
+  )
+  await form.getByRole('button', { name: 'Add product', exact: true }).click()
+  const response = await responsePromise
+  const responseBody = await response.text()
+  expect(response.ok(), `POST /api/products returned ${response.status()}: ${responseBody}`).toBe(true)
+
+  // The catalogue is paged (10 rows by default). Search for the newly saved item instead
+  // of assuming it will be on the first page when the tenant already has many products.
+  await products.getByRole('search').getByLabel('Search', { exact: true }).fill(name)
+  await expect(products.getByRole('cell', { name, exact: true })).toBeVisible({ timeout: 30_000 })
+}
+
 /** Category is a select: pick an existing one, otherwise choose "Other" and type a new one. */
 export async function chooseCategory(form: Locator, name: string) {
   const select = form.getByLabel('Category')
