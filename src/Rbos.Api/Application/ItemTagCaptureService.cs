@@ -293,6 +293,12 @@ public sealed class ItemTagCaptureService(
             "select id from catalog.product where id=@p and is_active", ct, ("p", review.ProductId));
         if (exists is null) return ServiceResult<object>.Fail("Selected product was not found in this business.", 404);
 
+        var captureStatus = await SqlHelpers.Scalar<string>(s,
+            "select status from sales.item_tag_capture where id=@i", ct, ("i", id));
+        if (captureStatus is null) return ServiceResult<object>.Fail("Capture not found.", 404);
+        if (captureStatus is not ("ReadyForReview" or "NeedsAttention" or "Reviewed"))
+            return ServiceResult<object>.Fail("Capture is no longer available for review.", 409);
+
         var duplicate = false;
         if (!string.IsNullOrWhiteSpace(review.Serial))
             duplicate = await SqlHelpers.Scalar<bool>(s,
