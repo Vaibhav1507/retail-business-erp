@@ -39,7 +39,6 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
             catch (FormatException) { return ServiceResult<object>.Fail("A page could not be read."); }
             extra.Add((pm, pb));
         }
-        var apiKey = cfg["Gemini:ApiKey"];
 
         if (mime is null || !Allowed.Contains(mime)) return ServiceResult<object>.Fail("Upload a JPEG, PNG, WebP or PDF file.");
         if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<object>.Fail("File is empty or larger than 8 MB.");

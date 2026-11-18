@@ -550,10 +550,24 @@ Provider limits, model availability, prices and terms change. Re-check official 
 - [x] Finish source-level review and remove superseded direct provider clients/tests.
 - [ ] Re-run the .NET Release build and unit tests after the latest fixes.
 - [ ] Re-run full CI migration validation, frontend checks and deployment-container build.
-- [ ] Fix every implementation or CI issue found and rerun relevant checks.
+- [x] Fixed CI-discovered issues: cost rounding, paid-cost eligibility, numeric structured-output validation and forced RLS for the usage ledger; reran full CI successfully.
 - [ ] Update this plan/status document with final CI evidence and PR #45 link.
-- [ ] Open one combined PR for PR A. Do not merge or deploy without explicit owner approval.
+- [x] Opened one combined PR for PR A: [PR #45](https://github.com/Vaibhav1507/retail-business-erp/pull/45). It is ready for review; do not merge or deploy without explicit owner approval.
 
 ### PR B sequencing gate
 
 Invoice item-tag photo capture is **not started** in this workstream. Start PR B only after PR A is merged into `main` and the owner explicitly confirms that PR B may begin.
+
+
+### Final CI evidence — 2026-11-18
+
+GitHub Actions run **#555** for commit `44c1777a4e5e6651c26e21f24d8e144ded5c7780` completed successfully.
+
+- Backend Release build: passed (one existing CA1416 platform-compatibility warning in `PdfPageReader.cs`, no errors).
+- Database migration validation: passed; migrations 001 through 048 applied to the throwaway CI database.
+- Unit tests: 121 passed, 0 failed.
+- Integration tests: 153 passed, 0 failed.
+- Frontend: TypeScript check, frontend tests and production build passed.
+- Deployment container: built successfully; no image push or deployment was performed.
+
+PR #45 remains unmerged. PR B remains gated on PR A merge plus explicit owner confirmation.

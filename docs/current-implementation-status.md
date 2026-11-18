@@ -79,25 +79,25 @@ Durable recovery records:
 
 **Branch:** `feat/central-ai-gateway`  
 **Base commit:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
-**State:** Draft PR #45 is open. Frontend checks and backend Release build/migration validation passed on the second CI attempt; unit tests then exposed a paid-cost gate test, voice numeric validation and missing forced RLS on the usage table. Those fixes are in the latest commits; CI rerun is pending. Not merged or deployed.
+**State:** PR #45 is open and all CI jobs passed on 2026-11-18 (run #555, commit `44c1777`). Backend Release build passed; migrations 001–048 applied; 121 unit tests and 153 integration tests passed; frontend checks/build and deployment-container build passed. Not merged or deployed.
 
 The provider-call table above describes the current `main` baseline. PR A consolidates those paths behind one internal `AiGateway`.
 
 | Area | Draft implementation | Remaining validation |
 |---|---|---|
-| Gateway | Provider-neutral contracts, Gemini/Groq adapters, feature/provider kill switches, bounded attempts, timeout and structured validation | Follow-up Release build, tests and review |
+| Gateway | Provider-neutral contracts, Gemini/Groq adapters, feature/provider kill switches, bounded attempts, timeout and structured validation | CI Release build, unit/integration tests, migration validation and container build all passed; code review remains |
 | Credential pool | Concurrent round-robin; Gemini project and Groq team quota buckets; 429 cooldown; invalid-key suppression; circuit breaker | CI concurrency/failure-path evidence |
 | Cost control | Unknown billing fails closed; paid calls require explicit opt-in, pricing and cost estimate; monthly global/per-tenant hard limits | Migration execution and database-backed evidence |
-| Usage ledger | Migration 048, serialized reservation/settlement, metadata-only events | Validate forced-RLS membership and usage-event policies and query access |
-| Invoice extraction | Gateway-backed Gemini extraction and opt-in Groq fallback; output remains an unsaved draft | Regression tests and CI |
+| Usage ledger | Migration 048, serialized reservation/settlement, metadata-only events | Forced-RLS migration validation passed in CI; verify operational reporting queries during rollout |
+| Invoice extraction | Gateway-backed Gemini extraction and opt-in Groq fallback; output remains an unsaved draft | Regression tests and CI passed |
 | Catalogue extraction | Gateway-backed Gemini/Groq photo/PDF extraction; local OCR/manual mapping recovery retained | Regression tests and CI |
 | Voice intent | Gateway-backed Gemini/Groq classification with the existing destination allowlist | Regression tests and CI |
 | Hosted transcription | Gateway-backed Groq Whisper only when explicitly enabled | Audio adapter tests and CI |
-| Local-first voice | Shruti remains local primary; no change intended | Verify local STT path was not altered |
+| Local-first voice | Shruti remains local primary; no change intended | Local Shruti path retained; verify behaviour in pilot acceptance |
 
 **Current safety defaults:** gateway disabled; Gemini/Groq providers disabled; paid providers disabled; existing hosted voice flags disabled. No API key, billing tier, production provider configuration, database or deployment has been changed by this branch.
 
-**Next gate:** finish review, run all CI checks and open one combined PR A. PR B (invoice item-tag photo capture) remains gated: do not begin until PR A is merged and the owner confirms.
+**CI evidence:** run #555 passed: Release build, migration 001–048 validation, 121 unit tests, 153 integration tests, frontend checks/build and deployment-container build (no push). [PR #45](https://github.com/Vaibhav1507/retail-business-erp/pull/45) is open and ready for review. No merge or deployment has occurred. PR B (invoice item-tag photo capture) remains gated: do not begin until PR A is merged and the owner confirms.
 
 ## Database and deployment
 
