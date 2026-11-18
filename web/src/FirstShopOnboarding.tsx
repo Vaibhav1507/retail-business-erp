@@ -44,7 +44,7 @@ export function FirstShopOnboarding({ offlineMode = false }: { offlineMode?: boo
       <div className="first-shop-count" aria-label={t('onboarding.progress', { done: completed, total: steps.length })}><strong>{completed}/{steps.length}</strong><span>{t('onboarding.doneLabel')}</span></div></div>
     <div className="first-shop-progress" role="progressbar" aria-label={t('onboarding.progressLabel')} aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={completed}><span style={{ width: percent + '%' }} /></div>
     {loading && <p role="status" className="first-shop-status">{t('onboarding.loading')}</p>}
-    {error && <div className="first-shop-error" role="alert"><p>{t('onboarding.error')}</p><button type="button" className="secondary" onClick={() => void refresh()}>{t('onboarding.retry')}</button></div>}
+    {error && <div className="first-shop-error" role="status" aria-live="polite"><p>{t('onboarding.error')}</p><button type="button" className="secondary" onClick={() => void refresh()}>{t('onboarding.retry')}</button></div>}
     {!loading && !error && <><ol className="first-shop-steps">{steps.map((step, index) => {
       const done = progress[step.key], current = !done && next?.key === step.key
       return <li key={step.key} className={done ? 'is-done' : current ? 'is-current' : ''}>
