@@ -56,6 +56,7 @@ function OpeningStock({ products, locations, reload }: { products: Product[]; lo
   return (
 	<section aria-label="Opening stock" className="billing-screen">
 	  <h2>Opening stock</h2>
+	  <p>Enter the quantity and an actual or owner-estimated unit cost for every item. Cost is required to value inventory and create the opening journal entry. RBOS will not guess a cost or post zero value.</p>
 	  <label>Location
 		<select value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
 	  </label>
@@ -68,7 +69,7 @@ function OpeningStock({ products, locations, reload }: { products: Product[]; lo
 		  </select>
 		</label>
 		<label>Quantity <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
-		<label>Unit cost (INR) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
+		<label>Unit cost (INR — actual or owner-estimated) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
 		<button type="button" onClick={addLine}>Add line</button>
 	  </div>
 	  <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}</li>)}</ul>
