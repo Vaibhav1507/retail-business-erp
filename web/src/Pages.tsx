@@ -89,7 +89,7 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
           ))}
         </div>
       )}
-      {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} />}
+      {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} />}
       {tab === 'bills' && <SalesHistory locations={c.locations} />}
       {tab === 'collect' && <AfterSales reload={c.reload} show="collect" />}
       {tab === 'return' && <AfterSales reload={c.reload} show="sreturn" />}

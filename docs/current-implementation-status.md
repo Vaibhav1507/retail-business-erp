@@ -1,8 +1,8 @@
 # Current implementation and repository status
 
-**Reviewed:** 2026-11-14  
+**Reviewed:** 2026-11-17  
 **Repository:** `Vaibhav1507/retail-business-erp`  
-**Source of truth:** current `main` code, SQL migrations, tests and GitHub Actions. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
+**Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
 ## Product and pilot status
 
@@ -45,10 +45,34 @@ Provider clients are feature-specific. Qwen vision is not the same client or tas
 |---|---|---|---|
 | #24 | H2 voice navigation | Merged | Implementation is in main |
 | #22 | Local Qwen LLM intent benchmark | Closed, not merged | Experiment remains separate; no production implementation was merged from this PR |
-| #25 | Mobile assistant quick-action wrapping | Open | Preferred focused CSS-only fix; wraps shortcut buttons onto following rows |
-| #26 | Duplicate quick-action wrapping fix | Open | Duplicate of #25; do not merge both. Close after confirming #25 is the retained PR |
+| #25 | Mobile assistant quick-action wrapping | Merged (2026-11-14) | CSS-only fix; wraps shortcut buttons onto following rows |
+| #26 | Duplicate quick-action wrapping fix | Closed, not merged | Duplicate of #25; retained PR #25 instead |
 
-PR #25 and #26 are UI-only CSS changes and are not part of the merged PR #24 baseline. The main branch remains the source of truth until a UI PR is merged.
+PR #25 is merged to `main`; duplicate PR #26 is closed without merge. The merged UI fix is part of the current main baseline.
+
+
+
+### Authorization, persistent login and offline operations — open implementation stack
+
+These changes are under review in separate stacked PRs. They are **not merged into main**, and implementation presence must not be mistaken for validated or production-ready functionality.
+
+| PR | Phase | Branch | Current implementation / evidence |
+|---|---|---|---|
+| [#31](https://github.com/Vaibhav1507/retail-business-erp/pull/31) | Plan | `plan/authorization-and-trusted-device` | Documentation-only implementation plan; open and unmerged. PIN policy corrected to exactly four digits (0000–9999). |
+| [#32](https://github.com/Vaibhav1507/retail-business-erp/pull/32) | 1 — API authorization | `security/fail-closed-api-authorization` | Explicit exact method/route classification and fail-closed enforcement; Brand routes registered. Latest-head CI run #395 passed. Human review remains for finance-read access and sensitive cost/WAC/value fields. |
+| [#33](https://github.com/Vaibhav1507/retail-business-erp/pull/33) | 2 — Persistent login | `auth/persistent-login-and-network-state` | 30-day persistent/sliding cookie, 90-day absolute server session age, logout revocation and recoverable network-state UX. CI #409 passed on its recorded implementation/test head; later PR-head run #410 failed before job steps, so latest head is not fully validated. |
+| [#34](https://github.com/Vaibhav1507/retail-business-erp/pull/34) | 3 — Trusted devices | `auth/trusted-device-registry` | User-scoped device registry, session linkage, list/revoke and security-event audit; migration 046. Latest PR-head CI #413 failed before job steps; no build/test ran. |
+| [#35](https://github.com/Vaibhav1507/retail-business-erp/pull/35) | 4 — PIN and passkeys | `auth/pin-and-passkey-unlock` | Four-digit local privacy lock and Identity passkey implementation; migration 047. Latest CI #487 failed before job steps; no build/test ran. Passkeys stay disabled until an exact HTTPS RP domain is explicitly approved and configured. |
+| [#40](https://github.com/Vaibhav1507/retail-business-erp/pull/40) | 5 — PWA/local store | `offline/pwa-shell-and-local-store-v3` | Versioned PWA shell, API cache exclusion and AES-GCM encrypted IndexedDB snapshot. CI #488 failed before job steps; no build/test ran. Follow-up review found fixed record IDs could collide across users/tenants; an owner-scoped physical-key correction and legacy-record compatibility fix are included downstream in PR #41 and still need browser/CI validation. |
+| [#41](https://github.com/Vaibhav1507/retail-business-erp/pull/41) | 6 — Offline sales | `offline/sales-outbox-and-sync-v3` | Encrypted sales outbox, stable idempotency key and server-authoritative sync. Run #500 and its retry failed before job steps; earlier runs #489–#492 also failed before runner allocation. Follow-up review fixed owner/tenant collisions in IndexedDB record IDs, added a focused key-isolation test, and kept 401 authentication-expired bills retryable after reauthentication. Current code/test head includes these changes. Latest-head run #510 and its retry both failed before any job steps; no logs were produced and no code/test step ran. GitHub's public status page showed all systems operational and no incidents on 2026-11-17, so repository Actions settings/usage and runner allocation require owner-side inspection. Real-browser offline/reconnect acceptance remains outstanding. |
+
+PRs #32–#35, #40 and #41 are open and unmerged. The older offline drafts #36–#39 are closed without merge and superseded by #40/#41. All open PRs in this stack currently report mergeable, but mergeability is not test evidence or approval to merge.
+
+The CI failures for Phases 2–6 show empty job-step arrays: GitHub Actions did not start the frontend/backend steps. The most recent Phase 6 attempt is run #510; both its original attempt and retry failed with empty step arrays and no downloadable logs. These are runner-allocation/infrastructure failures, not reported application test failures, but they also provide no successful validation. No production database migration or deployment has been performed for this stack.
+
+Durable recovery records:
+- `docs/implementation-plans/authorization-trusted-device-and-offline-operations.md`
+- `docs/implementation-log/README.md` and the phase-specific logs in `docs/implementation-log/`
 
 ## Database and deployment
 
@@ -76,7 +100,7 @@ The discovery report and knowledge-transfer system snapshots are historical inve
 ## Next acceptance work
 
 1. PR #25 merged the quick-action wrapping fix; PR #26 closed without merging.
-2. Run the frontend CI and verify the shortcut row on narrow Android/mobile viewports after the CSS PR is merged.
+2. Verify the merged quick-action wrapping fix on narrow Android/mobile viewports.
 3. Complete Android Chrome voice acceptance using non-real pilot data and a controlled rollback plan.
 4. Build a consented, anonymised Hindi/Hinglish/Bundelkhandi/Indian-English command audio set before making accuracy claims about Shruti or Whisper.
 5. Keep hosted voice and invoice fallback switches off until provider quotas/cost tier and pilot approval are confirmed.

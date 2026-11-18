@@ -4,7 +4,10 @@ const KEY_STORE = 'keys'
 const RECORD_STORE = 'records'
 
 type StoredRecord = {
+  // Physical IndexedDB key is owner-scoped. logicalId is the caller-visible ID.
+  // Older v1 records used a globally unique logical ID; read() keeps supporting them.
   id: string
+  logicalId?: string
   ownerKey: string
   kind: string
   state: string
@@ -58,6 +61,13 @@ async function scopeKey(ownerKey: string) {
   return encode(new Uint8Array(digest))
 }
 
+// The object store is keyed by one string, so include the hashed owner scope.
+// This prevents fixed IDs such as "tenant-snapshot" and "held-bills" from
+// colliding when different users/tenants share one browser profile.
+export function offlineRecordStorageId(ownerScope: string, logicalId: string) {
+  return ownerScope + ':' + logicalId
+}
+
 async function keyFor(ownerKey: string): Promise<CryptoKey> {
   const db = await openDb()
   try {
@@ -92,21 +102,31 @@ async function save<T>(ownerKey: string, id: string, kind: string, state: string
   const aad = new TextEncoder().encode(scope + ':' + id + ':' + kind)
   const plain = new TextEncoder().encode(JSON.stringify(value))
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, plain)
+  const storageId = offlineRecordStorageId(scope, id)
   const record: StoredRecord = {
-    id, ownerKey: scope, kind, state, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    id: storageId, logicalId: id, ownerKey: scope, kind, state,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     iv: encode(iv), ciphertext: encode(new Uint8Array(encrypted))
   }
   const db = await openDb()
   try {
     const tx = db.transaction(RECORD_STORE, 'readwrite')
-    tx.objectStore(RECORD_STORE).put(record)
+    const store = tx.objectStore(RECORD_STORE)
+    // Migrate a legacy v1 record with this logical ID only when it belongs to
+    // the same owner. Never delete another owner's legacy record.
+    const legacy = store.get(id)
+    legacy.onsuccess = () => {
+      if (legacy.result?.ownerKey === scope && legacy.result.id !== storageId) store.delete(id)
+      store.put(record)
+    }
     await transactionDone(tx)
   } finally { db.close() }
 }
 
 async function read<T>(record: StoredRecord): Promise<T> {
   const key = await keyFor(record.ownerKey)
-  const aad = new TextEncoder().encode(record.ownerKey + ':' + record.id + ':' + record.kind)
+  const logicalId = record.logicalId ?? record.id
+  const aad = new TextEncoder().encode(record.ownerKey + ':' + logicalId + ':' + record.kind)
   const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(record.iv), additionalData: aad }, key, decode(record.ciphertext))
   return JSON.parse(new TextDecoder().decode(plain)) as T
 }
@@ -137,7 +157,7 @@ export async function saveOfflineSnapshot(ownerKey: string, snapshot: Omit<Offli
 
 export async function loadOfflineSnapshot(ownerKey: string): Promise<OfflineSnapshot | null> {
   const records = await recordsFor(ownerKey)
-  const record = records.find(x => x.id === 'tenant-snapshot' && x.kind === 'snapshot')
+  const record = records.find(x => (x.logicalId ?? x.id) === 'tenant-snapshot' && x.kind === 'snapshot')
   return record ? read<OfflineSnapshot>(record) : null
 }
 
@@ -149,7 +169,7 @@ export async function readOfflineRecords<T>(ownerKey: string, kind: string): Pro
   const records = (await recordsFor(ownerKey)).filter(x => x.kind === kind)
   const result: { id: string; state: string; value: T; createdAt: string; updatedAt: string }[] = []
   for (const record of records) {
-    result.push({ id: record.id, state: record.state, value: await read<T>(record), createdAt: record.createdAt, updatedAt: record.updatedAt })
+    result.push({ id: record.logicalId ?? record.id, state: record.state, value: await read<T>(record), createdAt: record.createdAt, updatedAt: record.updatedAt })
   }
   return result
 }
@@ -161,11 +181,28 @@ export async function updateOfflineRecordState(ownerKey: string, id: string, sta
     const tx = db.transaction(RECORD_STORE, 'readwrite')
     const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
-    const record = await requestValue<StoredRecord | undefined>(store.get(id))
-    if (record && record.ownerKey === scope) {
-      record.state = state
-      record.updatedAt = new Date().toISOString()
-      store.put(record)
+    const storageId = offlineRecordStorageId(scope, id)
+    const request = store.get(storageId)
+    request.onsuccess = () => {
+      const record = request.result as StoredRecord | undefined
+      if (record && record.ownerKey === scope) {
+        record.state = state
+        record.updatedAt = new Date().toISOString()
+        store.put(record)
+      } else {
+        // Backward-compatible lookup for records written before owner-scoped IDs.
+        const legacy = store.get(id)
+        legacy.onsuccess = () => {
+          const old = legacy.result as StoredRecord | undefined
+          if (!old || old.ownerKey !== scope) return
+          old.id = storageId
+          old.logicalId = id
+          old.state = state
+          old.updatedAt = new Date().toISOString()
+          store.put(old)
+          store.delete(id)
+        }
+      }
     }
     await done
   } finally { db.close() }
@@ -178,8 +215,21 @@ export async function deleteOfflineRecord(ownerKey: string, id: string) {
     const tx = db.transaction(RECORD_STORE, 'readwrite')
     const done = transactionDone(tx)
     const store = tx.objectStore(RECORD_STORE)
-    const record = await requestValue<StoredRecord | undefined>(store.get(id))
-    if (record && record.ownerKey === scope) store.delete(id)
+    const storageId = offlineRecordStorageId(scope, id)
+    const request = store.get(storageId)
+    request.onsuccess = () => {
+      const record = request.result as StoredRecord | undefined
+      if (record && record.ownerKey === scope) {
+        store.delete(storageId)
+      } else {
+        // Backward-compatible cleanup for a legacy v1 record.
+        const legacy = store.get(id)
+        legacy.onsuccess = () => {
+          const old = legacy.result as StoredRecord | undefined
+          if (old && old.ownerKey === scope) store.delete(id)
+        }
+      }
+    }
     await done
   } finally { db.close() }
 }

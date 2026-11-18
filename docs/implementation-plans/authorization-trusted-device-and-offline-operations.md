@@ -1,6 +1,6 @@
 # RBOS Authorization, Trusted-Device Login and Offline Operations — Implementation Plan
 
-**Status:** Phases 1–3 have implementation branches. Phase 4 local privacy lock is implemented on `auth/pin-and-passkey-unlock`; passkey registration is blocked pending an owner-approved HTTPS RP domain and supported-browser acceptance. Phases 5–6 remain in progress on subsequent stacked branches.  
+**Status:** Implementation code for Phases 1–6 is present in the stacked PR branches. PRs remain unmerged. Phase 1 has a passing latest-head CI run; Phase 2 passed on its recorded implementation/test head but its later PR-head run did not execute jobs; Phases 3–6 have no passing current-head CI evidence because GitHub Actions jobs failed before steps were allocated. Passkey activation is still gated on an owner-approved HTTPS RP domain and supported-browser acceptance.  
 **Last reviewed:** 2026-11-17  
 **Planning baseline:** `main` after PR #30 merge (`c14f30208ce272ec9797f65f503034041d5ba92e`)  
 **Scope:** API authorization baseline first, then reliable persistent login, trusted devices, PIN/passkeys, and finally offline shop operations
@@ -233,7 +233,7 @@ Tasks:
 
 ### Phase 3 — Trusted device registry and revocation
 
-**Implementation status (2026-11-17):** Implemented on `auth/trusted-device-registry`, stacked on Phase 2 head `4e9a6a72dc24d89bec5417c17b60193b5381b6e8`; implementation head `3c208ee3ab0fa0473d7dcd5879823029f002988c`. Adds migration `046_trusted_device_registry.sql`, user-scoped device registration/list/revocation, session-device linkage and security-event audit, frontend device management, and PostgreSQL integration tests. Dedicated PR #34 is open/draft/unmerged. CI run #411 failed before either job received a runner (`runner_id: 0`, no steps); a retry reproduced the same infrastructure failure, so Phase 3 tests have not run. Do not call the phase validated until the PR workflow passes. Review the migration's legacy-session backfill and device-cookie semantics before production rollout.
+**Implementation status (2026-11-17):** Implemented on `auth/trusted-device-registry`, stacked on Phase 2 head `4e9a6a72dc24d89bec5417c17b60193b5381b6e8`; implementation head `3c208ee3ab0fa0473d7dcd5879823029f002988c`. Adds migration `046_trusted_device_registry.sql`, user-scoped device registration/list/revocation, session-device linkage and security-event audit, frontend device management, and PostgreSQL integration tests. Dedicated PR #34 is open/draft/unmerged. Initial CI run #411 and latest PR-head run #413 both failed before either job received a runner; the latest frontend/backend jobs have empty step arrays. Phase 3 tests have not run. Do not call the phase validated until the PR workflow passes. Review the migration's legacy-session backfill and device-cookie semantics before production rollout.
 
 Tasks:
 
@@ -255,7 +255,7 @@ Tasks:
 
 ### Phase 4 — PIN lock and optional passkey/biometric unlock
 
-**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented. ASP.NET Core Identity 10 passkey persistence, registration, listing/removal and passkey sign-in are also implemented behind an explicit RP-domain configuration gate. Registration and removal require current-password confirmation; no guessed hostname or host-header-derived RP scope is used. Passkeys remain disabled until the owner supplies the production HTTPS hostname in `Auth:Passkeys:ServerDomain` and the same exact hostname is allowed by `AllowedHosts`. Phase 4 code and migration 047 are implemented on PR #35. CI run #482 failed before runner allocation (runner ID 0, no steps); no build/test ran. Supported-browser acceptance remains pending. The PIN remains a UI privacy feature only; it does not replace Identity authentication or cryptographically protect browser data.
+**Implementation checkpoint (2026-11-17):** Four-digit local privacy PIN setup, confirmation, PBKDF2 verifier, progressive local retry delay, manual lock and five-minute inactivity lock are implemented. ASP.NET Core Identity 10 passkey persistence, registration, listing/removal and passkey sign-in are also implemented behind an explicit RP-domain configuration gate. Registration and removal require current-password confirmation; no guessed hostname or host-header-derived RP scope is used. Passkeys remain disabled until the owner supplies the production HTTPS hostname in `Auth:Passkeys:ServerDomain` and the same exact hostname is allowed by `AllowedHosts`. Phase 4 code and migration 047 are implemented on PR #35. The latest CI attempt (run #487) and its retry both failed before runner allocation (runner ID 0, zero steps); no build/test ran. Passkey activation and supported-browser acceptance remain pending. The PIN remains a UI privacy feature only; it does not replace Identity authentication or cryptographically protect browser data.
 
 #### 4.1 PIN
 
@@ -289,7 +289,7 @@ Official implementation guide: https://learn.microsoft.com/aspnet/core/security/
 
 ### Phase 5 — Offline application shell and protected local store
 
-**Implementation checkpoint (2026-11-17):** Added versioned PWA shell caching (navigation fallback and same-origin static assets only; /api, authorization-bearing requests and non-GET requests are excluded) and an IndexedDB store using AES-GCM with a non-extractable per-user/tenant CryptoKey. The app provisions an encrypted product/location/stock snapshot after a successful online load and can restore it after a network failure. Explicit sign-out clears the local workspace/key. This is at-rest protection against casual database inspection, not an XSS or compromised-browser boundary; the same-origin app can use the key. Offline sales outbox is Phase 6. Draft PR #38 is open. CI run #483 failed before runner allocation (runner ID 0, no steps); no build/test ran. Browser storage/eviction testing remains pending.
+**Implementation checkpoint (2026-11-17):** Added versioned PWA shell caching (navigation fallback and same-origin static assets only; /api, authorization-bearing requests and non-GET requests are excluded) and an IndexedDB store using AES-GCM with a non-extractable per-user/tenant CryptoKey. The app provisions an encrypted product/location/stock snapshot after a successful online load and can restore it after a network failure. Follow-up review found that fixed logical IDs could collide across different users/tenants in one browser; the Phase 6 branch now scopes physical IndexedDB IDs by the hashed owner/tenant key and retains legacy-record read/migration support. Explicit sign-out clears the local workspace/key. This is at-rest protection against casual database inspection, not an XSS or compromised-browser boundary; the same-origin app can use the key. Offline sales outbox is Phase 6. Rebased draft PR #40 is open on top of PR #35. Earlier conflicted PR #38 is closed. CI run #488 and its retry failed before runner allocation (runner ID 0, zero steps); no build/test ran. Browser storage/eviction testing remains pending.
 
 Tasks:
 
@@ -305,6 +305,8 @@ Tasks:
 **Acceptance tests:** first install vs repeat install; offline app launch; browser restart; app update while work is queued; local-store schema upgrade; storage quota and eviction; lock prevents local data access; logout/revocation behaviour; no authenticated API responses cached.
 
 ### Phase 6 — Offline invoice drafts and sync
+
+**Implementation checkpoint (2026-11-17):** Added an encrypted IndexedDB sales outbox for existing-catalogue products and either a selected existing customer or walk-in sale. Draft is persisted before showing success, carries one stable command/idempotency key, and is visibly Pending sync (never an official invoice). Reconnect/manual sync posts through the existing /sales endpoint and server idempotency path; server ID is persisted before invoice-detail retrieval to avoid duplicate posting. Server assigns the invoice number. Validation/permission 4xx drafts are retained as Needs attention; transient/network/5xx failures and 401 authentication expiry remain Pending sync. A 401 records sign-in guidance and can be retried after reauthentication. Offline queue capped at 100 bills, 100 lines per bill and 256 KB payload per bill. New products/customer creation, purchases, returns, stock adjustments, attachments and multi-device conflict resolution remain online-only/deferred. Rebased draft PR #41 is open on top of PR #40. Earlier conflicted PR #39 is closed. CI attempts #489–#492, run #500 and latest-head run #510 (including retries) failed before frontend/backend steps; the latest attempt produced no job logs. No build or test has run on the current Phase 6 head. GitHub's public status page showed all systems operational/no incidents on 2026-11-17, so inspect repository Actions settings/usage and runner allocation rather than attributing this to a confirmed public outage. Real-browser offline acceptance remains pending.
 
 Tasks:
 
@@ -325,24 +327,24 @@ Tasks:
 
 ## 5. Dependency and readiness register
 
-| Area | Existing dependency/state | Required before implementation |
+| Area | Current implementation state | Remaining validation / release gate |
 |---|---|---|
 | Route inventory | Endpoint modules and central permission map exist | Full method/template catalogue and explicit access classifications |
 | Role policy | Four roles and permission constants exist | Owner approval/reconciliation of matrix with code |
-| RBAC enforcement | Central filter exists but uses nullable/default-allow behaviour | Fail-closed metadata/registry and route-inventory tests |
-| Brand endpoint | Endpoint class exists; not registered | Register and classify routes |
-| Reminder endpoint | Already registered | Explicit read/access classification and tenant test |
+| RBAC enforcement | Explicit exact-method/route access catalogue and fail-closed enforcement implemented in PR #32; latest-head CI run #395 passed | Owner review of unresolved role/finance-read and DTO field-exposure policy |
+| Brand endpoint | Registered and classified in PR #32 | Verify regression coverage remains green in the current stacked PR CI |
+| Reminder endpoint | Already registered and explicitly classified | Confirm route and tenant tests in the current stacked PR CI |
 | Webhook | Mapped outside /api with signature validation | Keep independent; regression tests |
-| Identity cookie | ASP.NET Identity cookie; 8-hour lifetime | Persistent policy, sliding renewal and absolute age |
-| Password/OTP | Both non-persistent sign-in paths | Parity tests and reauthentication policy |
+| Identity cookie | 30-day persistent/sliding cookie plus 90-day server-side absolute age implemented in PR #33 | Re-run current PR-head CI; browser restart and expiry acceptance |
+| Password/OTP | Both use the server-authoritative session creation/revocation flow in PR #33 | Retain password/OTP parity and logout tests in passing CI |
 | Data Protection | PostgreSQL key persistence migration 037 exists | Restart/multi-instance regression test |
-| Session/device | Phase 2 session table (045) and Phase 3 device registry (046) implemented on stacked branches | Phase 3 PR CI, security review, then supported browser/revocation checks |
-| Passkey | .NET 10 Identity support available | Validate model/table migration, RP domain/origin, browser coverage |
-| App PIN | No current PIN flow | Security design, rate limit and recovery |
-| PWA | Manifest and registration exist; service worker caches nothing | Asset precache/fallback/update design |
-| Local database | No IndexedDB dependency or offline store | Technology POC, encryption and schema |
-| Sync | No outbox/sync worker; sales idempotency exists | Command contract, server validation, attachment handling |
-| Offline invoice | No current offline posting | Pending draft model; server-authoritative invoice numbers |
+| Session/device | Migrations 045/046, session linkage, user-scoped device registry and revocation implemented in PRs #33/#34 | Current Phase 3 CI, legacy-session backfill review, browser/device revocation acceptance |
+| Passkey | Identity 10 passkey store, endpoints and migration 047 implemented in PR #35; disabled unless explicit RP domain and matching AllowedHosts are configured | Owner-approved HTTPS RP domain, CI/migration validation, supported-browser and recovery tests |
+| App PIN | Four-digit PBKDF2-backed local privacy lock implemented in PR #35; not an authentication factor or encryption key | Passing CI and Android/desktop tests for lock, retry delay, inactivity and account isolation |
+| PWA | Versioned shell/navigation fallback and same-origin asset cache implemented in PR #40; API/authenticated requests excluded | Passing CI plus install/update/offline launch and storage-eviction browser tests |
+| Local database | AES-GCM encrypted IndexedDB snapshot/store implemented in PR #40 using a non-extractable CryptoKey | Passing CI, browser CryptoKey persistence/quota tests and threat-boundary review |
+| Sync | Encrypted sales outbox with stable idempotency key and server-authoritative sync implemented in PR #41 | Passing CI, reconnect/retry/concurrency tests and rejected-draft recovery UX |
+| Offline invoice | Existing-product sales drafts for existing customer or walk-in; pending sync only, server assigns invoice number | Real-browser offline/reconnect test; purchases/returns/attachments/new master-data creation remain out of scope |
 
 ## 6. Test and CI strategy
 
@@ -394,7 +396,7 @@ Each PR must be focused, run the applicable tests, include an implementation not
 
 ## 9. Current implementation checkpoint and next work
 
-The original sequence-1 recommendation is historical. Branches contain Phases 1–3, the Phase 4 local privacy lock, and the Phase 5 PWA shell/encrypted local snapshot. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. Phase 6 offline sales outbox is the next stacked branch. PRs remain unmerged by instruction. Do not invent a relying-party domain; retain server-authoritative validation, posting and invoice numbering.
+The original sequence-1 recommendation is historical. Branches contain Phases 1–3, Phase 4 local privacy lock, Phase 5 PWA shell/encrypted local snapshot, and Phase 6 offline sales outbox/sync. Passkey enrollment remains gated on an approved RP domain and .NET 10 Identity WebAuthn integration. PRs #32–#35, #40 and #41 remain open/unmerged; superseded offline PRs #36–#39 are closed without merge. Latest CI evidence: Phase 3 run #413, Phase 4 run #487, Phase 5 run #488 and Phase 6 run #492 and latest-head documentation-only run #498 both failed before job steps executed. Retries of #492 and #498 also failed before execution. These are infrastructure failures, not successful validation or reported code/test failures. Complete CI and supported-browser/manual pilot acceptance before considering the phases validated. Retain server-authoritative validation, posting and invoice numbering.
 
 ## 10. Scope guardrails
 

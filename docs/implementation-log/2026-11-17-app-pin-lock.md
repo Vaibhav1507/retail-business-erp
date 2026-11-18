@@ -2,9 +2,9 @@
 
 **Date:** 2026-11-17  
 **Repository:** Vaibhav1507/retail-business-erp  
-**Branch:** auth/pin-and-passkey-unlock  
+**Branch:** auth/pin-and-passkey-unlock (PR #35)  
 **Base:** auth/trusted-device-registry  
-**Status:** Local privacy-lock implementation committed; passkey portion blocked pending approved RP domain. No merge or deployment.
+**Status:** Local privacy lock and gated Identity passkey implementation committed. PR #35 remains open/unmerged. CI has not run any build/test steps because GitHub-hosted runners were not allocated. No merge or deployment.
 
 ## Delivered
 - First authenticated use of a browser profile requires a four-digit numeric PIN setup and confirmation.
@@ -34,7 +34,10 @@ This is a local UI privacy lock, not an online authentication factor, device att
 - Identity EF model/schema versioning: https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity-primary-key-configuration?view=aspnetcore-10.0
 
 ## Validation
-CI is triggered by the draft PR. No local build or browser acceptance is claimed. Require frontend TypeScript/Vitest/build and backend build/test/migration CI. Manual acceptance still required for Android Chrome and desktop browsers, inactivity lock, shared-browser account isolation and local retry behavior.
+
+- PR #35 current head `5f5d61e715ee381018abad30455ec0173c38c721` was associated with CI run #487 ([run](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44107535282)). Both frontend and backend jobs failed before any step was recorded; no TypeScript, Vitest, frontend build, backend build, migration or test step ran.
+- This is a runner-allocation failure, not a reported compiler or test failure. No local build/test or browser acceptance is claimed.
+- Manual acceptance remains required for Android Chrome and desktop browsers, inactivity lock, shared-browser account isolation and local retry behaviour.
 
 ## Recovery
 Start from this branch and inspect the latest PR workflow. Passkey work requires a separate owner-approved RP domain and a WebAuthn implementation using the .NET 10 Identity passkey store and strict origin validation.
