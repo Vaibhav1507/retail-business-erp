@@ -318,7 +318,7 @@ public sealed class SalesService(TenantDb db)
                     ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials));
                 if (l.CaptureIds is { Length: > 0 })
                 {
-                    var attached = await Exec(s, ct, @"
+                    var attached = await SqlHelpers.ExecCount(s, ct, @"
                         update sales.item_tag_capture
                         set status='Attached',sale_id=@s,sale_product_id=@p,attached_at=now()
                         where tenant_id=@t and id=any(@ids) and product_id=@p
