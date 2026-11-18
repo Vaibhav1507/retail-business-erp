@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Rbos.Api.Persistence;
 
 namespace Rbos.IntegrationTests;
 
@@ -137,6 +140,65 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    [Fact]
+    public async Task Stock_verification_resolves_migration_044_aliases_and_detects_corrupt_projections()
+    {
+        var c = new Client(f); await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var canonical = await c.AddProduct("Alias canonical cable");
+        var retired = await c.AddProduct("Alias duplicate cable");
+        var supplier = await Id(await c.Send(HttpMethod.Post, "/suppliers", new { name = "Alias test supplier" }));
+        await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = canonical, quantity = 5m, unitCost = 100m } } }, K()));
+        await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = retired, quantity = 10m, unitCost = 200m } } }, K()));
+
+        using var scope = f.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser<Guid>>>();
+        var uid = (await users.FindByNameAsync(c.Email))!.Id;
+        var db = scope.ServiceProvider.GetRequiredService<TenantDb>();
+        var tenant = (await db.FindTenantAsync(uid, default))!.Value;
+        await using (var session = await db.BeginAsync(uid, tenant, default))
+        {
+            await using (var alias = session.Command("insert into catalog.product_alias(tenant_id,alias_product_id,canonical_product_id) values (@t,@a,@c)"))
+            {
+                alias.Parameters.AddWithValue("t", tenant); alias.Parameters.AddWithValue("a", retired); alias.Parameters.AddWithValue("c", canonical);
+                await alias.ExecuteNonQueryAsync();
+            }
+            await using (var mergeBalance = session.Command(@"insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity)
+                select tenant_id,@c,location_id,quantity from inventory.stock_balance where product_id=@a
+                on conflict (tenant_id,product_id,location_id) do update set quantity=inventory.stock_balance.quantity+excluded.quantity"))
+            { mergeBalance.Parameters.AddWithValue("c", canonical); mergeBalance.Parameters.AddWithValue("a", retired); await mergeBalance.ExecuteNonQueryAsync(); }
+            await using (var removeBalance = session.Command("delete from inventory.stock_balance where product_id=@a"))
+            { removeBalance.Parameters.AddWithValue("a", retired); await removeBalance.ExecuteNonQueryAsync(); }
+            await using (var mergeCost = session.Command(@"insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac)
+                select tenant_id,@c,total_quantity,inventory_value,wac from inventory.item_cost where product_id=@a
+                on conflict (tenant_id,product_id) do update set total_quantity=inventory.item_cost.total_quantity+excluded.total_quantity,
+                  inventory_value=inventory.item_cost.inventory_value+excluded.inventory_value,
+                  wac=round((inventory.item_cost.inventory_value+excluded.inventory_value)/nullif(inventory.item_cost.total_quantity+excluded.total_quantity,0),4)"))
+            { mergeCost.Parameters.AddWithValue("c", canonical); mergeCost.Parameters.AddWithValue("a", retired); await mergeCost.ExecuteNonQueryAsync(); }
+            await using (var removeCost = session.Command("delete from inventory.item_cost where product_id=@a"))
+            { removeCost.Parameters.AddWithValue("a", retired); await removeCost.ExecuteNonQueryAsync(); }
+            await using (var retire = session.Command("update catalog.product set is_active=false where id=@a"))
+            { retire.Parameters.AddWithValue("a", retired); await retire.ExecuteNonQueryAsync(); }
+            await session.CommitAsync(default);
+        }
+
+        var healthy = await c.GetJson("/reports/stock-verification");
+        Assert.True(healthy.GetProperty("ok").GetBoolean());
+        Assert.DoesNotContain(healthy.GetProperty("items").EnumerateArray(), x => x.GetProperty("productId").GetGuid() == retired);
+        await using (var session = await db.BeginAsync(uid, tenant, default))
+        {
+            await using var corrupt = session.Command("update inventory.stock_balance set quantity=quantity+1 where product_id=@p");
+            corrupt.Parameters.AddWithValue("p", canonical); await corrupt.ExecuteNonQueryAsync(); await session.CommitAsync(default);
+        }
+        var damaged = await c.GetJson("/reports/stock-verification");
+        Assert.False(damaged.GetProperty("ok").GetBoolean());
+        Assert.Contains(damaged.GetProperty("items").EnumerateArray(), x => x.GetProperty("productId").GetGuid() == canonical);
+        var other = new Client(f); await other.SignUpAndBootstrap();
+        var isolated = await other.GetJson("/reports/stock-verification");
+        Assert.True(isolated.GetProperty("ok").GetBoolean());
+        Assert.DoesNotContain(isolated.GetProperty("items").EnumerateArray(), x => x.GetProperty("name").GetString() == "Alias canonical cable");
+    }
+
     public async Task Gst_summary_splits_tax_by_rate_and_validates_range()
     {
         var c = new Client(f); await c.SignUpAndBootstrap();
