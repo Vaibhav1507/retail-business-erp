@@ -79,3 +79,17 @@ The PR B branch adds these suites without changing the historical test inventory
 
 
 **Executed evidence:** GitHub Actions run [#566](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44330825072) passed: 126/126 .NET unit tests, 160/160 PostgreSQL integration tests, frontend TypeScript, frontend tests, frontend production build, dependency audit, and container build (no push). Release build and migrations 001–049 also passed. The CI workflow does not run a separate `npm run lint` command. Mobile-browser camera permission, orientation and retake behaviour still need real-device acceptance.
+
+
+## PR #47 — focused pilot-readiness P0 validation (2026-11-18)
+
+The P0 remediation adds/extends the following coverage beyond the historical Slice 1–4 inventory above:
+
+- Alias-aware stock verification and deterministic WAC replay, including canonical/retired product alias handling, historical movement references, corrupted stock projection detection and tenant isolation.
+- WAC rounding tests for four-decimal half-away-from-zero behaviour, tiny quantities with real cost, and repeated high-precision receipts with two-decimal monetary valuation.
+- Existing opening-stock cost validation plus browser guidance for explicit actual/owner-estimated unit cost; RBOS must not infer a cost or post zero-valued stock.
+- CI now runs frontend TypeScript, unit tests, Oxlint, production build, dependency audit checker, Release build, disposable PostgreSQL migration validation, .NET tests, synthetic Playwright E2E and a deployment-container build (no push). Provider-dependent AI invoice extraction/demo browser specs are intentionally not part of deterministic CI.
+
+**Latest-head evidence at this documentation update:** CI run [#589](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44338877280), commit `5253435c873de34512700ba3283e2c9c2a293a59`. Frontend job passed TypeScript, unit tests, lint, build and the audit checker. Backend Release build and disposable PostgreSQL migration passed; .NET tests were still running. Synthetic Playwright and container build were pending. This is an in-progress snapshot, not a final green CI claim.
+
+**Known acceptance gap:** the separate focused suites are not equivalent to one consolidated 25-step financial end-to-end journey. GST profile setup, GST and non-GST invoice print modes, full P&L/balance-sheet assertions and product-owner manual acceptance remain outstanding. CA approval of the valuation policy also remains outstanding. A CI pass or PR merge does not by itself make the pilot ready.
