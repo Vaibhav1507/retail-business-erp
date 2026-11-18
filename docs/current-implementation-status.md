@@ -5,7 +5,7 @@
 **Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
 
-## Focused pilot-readiness P0 remediation — PR pending
+## Focused pilot-readiness P0 remediation — PR #47 open (draft)
 
 **Baseline:** `main` at `fb56331eac368ba00db8b70503f20d504ec57fef` (2026-11-18). **Branch:** `fix/pilot-readiness-p0-remediation`. This section records implementation evidence for the five requested P0 items only; it does not imply pilot acceptance.
 
