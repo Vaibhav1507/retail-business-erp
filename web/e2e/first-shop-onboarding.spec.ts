@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { signUp, openAddProduct, chooseCategory, postInvoice } from './signup'
+import { signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice } from './signup'
 
 const run = Date.now().toString(36)
 const owner = `e2e-first-shop-${run}@example.test`
@@ -23,8 +23,7 @@ test('first-time electronics retailer completes and resumes the saved first-shop
   await form.getByLabel('Generic / unbranded').setChecked(false)
   await form.getByLabel('Brand', { exact: true }).fill('SyntheticBrand')
   await form.getByLabel('Model number').fill('TV-001')
-  await form.getByRole('button', { name: 'Add product' }).click()
-  await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name: product, exact: true })).toBeVisible({ timeout: 30_000 })
+  await createProductAndVerify(page, form, product)
 
   // Opening stock: entry and review must not post; the owner explicitly confirms afterward.
   await page.goto('/#/stock/opening')
