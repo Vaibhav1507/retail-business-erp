@@ -106,6 +106,11 @@ public sealed class AiProviderCredential
         InputCostPerMillionInr is > 0 || OutputCostPerMillionInr is > 0 ||
         ImageCostPerImageInr is > 0 || AudioCostPerMinuteInr is > 0;
 
+    public bool HasCompletePricing(AiCapability capability) =>
+        capability == AiCapability.AudioTranscription
+            ? AudioCostPerMinuteInr is > 0
+            : InputCostPerMillionInr is > 0 && OutputCostPerMillionInr is > 0;
+
     public bool CanEstimatePaidCost(AiGatewayRequest request)
     {
         if (!HasPaidPricing) return false;

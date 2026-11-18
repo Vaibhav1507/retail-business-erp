@@ -115,6 +115,7 @@ public sealed class AiGatewayTests
             ("AiGateway:Credentials:0:ProjectId", "project-paid"),
             ("AiGateway:Credentials:0:BillingMode", "Paid"),
             ("AiGateway:Credentials:0:InputCostPerMillionInr", "10"),
+            ("AiGateway:Credentials:0:OutputCostPerMillionInr", "10"),
             ("TestKeys:Paid", "secret"));
         var pool = new AiGatewayCredentialPool(config);
 

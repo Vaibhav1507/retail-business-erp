@@ -30,7 +30,7 @@ public sealed class AiGatewayCredentialPool
             .Where(c => !_invalidCredentials.ContainsKey(c.Id))
             .Where(c => !_cooldowns.TryGetValue(c.QuotaBucketId, out var until) || until <= DateTimeOffset.UtcNow)
             .Where(c => c.BillingMode == AiBillingMode.Free ||
-                (c.BillingMode == AiBillingMode.Paid && allowPaid && c.HasPaidPricing))
+                (c.BillingMode == AiBillingMode.Paid && allowPaid && c.HasCompletePricing(capability)))
             .ToArray();
         if (candidates.Length == 0) return [];
 
@@ -56,7 +56,7 @@ public sealed class AiGatewayCredentialPool
             !_invalidCredentials.ContainsKey(c.Id) &&
             (!_cooldowns.TryGetValue(c.QuotaBucketId, out var until) || until <= DateTimeOffset.UtcNow) &&
             (c.BillingMode == AiBillingMode.Free ||
-             (c.BillingMode == AiBillingMode.Paid && allowPaid && c.HasPaidPricing)));
+             (c.BillingMode == AiBillingMode.Paid && allowPaid && c.HasCompletePricing(capability))));
 
     public bool IsCredentialStillEligible(AiProviderCredential credential, AiCapability capability, string model, bool allowPaid) =>
         ProviderEnabled(credential.Provider) && !IsCircuitOpen(credential.Provider) &&
@@ -64,7 +64,7 @@ public sealed class AiGatewayCredentialPool
         (!_cooldowns.TryGetValue(credential.QuotaBucketId, out var until) || until <= DateTimeOffset.UtcNow) &&
         credential.Supports(capability, model) &&
         (credential.BillingMode == AiBillingMode.Free ||
-         (credential.BillingMode == AiBillingMode.Paid && allowPaid && credential.HasPaidPricing));
+         (credential.BillingMode == AiBillingMode.Paid && allowPaid && credential.HasCompletePricing(capability)));
 
     public void MarkRateLimited(AiProviderCredential credential, TimeSpan? retryAfter)
     {
