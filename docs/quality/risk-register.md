@@ -46,3 +46,18 @@ New risks found from the implementation:
 | R22 | Browser coverage is thin: 2 Playwright tests; none for procurement or import; sale detail "View" button needed a forced click at 390 px | M | M | Add focused browser tests; check mobile layout | Eng | Before real-data use |
 | R23 | Class SalesService lives in file SalesPosting.cs | L | L | Rename when next touched | Eng | Next edit of the file |
 | R24 | Concurrent oversell and duplicate-submit races are not tested under real concurrency | M | M | Add concurrency integration tests | Eng | Before real-data use |
+
+
+## Pilot-readiness P0 reassessment — 2026-11-18 (PR #47)
+
+This dated update supplements the historical Slice 1–4 assessment above; it does not rewrite the original discovery record.
+
+| Risk area | Current evidence | Residual status / action |
+|---|---|---|
+| Alias-aware inventory verification | PR #47 adds tenant-scoped alias canonicalisation for stock verification and deterministic replay, with migrated-alias, corrupted-projection and tenant-isolation integration coverage. | Await latest-head .NET test, Playwright and container CI results; manually review migrated production-like data before real use. |
+| WAC precision / valuation | Application uses the existing four-decimal persisted WAC scale consistently; INR money remains two decimals. | CA review is outstanding. Four decimals are an interim engineering/storage convention, not approved accounting policy. |
+| Opening-stock valuation | Positive explicit owner-entered actual/estimated cost is required; UI explains that RBOS will not infer or post zero value. | Owner must accept the workflow and source-of-cost expectation. |
+| Dependency audit | Production dependency audit is a hard high/critical gate; one enumerated development-only picomatch advisory exception is documented through 2026-12-02. | Reassess before expiry and remove exception once upstream fix is available. |
+| Financial one-shop acceptance | Focused tests cover material parts of opening stock, purchases, sales, collections, returns/cancellations, stock verification, idempotency and tenant isolation. | A single consolidated 25-step shop journey, GST/non-GST print acceptance and complete P&L/balance-sheet assertions are not yet demonstrated. Keep pilot acceptance Open. |
+
+Merging PR #47 does not close the residual accounting, manual acceptance, production migration, deployment or pilot risks.
