@@ -108,6 +108,7 @@ builder.Services.AddSingleton<Rbos.Api.Application.IAiProviderAdapter, Rbos.Api.
 builder.Services.AddScoped<Rbos.Api.Application.IAiGatewayUsageLedger, Rbos.Api.Application.AiGatewayUsageLedger>();
 builder.Services.AddScoped<Rbos.Api.Application.AiGateway>();
 builder.Services.AddScoped<Rbos.Api.Application.InvoiceExtractionService>();
+builder.Services.AddScoped<Rbos.Api.Application.ItemTagCaptureService>();
 builder.Services.AddScoped<Rbos.Api.Application.VoiceNavigationIntentService>();
 builder.Services.AddScoped<Rbos.Api.Application.ProductFileReader>();
 builder.Services.AddScoped<Rbos.Api.Application.OtpService>();

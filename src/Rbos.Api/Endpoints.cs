@@ -225,6 +225,7 @@ public static class Endpoints
 		BarcodeEndpoints.Map(api);
 		ProcurementEndpoints.Map(api);
         SalesEndpoints.Map(api);
+        ItemTagCaptureEndpoints.Map(api);
                 AfterSalesEndpoints.Map(api);
                 FinanceEndpoints.Map(api);
                 ReportChecksEndpoints.Map(api);

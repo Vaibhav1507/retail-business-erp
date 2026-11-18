@@ -36,3 +36,10 @@
 
 ## Recovery
 Start from this branch. Offline drafts are records of kind sale in the rbos-offline-v1 IndexedDB database. The encrypted payload contains the full SaleRequest body and stable idempotency key. The IndexedDB owner/tenant scope is SHA-256 hashed; no raw email or tenant key is stored in record metadata. Do not alter or regenerate an existing key when retrying a draft. State transitions: pending-sync -> syncing -> posted or needs-attention; temporary failure returns to pending-sync. If a record already has serverSaleId, never POST it again; only retrieve authoritative invoice details.
+
+
+## PR B extension — invoice item-tag references (18 November 2026)
+
+PR B extends the offline sale line DTO with optional `captureIds`. A photo must be uploaded and reviewed online first. If the cashier then holds or queues the bill, the encrypted held-bill/outbox payload retains the capture IDs so the server can attach the already uploaded evidence when the sale is synced.
+
+The photo binary is **not** written to localStorage or IndexedDB. New photo capture/upload is disabled in offline mode; no deferred image-upload queue or offline photo retry is claimed. If a sale is synced after an evidence record has expired or been removed, server validation rejects the capture reference and the normal outbox keeps the rejected sale in its existing attention state. Regular typed/manual offline billing remains available.

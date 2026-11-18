@@ -188,3 +188,12 @@ Reserved or failed attempts with no actual cost continue to count at their estim
 - Voice intent can only select allowlisted destinations. It cannot answer business-data questions or post transactions.
 - Shruti remains the local-first speech recognizer. Hosted Whisper is a separately flagged fallback.
 - If the gateway or every provider is unavailable, return the existing manual/local recovery path; do not block billing, inventory or accounting.
+
+
+## Invoice item-tag photo extraction (PR B)
+
+The cashier photo workflow calls only the Central AI Gateway with feature name `InvoiceItemTagExtraction`, capability `ImageUnderstanding` and structured output. It does not call Gemini/Groq directly. The provider order is Gemini first; Groq fallback is separately controlled by `Groq__ItemTagFallbackEnabled` and remains false in checked-in configuration.
+
+The feature flag is `AiGateway__Features__InvoiceItemTagExtraction__Enabled`. This flag alone does not activate AI: `AiGateway__Enabled`, provider switches, an eligible image-capable credential/model and the relevant budget reservation must also permit the call. The checked-in gateway and both providers remain disabled, and `AiGateway__AllowPaidProviders=false`. Never add keys to source control or enable paid providers as part of PR B.
+
+If no provider is eligible, the capture remains saved with a manual-review status. Billing continues without AI. The extraction request treats the photograph as untrusted data, separates product-level tag fields from unit serial/IMEI values, and explicitly forbids inferring selling price, discount or tax.

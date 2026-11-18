@@ -48,7 +48,7 @@ The following routes require an active known business membership, but no additio
 - Core reads: `GET /api/locations`, `GET /api/stock`, `GET /api/business-profile`
 - Catalogue reads: `GET /api/products`, `GET /api/products/master`, `GET /api/categories`, `GET /api/products/suggest-for-barcode`, `GET /api/catalogue/source-documents`, `GET /api/catalogue-sources`, `GET /api/products/by-barcode`, `GET /api/products/{id:guid}/barcodes`
 - Procurement and supplier reads: `GET /api/suppliers`, `GET /api/suppliers/{id:guid}/statement`, `GET /api/suppliers/{id:guid}/open-bills`, `GET /api/purchases`, `GET /api/purchases/{id:guid}`, `GET /api/purchases/{id:guid}/invoice`, `GET /api/purchase-returns`, `GET /api/purchase-returns/{id:guid}`, `GET /api/supplier-payments`, `GET /api/purchase-orders`
-- Sales/customer reads: `GET /api/customers`, `GET /api/customers/{id:guid}/statement`, `GET /api/customers/{id:guid}/open-sales`, `GET /api/customers/{id:guid}/history`, `GET /api/customers/ageing`, `GET /api/sales`, `GET /api/sales/{id:guid}`, `GET /api/sales/{id:guid}/returnable`, `GET /api/customer-payments`, `GET /api/customer-payments/{id:guid}`, `GET /api/sale-returns`, `GET /api/sale-returns/{id:guid}`, `GET /api/business-name`
+- Sales/customer reads: `GET /api/sales/item-tag-captures/{id:guid}`, `GET /api/sales/item-tag-captures/{id:guid}/image`, `GET /api/customers`, `GET /api/customers/{id:guid}/statement`, `GET /api/customers/{id:guid}/open-sales`, `GET /api/customers/{id:guid}/history`, `GET /api/customers/ageing`, `GET /api/sales`, `GET /api/sales/{id:guid}`, `GET /api/sales/{id:guid}/returnable`, `GET /api/customer-payments`, `GET /api/customer-payments/{id:guid}`, `GET /api/sale-returns`, `GET /api/sale-returns/{id:guid}`, `GET /api/business-name`
 - Finance and cash reads retained from the existing permission resolver: `GET /api/accounts`, `GET /api/money-accounts`, `GET /api/money-accounts/{id:guid}/history`, `GET /api/expense-categories`, `GET /api/expenses`, `GET /api/owner-transactions`, `GET /api/loans`, `GET /api/loans/{id:guid}/schedule`, `GET /api/stock-adjustments`, `GET /api/cash-closings`, `GET /api/cash-closings/preview`, `GET /api/period-lock`, `GET /api/reconciliation`
 - Stock and setup reads: `GET /api/branches`, `GET /api/stock-transfers`, `GET /api/unit-conversions`, `GET /api/stock-count/sheet`, `GET /api/stock-adjustments/history`, `GET /api/stock/low`, `GET /api/stock/dead`, `GET /api/stock/ageing`
 - Reminder and brand reads: `GET /api/reminders`, `GET /api/brands`
@@ -61,7 +61,7 @@ The following routes require an active known business membership, but no additio
 | `settings.manage` | `PUT /api/business-profile`; `PUT /api/period-lock`; `POST /api/branches`; `POST /api/locations`; `POST /api/profile/mobile/send-otp`; `POST /api/profile/mobile/verify` |
 | `catalogue.manage` | Product create/update and master-product add; category rename; product import read/preview/commit; barcode add/delete; serial tracking; unit conversion update; reorder-level update; brand create/update |
 | `purchases.manage` | Supplier create/update; purchase create/extract; supplier payment create; purchase return create; purchase order create/status update |
-| `sales.create` | Sale create; WhatsApp invoice retry |
+| `sales.create` | Sale create; item-tag capture upload, review and unattached delete; WhatsApp invoice retry |
 | `customers.manage` | Customer create/update; customer payment create |
 | `sales.cancel` | Sale cancellation |
 | `sales.return` | Sale return creation |
@@ -93,3 +93,16 @@ The same distinction applies to stock read payloads: a route-level access classi
 - `BrandEndpoints.Map(api)` is now registered. Brand create/update requires `catalogue.manage`.
 - `ReminderEndpoints.Map(api)` was already registered; it is explicitly classified as an authenticated-member route.
 - No database migration is required for this route-policy change.
+
+
+## Item-tag image access (PR B)
+
+| Method and route | Access class | Additional boundary |
+|---|---|---|
+| `POST /api/sales/item-tag-captures` | `Permission(sales.create)` | Raw image body; required tenant-scoped idempotency key; JPEG/PNG/WebP signature and 8 MiB limit |
+| `GET /api/sales/item-tag-captures/{id:guid}` | `AuthenticatedMember` | Tenant RLS and active membership; unknown/foreign IDs return 404 |
+| `GET /api/sales/item-tag-captures/{id:guid}/image` | `AuthenticatedMember` | Same ownership check; `private, no-store` and `X-Content-Type-Options: nosniff` |
+| `PUT /api/sales/item-tag-captures/{id:guid}/review` | `Permission(sales.create)` | Confirms a same-tenant active catalogue product; only unattached captures can be reviewed |
+| `DELETE /api/sales/item-tag-captures/{id:guid}` | `Permission(sales.create)` | Only unattached captures can be removed |
+
+The image is never served from a public URL or user-supplied storage path. The browser supplies only the capture ID when posting a sale; tenant, creator and sale ownership are resolved server-side. The sale transaction additionally requires a reviewed capture whose product matches the sale line. The route inventory integration test must continue to pass for every registered method/template.

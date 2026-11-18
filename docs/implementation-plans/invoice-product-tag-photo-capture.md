@@ -1,10 +1,10 @@
 # Invoice Item-Tag Photo Capture — Product Requirements and Implementation Plan
 
-**Status:** Proposed feature specification  
+**Status:** PR B implementation committed; automated validation and review pending  
 **Planning target:** Controlled pilot  
 **Repository:** `Vaibhav1507/retail-business-erp`  
-**Branch:** `docs/pilot-readiness-remediation-plan`  
-**Last reviewed:** 17 November 2026
+**Implementation branch:** `feat/invoice-item-tag-photo-capture`  
+**Last reviewed:** 18 November 2026
 
 ## 1. Executive summary
 
@@ -613,3 +613,68 @@ Before implementation, reconcile any differences between historical design docum
 - Domain model: `docs/architecture/domain-model-erd.md`
 - Current implementation status: `docs/current-implementation-status.md`
 
+
+
+## 20. PR B implementation reconciliation — 18 November 2026
+
+This section records the implementation on `feat/invoice-item-tag-photo-capture` against the original requirements above. The implementation follows the post-PR-A code on `main`; PR #30 supplied this plan and PR #31 supplied adjacent authorisation/offline constraints. This is a code-status record, not a claim that builds or tests have passed.
+
+### 20.1 What existed before PR B
+
+- `GenerateInvoice.tsx` already supported manual product entry, a live barcode scanner and manual serial/IMEI text.
+- Catalogue barcodes and serial-unit records already had tenant-scoped persistence and barcode normalisation.
+- Supplier invoice documents already had a separate upload/extraction workflow and PostgreSQL binary storage. That workflow is not reused for an item tag.
+- PR A's Central AI Gateway already supported image understanding, structured output, credential eligibility, cost budgeting and usage ledger accounting.
+- PR #40/#41's encrypted IndexedDB sales outbox already supported offline JSON sale drafts and idempotent server posting. It did not persist image bytes.
+
+No invoice item-tag photo capture, per-photo review state, or sale-line evidence association was present before PR B.
+
+### 20.2 Requirement-to-code reconciliation
+
+| Requirement | PR B implementation |
+|---|---|
+| Camera and gallery from Generate Invoice | Camera-oriented file input (`capture=environment`) and multi-select gallery input inside `ItemTagCapture`. |
+| Independent photo per physical item | Each selected file is uploaded as an independent capture with its own idempotency key. The cashier confirms and adds one physical item at a time. |
+| Validation and preview | JPEG, PNG and WebP only; 8 MiB limit; server verifies file signature and size; the browser shows a preview and upload/retry/error state. |
+| Deterministic barcode read | Existing ZXing dependency decodes EAN-13, EAN-8, UPC-A, UPC-E and Code 128 locally. QR/Data Matrix content is not assumed to be a product barcode. Known local barcodes are resolved through the existing tenant-scoped lookup API. |
+| Vision/OCR extraction | Structured extraction is requested through PR A's `AiGateway` using the `InvoiceItemTagExtraction` feature. No direct provider call or new AI SDK is added. |
+| Catalogue suggestion | Exact local barcode, unique brand/model, then unique exact product-name match may suggest a product. Suggestions require cashier confirmation. Ambiguous matches are not auto-selected. |
+| Human review | The review card lets the cashier select a catalogue product (or explicitly create one online) and review/edit product name, brand, model, barcode, serial, IMEI 1/2, MRP and HSN. MRP is reference-only. |
+| Sale-line association | Optional `captureIds` are accepted on sale lines. Sale posting locks and validates every capture and attaches it to the matching product line in the same transaction as the sale. Existing sale requests without capture IDs remain valid. |
+| Evidence retrieval | Authenticated metadata and image routes return tenant-owned data only. Image responses are marked private/no-store and nosniff. Sale detail and immutable invoice snapshot retain capture IDs, not image bytes. |
+| Remove/replace | Unattached captures can be removed; retaking is a new independent capture. Attached evidence cannot be deleted through the cashier API. |
+| Orphan handling | Unattached captures expire after 30 days and are purged opportunistically on a subsequent upload. Attached evidence is excluded from that purge. |
+| Multi-tenant isolation | Composite tenant keys/foreign keys, RLS ENABLE+FORCE, active-membership policy, server-side tenant resolution and role-filtered routes. |
+| Offline | Photo capture/upload is disabled while offline. The offline sales payload contains capture IDs only when the photo was already uploaded and reviewed online. No image bytes are placed in localStorage or the offline outbox. |
+
+### 20.3 Data flow and contracts
+
+1. The browser validates the chosen file, creates a local preview, and attempts local retail-barcode decoding.
+2. `POST /api/sales/item-tag-captures` accepts the raw image body, its MIME type and a required `Idempotency-Key`. The server calculates SHA-256 and persists the private image before AI processing.
+3. The Central AI Gateway may extract tag fields. The API still returns a reviewable capture when AI is unavailable; the user can enter the values manually.
+4. The cashier confirms a catalogue product and the extracted identifiers through `PUT /api/sales/item-tag-captures/{id}/review`.
+5. The normal `POST /api/sales` includes the capture ID in the relevant line's optional `captureIds` array. The sale transaction validates ownership, review state and product association, then attaches the capture atomically.
+6. `GET /api/sales/item-tag-captures/{id}` returns metadata; `GET /api/sales/item-tag-captures/{id}/image` streams the protected image; `DELETE` is limited to unattached captures.
+
+### 20.4 Database and storage decision
+
+Migration `049_invoice_item_tag_captures.sql` adds `sales.item_tag_capture`. Image bytes use PostgreSQL `bytea`, consistent with the existing supplier-invoice file-storage pattern. This avoids a new paid service, bucket, SDK or secret. The row records MIME type, byte count, SHA-256, extraction JSON, reviewed product/unit identifiers, creator/reviewer and optional sale-line association. Tenant RLS and composite foreign keys are applied in the migration. The table is separate from `procurement.invoice_file`.
+
+### 20.5 PR B validation added
+
+- `tests/Rbos.UnitTests/SaleLineCaptureRulesTests.cs`: optional-reference compatibility, duplicate/empty IDs, unit quantity and count rules.
+- `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs`: upload, idempotency conflict/replay, MIME/signature/size validation, private image retrieval, tenant isolation, review/delete, sale attachment and unreviewed-capture rejection.
+- `web/src/ItemTagCapture.test.tsx`: camera/gallery controls, image upload, review/add, unsupported image feedback and offline-disabled controls.
+- `ApiAuthorizationTests` continues to inventory all registered API routes against the fail-closed access registry.
+
+These are test sources added to the branch. Local build/test execution and CI results must be read from the actual runner output; they are not represented as passed here.
+
+### 20.6 Explicit limitations / decisions still open
+
+- No offline photo byte queue, deferred upload, or automatic photo retry after reconnect is implemented. This is intentionally not claimed; offline billing without photos remains available.
+- Upload progress is an indeterminate busy state, not a percentage.
+- AI is optional and remains unavailable by default because the Central AI Gateway and provider switches are disabled in checked-in configuration. Enabling it requires an explicitly verified eligible image-capable credential; paid providers remain disabled by default. Manual review is the recovery path.
+- Local barcode decoding intentionally excludes QR and Data Matrix payloads from automatic product-barcode mapping.
+- Extraction confidence is not presented as a calibrated score. Warranty, specifications and other printed text are visible in a read-only “More information” section; they are not yet editable catalogue fields.
+- Unattached-image cleanup is opportunistic rather than a scheduled job. Attached evidence has no automated retention/deletion policy in this change; define that policy before production-scale retention.
+- The feature records evidence and unit identifiers but does not enable inventory serial tracking or alter stock valuation/tracking policy.

@@ -36,3 +36,12 @@ Status: **Partly implemented.** Tenant-isolation, RLS, role, header/cookie, CSRF
 ## Exit criteria per slice
 
 All suites applicable to the slice pass locally; any failure blocks slice completion. Results are recorded as actually observed, never assumed.
+
+
+## PR B — item-tag photo security cases
+
+The added integration suite `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs` covers upload replay/conflict, MIME/signature/size rejection, authenticated retrieval, deletion before attachment, tenant A/B metadata/image/review/delete isolation, reviewed sale attachment and rejection of unreviewed evidence. The API route inventory also classifies upload/review/delete as `sales.create` and reads as authenticated-member routes.
+
+The migration adds RLS ENABLE+FORCE, an active-membership policy, composite product/sale-line foreign keys and a tenant-scoped unique idempotency key. Image bytes are returned only from the authenticated image route with private/no-store and nosniff headers. No public object URL or path traversal input is accepted.
+
+These are source-level test additions. PostgreSQL integration execution, CI evidence and independent penetration testing remain pending until actually run.

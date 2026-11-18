@@ -61,3 +61,10 @@ The application validates all business invariants before persistence. The databa
 ## Backup and recovery (local)
 
 `pg_dump` of the local database on demand; documented restore. Synthetic data only, so loss is acceptable during development. Real-data use would require a backup decision first.
+
+
+## Item-tag evidence storage (PR B)
+
+The invoice item-tag workflow reuses PostgreSQL rather than introducing a new object-storage provider. Migration `049_invoice_item_tag_captures.sql` stores JPEG/PNG/WebP bytes (maximum 8 MiB) in `sales.item_tag_capture.content` (`bytea`) alongside a SHA-256 digest, content type, extraction JSON and lifecycle metadata. This follows the existing supplier invoice file-storage precedent while keeping the business concepts and access paths separate.
+
+The table is tenant-owned: composite primary/foreign keys, RLS ENABLE+FORCE, an active-member policy and explicit grants are part of the migration. Unattached captures have a 30-day expiry and are removed opportunistically on subsequent uploads; stale `ReadingTag` rows older than five minutes are moved to `NeedsAttention` during that same upload cleanup; attached sale evidence is not removed by that cleanup. A separate posted-evidence retention policy remains an operational decision.

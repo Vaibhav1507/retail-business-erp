@@ -64,3 +64,17 @@ Gaps against the original plan: no browser tests for catalogue import or procure
 ## Scenario scripts
 
 A library of synthetic end-to-end scripts ("Day in the shop") posts a fixed sequence and asserts: TB balances, BS equation holds, all reconciliations zero, stock rebuild matches. Reused across slices as scope grows.
+
+
+## PR B — invoice item-tag photo coverage (added; execution pending)
+
+The PR B branch adds these suites without changing the historical test inventory above:
+
+| Layer | Added source | Intended assertions |
+|---|---|---|
+| Domain unit | `tests/Rbos.UnitTests/SaleLineCaptureRulesTests.cs` | Optional capture IDs preserve old requests; empty/duplicate IDs fail; number of captures cannot exceed whole-unit quantity |
+| API/PostgreSQL integration | `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs` | Valid raw upload; unsupported MIME/signature and oversize rejection; same-key replay and conflicting reuse; private image retrieval; delete; tenant A/B 404; review; atomic sale-line attachment; unreviewed capture rejection |
+| Frontend component | `web/src/ItemTagCapture.test.tsx` | Camera/gallery input attributes, upload/review/add callback, unsupported image message and offline-disabled controls |
+| Route inventory | `tests/Rbos.IntegrationTests/ApiAuthorizationTests.cs` | All new API route method/template pairs have an explicit fail-closed policy |
+
+Run `dotnet test` (including real PostgreSQL integration tests), `npm test`, `npm run build` and `npm run lint` from the repository's documented locations. Do not update the inventory counts or claim results until the relevant commands/CI jobs have actually completed. Mobile-browser camera permission, orientation and retake behaviour still need real-device acceptance.

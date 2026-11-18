@@ -116,3 +116,18 @@ Every relationship between tenant-owned tables is a composite FK including `tena
 - `stock_movement` nullable `tracking_ref` reserved → see `product-tracking-extensibility.md`.
 - `stock_location` already supports multiple per branch → transfers later.
 - `journal_line.party_id` → subledgers; `cost_center` not added.
+
+
+## 5. Implemented PR B extension — item-tag evidence
+
+Migration `049_invoice_item_tag_captures.sql` adds the tenant-owned source table `sales.item_tag_capture`. It is an evidence object linked to a specific `sales.sale_line`, not a new product variant or the full tracked-unit ledger.
+
+- Primary key: `(tenant_id, id)`; idempotency key is unique per tenant.
+- Product suggestions and confirmed products use composite tenant foreign keys to `catalog.product`.
+- The optional sale reference uses `(tenant_id, sale_id, sale_product_id)` to reference `sales.sale_line(tenant_id, sale_id, product_id)`.
+- RLS is enabled and forced with the active-member tenant policy.
+- The row stores the private image bytes (PostgreSQL `bytea`), MIME/size/hash, structured extraction JSON, reviewed product/unit fields, lifecycle status and audit timestamps.
+- Status progresses through `ReadingTag`, `ReadyForReview` or `NeedsAttention`, `Reviewed`, then `Attached`. Only `Reviewed` unattached rows can be attached during `POST /sales`.
+- The sale transaction updates the capture and sale line together. The sale detail and invoice snapshot contain capture IDs; they do not embed image bytes.
+
+This is additive. Existing products, sale lines and sale requests without capture IDs remain valid. The evidence row is not a substitute for the proposed `tracked_unit` projection or stock movement serial lifecycle.
