@@ -1,6 +1,6 @@
 # Current implementation and repository status
 
-**Reviewed:** 2026-11-17  
+**Reviewed:** 2026-11-18  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
@@ -73,6 +73,31 @@ The CI failures for Phases 2–6 show empty job-step arrays: GitHub Actions did 
 Durable recovery records:
 - `docs/implementation-plans/authorization-trusted-device-and-offline-operations.md`
 - `docs/implementation-log/README.md` and the phase-specific logs in `docs/implementation-log/`
+
+
+## Central AI gateway — PR A implementation work (unmerged)
+
+**Branch:** `feat/central-ai-gateway`  
+**Base commit:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
+**State:** draft implementation; not yet CI-validated, merged or deployed.
+
+The provider-call table above describes the current `main` baseline. PR A consolidates those paths behind one internal `AiGateway`.
+
+| Area | Draft implementation | Remaining validation |
+|---|---|---|
+| Gateway | Provider-neutral contracts, Gemini/Groq adapters, feature/provider kill switches, bounded attempts, timeout and structured validation | Release build, tests and review |
+| Credential pool | Concurrent round-robin; Gemini project and Groq team quota buckets; 429 cooldown; invalid-key suppression; circuit breaker | CI concurrency/failure-path evidence |
+| Cost control | Unknown billing fails closed; paid calls require explicit opt-in, pricing and cost estimate; monthly global/per-tenant hard limits | Migration execution and database-backed evidence |
+| Usage ledger | Migration 048, serialized reservation/settlement, metadata-only events | Validate forced-RLS membership policy and query access |
+| Invoice extraction | Gateway-backed Gemini extraction and opt-in Groq fallback; output remains an unsaved draft | Regression tests and CI |
+| Catalogue extraction | Gateway-backed Gemini/Groq photo/PDF extraction; local OCR/manual mapping recovery retained | Regression tests and CI |
+| Voice intent | Gateway-backed Gemini/Groq classification with the existing destination allowlist | Regression tests and CI |
+| Hosted transcription | Gateway-backed Groq Whisper only when explicitly enabled | Audio adapter tests and CI |
+| Local-first voice | Shruti remains local primary; no change intended | Verify local STT path was not altered |
+
+**Current safety defaults:** gateway disabled; Gemini/Groq providers disabled; paid providers disabled; existing hosted voice flags disabled. No API key, billing tier, production provider configuration, database or deployment has been changed by this branch.
+
+**Next gate:** finish review, run all CI checks and open one combined PR A. PR B (invoice item-tag photo capture) remains gated: do not begin until PR A is merged and the owner confirms.
 
 ## Database and deployment
 

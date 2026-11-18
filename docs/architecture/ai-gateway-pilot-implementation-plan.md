@@ -501,3 +501,59 @@ Preserve local voice navigation. Do not migrate it to a cloud provider as part o
 - xAI pricing: https://docs.x.ai/developers/pricing
 
 Provider limits, model availability, prices and terms change. Re-check official documentation immediately before implementation and before enabling a provider for real pilot-shop data.
+
+
+---
+
+## 18. Implementation status — 2026-11-18 (PR A)
+
+**Workstream:** Central AI Gateway  
+**Implementation branch:** `feat/central-ai-gateway`  
+**Base:** `b992452f75598a8e04f4abcb693551331cd3cc82`  
+**State:** Implementation assembled in draft; not yet validated by CI and not merged or deployed.
+
+### Investigation completed
+
+- Reconfirmed the .NET 10 API, dependency-injection, configuration, tenant-context and migration patterns.
+- Mapped every existing hosted-provider call path: Gemini invoice extraction, Gemini catalogue extraction, Groq vision invoice/catalogue fallback, Gemini voice intent, Groq Qwen voice intent and Groq Whisper transcription.
+- Confirmed local Shruti speech recognition and local OCR are separate local-first paths and must remain available.
+- Confirmed invoice extraction is review-before-save and product extraction returns import rows for preview; the gateway does not create or post business transactions.
+- Confirmed migration 048 is the next migration after 047.
+
+### Implementation assembled
+
+- Provider-neutral request/response, media, capability, failure and credential contracts.
+- Gemini and Groq provider adapters behind `IAiProviderAdapter`; provider-specific HTTP endpoints and authentication are confined to these adapters.
+- Gateway orchestration with feature/provider kill switches, bounded attempts, timeout, retry-after handling, quota-bucket cooldown, circuit breaker, structured-output validation and safe structured logging.
+- Concurrent round-robin credential pool. Gemini credentials sharing a project ID share one quota bucket; Groq credentials sharing a team ID share one bucket. Missing quota identity collapses to one conservative bucket.
+- Fail-closed billing classification: unknown billing mode is ineligible; paid credentials require explicit opt-in, positive pricing and a calculable estimate.
+- Migration 048 for usage reservations/settlement. A database advisory lock serializes global and per-tenant paid-budget reservations across instances. The usage table stores metadata only, not prompts, documents, transcripts, responses or secrets.
+- Rewired invoice extraction, catalogue image/PDF extraction, voice intent and hosted transcription to use the gateway with trusted tenant/user context.
+- Preserved local Shruti-first voice behaviour, the voice destination allowlist, daily limits, local OCR/manual mapping and review-before-save flows.
+- Regression tests for credential rotation/concurrency, same-project quota sharing, independent quota buckets, unknown/paid billing gates, budget denial, provider fallback, content-safety refusal, adapter requests, structured-output validation and voice destination allowlisting.
+- Updated operator configuration/usage guidance and current implementation status.
+
+### Safety posture
+
+- `AiGateway:Enabled` defaults to `false`.
+- Gemini and Groq provider switches default to `false`.
+- `AllowPaidProviders` defaults to `false`.
+- Existing voice intent and hosted Whisper flags remain disabled by default.
+- Legacy credentials are treated as `Unknown` billing unless an operator explicitly classifies them. Do not mark a key Free without confirming its provider billing/quota tier.
+- The ₹1,500 global and ₹50 per-tenant values are hard ceilings for paid usage, not spending targets. No automatic top-ups are implemented.
+- Multiple keys/projects must not be used to evade provider limits or terms. Independent quota buckets may only be configured when genuinely independent and authorised.
+- Round-robin, circuit-breaker and quota-cooldown state are process-local to each API instance; the database budget reservation is shared across instances. A restart resets local cooldown/circuit state.
+- No production secrets or deployment settings are changed by this branch.
+
+### Remaining work before PR A is ready
+
+- [ ] Finish source-level review and confirm all superseded direct provider clients/tests are removed.
+- [ ] Run the .NET Release build and unit tests.
+- [ ] Run full CI migration validation, frontend checks and deployment-container build.
+- [ ] Fix every implementation or CI issue found and rerun relevant checks.
+- [ ] Update this plan/status document with final CI evidence and PR link.
+- [ ] Open one combined PR for PR A. Do not merge or deploy without explicit owner approval.
+
+### PR B sequencing gate
+
+Invoice item-tag photo capture is **not started** in this workstream. Start PR B only after PR A is merged into `main` and the owner explicitly confirms that PR B may begin.

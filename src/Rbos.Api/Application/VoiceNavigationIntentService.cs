@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -12,10 +11,9 @@ public sealed record VoiceIntentResult(string Kind, string? TargetId, IReadOnlyL
 /// this service cannot return URLs, business data or transaction commands.
 /// </summary>
 public sealed class VoiceNavigationIntentService(
-    HttpClient http,
     IConfiguration cfg,
     ILogger<VoiceNavigationIntentService> log,
-    GroqTextIntentClient groq)
+    AiGateway gateway)
 {
     static readonly HashSet<string> Destinations = new(StringComparer.Ordinal)
     {
@@ -29,7 +27,6 @@ public sealed class VoiceNavigationIntentService(
         "more.loans", "settings"
     };
 
-    const string GeminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/";
     const double NavigateThreshold = 0.85;
     const string SystemPrompt = """
 You are a strict intent classifier for a retail business app's navigation assistant.
@@ -59,86 +56,93 @@ Never invent an ID, route, URL, screen, fact or action.
 
     public bool Available =>
         string.Equals(cfg["VoiceIntent:Enabled"], "true", StringComparison.OrdinalIgnoreCase) &&
-        ((!string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]) &&
-          string.Equals(cfg["Gemini:VoiceIntentEnabled"], "true", StringComparison.OrdinalIgnoreCase)) || groq.Available);
+        gateway.IsFeatureAvailable("VoiceIntent", EnabledProviders(), AiCapability.StructuredJson, Models());
 
-    public async Task<VoiceIntentResult> ClassifyAsync(VoiceIntentRequest request, CancellationToken ct)
+    private IReadOnlyList<AiProviderKind> EnabledProviders()
+    {
+        var providers = new List<AiProviderKind>();
+        if (string.Equals(cfg["Gemini:VoiceIntentEnabled"], "true", StringComparison.OrdinalIgnoreCase))
+            providers.Add(AiProviderKind.Gemini);
+        if (string.Equals(cfg["Groq:VoiceIntentEnabled"], "true", StringComparison.OrdinalIgnoreCase))
+            providers.Add(AiProviderKind.Groq);
+        return providers;
+    }
+
+    private IReadOnlyDictionary<AiProviderKind, IReadOnlyList<string>> Models() =>
+        new Dictionary<AiProviderKind, IReadOnlyList<string>>
+        {
+            [AiProviderKind.Gemini] = [cfg["Gemini:VoiceIntentModel"] ?? "gemini-3.5-flash"],
+            [AiProviderKind.Groq] = [cfg["Groq:VoiceIntentModel"] ?? "qwen/qwen3.8-27b"]
+        };
+
+    public async Task<VoiceIntentResult> ClassifyAsync(
+        Guid tenantId, Guid actorUserId, VoiceIntentRequest request, CancellationToken ct)
     {
         var transcript = request.Transcript?.Trim();
         if (string.IsNullOrWhiteSpace(transcript) || transcript.Length > 500)
             return NotUnderstood("none");
-        if (!Available) return NotUnderstood("disabled");
+        var providers = EnabledProviders();
+        if (!Available || tenantId == Guid.Empty || actorUserId == Guid.Empty || providers.Count == 0)
+            return NotUnderstood("disabled");
 
         var current = request.CurrentScreenId is not null && Destinations.Contains(request.CurrentScreenId)
             ? request.CurrentScreenId : null;
         var input = JsonSerializer.Serialize(new { transcript, currentScreenId = current });
+        var result = await ClassifyWithProvidersAsync(tenantId, actorUserId, input, providers, ct);
+        if (result is not null) return result;
 
-        if (!string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]) &&
-            string.Equals(cfg["Gemini:VoiceIntentEnabled"], "true", StringComparison.OrdinalIgnoreCase))
+        // A structurally valid but semantically unsafe/unknown destination must not prevent the
+        // independent configured fallback from being tried.
+        if (providers.Contains(AiProviderKind.Groq) && providers[0] != AiProviderKind.Groq)
         {
-            try
-            {
-                var parsed = await CallGeminiAsync(cfg["Gemini:VoiceIntentModel"] ?? "gemini-3.5-flash", cfg["Gemini:ApiKey"]!, input, ct);
-                var normalized = Normalize(parsed, "gemini");
-                if (normalized is not null) return normalized;
-                log.LogWarning("Gemini voice intent returned an invalid or low-confidence result; trying Groq fallback");
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-            {
-                log.LogWarning(e, "Gemini voice intent failed; trying Groq fallback");
-            }
+            result = await ClassifyWithProvidersAsync(tenantId, actorUserId, input, [AiProviderKind.Groq], ct);
+            if (result is not null) return result;
         }
-
-        if (groq.Available)
-        {
-            try
-            {
-                var parsed = await groq.ClassifyAsync(SystemPrompt, input, ct);
-                var normalized = Normalize(parsed, "groq-qwen");
-                if (normalized is not null) return normalized;
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-            {
-                log.LogWarning(e, "Groq Qwen voice intent fallback failed");
-            }
-        }
-
         return NotUnderstood("none");
     }
 
-    async Task<JsonNode?> CallGeminiAsync(string model, string key, string input, CancellationToken ct)
+    private async Task<VoiceIntentResult?> ClassifyWithProvidersAsync(
+        Guid tenantId, Guid actorUserId, string input, IReadOnlyList<AiProviderKind> providers, CancellationToken ct)
     {
-        var body = new JsonObject
+        try
         {
-            ["systemInstruction"] = new JsonObject
+            var response = await gateway.ExecuteAsync(new AiGatewayRequest
             {
-                ["parts"] = new JsonArray(new JsonObject { ["text"] = SystemPrompt })
-            },
-            ["contents"] = new JsonArray(new JsonObject
+                TenantId = tenantId,
+                ActorUserId = actorUserId,
+                Feature = "VoiceIntent",
+                Task = AiTaskKind.TextClassification,
+                SystemPrompt = SystemPrompt,
+                Prompt = "Classify the navigation request. Return only the required JSON object.",
+                InputText = input,
+                ResponseSchema = Schema(),
+                ProviderOrder = providers,
+                Models = Models(),
+                MaxOutputTokens = 250,
+                MaxAttemptsPerProvider = 2
+            }, ct);
+            if (response is null) return NotUnderstood("provider-unavailable");
+            var provider = response.Provider.Equals("Gemini", StringComparison.OrdinalIgnoreCase) ? "gemini" : "groq-qwen";
+            var normalized = Normalize(response.StructuredContent, provider);
+            if (normalized is null)
             {
-                ["role"] = "user",
-                ["parts"] = new JsonArray(new JsonObject { ["text"] = input })
-            }),
-            ["generationConfig"] = new JsonObject
-            {
-                ["responseMimeType"] = "application/json",
-                ["responseSchema"] = Schema(),
-                ["temperature"] = 0,
-                ["maxOutputTokens"] = 250
+                log.LogWarning("AI gateway voice intent returned a structurally valid but disallowed or low-confidence result");
+                if (response.Provider.Equals("Groq", StringComparison.OrdinalIgnoreCase))
+                    return NotUnderstood("groq-invalid-result");
             }
-        };
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GeminiEndpoint}{Uri.EscapeDataString(model)}:generateContent");
-        request.Headers.Add("x-goog-api-key", key);
-        request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-        using var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            log.LogWarning("Gemini voice intent request failed with HTTP {StatusCode}", (int)response.StatusCode);
-            response.EnsureSuccessStatusCode();
+            return normalized;
         }
-        var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
-        var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
-        return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (AiProviderException e) when (e.Category == AiFailureCategory.ContentSafetyRefusal)
+        {
+            log.LogWarning("AI provider declined voice intent classification for this request");
+            return NotUnderstood("safety-refusal");
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+        {
+            log.LogWarning(e, "AI gateway voice intent classification failed");
+            return NotUnderstood("provider-error");
+        }
     }
 
     static JsonObject Schema()
