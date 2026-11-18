@@ -73,7 +73,7 @@ Common rules for every posting:
 - **Dr** AP (party) (or Cash/Bank if refunded) · **Cr** Inventory (original landed cost of source line) · **Cr** GST Input (as recorded on source, if any)
 - **Inventory:** − qty; WAC recalculated. **Party:** AP down.
 - **Reversal:** mirror.
-- **Open question ⚑ (PR-02):** original receipt cost vs current WAC.
+- **Open question ⚑ (PR-02):** proposed policy says original receipt cost; the current application removes supplier-return inventory at current WAC. This difference remains a CA decision and must not be represented as approved.
 
 ### P-12 Supplier payment
 - **Dr** AP (party) · **Cr** Cash/Bank. Allocation to bills; excess → Supplier Advances (Dr Supplier Advances instead of AP for the unallocated part ⚑).

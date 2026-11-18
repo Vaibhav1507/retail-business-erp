@@ -7,13 +7,16 @@ const WEB = 'http://localhost:5173'
 // and the Vite dev server (which proxies /api to the API). Existing servers are reused.
 export default defineConfig({
   testDir: './e2e',
+  // CI runs only deterministic, synthetic-data specs. The invoice-extraction/demo specs
+  // exercise external AI/document providers and remain manual, opt-in acceptance tests.
+  ...(process.env.CI ? { testMatch: ['api-contract.spec.ts', 'collections.spec.ts', 'opening-stock.spec.ts', 'sales.spec.ts', 'ui-audit.spec.ts'] } : {}),
   timeout: 90_000,
   fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: [['list']],
   use: { baseURL: WEB, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
-  projects: [{ name: 'mobile-390x844', use: { channel: 'msedge', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } }],
+  projects: [{ name: 'mobile-390x844', use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } }],
   webServer: [
     {
       command: 'dotnet run --project ../src/Rbos.Api --no-launch-profile --urls http://localhost:5082',

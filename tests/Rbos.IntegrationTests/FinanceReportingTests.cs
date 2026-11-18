@@ -1,6 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
+using Microsoft.Extensions.DependencyInjection;
+using Rbos.Api.Persistence;
 
 namespace Rbos.IntegrationTests;
 
@@ -134,6 +139,128 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.True(v.GetProperty("ok").GetBoolean());
         Assert.Equal(0, v.GetProperty("items").GetArrayLength());
         Assert.Equal(HttpStatusCode.Unauthorized, (await f.CreateClient().GetAsync("/api/reports/stock-verification")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Stock_verification_resolves_migration_044_aliases_and_detects_corrupt_projections()
+    {
+        var c = new Client(f); await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var canonical = await c.AddProduct("Alias canonical cable");
+        var retired = await c.AddProduct("Alias duplicate cable");
+        var supplier = await Id(await c.Send(HttpMethod.Post, "/suppliers", new { name = "Alias test supplier" }));
+        await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = canonical, quantity = 5m, unitCost = 100m } } }, K()));
+        var retiredReceipt = await Id(await c.Send(HttpMethod.Post, "/purchases", new { supplierId = supplier, locationId = location, receiptDate = Today, lines = new[] { new { productId = retired, quantity = 10m, unitCost = 200m } } }, K()));
+        var cancelSale = await Id(await c.Send(HttpMethod.Post, "/sales", new { locationId = location, saleDate = Today, saleType = "Cash", amountPaid = 300m, payMethod = "Cash", lines = new[] { new { productId = retired, quantity = 1m, unitPrice = 300m, discount = 0m } } }, K()));
+        var returnSale = await Id(await c.Send(HttpMethod.Post, "/sales", new { locationId = location, saleDate = Today, saleType = "Cash", amountPaid = 300m, payMethod = "Cash", lines = new[] { new { productId = retired, quantity = 1m, unitPrice = 300m, discount = 0m } } }, K()));
+
+        using var scope = f.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser<Guid>>>();
+        var uid = (await users.FindByNameAsync(c.Email))!.Id;
+        var db = scope.ServiceProvider.GetRequiredService<TenantDb>();
+        var tenant = (await db.FindTenantAsync(uid, default))!.Value;
+
+        // This is deliberate fixture-level projection corruption/merge setup. Use the
+        // dedicated migrator connection, not rbos_app: runtime grants must not permit
+        // arbitrary stock_balance deletes. FORCE ROW LEVEL SECURITY still applies.
+        var config = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
+        var migratorConnectionString = config["ConnectionStrings:RbosTestMigrator"];
+        Assert.False(string.IsNullOrWhiteSpace(migratorConnectionString));
+        await using var connection = new NpgsqlConnection(migratorConnectionString);
+        await connection.OpenAsync();
+        await using (var tx = await connection.BeginTransactionAsync())
+        {
+            await using (var context = new NpgsqlCommand(
+                "select set_config('app.user_id', @u, true), set_config('app.tenant_id', @t, true)", connection, tx))
+            {
+                context.Parameters.AddWithValue("u", uid.ToString());
+                context.Parameters.AddWithValue("t", tenant.ToString());
+                await context.ExecuteNonQueryAsync();
+            }
+
+            async Task Execute(string sql, Action<NpgsqlCommand>? configure = null)
+            {
+                await using var command = new NpgsqlCommand(sql, connection, tx);
+                configure?.Invoke(command);
+                await command.ExecuteNonQueryAsync();
+            }
+
+            // FORCE RLS also applies to the table owner. Add a tenant-scoped,
+            // transaction-only policy for the migrator fixture role, then remove it.
+            // This keeps runtime rbos_app grants and production policies unchanged.
+            foreach (var table in new[] { "catalog.product_alias", "inventory.stock_balance", "inventory.item_cost", "catalog.product" })
+                await Execute($"create policy rbos_test_fixture_tenant_access on {table} for all to rbos_migrator using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid) with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)");
+
+            await Execute(
+                "insert into catalog.product_alias(tenant_id,alias_product_id,canonical_product_id) values (@t,@a,@c)",
+                command => { command.Parameters.AddWithValue("t", tenant); command.Parameters.AddWithValue("a", retired); command.Parameters.AddWithValue("c", canonical); });
+            await Execute(@"insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity)
+                select tenant_id,@c,location_id,quantity from inventory.stock_balance where product_id=@a
+                on conflict (tenant_id,product_id,location_id) do update set quantity=inventory.stock_balance.quantity+excluded.quantity",
+                command => { command.Parameters.AddWithValue("c", canonical); command.Parameters.AddWithValue("a", retired); });
+            await Execute("delete from inventory.stock_balance where product_id=@a",
+                command => command.Parameters.AddWithValue("a", retired));
+            await Execute(@"insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac)
+                select tenant_id,@c,total_quantity,inventory_value,wac from inventory.item_cost where product_id=@a
+                on conflict (tenant_id,product_id) do update set total_quantity=inventory.item_cost.total_quantity+excluded.total_quantity,
+                  inventory_value=inventory.item_cost.inventory_value+excluded.inventory_value,
+                  wac=round((inventory.item_cost.inventory_value+excluded.inventory_value)/nullif(inventory.item_cost.total_quantity+excluded.total_quantity,0),4)",
+                command => { command.Parameters.AddWithValue("c", canonical); command.Parameters.AddWithValue("a", retired); });
+            await Execute("delete from inventory.item_cost where product_id=@a",
+                command => command.Parameters.AddWithValue("a", retired));
+            await Execute("update catalog.product set is_active=false where id=@a",
+                command => command.Parameters.AddWithValue("a", retired));
+            foreach (var table in new[] { "catalog.product_alias", "inventory.stock_balance", "inventory.item_cost", "catalog.product" })
+                await Execute($"drop policy rbos_test_fixture_tenant_access on {table}");
+            await tx.CommitAsync();
+        }
+
+        // Historical sale/receipt lines still reference the retired product ID.
+        // Posting these returns after migration must route stock movements to the
+        // canonical product and replay them from the merged pre-migration WAC state.
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, $"/sales/{cancelSale}/cancel", new { reason = "Alias replay regression" }, K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sale-returns", new { saleId = returnSale, returnDate = Today, reason = "Alias return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/purchase-returns", new { receiptId = retiredReceipt, returnDate = Today, reason = "Alias supplier return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
+
+        var healthy = await c.GetJson("/reports/stock-verification");
+        Assert.True(
+            healthy.GetProperty("ok").GetBoolean(),
+            $"Expected migrated alias projections to reconcile and original-product replay to remain valid. Details: {healthy.GetRawText()}");
+        Assert.Empty(healthy.GetProperty("items").EnumerateArray());
+        Assert.Empty(healthy.GetProperty("replay").EnumerateArray());
+
+        // Corrupt the projection through the same isolated test-fixture connection.
+        await using (var tx = await connection.BeginTransactionAsync())
+        {
+            await using (var context = new NpgsqlCommand(
+                "select set_config('app.user_id', @u, true), set_config('app.tenant_id', @t, true)", connection, tx))
+            {
+                context.Parameters.AddWithValue("u", uid.ToString());
+                context.Parameters.AddWithValue("t", tenant.ToString());
+                await context.ExecuteNonQueryAsync();
+            }
+            await using (var policy = new NpgsqlCommand(
+                "create policy rbos_test_fixture_tenant_access on inventory.stock_balance for all to rbos_migrator using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid) with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)", connection, tx))
+                await policy.ExecuteNonQueryAsync();
+            await using (var corrupt = new NpgsqlCommand(
+                "update inventory.stock_balance set quantity=quantity+1 where product_id=@p", connection, tx))
+            {
+                corrupt.Parameters.AddWithValue("p", canonical);
+                Assert.Equal(1, await corrupt.ExecuteNonQueryAsync());
+            }
+            await using (var dropPolicy = new NpgsqlCommand(
+                "drop policy rbos_test_fixture_tenant_access on inventory.stock_balance", connection, tx))
+                await dropPolicy.ExecuteNonQueryAsync();
+            await tx.CommitAsync();
+        }
+
+        var damaged = await c.GetJson("/reports/stock-verification");
+        Assert.False(damaged.GetProperty("ok").GetBoolean());
+        Assert.Contains(damaged.GetProperty("items").EnumerateArray(), x => x.GetProperty("productId").GetGuid() == canonical);
+        var other = new Client(f); await other.SignUpAndBootstrap();
+        var isolated = await other.GetJson("/reports/stock-verification");
+        Assert.True(isolated.GetProperty("ok").GetBoolean());
+        Assert.DoesNotContain(isolated.GetProperty("items").EnumerateArray(), x => x.GetProperty("name").GetString() == "Alias canonical cable");
     }
 
     [Fact]

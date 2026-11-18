@@ -16,12 +16,12 @@ Status: **Proposed.**
 | I-10 | Stock valuation reconciles to Inventory control | Same calculation produces movement value and journal amount | Reconciliation test |
 | I-11 | Money uses decimal arithmetic | decimal / numeric only; no floating point | Static analysis + tests |
 | I-12 | Quantity uses configured precision | Per-unit precision; piece = 0 decimals | Validation tests |
-| I-13 | Unknown cost never becomes zero | Draft quantity until cost entered | Posting without cost rejected |
+| I-13 | Unknown cost never becomes zero | Pilot posting requires an explicit positive owner-entered actual or estimated unit cost; no inferred/zero cost | Posting without cost rejected |
 | I-14 | Every movement records required context | NOT NULL constraints | Schema test |
 
 ## Movement record (required fields)
 
-tenant_id, id, variant_id, location_id (from/to via direction + location), branch_id, quantity_base (signed by direction), entered_quantity, entered_unit_id, conversion_factor, unit_cost (numeric 18,6), value (numeric 18,2), movement_kind, source_type, source_id, source_line_no, effective_date, posted_at, posted_seq, user_id, reason_code (where required), correlation_id, idempotency_key reference, tracking_ref (reserved, null in 1A).
+Live schema (migration 003, updated by migration 008): `tenant_id`, `id`, `product_id`, `location_id`, `quantity_delta numeric(18,3)`, `unit_cost numeric(18,4)`, `value_delta numeric(18,2)`, `effective_date`, `source_type`, `source_id`, `occurred_at`. The live table has no `variant_id`, `branch_id`, `posted_at`, `posted_seq`, `source_line_no` or `tracking_ref`; do not query or rely on those proposed fields.
 
 ## Movement kinds (1A)
 
@@ -29,4 +29,4 @@ tenant_id, id, variant_id, location_id (from/to via direction + location), branc
 
 ## Ordering
 
-`posted_seq` is a per-tenant monotonic sequence assigned at posting. Replay order = (effective_date, posted_seq). See valuation policy for backdating limits.
+Current implementation replay order = (`effective_date`, `occurred_at`, `id`). The live schema has no `posted_seq`; `occurred_at` plus movement UUID provides a deterministic tie-break after effective date. This is an implementation fallback, not a claim that a per-tenant posting sequence exists.

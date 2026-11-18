@@ -168,6 +168,31 @@ public class WeightedAverageCostTests
 	}
 
 	[Fact]
+	public void High_precision_cost_is_persisted_at_four_places_half_away_from_zero()
+	{
+		Assert.Equal(1.2346m, WeightedAverageCostCalculator.RoundWac(1.23455m));
+		Assert.Equal(-1.2346m, WeightedAverageCostCalculator.RoundWac(-1.23455m));
+	}
+
+	[Fact]
+	public void Small_quantity_with_real_cost_keeps_two_place_inventory_value()
+	{
+		var s = Receive(CostState.Empty, 0.001m, 10000m);
+		Assert.Equal(0.001m, s.TotalQuantity);
+		Assert.Equal(10.00m, s.InventoryValue);
+		Assert.Equal(10000m, s.Wac);
+	}
+
+	[Fact]
+	public void Repeated_high_precision_receipts_use_the_same_persisted_wac_rule()
+	{
+		var s = Receive(CostState.Empty, 100m, 1.0001m);
+		s = Receive(s, 100m, 1.0002m);
+		Assert.Equal(200.03m, s.InventoryValue);
+		Assert.Equal(1.0002m, s.Wac);
+	}
+
+	[Fact]
 	public void Fractional_quantity_is_supported()
 	{
 		var s = Receive(CostState.Empty, 2.5m, 4m);

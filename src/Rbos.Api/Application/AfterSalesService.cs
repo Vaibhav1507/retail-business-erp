@@ -229,7 +229,7 @@ public sealed class AfterSalesService(TenantDb db)
                 var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost.Amount;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
-                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
+                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", WeightedAverageCostCalculator.RoundWac(tv / tq)));
             }
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, total = total.Amount, balanceCredit = credit, cashRefund = refund });
@@ -505,7 +505,7 @@ public sealed class AfterSalesService(TenantDb db)
                 ("t", tenantId), ("i", id), ("s", saleId), ("d", cancelDate), ("r", Blank(reason)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
             foreach (var x in lines)
             {
-                var unitCost = x.Qty == 0 ? 0m : decimal.Round(x.Cost / x.Qty, 4, MidpointRounding.AwayFromZero);
+                var unitCost = x.Qty == 0 ? 0m : WeightedAverageCostCalculator.RoundWac(x.Cost / x.Qty);
                 if (x.Cost > 0)
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleCancellation',@d)",
                         ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", unitCost), ("v", x.Cost), ("e", cancelDate), ("d", id));
@@ -514,7 +514,7 @@ public sealed class AfterSalesService(TenantDb db)
                 var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
                 var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
-                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", decimal.Round(tv / tq, 4, MidpointRounding.AwayFromZero)));
+                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", WeightedAverageCostCalculator.RoundWac(tv / tq)));
             }
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, saleId, cancelled = true });

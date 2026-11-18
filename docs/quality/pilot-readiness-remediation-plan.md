@@ -1,7 +1,7 @@
 # Pilot Readiness & Remediation Plan
 
-**Status:** Proposed — implementation and pilot acceptance not yet complete  
-**Last reviewed:** 2026-11-17  
+**Status:** Active remediation tracker — implementation evidence updated 2026-11-18; pilot acceptance not yet complete  
+**Last reviewed:** 2026-11-18  
 **Repository baseline:** `main` at `0ece8c1ef80ccbdc5356c1697e5c388e9a3fd5a1`  
 **Purpose:** One controlled pilot for one retail business. This document is the consolidated engineering checklist for closing the repository findings and proving the pilot workflow. It supplements, and does not replace, the product scope, owner decisions, security model, financial policies or deployment runbook.
 
@@ -477,3 +477,22 @@ For each completed item, record:
 - Current CI workflow: [rbos-ci](https://github.com/Vaibhav1507/retail-business-erp/actions/workflows/ci.yml)
 - Production migration workflow: [migrate-prod](https://github.com/Vaibhav1507/retail-business-erp/actions/workflows/migrate-prod.yml)
 - Outstanding dynamic catalogue PR: [PR #3](https://github.com/Vaibhav1507/retail-business-erp/pull/3)
+
+
+---
+
+## Focused five-item P0 remediation — 2026-11-18
+
+The product owner requested one focused branch/PR for five work items: alias-aware stock verification/replay; WAC precision consistency; opening-stock cost correctness; CI quality gates; and one-shop financial end-to-end evidence. This scope intentionally excludes the other historical P0 rows in the original register (including endpoint registration and route-permission audit); those are separate findings and must not be represented as closed by this work.
+
+**Baseline:** `main` `fb56331eac368ba00db8b70503f20d504ec57fef`. **Branch:** `fix/pilot-readiness-p0-remediation`. **PR:** [#47](https://github.com/Vaibhav1507/retail-business-erp/pull/47), open at last check (merge status must be verified after owner action). **Latest validation at documentation update:** latest-head CI run #589 on `5253435c873de34512700ba3283e2c9c2a293a59`. Frontend typecheck, unit tests, lint, build and dependency-audit checker passed. Backend Release build and disposable PostgreSQL migration passed; 129 unit tests passed; integration tests failed 162/163 because the new alias regression attempted direct `inventory.stock_balance` deletion under the restricted app role. Playwright and container build were skipped. CI evidence applies only to this exact commit/run.
+
+| Requested item | Branch status | Test/evidence status | Professional/manual approval |
+|---|---|---|---|
+| P0.1 Alias-aware verification and replay | Code changed: alias-aware tenant joins canonicalise historical movement IDs; replay orders by actual `effective_date, occurred_at, id`. | New integration regression covers merged balances/cost, healthy alias verification, corrupted stock projection detection and tenant isolation. Latest-head CI Release build and disposable PostgreSQL migration passed; unit tests passed 129/129; integration tests failed 162/163. The sole failure is a permission-denied direct delete from `inventory.stock_balance` in the new alias regression test (the test uses the restricted app role). Playwright and container build were skipped. | Manual review of migrated fixture and post-alias return/cancellation source references remains. |
+| P0.2 WAC precision | Code changed: central four-decimal WAC rounding with half-away-from-zero; two-decimal INR money rounding retained. No schema migration. | Existing finance/reconciliation tests plus CI required. | CA approval not available/recorded. Four decimals are an interim implementation/storage rule only; six-decimal proposal is not approved. |
+| P0.3 Opening-stock cost | Existing server validation requires positive explicit cost; UI now explains actual/owner-estimated entry and no inferred/zero cost. | Existing unit/integration/Playwright opening-stock tests; CI pending. | Pilot owner must review the wording and manually confirm cost entry behaviour. |
+| P0.4 CI | Lint, strict high/critical dependency audit, Playwright browser install and synthetic browser E2E added. Provider-dependent AI demo/extraction specs are excluded from CI. | Latest frontend CI passed typecheck, unit tests, lint, build and the time-bound audit checker. The checker allows only the documented development-only picomatch advisory chain through 2026-12-02; production dependency audit remains a hard gate. Latest-head backend Release build and disposable PostgreSQL migration passed; unit tests passed 129/129; integration tests failed 162/163 due to the test-role permission issue noted above. Playwright and container build were skipped. | None for code gate; dependency exception approval only if required. |
+| P0.5 One-shop financial journey | Existing separate synthetic API/integration/browser suites cover material parts of the journey. | Not yet proven as one single 25-step scenario; complete GST/non-GST print and all report assertions need consolidated E2E proof. | Product owner manual acceptance remains outstanding. |
+
+**No pilot acceptance is claimed.** CI green is not manual acceptance, CA approval, production migration evidence or permission to deploy. No production migration or deployment is part of this PR.
