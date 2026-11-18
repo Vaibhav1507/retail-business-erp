@@ -239,7 +239,7 @@ export default function App() {
 	case 'parties': body = <PartiesPage tab={first('customers')} c={c} />; break
 	case 'money': body = <MoneyPage tab={first('cash')} />; break
 	case 'more': body = <MorePage tab={tab} onLogout={logout} email={me.email} />; break
-	default: body = <HomePage businessName={businessName} />
+	default: body = <HomePage businessName={businessName} offlineMode={offlineMode} />
   }
   const active = NAV.some(n => n.key === page) ? page : 'home'
   return (
