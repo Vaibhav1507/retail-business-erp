@@ -1,4 +1,4 @@
-import { signUp, randomMobile, openAddProduct, chooseCategory, postInvoice } from './signup'
+import { signUp, randomMobile, openAddProduct, chooseCategory, postInvoice, saveNewProduct } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
@@ -21,8 +21,7 @@ test('shopkeeper sells for cash, on credit with part payment, and reviews histor
   await form.getByLabel('Name', { exact: true }).fill(item)
   await chooseCategory(form, 'Cables')
   await form.getByLabel('Generic / unbranded').setChecked(true)
-  await form.getByRole('button', { name: 'Add product' }).click()
-  await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name: item, exact: true })).toBeVisible()
+  await saveNewProduct(page, form, item)
 
   await page.goto('/#/stock/opening')
   const stockForm = page.getByRole('region', { name: 'Opening stock' })
