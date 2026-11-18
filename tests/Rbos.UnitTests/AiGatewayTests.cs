@@ -93,6 +93,36 @@ public sealed class AiGatewayTests
     }
 
     [Fact]
+    public void CredentialPool_RotatesAcrossFiveConfiguredGroqTeamsWithoutCodeChanges()
+    {
+        var values = new List<(string Key, string Value)>
+        {
+            ("AiGateway:Providers:Groq:Enabled", "true")
+        };
+        for (var i = 0; i < 5; i++)
+        {
+            values.Add(($"AiGateway:Credentials:{i}:Provider", "Groq"));
+            values.Add(($"AiGateway:Credentials:{i}:Id", $"groq-team-{i + 1}-key"));
+            values.Add(($"AiGateway:Credentials:{i}:SecretRef", $"TestKeys:Groq{i + 1}"));
+            values.Add(($"AiGateway:Credentials:{i}:TeamId", $"team-{i + 1}"));
+            values.Add(($"AiGateway:Credentials:{i}:BillingMode", "Free"));
+            values.Add(($"TestKeys:Groq{i + 1}", $"secret-{i + 1}"));
+        }
+
+        var pool = new AiGatewayCredentialPool(Config(values.ToArray()));
+        var selected = Enumerable.Range(0, 5)
+            .Select(_ => pool.SelectOrder(AiProviderKind.Groq, AiCapability.Text, "model", allowPaid: false)[0])
+            .ToArray();
+
+        Assert.Equal(5, selected.Select(x => x.Id).Distinct().Count());
+        Assert.Equal(5, selected.Select(x => x.QuotaBucketId).Distinct().Count());
+
+        pool.MarkRateLimited(selected[0], TimeSpan.FromMinutes(1));
+        var remaining = pool.SelectOrder(AiProviderKind.Groq, AiCapability.Text, "model", allowPaid: false);
+        Assert.Equal(4, remaining.Count);
+        Assert.DoesNotContain(remaining, x => x.QuotaBucketId == selected[0].QuotaBucketId);
+    }
+    [Fact]
     public void CredentialPool_UnknownBillingModeIsFailClosed()
     {
         var config = Config(

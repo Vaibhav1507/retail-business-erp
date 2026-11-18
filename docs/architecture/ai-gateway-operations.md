@@ -36,24 +36,110 @@ AiGateway__AllowPaidProviders=false
 
 Keep task-level flags disabled unless that exact feature has been reviewed and approved: `Groq__InvoiceFallbackEnabled`, `Groq__VoiceIntentEnabled`, `VoiceIntent__Enabled`, `Gemini__VoiceIntentEnabled` and `Groq__WhisperEnabled`.
 
-## Multiple authorised credentials
+## Multiple authorised credentials — configuration only
 
-For multiple keys, prefer explicit credential entries and keep secrets in the secret manager. Example shape:
+The gateway reads an indexed credential list at startup. Add, remove, enable or disable entries in deployment configuration or the secret manager; **no application code change is required**. Restart/redeploy the API after changing the list because the credential pool is loaded once when the singleton is created.
+
+Keep API keys in the secret manager. `SecretRef` is a configuration key path, not the secret itself. For example, inject `AiSecrets__GeminiA` or `AiSecrets__GroqA` as secret environment variables and point the corresponding entry at `AiSecrets:GeminiA` or `AiSecrets:GroqA`.
+
+Example with five Gemini credentials and five Groq credentials (repeat the indexed pattern for as many authorised credentials as needed):
 
 ```text
+AiGateway__Enabled=true
+AiGateway__AllowPaidProviders=false
+AiGateway__Providers__Gemini__Enabled=true
+AiGateway__Providers__Groq__Enabled=true
+
 AiGateway__Credentials__0__Provider=Gemini
-AiGateway__Credentials__0__Id=gemini-project-a-key-1
-AiGateway__Credentials__0__SecretRef=AiSecrets:GeminiProjectAKey1
-AiGateway__Credentials__0__ProjectId=<project-a>
+AiGateway__Credentials__0__Id=gemini-a
+AiGateway__Credentials__0__SecretRef=AiSecrets:GeminiA
+AiGateway__Credentials__0__ProjectId=<google-cloud-project-a>
 AiGateway__Credentials__0__BillingMode=Free
 AiGateway__Credentials__0__Enabled=true
+
+AiGateway__Credentials__1__Provider=Gemini
+AiGateway__Credentials__1__Id=gemini-b
+AiGateway__Credentials__1__SecretRef=AiSecrets:GeminiB
+AiGateway__Credentials__1__ProjectId=<google-cloud-project-b>
+AiGateway__Credentials__1__BillingMode=Free
+AiGateway__Credentials__1__Enabled=true
+
+AiGateway__Credentials__2__Provider=Gemini
+AiGateway__Credentials__2__Id=gemini-c
+AiGateway__Credentials__2__SecretRef=AiSecrets:GeminiC
+AiGateway__Credentials__2__ProjectId=<google-cloud-project-c>
+AiGateway__Credentials__2__BillingMode=Free
+AiGateway__Credentials__2__Enabled=true
+
+AiGateway__Credentials__3__Provider=Gemini
+AiGateway__Credentials__3__Id=gemini-d
+AiGateway__Credentials__3__SecretRef=AiSecrets:GeminiD
+AiGateway__Credentials__3__ProjectId=<google-cloud-project-d>
+AiGateway__Credentials__3__BillingMode=Free
+AiGateway__Credentials__3__Enabled=true
+
+AiGateway__Credentials__4__Provider=Gemini
+AiGateway__Credentials__4__Id=gemini-e
+AiGateway__Credentials__4__SecretRef=AiSecrets:GeminiE
+AiGateway__Credentials__4__ProjectId=<google-cloud-project-e>
+AiGateway__Credentials__4__BillingMode=Free
+AiGateway__Credentials__4__Enabled=true
+
+AiGateway__Credentials__5__Provider=Groq
+AiGateway__Credentials__5__Id=groq-a
+AiGateway__Credentials__5__SecretRef=AiSecrets:GroqA
+AiGateway__Credentials__5__TeamId=<groq-team-a>
+AiGateway__Credentials__5__BillingMode=Free
+AiGateway__Credentials__5__Enabled=true
+
+AiGateway__Credentials__6__Provider=Groq
+AiGateway__Credentials__6__Id=groq-b
+AiGateway__Credentials__6__SecretRef=AiSecrets:GroqB
+AiGateway__Credentials__6__TeamId=<groq-team-b>
+AiGateway__Credentials__6__BillingMode=Free
+AiGateway__Credentials__6__Enabled=true
+
+AiGateway__Credentials__7__Provider=Groq
+AiGateway__Credentials__7__Id=groq-c
+AiGateway__Credentials__7__SecretRef=AiSecrets:GroqC
+AiGateway__Credentials__7__TeamId=<groq-team-c>
+AiGateway__Credentials__7__BillingMode=Free
+AiGateway__Credentials__7__Enabled=true
+
+AiGateway__Credentials__8__Provider=Groq
+AiGateway__Credentials__8__Id=groq-d
+AiGateway__Credentials__8__SecretRef=AiSecrets:GroqD
+AiGateway__Credentials__8__TeamId=<groq-team-d>
+AiGateway__Credentials__8__BillingMode=Free
+AiGateway__Credentials__8__Enabled=true
+
+AiGateway__Credentials__9__Provider=Groq
+AiGateway__Credentials__9__Id=groq-e
+AiGateway__Credentials__9__SecretRef=AiSecrets:GroqE
+AiGateway__Credentials__9__TeamId=<groq-team-e>
+AiGateway__Credentials__9__BillingMode=Free
+AiGateway__Credentials__9__Enabled=true
+
+# Secret-manager-injected values; never commit actual API keys:
+AiSecrets__GeminiA=<gemini-key-a>
+AiSecrets__GeminiB=<gemini-key-b>
+AiSecrets__GeminiC=<gemini-key-c>
+AiSecrets__GeminiD=<gemini-key-d>
+AiSecrets__GeminiE=<gemini-key-e>
+AiSecrets__GroqA=<groq-key-a>
+AiSecrets__GroqB=<groq-key-b>
+AiSecrets__GroqC=<groq-key-c>
+AiSecrets__GroqD=<groq-key-d>
+AiSecrets__GroqE=<groq-key-e>
 ```
 
-Use the same `ProjectId` for keys belonging to the same Gemini project. They rotate as credentials but share one quota bucket; a 429 cools down the entire project bucket. Groq keys sharing one team identity share a team bucket. A missing project/team identity collapses into a conservative `unidentified` bucket.
+The numbered list can mix providers; indexes should be unique and contiguous for operational clarity. Every entry has its own `Id`, `SecretRef`, `Enabled`, `BillingMode`, and provider quota identity (`ProjectId` for Gemini, `TeamId` for Groq). Optional `Capabilities` and `Models` restrict what an entry may serve.
 
-Only configure independent quota buckets when they are genuinely independent, authorised and permitted by provider terms. Never rotate accounts, keys or projects to circumvent rate limits, free-tier restrictions or provider policies.
+**Rotation behaviour:** for each gateway request, the starting eligible credential advances round-robin. If a credential fails, the gateway tries other eligible credentials up to the configured per-provider attempt limit. Disabled, invalid, cooling-down, unsupported-model and ineligible billing entries are skipped. Rotation state and cooldowns are process-local; they reset on API restart.
 
-Round-robin cursors, invalid-key suppression, circuit-breaker state and quota cooldowns are process-local to each API instance. They are thread-safe within that instance but reset on instance restart. The monthly budget ledger is database-backed and serialized across instances.
+**Important quota distinction:** a Gmail address is not a quota bucket. Gemini keys created in the same Google Cloud project share that project's quota, even if the keys were created while signed into different Google accounts. Separate `ProjectId` values are only treated as separate buckets when those projects really have independent quotas and their use is authorised under Google's terms. Likewise, Groq keys under the same `TeamId` share the team quota; different team IDs are treated as separate buckets only where they represent legitimately independent teams/entitlements. This mechanism is for legitimate key management, availability and failover—not for rotating accounts/projects to evade provider rate limits, free-tier restrictions or terms. It does not guarantee that creating more accounts/projects grants more free usage.
+
+Missing project/team identity is collapsed into a conservative `unidentified` bucket. A 429 cools down every key in the same quota bucket while independent eligible buckets remain available.
 
 ## Paid provider safeguards
 
