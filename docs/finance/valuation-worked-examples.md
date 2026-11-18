@@ -4,7 +4,7 @@ Status: **Proposed. Illustrative synthetic numbers. Tax rate 18% is illustrative
 
 Examples 1–9 are **chained** for one variant: *32 inch LED TV - Local* (`INT-000123`). Examples 10–13 are standalone.
 
-Notation: Q = quantity, V = inventory value (₹), W = WAC (₹/unit).
+Notation: Q = quantity, V = inventory value (₹), W = WAC (₹/unit).\n\n**Implementation note (2026-11-18):** These examples remain proposed mathematical illustrations, not an approved persistence contract. The live schema stores unit cost/WAC to 4 decimals, quantity to 3 decimals and value to 2 decimals. The six-decimal figures below are not implemented; CA approval is outstanding.
 
 ## Chained examples (INT-000123)
 
