@@ -113,12 +113,11 @@ public sealed class AiProviderCredential
 
     public bool CanEstimatePaidCost(AiGatewayRequest request)
     {
-        if (!HasPaidPricing) return false;
-        if (request.Media.Any(m => m.MimeType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) && m.PageCount is null)) return false;
         if (request.Audio is not null)
             return request.AudioDurationSeconds is > 0 && AudioCostPerMinuteInr is > 0;
-        if (request.Media.Count > 0 && ImageCostPerImageInr is not > 0 &&
-            (InputCostPerMillionInr is not > 0 || request.EstimatedInputTokens is null))
+        if (InputCostPerMillionInr is not > 0 || OutputCostPerMillionInr is not > 0)
+            return false;
+        if (request.Media.Any(m => m.MimeType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) && m.PageCount is null))
             return false;
         return EstimateCost(request) > 0;
     }

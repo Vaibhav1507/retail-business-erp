@@ -312,9 +312,12 @@ public static class AiStructuredOutputValidator
                 return schema["enum"] is not JsonArray choices ||
                     choices.Any(x => x is JsonValue choice && choice.TryGetValue<string>(out var allowed) && allowed == text);
             case "NUMBER":
-                return value is JsonValue number && number.TryGetValue<decimal>(out _);
+                return value is JsonValue number &&
+                    (number.TryGetValue<decimal>(out _) || number.TryGetValue<double>(out _) ||
+                     number.TryGetValue<long>(out _) || number.TryGetValue<int>(out _));
             case "INTEGER":
-                return value is JsonValue integer && integer.TryGetValue<long>(out _);
+                return value is JsonValue integer &&
+                    (integer.TryGetValue<long>(out _) || integer.TryGetValue<int>(out _));
             case "BOOLEAN":
                 return value is JsonValue boolean && boolean.TryGetValue<bool>(out _);
             default:
