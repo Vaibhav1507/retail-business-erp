@@ -652,7 +652,7 @@ No invoice item-tag photo capture, per-photo review state, or sale-line evidence
 1. The browser validates the chosen file, creates a local preview, and attempts local retail-barcode decoding.
 2. `POST /api/sales/item-tag-captures` accepts the raw image body, its MIME type and a required `Idempotency-Key`. The server calculates SHA-256 and persists the private image before AI processing.
 3. The Central AI Gateway may extract tag fields. The API still returns a reviewable capture when AI is unavailable; the user can enter the values manually.
-4. The cashier confirms a catalogue product and the extracted identifiers through `PUT /api/sales/item-tag-captures/{id}/review`.
+4. The cashier confirms a catalogue product and the extracted identifiers through `PUT /api/sales/item-tag-captures/{id}/review`. A confirmed product barcode is also persisted in `catalog.product_barcode` for that tenant, including when the selected product already existed without a barcode. Reconfirming the same product mapping is idempotent; a barcode already owned by another product is rejected and never reassigned.
 5. The normal `POST /api/sales` includes the capture ID in the relevant line's optional `captureIds` array. The sale transaction validates ownership, review state and product association, then attaches the capture atomically.
 6. `GET /api/sales/item-tag-captures/{id}` returns metadata; `GET /api/sales/item-tag-captures/{id}/image` streams the protected image; `DELETE` is limited to unattached captures.
 
@@ -663,7 +663,7 @@ Migration `049_invoice_item_tag_captures.sql` adds `sales.item_tag_capture`. Ima
 ### 20.5 PR B validation added
 
 - `tests/Rbos.UnitTests/SaleLineCaptureRulesTests.cs`: optional-reference compatibility, duplicate/empty IDs, unit quantity and count rules.
-- `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs`: upload, idempotency conflict/replay, MIME/signature/size validation, private image retrieval, tenant isolation, review/delete, sale attachment and unreviewed-capture rejection.
+- `tests/Rbos.IntegrationTests/ItemTagCaptureTests.cs`: upload, idempotency conflict/replay, MIME/signature/size validation, private image retrieval, tenant isolation, review/delete, sale attachment and unreviewed-capture rejection; confirmed barcode learning for an existing product, future local lookup, idempotent re-review and cross-product reassignment rejection.
 - `web/src/ItemTagCapture.test.tsx`: camera/gallery controls, image upload, review/add, unsupported image feedback and offline-disabled controls.
 - `ApiAuthorizationTests` continues to inventory all registered API routes against the fail-closed access registry.
 
