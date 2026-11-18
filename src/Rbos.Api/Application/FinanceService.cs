@@ -435,7 +435,7 @@ public sealed class FinanceService(TenantDb db)
             left join movement m on m.tenant_id=p.tenant_id and m.product_id=p.id
             left join balance b on b.tenant_id=p.tenant_id and b.product_id=p.id
             where p.is_active and (coalesce(c.total_quantity,0) <> coalesce(m.q,0)
-                or abs(coalesce(c.inventory_value,0) - coalesce(m.v,0)) > 0.01
+                or coalesce(c.inventory_value,0) <> coalesce(m.v,0)
                 or coalesce(c.total_quantity,0) <> coalesce(b.q,0))
             order by p.name limit 200", ct);
         var items = rows.Select(r => new { productId = r[0], name = r[1], costQuantity = r[2] is DBNull ? 0m : (decimal)r[2], costValue = r[3] is DBNull ? 0m : (decimal)r[3], wac = r[4] is DBNull ? 0m : (decimal)r[4], movementQuantity = (decimal)r[5], movementValue = (decimal)r[6], balanceQuantity = (decimal)r[7] }).ToList();
@@ -461,7 +461,7 @@ public sealed class FinanceService(TenantDb db)
             if (dq < 0m && !flagged)
             {
                 var expected = qty <= 0m ? 0m : -Money.Round(-dq * val / qty);
-                if (qty + dq < 0m || Math.Abs(expected - dv) > 0.05m)
+                if (qty + dq < 0m || expected != dv)
                 {
                     flagged = true;
                     replay.Add(new { productId = pid, name = mv[1], movementId = mv[2], quantity = dq, recordedValue = dv, expectedValue = expected, runningQuantity = qty });
