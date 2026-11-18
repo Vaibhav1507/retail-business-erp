@@ -154,6 +154,13 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
         var cancelSale = await Id(await c.Send(HttpMethod.Post, "/sales", new { locationId = location, saleDate = Today, saleType = "Cash", amountPaid = 300m, payMethod = "Cash", lines = new[] { new { productId = retired, quantity = 1m, unitPrice = 300m, discount = 0m } } }, K()));
         var returnSale = await Id(await c.Send(HttpMethod.Post, "/sales", new { locationId = location, saleDate = Today, saleType = "Cash", amountPaid = 300m, payMethod = "Cash", lines = new[] { new { productId = retired, quantity = 1m, unitPrice = 300m, discount = 0m } } }, K()));
 
+        // These documents are created while the retired product is still active.
+        // Migration 044 must consolidate their existing projections and preserve
+        // their original product IDs in the historical documents and movements.
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, $"/sales/{cancelSale}/cancel", new { reason = "Alias replay regression" }, K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sale-returns", new { saleId = returnSale, returnDate = Today, reason = "Alias return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/purchase-returns", new { receiptId = retiredReceipt, returnDate = Today, reason = "Alias supplier return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
+
         using var scope = f.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser<Guid>>>();
         var uid = (await users.FindByNameAsync(c.Email))!.Id;
@@ -214,11 +221,6 @@ public class FinanceReportingTests(ApiFactory f) : IClassFixture<ApiFactory>
                 await Execute($"drop policy rbos_test_fixture_tenant_access on {table}");
             await tx.CommitAsync();
         }
-
-        // Historical sale and receipt documents still refer to the retired product ID.
-        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, $"/sales/{cancelSale}/cancel", new { reason = "Alias replay regression" }, K())).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sale-returns", new { saleId = returnSale, returnDate = Today, reason = "Alias return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/purchase-returns", new { receiptId = retiredReceipt, returnDate = Today, reason = "Alias supplier return regression", lines = new[] { new { productId = retired, quantity = 1m } } }, K())).StatusCode);
 
         var healthy = await c.GetJson("/reports/stock-verification");
         Assert.True(healthy.GetProperty("ok").GetBoolean());
