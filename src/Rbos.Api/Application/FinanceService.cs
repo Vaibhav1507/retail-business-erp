@@ -448,32 +448,131 @@ public sealed class FinanceService(TenantDb db)
     {
         var replay = new List<object>();
 
-        // Migration 044 intentionally preserves original product IDs on historical
-        // stock movements. Those outbound values were calculated using each source
-        // product's own WAC before duplicate products were consolidated. Replay the
-        // original product streams independently; canonicalise only the current
-        // aggregate comparison in StockVerificationAsync above.
-        var moves = await Rows(s, @"select m.product_id, p.name, m.id, m.quantity_delta, m.value_delta
+        // Migration 044 preserves historical movement product IDs, while later
+        // transactions resolve retired IDs to the canonical product. Replay the
+        // pre-migration histories independently, then seed one canonical stream
+        // with their combined quantity/value and replay post-migration movements.
+        // The alias created_at timestamp is the migration cutover: stock movements
+        // carry occurred_at from the same database clock.
+        const string cutoverCte = @"with cutover as (
+                select tenant_id, canonical_product_id, min(created_at) as migrated_at
+                from catalog.product_alias
+                group by tenant_id, canonical_product_id
+            )";
+
+        var historical = await Rows(s, cutoverCte + @",
+            movement as (
+                select m.product_id, coalesce(a.canonical_product_id, m.product_id) as canonical_product_id,
+                       p.name, m.id, m.quantity_delta, m.value_delta,
+                       c.migrated_at, m.effective_date, m.occurred_at
                 from inventory.stock_movement m
                 join catalog.product p on p.tenant_id=m.tenant_id and p.id=m.product_id
-                order by m.product_id, m.effective_date, m.occurred_at, m.id", ct);
-        Guid? current = null; decimal qty = 0m, val = 0m; var flagged = false;
-        foreach (var mv in moves)
+                left join catalog.product_alias a on a.tenant_id=m.tenant_id and a.alias_product_id=m.product_id
+                left join cutover c on c.tenant_id=m.tenant_id
+                    and c.canonical_product_id=coalesce(a.canonical_product_id, m.product_id)
+            )
+            select product_id, canonical_product_id, name, id, quantity_delta, value_delta
+            from movement
+            where migrated_at is null or occurred_at < migrated_at
+            order by product_id, effective_date, occurred_at, id", ct);
+
+        var mergedOpeningStates = new Dictionary<Guid, (decimal Quantity, decimal Value)>();
+        Guid? historicalProduct = null; decimal historicalQty = 0m, historicalValue = 0m;
+        var historicalFlagged = false;
+        foreach (var mv in historical)
         {
-            var pid = (Guid)mv[0];
-            if (current != pid) { current = pid; qty = 0m; val = 0m; flagged = false; }
-            var dq = (decimal)mv[3]; var dv = (decimal)mv[4];
-            if (dq < 0m && !flagged)
+            var sourceProductId = (Guid)mv[0];
+            var canonicalProductId = (Guid)mv[1];
+            if (historicalProduct != sourceProductId)
             {
-                var expected = qty <= 0m ? 0m : -Money.Round(-dq * WeightedAverageCostCalculator.RoundWac(val / qty));
-                if (qty + dq < 0m || expected != dv)
+                historicalProduct = sourceProductId;
+                historicalQty = 0m;
+                historicalValue = 0m;
+                historicalFlagged = false;
+            }
+
+            var dq = (decimal)mv[4];
+            var dv = (decimal)mv[5];
+            if (dq < 0m && !historicalFlagged)
+            {
+                var expected = historicalQty <= 0m
+                    ? 0m
+                    : -Money.Round(-dq * WeightedAverageCostCalculator.RoundWac(historicalValue / historicalQty));
+                if (historicalQty + dq < 0m || expected != dv)
                 {
-                    flagged = true;
-                    replay.Add(new { productId = pid, name = mv[1], movementId = mv[2], quantity = dq, recordedValue = dv, expectedValue = expected, runningQuantity = qty });
+                    historicalFlagged = true;
+                    replay.Add(new
+                    {
+                        productId = sourceProductId, name = mv[2], movementId = mv[3],
+                        quantity = dq, recordedValue = dv, expectedValue = expected,
+                        runningQuantity = historicalQty
+                    });
                 }
             }
-            qty += dq; val += dv;
+
+            historicalQty += dq;
+            historicalValue += dv;
+            var opening = mergedOpeningStates.GetValueOrDefault(canonicalProductId);
+            mergedOpeningStates[canonicalProductId] =
+                (opening.Quantity + dq, opening.Value + dv);
         }
+
+        // After migration, posting paths write movements against the canonical
+        // product and use the merged WAC. Start each such replay from the combined
+        // pre-migration state rather than incorrectly replaying either legacy stream.
+        var postMigration = await Rows(s, cutoverCte + @",
+            movement as (
+                select coalesce(a.canonical_product_id, m.product_id) as canonical_product_id,
+                       p.name, m.id, m.quantity_delta, m.value_delta,
+                       c.migrated_at, m.effective_date, m.occurred_at
+                from inventory.stock_movement m
+                left join catalog.product_alias a on a.tenant_id=m.tenant_id and a.alias_product_id=m.product_id
+                join catalog.product p on p.tenant_id=m.tenant_id
+                    and p.id=coalesce(a.canonical_product_id, m.product_id)
+                join cutover c on c.tenant_id=m.tenant_id
+                    and c.canonical_product_id=coalesce(a.canonical_product_id, m.product_id)
+            )
+            select canonical_product_id, name, id, quantity_delta, value_delta
+            from movement
+            where occurred_at >= migrated_at
+            order by canonical_product_id, effective_date, occurred_at, id", ct);
+
+        Guid? currentCanonicalProduct = null; decimal quantity = 0m, value = 0m;
+        var postMigrationFlagged = false;
+        foreach (var mv in postMigration)
+        {
+            var productId = (Guid)mv[0];
+            if (currentCanonicalProduct != productId)
+            {
+                currentCanonicalProduct = productId;
+                var opening = mergedOpeningStates.GetValueOrDefault(productId);
+                quantity = opening.Quantity;
+                value = opening.Value;
+                postMigrationFlagged = false;
+            }
+
+            var dq = (decimal)mv[3];
+            var dv = (decimal)mv[4];
+            if (dq < 0m && !postMigrationFlagged)
+            {
+                var expected = quantity <= 0m
+                    ? 0m
+                    : -Money.Round(-dq * WeightedAverageCostCalculator.RoundWac(value / quantity));
+                if (quantity + dq < 0m || expected != dv)
+                {
+                    postMigrationFlagged = true;
+                    replay.Add(new
+                    {
+                        productId, name = mv[1], movementId = mv[2],
+                        quantity = dq, recordedValue = dv, expectedValue = expected,
+                        runningQuantity = quantity
+                    });
+                }
+            }
+            quantity += dq;
+            value += dv;
+        }
+
         return replay;
     }
 
