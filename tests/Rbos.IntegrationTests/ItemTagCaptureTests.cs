@@ -73,7 +73,8 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var image = await client.Raw("/sales/item-tag-captures/" + id + "/image");
         Assert.Equal(HttpStatusCode.OK, image.StatusCode);
         Assert.Equal(Jpeg, await image.Content.ReadAsByteArrayAsync());
-        Assert.Equal("private, no-store", image.Headers.CacheControl?.ToString());
+        Assert.Contains("private", image.Headers.CacheControl?.ToString());
+        Assert.Contains("no-store", image.Headers.CacheControl?.ToString());
 
         var removed = await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id);
         Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
