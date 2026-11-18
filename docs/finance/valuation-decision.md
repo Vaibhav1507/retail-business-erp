@@ -1,12 +1,12 @@
 # Inventory valuation policy — moving weighted average (WAC)
 
-Status: **Proposed. Leading candidate. Requires CA review (PR-01…PR-04).**
+Status: **Proposed; no CA approval recorded. Interim engineering storage rule recorded 2026-11-18.**
 
 ## 1. Calculation
 
 Per tenant, per variant (across all locations in 1A):
 
-- State: `Q` (base quantity on hand), `V` (inventory value, 2 dp), `W = V / Q` (6 dp; undefined when Q = 0).
+- State: `Q` (base quantity on hand), `V` (inventory value, 2 dp), `W = V / Q` (persisted to 4 dp in the current schema; undefined when Q = 0).
 - **Inbound** with cost `C` (total, 2 dp): `Q' = Q + q`, `V' = V + C`, `W' = V' / Q'`.
 - **Outbound** of `q`: cost `c = round(q × W, 2)`; if `q = Q`, then `c = V` (residue rule). `Q' = Q − q`, `V' = V − c`; W unchanged except for rounding.
 - WAC is per variant per tenant, not per location. Per-location WAC is not needed while transfers do not exist.
@@ -16,7 +16,7 @@ Per tenant, per variant (across all locations in 1A):
 | Item | Precision | Rounding |
 |---|---|---|
 | Quantity | numeric(18,3), per-unit scale (piece = 0) | Reject excess precision |
-| Unit cost / WAC | 6 dp | Stored as computed (truncate never) |
+| Unit cost / WAC | 4 dp in current schema (`numeric(18,4)`) | WAC rounded half-away-from-zero; no six-decimal storage change without CA decision and migration |
 | Money values | 2 dp | Half-away-from-zero ⚑ PR-05 |
 
 ## 3. Event rules
@@ -60,14 +60,14 @@ Corrections that relate to a locked period post in the current open period with 
 
 ## 8. Rebuild
 
-Replay movements per variant ordered by `(effective_date, posted_seq)`; `posted_seq` breaks ties deterministically. The rebuild uses movement values as stored (it verifies, it does not revalue). Mismatch → reconciliation report, no automatic repair.
+Replay movements per canonical variant ordered by `(effective_date, occurred_at, id)`. The current `inventory.stock_movement` schema has no `posted_seq`; `occurred_at` and UUID `id` provide deterministic tie-breaks after effective date. The rebuild uses movement values as stored (it verifies, it does not revalue). Mismatch → reconciliation report, no automatic repair.
 
 ## 9. Reversal
 
 A reversal movement uses exactly the value of the movement it reverses (not current W), so the reversal nets to zero in value and quantity.
 
-## 10. Policy abstraction
+## 10. Interim engineering precision decision (2026-11-18)\n\nThe repository's current `inventory.item_cost.wac` and stock-movement unit-cost columns persist four decimal places; `Quantity` allows three decimal places; `Money` stores INR at two decimal places using half-away-from-zero. The application therefore keeps WAC at four decimals consistently across receipt calculation, stock adjustment, sale/return/cancellation replay and persistence. This preserves the current database contract and avoids silently truncating a six-decimal calculation on write.\n\nThis is **not CA approval** of four-decimal WAC or of the broader valuation policy. The six-decimal proposal is not implemented. Do not change the database scale or represent the policy as approved until a qualified CA records the decision; any later precision change must include a migration, backfill/reconciliation analysis, API/report review and regression evidence. Currency amounts remain two decimals.\n\n## 11. Policy abstraction
 
 A `IValuationPolicy` boundary is designed so FIFO or specific identification could be added later. Only WAC is implemented.
 
-Worked examples: `valuation-worked-examples.md`.
+Worked examples: `valuation-worked-examples.md`.\n
