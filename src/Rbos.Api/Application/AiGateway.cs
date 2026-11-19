@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -139,6 +140,12 @@ public sealed class AiGateway(
                     catch (AiProviderException e)
                     {
                         stopwatch.Stop();
+                        log.LogWarning(
+                            "AI gateway provider attempt failed. Feature {Feature}, provider {Provider}, model {Model}, credential {CredentialId}, category {FailureCategory}, HTTP {StatusCode}, retry-after-ms {RetryAfterMs}, correlation {CorrelationId}",
+                            request.Feature, provider, model, credential.Id, e.Category,
+                            e.StatusCode is null ? null : (int)e.StatusCode.Value,
+                            e.RetryAfter is null ? null : (long?)Math.Max(0, e.RetryAfter.Value.TotalMilliseconds),
+                            correlationId);
                         await CompleteUsageAsync(request, reservation.Id, "Failed", null, null, null,
                             stopwatch, e.Category.ToString(), retryCount, CancellationToken.None);
                         completed = true;
@@ -314,7 +321,9 @@ public static class AiStructuredOutputValidator
             case "NUMBER":
                 return value is JsonValue number &&
                     (number.TryGetValue<decimal>(out _) || number.TryGetValue<double>(out _) ||
-                     number.TryGetValue<long>(out _) || number.TryGetValue<int>(out _));
+                     number.TryGetValue<long>(out _) || number.TryGetValue<int>(out _) ||
+                     (number.TryGetValue<string>(out var numericText) &&
+                      decimal.TryParse(numericText, NumberStyles.Number, CultureInfo.InvariantCulture, out _)));
             case "INTEGER":
                 return value is JsonValue integer &&
                     (integer.TryGetValue<long>(out _) || integer.TryGetValue<int>(out _));
