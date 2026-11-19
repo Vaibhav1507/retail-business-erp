@@ -1,9 +1,8 @@
 import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify } from './signup'
-import { expect, request as pwRequest, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Synthetic data only. Unique suffix per run so the test is repeatable against the same database.
 const run = Date.now().toString(36)
-const password = 'Synthetic#Pass123'
 const ownerA = `e2e-a-${run}@example.test`
 const ownerB = `e2e-b-${run}@example.test`
 const cableName = `E2E USB-C Cable ${run}`
@@ -88,12 +87,12 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   const aLocation = (await (await api(aCtx, 'GET', '/locations')).json())[0].id as string
 
   const bContext = await browser.newContext()
-  const b = await pwRequest.newContext({ baseURL, storageState: undefined })
+  const bPage = await bContext.newPage()
   try {
-    const mobileB = randomMobile()
-    expect((await api(b, 'POST', '/auth/register', { email: ownerB, password: PASSWORD, mobile: mobileB })).status()).toBe(200)
-    expect((await api(b, 'POST', '/auth/login', { email: ownerB, password: PASSWORD })).status()).toBe(200)
-    expect((await api(b, 'POST', '/bootstrap', { businessName: `E2E Other ${run}`, branchName: 'B', locationName: 'L' }, crypto.randomUUID())).status()).toBe(200)
+    // Exercise the same verified mobile signup flow as a real second tenant. The old
+    // direct /auth/register call skipped OTP verification and now correctly returns 400.
+    await signUp(bPage, { email: ownerB, businessName: `E2E Other ${run}` })
+    const b = bPage.context().request
 
     expect(await (await api(b, 'GET', '/products')).json()).toEqual([])
     expect(await (await api(b, 'GET', '/stock')).json()).toEqual([])
@@ -105,7 +104,6 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
     expect(attack.status()).toBeLessThan(500)
     expect(JSON.stringify(await attack.json())).not.toContain(cableName)
   } finally {
-    await b.dispose()
     await bContext.close()
   }
 
