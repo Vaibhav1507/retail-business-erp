@@ -53,7 +53,7 @@ public sealed class AiProviderAdapterTests
         {
             capturedPayload = await request.Content!.ReadAsStringAsync();
             return JsonResponse(
-                """{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"{\\"lines\\":[]}"}]}}]}""");
+                """{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"{\"lines\":[]}"}]}}]}""");
         });
         var adapter = new GeminiAiProviderAdapter(factory, NullLogger<GeminiAiProviderAdapter>.Instance);
         var imageBytes = Encoding.UTF8.GetBytes("synthetic invoice image bytes");
