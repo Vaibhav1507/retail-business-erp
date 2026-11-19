@@ -49,7 +49,7 @@ public sealed class AiProviderAdapterTests
     public async Task GeminiAdapter_ReportsWhenStructuredOutputWasTruncatedByTokenLimit()
     {
         var factory = new StubFactory(_ => Task.FromResult(JsonResponse(
-            """{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"{\\"lines\\":["}]}}]}""")));
+            """{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"{\"lines\":["}]}}]}""")));
         var adapter = new GeminiAiProviderAdapter(factory, NullLogger<GeminiAiProviderAdapter>.Instance);
         var request = new AiGatewayRequest
         {
