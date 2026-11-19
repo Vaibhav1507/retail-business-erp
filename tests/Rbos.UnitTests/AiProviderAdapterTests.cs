@@ -46,6 +46,80 @@ public sealed class AiProviderAdapterTests
     }
 
     [Fact]
+    public async Task GeminiAdapter_IgnoresThinkingPartsAndReturnsTheActualAnswer()
+    {
+        var factory = new StubFactory(_ => Task.FromResult(JsonResponse(
+            """{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"private reasoning","thought":true},{"text":"actual answer"}]}}]}""")));
+        var adapter = new GeminiAiProviderAdapter(factory, NullLogger<GeminiAiProviderAdapter>.Instance);
+        var request = new AiGatewayRequest
+        {
+            TenantId = Guid.NewGuid(),
+            ActorUserId = Guid.NewGuid(),
+            Feature = "AdapterTest",
+            Task = AiTaskKind.TextGeneration,
+            Prompt = "Answer the request.",
+            ProviderOrder = [AiProviderKind.Gemini]
+        };
+
+        var response = await adapter.ExecuteAsync(request,
+            Credential(AiProviderKind.Gemini, "gemini-secret"), "gemini-test-model", CancellationToken.None);
+
+        Assert.Equal("actual answer", response.Text);
+    }
+
+    [Fact]
+    public async Task GeminiAdapter_ReportsWhenStructuredOutputWasTruncatedByTokenLimit()
+    {
+        var factory = new StubFactory(_ => Task.FromResult(JsonResponse(
+            """{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"{\"lines\":["}]}}]}""")));
+        var adapter = new GeminiAiProviderAdapter(factory, NullLogger<GeminiAiProviderAdapter>.Instance);
+        var request = new AiGatewayRequest
+        {
+            TenantId = Guid.NewGuid(),
+            ActorUserId = Guid.NewGuid(),
+            Feature = "InvoiceExtraction",
+            Task = AiTaskKind.StructuredExtraction,
+            Prompt = "Extract invoice.",
+            ProviderOrder = [AiProviderKind.Gemini]
+        };
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() =>
+            adapter.ExecuteAsync(request, Credential(AiProviderKind.Gemini, "gemini-secret"),
+                "gemini-test-model", CancellationToken.None));
+
+        Assert.Equal(AiFailureCategory.InvalidStructuredOutput, error.Category);
+        Assert.Contains("token limit", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GeminiAdapter_ClassifiesInvalidApiKeyReturnedAsBadRequest()
+    {
+        var factory = new StubFactory(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent(
+                """{"error":{"message":"API key not valid. Please pass a valid API key."}}""",
+                Encoding.UTF8, "application/json")
+        }));
+        var adapter = new GeminiAiProviderAdapter(factory, NullLogger<GeminiAiProviderAdapter>.Instance);
+        var request = new AiGatewayRequest
+        {
+            TenantId = Guid.NewGuid(),
+            ActorUserId = Guid.NewGuid(),
+            Feature = "InvoiceExtraction",
+            Task = AiTaskKind.StructuredExtraction,
+            Prompt = "Extract invoice.",
+            ProviderOrder = [AiProviderKind.Gemini]
+        };
+
+        var error = await Assert.ThrowsAsync<AiProviderException>(() =>
+            adapter.ExecuteAsync(request, Credential(AiProviderKind.Gemini, "gemini-secret"),
+                "gemini-test-model", CancellationToken.None));
+
+        Assert.Equal(AiFailureCategory.InvalidCredential, error.Category);
+        Assert.Equal(HttpStatusCode.BadRequest, error.StatusCode);
+    }
+
+    [Fact]
     public async Task GroqAdapter_TranscribesOnlyWhenAudioTaskIsExplicit()
     {
         string? capturedAuthorization = null;

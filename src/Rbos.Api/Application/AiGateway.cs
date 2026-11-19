@@ -10,6 +10,7 @@ public sealed class AiGateway(
     AiGatewayCredentialPool credentials,
     IEnumerable<IAiProviderAdapter> providerAdapters,
     IAiGatewayUsageLedger usageLedger,
+    IHttpContextAccessor httpContextAccessor,
     ILogger<AiGateway> log)
 {
     private readonly IReadOnlyDictionary<AiProviderKind, IAiProviderAdapter> _adapters =
@@ -44,23 +45,51 @@ public sealed class AiGateway(
 
         var allowPaid = configuration.GetValue("AiGateway:AllowPaidProviders", false);
         var maxAttempts = Math.Clamp(request.MaxAttemptsPerProvider, 1, 5);
-        var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
-            ? Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N")
-            : request.CorrelationId.Trim()[..Math.Min(request.CorrelationId.Trim().Length, 64)];
+        // Prefer the HTTP correlation ID established by Program.cs so API, extraction,
+        // gateway and provider-attempt logs can be joined in one Cloud Run query.
+        var httpCorrelationId = httpContextAccessor.HttpContext?.TraceIdentifier;
+        var correlationId = !string.IsNullOrWhiteSpace(request.CorrelationId)
+            ? request.CorrelationId.Trim()[..Math.Min(request.CorrelationId.Trim().Length, 64)]
+            : !string.IsNullOrWhiteSpace(httpCorrelationId)
+                ? httpCorrelationId[..Math.Min(httpCorrelationId.Length, 64)]
+                : Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
         request = request with { CorrelationId = correlationId };
         var paidBudgetBlocked = false;
 
         foreach (var provider in request.ProviderOrder.Distinct())
         {
-            if (!_adapters.TryGetValue(provider, out var adapter) ||
-                !adapter.Supports(request.RequiredCapability) || credentials.IsCircuitOpen(provider))
+            if (!_adapters.TryGetValue(provider, out var adapter))
+            {
+                log.LogWarning("AI gateway skipped provider {Provider}: no adapter is registered; feature {Feature}; correlation {CorrelationId}",
+                    provider, request.Feature, correlationId);
                 continue;
+            }
+            if (!adapter.Supports(request.RequiredCapability))
+            {
+                log.LogWarning("AI gateway skipped provider {Provider}: capability {Capability} is unsupported; feature {Feature}; correlation {CorrelationId}",
+                    provider, request.RequiredCapability, request.Feature, correlationId);
+                continue;
+            }
+            if (credentials.IsCircuitOpen(provider))
+            {
+                log.LogWarning("AI gateway skipped provider {Provider}: circuit breaker is open; feature {Feature}; correlation {CorrelationId}",
+                    provider, request.Feature, correlationId);
+                continue;
+            }
 
             var models = ResolveModels(request, provider);
             foreach (var model in models)
             {
                 if (string.IsNullOrWhiteSpace(model)) continue;
                 var candidates = credentials.SelectOrder(provider, request.RequiredCapability, model, allowPaid);
+                if (candidates.Count == 0)
+                {
+                    log.LogWarning(
+                        "AI gateway found no eligible credential for provider {Provider}, capability {Capability}, model {Model}. ProviderEnabled {ProviderEnabled}, circuitOpen {CircuitOpen}; feature {Feature}; correlation {CorrelationId}",
+                        provider, request.RequiredCapability, model, credentials.ProviderEnabled(provider),
+                        credentials.IsCircuitOpen(provider), request.Feature, correlationId);
+                    continue;
+                }
                 var attempts = 0;
 
                 foreach (var credential in candidates)
@@ -118,11 +147,12 @@ public sealed class AiGateway(
                         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
                         var response = await adapter.ExecuteAsync(request, credential, model, timeout.Token);
 
-                        if (request.ResponseSchema is not null &&
-                            (response.StructuredContent is null ||
-                             !AiStructuredOutputValidator.IsValid(response.StructuredContent, request.ResponseSchema)))
+                        // The provider receives the response schema (Gemini) or JSON mode (Groq).
+                        // Do not add a second gateway-side schema gate: the legacy extraction path
+                        // accepted provider JSON and let the feature parser handle partial fields.
+                        if (request.ResponseSchema is not null && response.StructuredContent is null)
                             throw new AiProviderException(AiFailureCategory.InvalidStructuredOutput,
-                                "The provider response does not match the required output schema.");
+                                "The provider returned no structured response.");
 
                         stopwatch.Stop();
                         var actualCost = credential.ActualCost(response.InputTokens, response.OutputTokens, request);
@@ -139,6 +169,12 @@ public sealed class AiGateway(
                     catch (AiProviderException e)
                     {
                         stopwatch.Stop();
+                        log.LogWarning(
+                            "AI gateway provider attempt failed. Feature {Feature}, provider {Provider}, model {Model}, credential {CredentialId}, category {FailureCategory}, HTTP {StatusCode}, retry-after-ms {RetryAfterMs}, correlation {CorrelationId}",
+                            request.Feature, provider, model, credential.Id, e.Category,
+                            e.StatusCode is null ? null : (int)e.StatusCode.Value,
+                            e.RetryAfter is null ? null : (long?)Math.Max(0, e.RetryAfter.Value.TotalMilliseconds),
+                            correlationId);
                         await CompleteUsageAsync(request, reservation.Id, "Failed", null, null, null,
                             stopwatch, e.Category.ToString(), retryCount, CancellationToken.None);
                         completed = true;
@@ -198,7 +234,7 @@ public sealed class AiGateway(
             }
         }
 
-        log.LogWarning("AI gateway has no eligible provider for feature {Feature}; correlation {CorrelationId}",
+        log.LogWarning("AI gateway exhausted configured providers for feature {Feature}; correlation {CorrelationId}",
             request.Feature, correlationId);
         return null;
     }
@@ -314,7 +350,9 @@ public static class AiStructuredOutputValidator
             case "NUMBER":
                 return value is JsonValue number &&
                     (number.TryGetValue<decimal>(out _) || number.TryGetValue<double>(out _) ||
-                     number.TryGetValue<long>(out _) || number.TryGetValue<int>(out _));
+                     number.TryGetValue<long>(out _) || number.TryGetValue<int>(out _) ||
+                     (number.TryGetValue<string>(out var numericText) &&
+                      decimal.TryParse(numericText, NumberStyles.Number, CultureInfo.InvariantCulture, out _)));
             case "INTEGER":
                 return value is JsonValue integer &&
                     (integer.TryGetValue<long>(out _) || integer.TryGetValue<int>(out _));
