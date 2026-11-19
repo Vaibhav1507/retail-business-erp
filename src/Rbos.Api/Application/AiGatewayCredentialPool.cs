@@ -24,7 +24,10 @@ public sealed class AiGatewayCredentialPool
     public IReadOnlyList<AiProviderCredential> SelectOrder(
         AiProviderKind provider, AiCapability capability, string model, bool allowPaid)
     {
-        if (!ProviderEnabled(provider) || IsCircuitOpen(provider)) return [];
+        // AiGateway checks the provider circuit once before entering the provider's
+        // model/credential fallback loop. Do not re-check it here: a failure on one
+        // model must not prevent this same request from trying the remaining models.
+        if (!ProviderEnabled(provider)) return [];
         var candidates = _credentials
             .Where(c => c.Provider == provider && c.Supports(capability, model))
             .Where(c => !_invalidCredentials.ContainsKey(c.Id))
