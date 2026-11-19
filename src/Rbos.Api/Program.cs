@@ -108,7 +108,8 @@ builder.Services.AddSingleton<Rbos.Api.Application.IAiProviderAdapter, Rbos.Api.
 builder.Services.AddSingleton<Rbos.Api.Application.IAiProviderAdapter, Rbos.Api.Application.GroqAiProviderAdapter>();
 builder.Services.AddScoped<Rbos.Api.Application.IAiGatewayUsageLedger, Rbos.Api.Application.AiGatewayUsageLedger>();
 builder.Services.AddScoped<Rbos.Api.Application.AiGateway>();
-builder.Services.AddScoped<Rbos.Api.Application.InvoiceExtractionService>();
+builder.Services.AddHttpClient<Rbos.Api.Application.InvoiceExtractionService>(h => h.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddHttpClient<Rbos.Api.Application.GroqVisionClient>(h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddScoped<Rbos.Api.Application.ItemTagCaptureService>();
 builder.Services.AddScoped<Rbos.Api.Application.VoiceNavigationIntentService>();
 builder.Services.AddScoped<Rbos.Api.Application.ProductFileReader>();
