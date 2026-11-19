@@ -283,7 +283,7 @@ public sealed class AiGatewayTests
 
         Assert.NotNull(response);
         Assert.Equal("invoice-fallback", response.Model);
-        Assert.Equal(["invoice-primary", "invoice-fallback"], attemptedModels);
+        Assert.Equal(new[] { "invoice-primary", "invoice-fallback" }, attemptedModels);
     }
 
     [Fact]
