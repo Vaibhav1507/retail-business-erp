@@ -1,4 +1,4 @@
-import { signUp, openAddProduct, chooseCategory, createProductAndVerify } from './signup'
+import { signUp, openAddProduct, chooseCategory, createProductAndVerify, unlockApp } from './signup'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Synthetic data only. Unique suffix per run so the test is repeatable against the same database.
@@ -110,6 +110,7 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   // Tenant A is unchanged after the attempted cross-tenant write
   await page.goto('/#/stock/current')
   await page.reload()
+  await unlockApp(page)
   await expect(page.getByRole('region', { name: 'Stock on hand' }).getByRole('row', { name: new RegExp(cableName) })).toContainText('255.00')
 })
 
