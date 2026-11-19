@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice } from './signup'
+import { signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 
 const run = Date.now().toString(36)
 const owner = `e2e-first-shop-${run}@example.test`
@@ -50,7 +50,7 @@ test('first-time electronics retailer completes and resumes the saved first-shop
 
   await page.goto('/#/buy/receive')
   const purchase = page.getByRole('region', { name: 'Purchasing' })
-  await purchase.getByLabel('Supplier').selectOption({ label: supplier })
+  await purchase.getByLabel('Supplier', { exact: true }).selectOption({ label: supplier })
   await purchase.getByLabel('Product').selectOption(productOption!)
   await purchase.getByLabel('Quantity').fill('1')
   await purchase.getByLabel('Unit cost (INR, before GST)').fill('11500')
@@ -64,7 +64,7 @@ test('first-time electronics retailer completes and resumes the saved first-shop
 
   // First sale continues through the existing invoice review, explicit confirmation and print action.
   await postInvoice(page, { product, qty: '1', price: '14500', mode: 'UPI' })
-  await expect(page.getByRole('status')).toContainText('Saved as INV-')
+  await expectInvoiceSaved(page)
 
   // A fresh Home load derives completion from saved tenant records, not browser memory or a page visit.
   await page.goto('/#/')
