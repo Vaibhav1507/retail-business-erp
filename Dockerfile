@@ -18,7 +18,13 @@ WORKDIR /app
 
 # Scanned-PDF OCR is performed by the Tesseract executable at runtime.
 # Install it in the final image (not only in the SDK/build stage).
-RUN apt-get update \
+# The Ubuntu Noble image defaults to HTTP apt mirrors; Cloud Build egress
+# timed out on port 80. Use HTTPS mirrors and bounded retries for reproducible builds.
+RUN find /etc/apt -type f \\( -name '*.sources' -o -name '*.list' \\) \
+       -exec sed -i \
+         -e 's#http://archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
+         -e 's#http://security.ubuntu.com/ubuntu#https://security.ubuntu.com/ubuntu#g' {} + \
+    && apt-get -o Acquire::Retries=3 -o Acquire::https::Timeout=30 update \
     && apt-get install -y --no-install-recommends \
        tesseract-ocr \
        tesseract-ocr-eng \
