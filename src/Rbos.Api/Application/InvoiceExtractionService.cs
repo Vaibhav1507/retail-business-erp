@@ -186,7 +186,11 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
             ResponseSchema = Schema(),
             Media = media,
             ProviderOrder = providers,
-            MaxOutputTokens = 4096,
+            // The pre-gateway Gemini path did not impose a 4,096-token response cap.
+            // Use a larger, configurable limit so invoices with many line items are not
+            // deterministically truncated on every retry.
+            MaxOutputTokens = Math.Clamp(
+                cfg.GetValue("AiGateway:InvoiceExtractionMaxOutputTokens", 8192), 4096, 16_384),
             MaxAttemptsPerProvider = 2
         }, ct);
         return result;
@@ -227,7 +231,20 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
     static string? Clip(string? s, int max = 200) => string.IsNullOrWhiteSpace(s) ? null : s.Trim()[..Math.Min(s.Trim().Length, max)];
     static decimal? Num(JsonNode? n)
     {
-        try { var v = n?.GetValue<decimal>(); return v is >= 0 and < 1_000_000_000 ? v : null; }
+        try
+        {
+            if (n is JsonValue numeric && numeric.TryGetValue<decimal>(out var value))
+                return value is >= 0 and < 1_000_000_000 ? value : null;
+
+            // Groq's JSON-object mode does not enforce Gemini's response schema and may
+            // serialize numeric fields as strings. Preserve the old fallback behaviour:
+            // parse safe invariant numeric strings instead of discarding the whole draft.
+            if (n is JsonValue text && text.TryGetValue<string>(out var raw) &&
+                decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+                return parsed is >= 0 and < 1_000_000_000 ? parsed : null;
+
+            return null;
+        }
         catch (Exception e) when (e is InvalidOperationException or FormatException) { return null; }
     }
 
