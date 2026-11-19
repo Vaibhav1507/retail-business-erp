@@ -54,6 +54,10 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
 }
 
 /** Opens the Add product form from the Products list (the form is not shown by default). */
+export async function expectInvoiceSaved(page: Page) {
+  await expect(page.getByText(/^Saved as INV-/)).toBeVisible()
+}
+
 export async function openAddProduct(page: Page) {
   const products = page.getByRole('region', { name: 'Products' })
   await products.getByRole('button', { name: 'Add product', exact: true }).click()
