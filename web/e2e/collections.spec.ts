@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
@@ -36,7 +36,7 @@ test('credit sale, outstanding balance, later collection, balance update', async
 
   const sales = page.getByRole('region', { name: 'Sales', exact: true })
   await postInvoice(page, { product: item, qty: '3', price: '100', mode: 'Credit', paid: '100', name: customer, phone: randomMobile() })
-  await expect(page.getByRole('status')).toContainText('Saved as INV-')
+  await expectInvoiceSaved(page)
   await page.goto('/#/parties/customers')
   const custRow = page.getByRole('table', { name: 'Customers' }).getByRole('row', { name: new RegExp(customer) })
   await expect(custRow).toContainText('200.00')
