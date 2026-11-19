@@ -50,9 +50,6 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   const attrFields = electronics ? ELECTRONICS_ATTRS : ATTRS
   const [d, setD] = useState<Draft>(!editingId && electronics ? { ...initial, generic: false } : initial)
   const [error, setError] = useState('')
-  // Prevent an older catalogue response from replacing results for a newer search/filter.
-  const loadSequence = useRef(0)
-  const masterLoadSequence = useRef(0)
   const set = (patch: Partial<Draft>) => setD(prev => ({ ...prev, ...patch }))
   const setAttr = (k: string, value: string) => setD(prev => ({ ...prev, attrs: { ...prev.attrs, [k]: value } }))
   const [otherCat, setOtherCat] = useState(false)
@@ -125,6 +122,9 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   const [editing, setEditing] = useState<Product | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [error, setError] = useState('')
+  // Prevent an older catalogue response from replacing results for a newer search/filter.
+  const loadSequence = useRef(0)
+  const masterLoadSequence = useRef(0)
   const [scanning, setScanning] = useState(false)
   const [scanned, setScanned] = useState<ScanResult | null>(null)
   type Suggestion = { id: string; name: string; brand: string | null; model: string | null; sku: string; match: string }
