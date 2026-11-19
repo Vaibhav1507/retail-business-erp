@@ -55,6 +55,16 @@ jobs:
           Rbos__Database: test
           Rbos__AllowOpenRegistration: 'true'
         run: npm run test:e2e
+      - name: Upload Playwright failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-diagnostics
+          path: |
+            web/test-results/
+            web/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Build deployment container (no push)
         run: docker build --pull -t retail-business-os:ci .
 
