@@ -46,6 +46,49 @@ public sealed class AiProviderAdapterTests
     }
 
     [Fact]
+    public async Task GeminiAdapter_StreamsMediaAsBase64AndPreservesStructuredRequestSchema()
+    {
+        string? capturedPayload = null;
+        var factory = new StubFactory(async request =>
+        {
+            capturedPayload = await request.Content!.ReadAsStringAsync();
+            return JsonResponse(
+                """{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"{\\"lines\\":[]}"}]}}]}""");
+        });
+        var adapter = new GeminiAiProviderAdapter(factory, NullLogger<GeminiAiProviderAdapter>.Instance);
+        var imageBytes = Encoding.UTF8.GetBytes("synthetic invoice image bytes");
+        var schema = new JsonObject
+        {
+            ["type"] = "OBJECT",
+            ["properties"] = new JsonObject
+            {
+                ["lines"] = new JsonObject { ["type"] = "ARRAY" }
+            }
+        };
+        var request = new AiGatewayRequest
+        {
+            TenantId = Guid.NewGuid(),
+            ActorUserId = Guid.NewGuid(),
+            Feature = "InvoiceExtraction",
+            Task = AiTaskKind.StructuredExtraction,
+            Prompt = "Extract this synthetic invoice.",
+            ResponseSchema = schema,
+            Media = [new AiMedia("image/png", imageBytes)],
+            ProviderOrder = [AiProviderKind.Gemini]
+        };
+
+        var response = await adapter.ExecuteAsync(request,
+            Credential(AiProviderKind.Gemini, "gemini-secret"), "gemini-test-model", CancellationToken.None);
+
+        Assert.NotNull(response.StructuredContent);
+        var body = JsonNode.Parse(capturedPayload!)!;
+        var encoded = body["contents"]?[0]?["parts"]?[0]?["inline_data"]?["data"]?.GetValue<string>();
+        Assert.Equal(imageBytes, Convert.FromBase64String(encoded!));
+        Assert.Equal("image/png", body["contents"]?[0]?["parts"]?[0]?["inline_data"]?["mime_type"]?.GetValue<string>());
+        Assert.Equal("OBJECT", body["generationConfig"]?["responseSchema"]?["type"]?.GetValue<string>());
+    }
+
+    [Fact]
     public async Task GeminiAdapter_IgnoresThinkingPartsAndReturnsTheActualAnswer()
     {
         var factory = new StubFactory(_ => Task.FromResult(JsonResponse(
