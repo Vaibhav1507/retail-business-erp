@@ -59,6 +59,7 @@ if (args.Contains("--migrate"))
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 QuestPDF.Settings.UseSystemFonts = true;
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttpContextAccessor();
 var passkeyDomain = builder.Configuration["Auth:Passkeys:ServerDomain"]?.Trim().ToLowerInvariant();
 if (!string.IsNullOrWhiteSpace(passkeyDomain))
 {
