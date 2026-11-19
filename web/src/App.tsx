@@ -177,6 +177,16 @@ export default function App() {
     if (!root) return
     const labelTables = () => {
       root.querySelectorAll<HTMLTableElement>('table').forEach(table => {
+        // Mobile CSS turns native table elements into block/grid cards. Restore explicit
+        // table roles so assistive technology still exposes the row/column relationships.
+        table.setAttribute('role', 'table')
+        table.querySelectorAll('thead, tbody, tfoot').forEach(group => group.setAttribute('role', 'rowgroup'))
+        table.querySelectorAll<HTMLTableRowElement>('tr').forEach(row => row.setAttribute('role', 'row'))
+        table.querySelectorAll<HTMLTableCellElement>('th').forEach(cell => {
+          cell.setAttribute('role', cell.scope === 'row' ? 'rowheader' : 'columnheader')
+        })
+        table.querySelectorAll<HTMLTableCellElement>('td').forEach(cell => cell.setAttribute('role', 'cell'))
+
         const labels = Array.from(table.tHead?.querySelectorAll('th') ?? []).map(th => (th.textContent ?? '').trim())
         if (labels.length === 0) return
         table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => {
