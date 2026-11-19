@@ -20,7 +20,7 @@ WORKDIR /app
 # Install it in the final image (not only in the SDK/build stage).
 # The Ubuntu Noble image defaults to HTTP apt mirrors; Cloud Build egress
 # timed out on port 80. Use HTTPS mirrors and bounded retries for reproducible builds.
-RUN find /etc/apt -type f \\( -name '*.sources' -o -name '*.list' \\) \
+RUN find /etc/apt -type f \( -name '*.sources' -o -name '*.list' \) \
        -exec sed -i \
          -e 's#http://archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' \
          -e 's#http://security.ubuntu.com/ubuntu#https://security.ubuntu.com/ubuntu#g' {} + \
