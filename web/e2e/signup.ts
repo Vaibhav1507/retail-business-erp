@@ -10,6 +10,13 @@ export const randomMobile = () => '9' + Math.floor(100_000_000 + Math.random() *
  * Relies on the Development API showing the OTP on screen (no real SMS is sent).
  */
 export async function signUp(page: Page, opts: { email: string; businessName: string; city?: string; state?: string; pin?: string; mobile?: string }) {
+  // The app intentionally asks for confirmation before leaving protected workflows.
+  // Playwright dismisses dialogs by default, which silently cancels page.goto() and leaves
+  // later assertions on the previous route. Accept the explicit navigation confirmation.
+  page.on('dialog', async dialog => {
+    if (dialog.type() === 'confirm') await dialog.accept()
+    else await dialog.dismiss()
+  })
   const mobile = opts.mobile ?? randomMobile()
   await page.goto('/')
   await page.getByRole('button', { name: 'Create an account' }).click()
