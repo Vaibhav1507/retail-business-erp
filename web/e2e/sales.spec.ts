@@ -21,8 +21,7 @@ test('shopkeeper sells for cash, on credit with part payment, and reviews histor
   await form.getByLabel('Name', { exact: true }).fill(item)
   await chooseCategory(form, 'Cables')
   await form.getByLabel('Generic / unbranded').setChecked(true)
-  await form.getByRole('button', { name: 'Add product' }).click()
-  await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name: item, exact: true })).toBeVisible({ timeout: 30_000 })
+  await createProductAndVerify(page, form, item)
 
   await page.goto('/#/stock/opening')
   const stockForm = page.getByRole('region', { name: 'Opening stock' })
