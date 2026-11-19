@@ -93,7 +93,10 @@ public sealed class GeminiAiProviderAdapter(
         {
             foreach (var part in outputParts)
             {
-                if (part?["text"] is JsonValue textNode &&
+                // Thinking parts are internal reasoning, not the structured response.
+                var isThought = part?["thought"] is JsonValue thoughtNode &&
+                    thoughtNode.TryGetValue<bool>(out var thought) && thought;
+                if (!isThought && part?["text"] is JsonValue textNode &&
                     textNode.TryGetValue<string>(out var partText) &&
                     !string.IsNullOrWhiteSpace(partText))
                     textParts.Add(partText);
