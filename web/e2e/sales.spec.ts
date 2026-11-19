@@ -1,4 +1,4 @@
-import { signUp, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice } from './signup'
+import { signUp, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
@@ -34,13 +34,13 @@ test('shopkeeper sells for cash, on credit with part payment, and reviews histor
   await expect(stockForm.getByRole('status')).toContainText('200.00 INR')
 
   await postInvoice(page, { product: item, qty: '2', price: '50', discount: '10' })
-  await expect(page.getByRole('status')).toContainText('Saved as INV-')
+  await expectInvoiceSaved(page)
   await page.goto('/#/stock/current')
   const stock = page.getByRole('region', { name: 'Stock on hand' })
   await expect(stock.getByRole('row', { name: new RegExp(item) })).toContainText('8')
 
   await postInvoice(page, { product: item, qty: '3', price: '100', mode: 'Credit', paid: '120', name: customer, phone: randomMobile() })
-  await expect(page.getByRole('status')).toContainText('Saved as INV-')
+  await expectInvoiceSaved(page)
   await page.goto('/#/parties/customers')
   await expect(page.getByRole('region', { name: 'Customers', exact: true }).getByRole('table', { name: 'Customers' }).getByRole('row', { name: new RegExp(customer) })).toContainText('180.00')
   await page.goto('/#/stock/current')
