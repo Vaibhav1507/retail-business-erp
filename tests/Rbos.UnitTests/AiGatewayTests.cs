@@ -1,4 +1,6 @@
 using System.Net;
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Rbos.Api.Application;
@@ -172,7 +174,7 @@ public sealed class AiGatewayTests
         var adapter = new FakeAdapter(AiProviderKind.Gemini, (_, _, _, _) =>
             Task.FromResult(new AiProviderResponse(null, "should not run", 1, 1)));
         var ledger = new FakeLedger(allowed: false);
-        var gateway = new AiGateway(config, pool, [adapter], ledger, NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [adapter], ledger, new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
 
         var response = await gateway.ExecuteAsync(Request(), CancellationToken.None);
 
@@ -209,7 +211,7 @@ public sealed class AiGatewayTests
         var groq = new FakeAdapter(AiProviderKind.Groq, (_, _, _, _) =>
             Task.FromResult(new AiProviderResponse(null, "free", 1, 1)));
         var ledger = new FakeLedger(credential => credential.BillingMode == AiBillingMode.Free);
-        var gateway = new AiGateway(config, pool, [gemini, groq], ledger, NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [gemini, groq], ledger, new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
 
         var response = await gateway.ExecuteAsync(Request(AiProviderKind.Gemini, AiProviderKind.Groq), CancellationToken.None);
 
@@ -230,7 +232,7 @@ public sealed class AiGatewayTests
         var groq = new FakeAdapter(AiProviderKind.Groq, (_, _, _, _) =>
             Task.FromResult(new AiProviderResponse(null, "fallback", 4, 2)));
         var ledger = new FakeLedger(allowed: true);
-        var gateway = new AiGateway(config, pool, [gemini, groq], ledger, NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [gemini, groq], ledger, new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
 
         var response = await gateway.ExecuteAsync(Request(AiProviderKind.Gemini, AiProviderKind.Groq), CancellationToken.None);
 
@@ -244,6 +246,47 @@ public sealed class AiGatewayTests
     }
 
     [Fact]
+    public async Task Gateway_CircuitOpeningDoesNotPreventFallbackModelsInTheSameRequest()
+    {
+        var config = Config(
+            ("AiGateway:Enabled", "true"),
+            ("AiGateway:Providers:Gemini:Enabled", "true"),
+            ("AiGateway:LegacyGeminiBillingMode", "Free"),
+            ("AiGateway:CircuitBreakerFailureThreshold", "1"),
+            ("AiGateway:CircuitBreakerCooldownSeconds", "30"),
+            ("Gemini:ApiKey", "gemini-test-secret"),
+            ("Gemini:ProjectId", "gemini-test-project"),
+            ("Gemini:Model", "invoice-primary"),
+            ("Gemini:FallbackModel", "invoice-fallback"),
+            ("Gemini:LastResortModel", "invoice-last-resort"));
+        var pool = new AiGatewayCredentialPool(config);
+        var attemptedModels = new List<string>();
+        var adapter = new FakeAdapter(AiProviderKind.Gemini, (_, _, model, _) =>
+        {
+            attemptedModels.Add(model);
+            if (attemptedModels.Count == 1)
+                throw new AiProviderException(AiFailureCategory.ProviderUnavailable, "temporary outage", HttpStatusCode.ServiceUnavailable);
+            return Task.FromResult(new AiProviderResponse(
+                new JsonObject { ["lines"] = new JsonArray() }, null, 1, 1));
+        });
+        var gateway = new AiGateway(config, pool, [adapter], new FakeLedger(allowed: true),
+            new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
+        var request = Request(AiProviderKind.Gemini) with
+        {
+            Feature = "InvoiceExtraction",
+            Task = AiTaskKind.StructuredExtraction,
+            ResponseSchema = new JsonObject { ["type"] = "OBJECT" },
+            MaxAttemptsPerProvider = 1
+        };
+
+        var response = await gateway.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.NotNull(response);
+        Assert.Equal("invoice-fallback", response.Model);
+        Assert.Equal(["invoice-primary", "invoice-fallback"], attemptedModels);
+    }
+
+    [Fact]
     public async Task Gateway_ContentSafetyRefusalDoesNotFallThroughToAnotherProvider()
     {
         var config = LegacyGeminiAndGroqConfig();
@@ -253,7 +296,7 @@ public sealed class AiGatewayTests
         var groq = new FakeAdapter(AiProviderKind.Groq, (_, _, _, _) =>
             Task.FromResult(new AiProviderResponse(null, "must not run", 1, 1)));
         var ledger = new FakeLedger(allowed: true);
-        var gateway = new AiGateway(config, pool, [gemini, groq], ledger, NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [gemini, groq], ledger, new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
 
         await Assert.ThrowsAsync<AiProviderException>(() =>
             gateway.ExecuteAsync(Request(AiProviderKind.Gemini, AiProviderKind.Groq), CancellationToken.None));
