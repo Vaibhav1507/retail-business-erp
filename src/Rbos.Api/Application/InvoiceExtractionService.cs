@@ -61,6 +61,15 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
                 : new[] { AiProviderKind.Gemini };
             gatewayResponse = await CallGatewayAsync(tid.Value, uid, invoicePages, invoiceProviders, ct);
             parsed = gatewayResponse?.StructuredContent?.DeepClone();
+            if (gatewayResponse is null)
+                log.LogWarning("Invoice extraction returned no provider response. Tenant {TenantId}, providers {Providers}",
+                    tid.Value, string.Join(",", invoiceProviders));
+            else
+                log.LogInformation("Invoice extraction provider returned a response. Provider {Provider}, model {Model}, lines {LineCount}, hasSupplier {HasSupplier}, hasTotal {HasTotal}, correlation {CorrelationId}",
+                    gatewayResponse.Provider, gatewayResponse.Model,
+                    parsed?["lines"] is JsonArray responseLines ? responseLines.Count : 0,
+                    parsed?["supplierName"] is not null, parsed?["total"] is not null,
+                    gatewayResponse.CorrelationId);
         }
         catch (AiProviderException e) when (e.Category == AiFailureCategory.ContentSafetyRefusal)
         {
@@ -83,7 +92,14 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
             { log.LogWarning(e, "Groq invoice extraction through the AI gateway failed"); }
         }
         if (parsed is null)
+        {
+            log.LogError("Invoice extraction failed: no provider produced structured invoice data. Tenant {TenantId}, user {UserId}",
+                tid.Value, uid);
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
+        }
+        if (parsed["lines"] is not JsonArray { Count: > 0 })
+            log.LogWarning("Invoice extraction produced structured data but no product lines. Provider {Provider}, model {Model}",
+                gatewayResponse?.Provider, gatewayResponse?.Model);
 
 
         await using var s = await db.BeginAsync(uid, tid, ct);
