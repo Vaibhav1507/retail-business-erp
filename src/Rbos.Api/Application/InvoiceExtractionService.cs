@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Text;
 using System.Text.Json.Nodes;
 using Rbos.Api.Persistence;
 using Rbos.Domain;
@@ -8,8 +9,8 @@ namespace Rbos.Api.Application;
 public sealed record DraftLine(string Description, decimal? Quantity, decimal? UnitCost, decimal? Amount, Guid? ProductId, string? ProductName, string? Category = null, string? Brand = null, decimal? Gst = null);
 public sealed record InvoiceDraft(Guid FileId, string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, List<DraftLine> Lines, List<string> Warnings, decimal? Subtotal = null, decimal? TaxAmount = null);
 
-/// <summary>Reads a supplier invoice photo/PDF through the central AI gateway and returns an unsaved draft. Nothing is posted here.</summary>
-public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log, AiGateway gateway)
+/// <summary>Reads a supplier invoice photo/PDF with Gemini and Groq vision fallback, then returns an unsaved draft. Nothing is posted here.</summary>
+public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log, GroqVisionClient groq)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
@@ -39,6 +40,7 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
             catch (FormatException) { return ServiceResult<object>.Fail("A page could not be read."); }
             extra.Add((pm, pb));
         }
+        var apiKey = cfg["Gemini:ApiKey"];
 
         if (mime is null || !Allowed.Contains(mime)) return ServiceResult<object>.Fail("Upload a JPEG, PNG, WebP or PDF file.");
         if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<object>.Fail("File is empty or larger than 8 MB.");
@@ -50,56 +52,23 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
         JsonNode? parsed = null;
-        AiGatewayResponse? gatewayResponse = null;
-        var safetyRefused = false;
-        var invoicePages = new List<(string Mime, string B64)> { (mime, b64) };
-        invoicePages.AddRange(extra);
-        try
+        if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            var invoiceProviders = string.Equals(cfg["Groq:InvoiceFallbackEnabled"], "true", StringComparison.OrdinalIgnoreCase)
-                ? new[] { AiProviderKind.Gemini, AiProviderKind.Groq }
-                : new[] { AiProviderKind.Gemini };
-            gatewayResponse = await CallGatewayAsync(tid.Value, uid, invoicePages, invoiceProviders, ct);
-            parsed = gatewayResponse?.StructuredContent?.DeepClone();
-            if (gatewayResponse is null)
-                log.LogWarning("Invoice extraction returned no provider response. Tenant {TenantId}, providers {Providers}",
-                    tid.Value, string.Join(",", invoiceProviders));
-            else
-                log.LogInformation("Invoice extraction provider returned a response. Provider {Provider}, model {Model}, lines {LineCount}, hasSupplier {HasSupplier}, hasTotal {HasTotal}, correlation {CorrelationId}",
-                    gatewayResponse.Provider, gatewayResponse.Model,
-                    parsed?["lines"] is JsonArray responseLines ? responseLines.Count : 0,
-                    parsed?["supplierName"] is not null, parsed?["total"] is not null,
-                    gatewayResponse.CorrelationId);
-        }
-        catch (AiProviderException e) when (e.Category == AiFailureCategory.ContentSafetyRefusal)
-        {
-            safetyRefused = true;
-            log.LogWarning("AI provider declined invoice extraction for this request");
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
-        {
-            log.LogWarning(e, "Invoice extraction through the AI gateway failed");
+            try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
+            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            { log.LogWarning("Gemini invoice extraction rate limited; trying configured fallback providers"); }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
+            { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
         }
 
-        if (!safetyRefused && parsed is not null && parsed["lines"] is not JsonArray { Count: > 0 } &&
-            gatewayResponse?.Provider != "Groq" &&
-            string.Equals(cfg["Groq:InvoiceFallbackEnabled"], "true", StringComparison.OrdinalIgnoreCase))
+        if ((parsed is null || parsed["lines"] is not JsonArray { Count: > 0 }) && groq.Available && string.Equals(cfg["Groq:InvoiceFallbackEnabled"], "true", StringComparison.OrdinalIgnoreCase))
         {
-            try { gatewayResponse = await CallGatewayAsync(tid.Value, uid, invoicePages, [AiProviderKind.Groq], ct); parsed = gatewayResponse?.StructuredContent?.DeepClone(); }
-            catch (AiProviderException e) when (e.Category == AiFailureCategory.ContentSafetyRefusal)
-            { safetyRefused = true; parsed = null; log.LogWarning("AI provider declined invoice extraction for this request"); }
+            try { parsed = await groq.ExtractInvoiceAsync([(mime, b64), .. extra], Prompt, ct); }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
-            { log.LogWarning(e, "Groq invoice extraction through the AI gateway failed"); }
+            { log.LogWarning(e, "Groq invoice extraction fallback failed"); }
         }
         if (parsed is null)
-        {
-            log.LogError("Invoice extraction failed: no provider produced structured invoice data. Tenant {TenantId}, user {UserId}",
-                tid.Value, uid);
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
-        }
-        if (parsed["lines"] is not JsonArray { Count: > 0 })
-            log.LogWarning("Invoice extraction produced structured data but no product lines. Provider {Provider}, model {Model}",
-                gatewayResponse?.Provider, gatewayResponse?.Model);
 
 
         await using var s = await db.BeginAsync(uid, tid, ct);
@@ -176,40 +145,44 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
         return await r.ReadAsync(ct) ? (r.GetString(0), (byte[])r[1]) : null;
     }
 
-    async Task<AiGatewayResponse?> CallGatewayAsync(
-        Guid tenantId, Guid actorUserId, IReadOnlyList<(string Mime, string B64)> pages,
-        IReadOnlyList<AiProviderKind> providers, CancellationToken ct)
+    async Task<JsonNode?> CallGeminiAsync(string apiKey, List<(string Mime, string B64)> pages, CancellationToken ct)
     {
-        var media = pages.Select(page =>
-        {
-            var bytes = Convert.FromBase64String(page.B64);
-            int? pageCount = 1;
-            if (page.Mime == "application/pdf")
+        var models = new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest", cfg["Gemini:LastResortModel"] ?? "gemini-2.5-flash-lite" }.Distinct().ToArray();
+        HttpRequestException? last = null;
+        foreach (var model in models)
+            for (var attempt = 0; attempt < 2; attempt++)
             {
-                try { pageCount = PdfPageReader.Read(bytes)?.Count; }
-                catch (Exception e) when (e is InvalidDataException or IOException or ArgumentException)
-                { pageCount = null; }
+                try { return await CallModelAsync(model, apiKey, pages, ct); }
+                catch (HttpRequestException e) when (e.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.InternalServerError or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.GatewayTimeout or System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.NotFound)
+                {
+                    last = e;
+                    log.LogWarning("Gemini model {Model} attempt {Attempt} failed with {Status}", model, attempt + 1, (int?)e.StatusCode);
+                    if (e.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.TooManyRequests) break;
+                    await Task.Delay(2000 * (attempt + 1), ct);
+                }
             }
-            return new AiMedia(page.Mime, bytes, pageCount);
-        }).ToArray();
-        var result = await gateway.ExecuteAsync(new AiGatewayRequest
+        if (last is not null) throw last;
+        throw new InvalidOperationException("No Gemini model configured.");
+    }
+
+    async Task<JsonNode?> CallModelAsync(string model, string apiKey, List<(string Mime, string B64)> pages, CancellationToken ct)
+    {
+        var parts = new JsonArray();
+        foreach (var (m, d) in pages) parts.Add(new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = m, ["data"] = d } });
+        parts.Add(new JsonObject { ["text"] = Prompt });
+        var body = new JsonObject
         {
-            TenantId = tenantId,
-            ActorUserId = actorUserId,
-            Feature = "InvoiceExtraction",
-            Task = AiTaskKind.StructuredExtraction,
-            Prompt = Prompt,
-            ResponseSchema = Schema(),
-            Media = media,
-            ProviderOrder = providers,
-            // The pre-gateway Gemini path did not impose a 4,096-token response cap.
-            // Use a larger, configurable limit so invoices with many line items are not
-            // deterministically truncated on every retry.
-            MaxOutputTokens = Math.Clamp(
-                cfg.GetValue("AiGateway:InvoiceExtractionMaxOutputTokens", 8192), 4096, 16_384),
-            MaxAttemptsPerProvider = 2
-        }, ct);
-        return result;
+            ["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
+            ["generationConfig"] = new JsonObject { ["responseMimeType"] = "application/json", ["responseSchema"] = Schema(), ["temperature"] = 0 }
+        };
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
+        req.Headers.Add("x-goog-api-key", apiKey);
+        req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        using var res = await http.SendAsync(req, ct);
+        res.EnsureSuccessStatusCode();
+        var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+        var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
+        return text is null ? null : JsonNode.Parse(text);
     }
 
     static JsonObject Schema()
@@ -247,20 +220,7 @@ public sealed class InvoiceExtractionService(TenantDb db, IConfiguration cfg, IL
     static string? Clip(string? s, int max = 200) => string.IsNullOrWhiteSpace(s) ? null : s.Trim()[..Math.Min(s.Trim().Length, max)];
     static decimal? Num(JsonNode? n)
     {
-        try
-        {
-            if (n is JsonValue numeric && numeric.TryGetValue<decimal>(out var value))
-                return value is >= 0 and < 1_000_000_000 ? value : null;
-
-            // Groq's JSON-object mode does not enforce Gemini's response schema and may
-            // serialize numeric fields as strings. Preserve the old fallback behaviour:
-            // parse safe invariant numeric strings instead of discarding the whole draft.
-            if (n is JsonValue text && text.TryGetValue<string>(out var raw) &&
-                decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
-                return parsed is >= 0 and < 1_000_000_000 ? parsed : null;
-
-            return null;
-        }
+        try { var v = n?.GetValue<decimal>(); return v is >= 0 and < 1_000_000_000 ? v : null; }
         catch (Exception e) when (e is InvalidOperationException or FormatException) { return null; }
     }
 
