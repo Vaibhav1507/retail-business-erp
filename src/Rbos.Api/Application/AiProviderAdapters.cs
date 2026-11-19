@@ -81,7 +81,25 @@ public sealed class GeminiAiProviderAdapter(
         var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
         if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase))
             throw new AiProviderException(AiFailureCategory.ContentSafetyRefusal, "The provider declined this request.");
-        var output = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
+        if (string.Equals(finishReason, "MAX_TOKENS", StringComparison.OrdinalIgnoreCase))
+            throw new AiProviderException(AiFailureCategory.InvalidStructuredOutput,
+                "Gemini reached the response token limit before completing the extraction. Increase the output limit or split the document.");
+
+        // Do not assume the generated JSON is always the first candidate part. Some models
+        // can emit more than one text part; concatenating them preserves the complete payload.
+        var outputParts = root?["candidates"]?[0]?["content"]?["parts"] as JsonArray;
+        var textParts = new List<string>();
+        if (outputParts is not null)
+        {
+            foreach (var part in outputParts)
+            {
+                if (part?["text"] is JsonValue textNode &&
+                    textNode.TryGetValue<string>(out var partText) &&
+                    !string.IsNullOrWhiteSpace(partText))
+                    textParts.Add(partText);
+            }
+        }
+        var output = textParts.Count == 0 ? null : string.Join("\n", textParts);
         if (string.IsNullOrWhiteSpace(output))
             throw new AiProviderException(AiFailureCategory.InvalidStructuredOutput, "Gemini returned an empty response.");
 
@@ -112,6 +130,9 @@ public sealed class GeminiAiProviderAdapter(
             HttpStatusCode.Forbidden => AiFailureCategory.PermissionDenied,
             HttpStatusCode.TooManyRequests => AiFailureCategory.RateLimited,
             HttpStatusCode.RequestTimeout => AiFailureCategory.Timeout,
+            HttpStatusCode.BadRequest when lower.Contains("api_key_invalid") ||
+                (lower.Contains("api key") && (lower.Contains("invalid") || lower.Contains("not valid"))) =>
+                AiFailureCategory.InvalidCredential,
             HttpStatusCode.BadRequest => AiFailureCategory.InvalidRequest,
             HttpStatusCode.NotFound => AiFailureCategory.UnsupportedModel,
             HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout
