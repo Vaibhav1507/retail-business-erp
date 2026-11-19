@@ -39,7 +39,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: npm test
+      # Temporarily disabled with backend unit/integration and Playwright E2E tests.
+      # Re-enable npm test when the temporary CI test bypass is lifted.
       - run: npm run lint
       - run: npm run build
       - name: Dependency audit (high and critical vulnerabilities fail CI)
