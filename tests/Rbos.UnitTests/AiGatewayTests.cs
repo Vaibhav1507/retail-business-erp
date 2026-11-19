@@ -272,12 +272,17 @@ public sealed class AiGatewayTests
             ["required"] = new System.Text.Json.Nodes.JsonArray(System.Text.Json.Nodes.JsonValue.Create("name")),
             ["properties"] = new System.Text.Json.Nodes.JsonObject
             {
-                ["name"] = new System.Text.Json.Nodes.JsonObject { ["type"] = "STRING" }
+                ["name"] = new System.Text.Json.Nodes.JsonObject { ["type"] = "STRING" },
+                ["amount"] = new System.Text.Json.Nodes.JsonObject { ["type"] = "NUMBER" }
             }
         };
 
         Assert.True(AiStructuredOutputValidator.IsValid(
             System.Text.Json.Nodes.JsonNode.Parse("{\"name\":\"Cable\"}")!, schema));
+        Assert.True(AiStructuredOutputValidator.IsValid(
+            System.Text.Json.Nodes.JsonNode.Parse("{\"name\":\"Cable\",\"amount\":\"1250.50\"}")!, schema));
+        Assert.False(AiStructuredOutputValidator.IsValid(
+            System.Text.Json.Nodes.JsonNode.Parse("{\"name\":\"Cable\",\"amount\":\"not-a-number\"}")!, schema));
         Assert.False(AiStructuredOutputValidator.IsValid(
             System.Text.Json.Nodes.JsonNode.Parse("{\"name\":42}")!, schema));
         Assert.False(AiStructuredOutputValidator.IsValid(
