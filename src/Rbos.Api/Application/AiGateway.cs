@@ -53,15 +53,38 @@ public sealed class AiGateway(
 
         foreach (var provider in request.ProviderOrder.Distinct())
         {
-            if (!_adapters.TryGetValue(provider, out var adapter) ||
-                !adapter.Supports(request.RequiredCapability) || credentials.IsCircuitOpen(provider))
+            if (!_adapters.TryGetValue(provider, out var adapter))
+            {
+                log.LogWarning("AI gateway skipped provider {Provider}: no adapter is registered; feature {Feature}; correlation {CorrelationId}",
+                    provider, request.Feature, correlationId);
                 continue;
+            }
+            if (!adapter.Supports(request.RequiredCapability))
+            {
+                log.LogWarning("AI gateway skipped provider {Provider}: capability {Capability} is unsupported; feature {Feature}; correlation {CorrelationId}",
+                    provider, request.RequiredCapability, request.Feature, correlationId);
+                continue;
+            }
+            if (credentials.IsCircuitOpen(provider))
+            {
+                log.LogWarning("AI gateway skipped provider {Provider}: circuit breaker is open; feature {Feature}; correlation {CorrelationId}",
+                    provider, request.Feature, correlationId);
+                continue;
+            }
 
             var models = ResolveModels(request, provider);
             foreach (var model in models)
             {
                 if (string.IsNullOrWhiteSpace(model)) continue;
                 var candidates = credentials.SelectOrder(provider, request.RequiredCapability, model, allowPaid);
+                if (candidates.Count == 0)
+                {
+                    log.LogWarning(
+                        "AI gateway found no eligible credential for provider {Provider}, capability {Capability}, model {Model}. ProviderEnabled {ProviderEnabled}, circuitOpen {CircuitOpen}; feature {Feature}; correlation {CorrelationId}",
+                        provider, request.RequiredCapability, model, credentials.ProviderEnabled(provider),
+                        credentials.IsCircuitOpen(provider), request.Feature, correlationId);
+                    continue;
+                }
                 var attempts = 0;
 
                 foreach (var credential in candidates)
