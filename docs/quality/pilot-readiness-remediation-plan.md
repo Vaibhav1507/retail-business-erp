@@ -496,3 +496,20 @@ The product owner requested one focused branch/PR for five work items: alias-awa
 | P0.5 One-shop financial journey | Existing separate synthetic API/integration/browser suites cover material parts of the journey. | Not yet proven as one single 25-step scenario; complete GST/non-GST print and all report assertions need consolidated E2E proof. | Product owner manual acceptance remains outstanding. |
 
 **No pilot acceptance is claimed.** CI green is not manual acceptance, CA approval, production migration evidence or permission to deploy. No production migration or deployment is part of this PR.
+
+
+---
+
+## 2026-11-18 — PR #47 merge and post-merge verification
+
+PR [#47](https://github.com/Vaibhav1507/retail-business-erp/pull/47), `fix/pilot-readiness-p0-remediation`, was merged to `main` as `eadee5d6151cc355abf90f0e4dbdc62e12212f2c`. This closes the code-review/merge state for the five scoped remediation workstreams; it does **not** automatically close CA or owner acceptance gates.
+
+Post-merge CI [run #603](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/44347681867):
+- Frontend TypeScript, unit tests, lint, production build and dependency-audit checker passed.
+- Backend Release build, disposable PostgreSQL migration and .NET tests passed.
+- Synthetic one-shop Playwright failed three existing specs: product-row visibility after product creation in collections and sales; and a stale `Model` label locator in opening stock (the form label is `Model number`).
+- Deployment-container build was skipped after the E2E failure.
+
+**Open acceptance:** CA review of WAC precision/valuation policy; consolidated owner one-shop financial journey, including GST/non-GST invoice print and financial-statement assertions; resolution and green rerun of the failing E2E coverage. No production deployment or migration is inferred from the merge.
+
+The P0 engineering implementation is merged; the pilot is not recorded as manually accepted or fully CI-verified based on run #603.

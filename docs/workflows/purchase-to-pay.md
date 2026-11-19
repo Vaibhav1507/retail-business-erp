@@ -50,3 +50,10 @@ Supported cases: GST tax invoice; unregistered supplier; cash purchase with a ca
 ## Supplier ledger and ageing
 
 Derived from journal lines on AP control with `party_id`, plus allocations for open-item ageing. No editable balance field.
+
+
+## PR C first-purchase review (2026-11-18)
+
+The existing purchase receipt workflow remains the only implementation. PR C adds an editable review checkpoint before the existing idempotent `POST /purchases` call: supplier, receiving location, receipt date, supplier bill reference and each product/quantity/unit-cost/GST amount are displayed for owner verification; lines can be removed before posting. The owner must explicitly choose the final Post receipt action. The guide does not post from navigation or on entering the screen.
+
+Unit cost remains the rate from the supplier document. GST is separate and is only entered when present on the supplier bill. Existing backend tax, valuation, inventory, payable, audit and idempotency rules are unchanged. The added review layer does not create a second purchase document model.

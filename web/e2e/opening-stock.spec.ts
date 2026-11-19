@@ -1,9 +1,8 @@
-import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory } from './signup'
-import { expect, request as pwRequest, test, type APIRequestContext, type Page } from '@playwright/test'
+import { signUp, openAddProduct, chooseCategory, createProductAndVerify } from './signup'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Synthetic data only. Unique suffix per run so the test is repeatable against the same database.
 const run = Date.now().toString(36)
-const password = 'Synthetic#Pass123'
 const ownerA = `e2e-a-${run}@example.test`
 const ownerB = `e2e-b-${run}@example.test`
 const cableName = `E2E USB-C Cable ${run}`
@@ -27,9 +26,8 @@ async function addProduct(page: Page, name: string, generic: boolean, brand = ''
   await chooseCategory(s, 'Cables')
   const box = s.getByLabel('Generic / unbranded')
   if ((await box.isChecked()) !== generic) await box.setChecked(generic)
-  if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model', { exact: true }).fill(model) }
-  await s.getByRole('button', { name: 'Add product' }).click()
-  await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name, exact: true })).toBeVisible()
+  if (!generic) { await s.getByLabel('Brand', { exact: true }).fill(brand); await s.getByLabel('Model number', { exact: true }).fill(model) }
+  await createProductAndVerify(page, s, name)
 }
 
 async function addLine(page: Page, product: string, qty: string, cost: string) {
@@ -38,11 +36,11 @@ async function addLine(page: Page, product: string, qty: string, cost: string) {
   const value = await s.getByLabel('Product').locator('option', { hasText: product }).getAttribute('value')
   await s.getByLabel('Product').selectOption(value!)
   await s.getByLabel('Quantity').fill(qty)
-  await s.getByLabel('Unit cost (INR)').fill(cost)
-  await s.getByRole('button', { name: 'Add line' }).click()
+  await s.getByLabel('Cost for one item (₹)').fill(cost)
+  await s.getByRole('button', { name: 'Add item' }).click()
 }
 
-test('owner sets up business, posts opening stock once, and is isolated from another tenant', async ({ page, browser, baseURL }) => {
+test('owner sets up business, posts opening stock once, and is isolated from another tenant', async ({ page, browser }) => {
   // 1-3. Register + sign in, bootstrap tenant, default branch and stock location
   await signUp(page, { email: ownerA, businessName: `E2E Traders ${run}` })
   await page.goto('/#/stock/products')
@@ -59,7 +57,8 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
 
   // 8. Post
   const stockForm = page.getByRole('region', { name: 'Opening stock' })
-  await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
+  await stockForm.getByRole('button', { name: 'Review starting stock' }).click()
+  await stockForm.getByRole('button', { name: 'Confirm & post opening stock' }).click()
   await expect(stockForm.getByRole('status')).toContainText('355.00 INR')
 
   // 9. Current quantity and value
@@ -75,7 +74,8 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
 
   // 11-12. Repeat the posting: must be blocked, and nothing changes
   await addLine(page, cableName, '1', '1')
-  await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
+  await stockForm.getByRole('button', { name: 'Review starting stock' }).click()
+  await stockForm.getByRole('button', { name: 'Confirm & post opening stock' }).click()
   await expect(stockForm.getByRole('alert')).toContainText('already posted')
   await page.goto('/#/stock/current')
   await expect(cableRow).toContainText('255.00')
@@ -87,12 +87,12 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
   const aLocation = (await (await api(aCtx, 'GET', '/locations')).json())[0].id as string
 
   const bContext = await browser.newContext()
-  const b = await pwRequest.newContext({ baseURL, storageState: undefined })
+  const bPage = await bContext.newPage()
   try {
-    const mobileB = randomMobile()
-    expect((await api(b, 'POST', '/auth/register', { email: ownerB, password: PASSWORD, mobile: mobileB })).status()).toBe(200)
-    expect((await api(b, 'POST', '/auth/login', { email: ownerB, password: PASSWORD })).status()).toBe(200)
-    expect((await api(b, 'POST', '/bootstrap', { businessName: `E2E Other ${run}`, branchName: 'B', locationName: 'L' }, crypto.randomUUID())).status()).toBe(200)
+    // Exercise the same verified mobile signup flow as a real second tenant. The old
+    // direct /auth/register call skipped OTP verification and now correctly returns 400.
+    await signUp(bPage, { email: ownerB, businessName: `E2E Other ${run}` })
+    const b = bPage.context().request
 
     expect(await (await api(b, 'GET', '/products')).json()).toEqual([])
     expect(await (await api(b, 'GET', '/stock')).json()).toEqual([])
@@ -104,7 +104,6 @@ test('owner sets up business, posts opening stock once, and is isolated from ano
     expect(attack.status()).toBeLessThan(500)
     expect(JSON.stringify(await attack.json())).not.toContain(cableName)
   } finally {
-    await b.dispose()
     await bContext.close()
   }
 

@@ -10,3 +10,9 @@ Facts measured: no overflow, no targets under 44px, no text under 14px, all form
 5. Investigate the identical page height (fixed or min-height layout) and verify mobile bottom-nav spacing and screen hierarchy visually.
 
 Separate: rewrite stale E2E specs (collections, opening-stock, sales).
+
+## PR C guided first-shop review
+
+The Home screen now includes a compact five-step guide intended for a 390px-class mobile viewport. The guide provides a primary next step, keeps completed steps revisitable and communicates that progress comes from saved shop records. Opening-stock and purchase forms now show a separate review step, with a final explicit posting action; sale retains its existing invoice confirmation.
+
+New onboarding and helper copy uses the existing typed English/Hindi message catalogue. English is the verified default; Hindi translations remain draft until a native speaker reviews them. This is not a claim of full Hindi coverage. The PR adds mobile Playwright coverage, but screenshots and real-device visual/usability acceptance are not claimed from source changes alone. Manual acceptance remains required on an Android phone with a first-time electronics retailer: confirm no horizontal overflow, tappable controls, daily actions remain visible, review details remain readable, and back/navigation/refresh does not imply a financial posting.

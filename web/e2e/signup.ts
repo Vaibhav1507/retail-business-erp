@@ -10,6 +10,13 @@ export const randomMobile = () => '9' + Math.floor(100_000_000 + Math.random() *
  * Relies on the Development API showing the OTP on screen (no real SMS is sent).
  */
 export async function signUp(page: Page, opts: { email: string; businessName: string; city?: string; state?: string; pin?: string; mobile?: string }) {
+  // The app intentionally asks for confirmation before leaving protected workflows.
+  // Playwright dismisses dialogs by default, which silently cancels page.goto() and leaves
+  // later assertions on the previous route. Accept the explicit navigation confirmation.
+  page.on('dialog', async dialog => {
+    if (dialog.type() === 'confirm') await dialog.accept()
+    else await dialog.dismiss()
+  })
   const mobile = opts.mobile ?? randomMobile()
   await page.goto('/')
   await page.getByRole('button', { name: 'Create an account' }).click()
@@ -47,10 +54,41 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
 }
 
 /** Opens the Add product form from the Products list (the form is not shown by default). */
+export async function expectInvoiceSaved(page: Page) {
+  await expect(page.getByText(/^Saved as INV-/)).toBeVisible()
+}
+
 export async function openAddProduct(page: Page) {
   const products = page.getByRole('region', { name: 'Products' })
   await products.getByRole('button', { name: 'Add product', exact: true }).click()
   return products.getByRole('form', { name: 'Add product' })
+}
+
+/** Submit the product, expose API rejections, then verify it through catalogue search. */
+export async function createProductAndVerify(page: Page, form: Locator, name: string) {
+  const products = page.getByRole('region', { name: 'Products' })
+  const responsePromise = page.waitForResponse(response =>
+    response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/products'
+  )
+  await form.getByRole('button', { name: 'Add product', exact: true }).click()
+  const response = await responsePromise
+  const responseBody = await response.text()
+  expect(response.ok(), `POST /api/products returned ${response.status()}: ${responseBody}`).toBe(true)
+
+  // The catalogue is paged (10 rows by default). Verify the filtered API response first,
+  // then assert the same saved record is rendered in the catalogue.
+  const searchResponsePromise = page.waitForResponse(candidate => {
+    if (candidate.request().method() !== 'GET') return false
+    const url = new URL(candidate.url())
+    return url.pathname === '/api/products' && url.searchParams.get('q') === name
+  })
+  await products.getByRole('search').getByLabel('Search', { exact: true }).fill(name)
+  const searchResponse = await searchResponsePromise
+  const searchBody = await searchResponse.text()
+  expect(searchResponse.ok(), `GET /api/products?q=... returned ${searchResponse.status()}: ${searchBody}`).toBe(true)
+  const matches = JSON.parse(searchBody) as { name: string }[]
+  expect(matches.some(product => product.name === name), `Filtered product response did not contain ${name}: ${searchBody}`).toBe(true)
+  await expect(products.getByText(name, { exact: true })).toBeVisible({ timeout: 30_000 })
 }
 
 /** Category is a select: pick an existing one, otherwise choose "Other" and type a new one. */

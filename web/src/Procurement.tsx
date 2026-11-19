@@ -37,6 +37,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const [cost, setCost] = useState('')
   const [gst, setGst] = useState('')
   const [lines, setLines] = useState<Line[]>([])
+  const [reviewReceipt, setReviewReceipt] = useState(false)
   const [rkey, setRkey] = useState(newKey)
   const [invoiceFileId, setInvoiceFileId] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
@@ -83,11 +84,11 @@ export function Procurement({ products, locations, reload, show }: { products: (
     const quantity = Number(qty); const unitCost = Number(cost); const gstAmount = Number(gst) || 0
     if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError('Choose a product and enter a positive quantity and unit cost.'); return }
     if (gstAmount < 0 || gstAmount > quantity * unitCost) { setError('GST amount must be between 0 and the line value before tax.'); return }
-    setError(''); setLines([...lines.filter(l => l.productId !== productId), { productId, quantity, unitCost, gstAmount }]); setQty(''); setCost(''); setGst('')
+    setError(''); setLines([...lines.filter(l => l.productId !== productId), { productId, quantity, unitCost, gstAmount }]); setQty(''); setCost(''); setGst(''); setReviewReceipt(false)
   }
   const receive = () => run(async () => {
     const r = await api<{ total: number; replayed?: boolean }>('POST', '/purchases', { supplierId: sup, locationId: loc, receiptDate: date, supplierRef: ref || null, lines, invoiceFileId }, rkey)
-    setLines([]); setRef(''); setInvoiceFileId(null); setRkey(newKey())
+    setLines([]); setRef(''); setInvoiceFileId(null); setRkey(newKey()); setReviewReceipt(false)
     return 'Receipt posted' + (r.replayed ? ' (already posted earlier).' : '.')
   })
   const pay = () => run(async () => {
@@ -120,23 +121,31 @@ export function Procurement({ products, locations, reload, show }: { products: (
       </>}
       {v('receive') && <>
       
-      <InvoiceUpload products={products} suppliers={suppliers.filter(s => s.isActive)} onSupplierAdded={() => { load().catch(() => undefined) }} onProductAdded={reload} onUse={(d: InvoiceDraft, picked) => { if (d.supplierId) setSupplierId(d.supplierId); if (d.date) setDate(d.date); if (d.invoiceNumber) setRef(d.invoiceNumber); setLines(picked); setInvoiceFileId(d.fileId) }} />
-      <label>Supplier <select value={sup} onChange={e => setSupplierId(e.target.value)}>{suppliers.filter(s => s.isActive).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      <label>Location <select value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-      <label>Receipt date <input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
-      <label>Supplier invoice no. <input value={ref} onChange={e => setRef(e.target.value)} /></label>
+      <InvoiceUpload products={products} suppliers={suppliers.filter(s => s.isActive)} onSupplierAdded={() => { load().catch(() => undefined) }} onProductAdded={reload} onUse={(d: InvoiceDraft, picked) => { if (d.supplierId) setSupplierId(d.supplierId); if (d.date) setDate(d.date); if (d.invoiceNumber) setRef(d.invoiceNumber); setLines(picked); setInvoiceFileId(d.fileId); setReviewReceipt(false) }} />
+      {suppliers.filter(s => s.isActive).length === 0 && <p className="hint-line">Add the supplier printed on your bill first. <a href="#/parties/suppliers">Add a supplier</a>.</p>}
+      <label>Supplier <select value={sup} onChange={e => { setSupplierId(e.target.value); setReviewReceipt(false) }}><option value="">Select a supplier</option>{suppliers.filter(s => s.isActive).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+      <label>Location <select value={loc} onChange={e => { setLocationId(e.target.value); setReviewReceipt(false) }}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+      <label>Receipt date <input type="date" value={date} onChange={e => { setDate(e.target.value); setReviewReceipt(false) }} /></label>
+      <label>Supplier invoice no. <input value={ref} onChange={e => { setRef(e.target.value); setReviewReceipt(false) }} /></label>
       <div>
-        <label>Product <select value={productId} onChange={e => setProductId(e.target.value)}><option value="">Select</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        <label>Quantity <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
-        <label>Unit cost (INR, before GST) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
-                <label>GST on this line (INR, optional) <input inputMode="decimal" value={gst} onChange={e => setGst(e.target.value)} /></label>
+        <label>Product <select value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">Select</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+        <label>Quantity <input inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
+        <label>Unit cost (INR, before GST) <input inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
+                <label>GST on this line (INR, optional) <input inputMode="decimal" value={gst} onChange={e => { setGst(e.target.value); setReviewReceipt(false) }} /></label>
         <button type="button" className="secondary" onClick={() => setScanning(true)}>Scan barcode</button>
         <button type="button" onClick={addLine}>Add line</button>
       </div>
       {scanning && <BarcodeScanner title="Scan product barcode" onScan={onScan} onClose={() => setScanning(false)} />}
       {unknownCode && <p role="status">Barcode <strong>{unknownCode.code}</strong> is new to your shop. Step 1: choose the matching product in the Product list above. Step 2: tap <button type="button" className="secondary" onClick={linkUnknown}>Link barcode to selected product</button>. Next time this barcode will fill the product automatically. If the product does not exist yet, add it under Manage Products first.</p>}
-      <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}{l.gstAmount ? ` + GST ${l.gstAmount}` : ''}</li>)}</ul>
-      <button type="button" onClick={receive} disabled={lines.length === 0 || !sup}>Post receipt</button>
+      <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}{l.gstAmount ? ` + GST ${l.gstAmount}` : ''} <button type="button" className="secondary" onClick={() => { setLines(current => current.filter(x => x.productId !== l.productId)); setReviewReceipt(false) }} aria-label={`Remove ${nameOf(l.productId)}`}>Remove</button></li>)}</ul>
+      <p className="billing-hint">{tr('onboarding.purchaseGuidance')}</p>
+      <button type="button" onClick={() => setReviewReceipt(true)} disabled={lines.length === 0 || !sup || !loc}>Review purchase</button>
+      {reviewReceipt && <div className="billing-card" role="region" aria-label="Review purchase">
+        <h3>Review purchase bill</h3><p>{tr('onboarding.purchaseReviewNote')}</p>
+        <dl className="review"><dt>Supplier</dt><dd>{suppliers.find(s => s.id === sup)?.name ?? 'Not selected'}</dd><dt>Location</dt><dd>{locations.find(l => l.id === loc)?.name ?? 'Not selected'}</dd><dt>Receipt date</dt><dd>{date}</dd><dt>Supplier bill no.</dt><dd>{ref || 'Not entered'}</dd></dl>
+        <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} × ₹{l.unitCost.toFixed(2)} before GST{l.gstAmount ? `; GST entered ₹${l.gstAmount.toFixed(2)}` : '; no GST amount entered'}</li>)}</ul>
+        <div className="form-actions"><button type="button" className="secondary" onClick={() => setReviewReceipt(false)}>Back to edit</button><button type="button" onClick={receive}>Post receipt</button></div>
+      </div>}
       </>}
       {v('pay') && <>
       

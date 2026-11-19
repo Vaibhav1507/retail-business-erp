@@ -1109,3 +1109,18 @@ Public sources reviewed on 2026-11-17. Vendor pages are marketing/pricing source
 - The MSME adoption statistics use different samples and definitions and should not be combined into one market-size estimate.
 - Segment readiness is assessed against RBOS's reviewed scope and known product decisions; it must be validated through actual shop workflows.
 - No market share, total addressable market, customer willingness-to-pay or conversion estimate is asserted without primary research.
+
+
+---
+
+## 2026-11-18 — PR C guided first-shop experience
+
+**Implementation status:** PR C is being prepared on `feat/guided-first-shop-onboarding`, based on merged `main` commit `eadee5d6151cc355abf90f0e4dbdc62e12212f2c`. This is an implementation record, not pilot or market acceptance.
+
+The first-shop experience reuses the existing business profile wizard, catalogue and import assistant, opening-stock service, supplier/purchase flow, invoice flow and dashboard. The Home checklist reads saved business profile, product, stock, purchase and sale records. Opening the relevant screen does not mark a step complete. No onboarding table, migration, AI dependency or new paid service is introduced.
+
+The five visible steps are shop details, products, starting stock, first purchase and first sale. Starting stock is treated as satisfied when saved positive stock exists or a posted purchase has brought stock into the shop; a shop with empty shelves can proceed through its first purchase. Each completed step remains revisitable, and the owner can leave the checklist and return to Home without blocking the rest of the application.
+
+PR C adds review-before-post checkpoints for opening stock and purchases while retaining the existing invoice confirmation for sales. It does not change financial posting rules, valuation policy, report definitions, tax calculations, import matching or sale pricing.
+
+English remains the established default. New onboarding and transaction guidance keys use the existing typed English/Hindi catalogue; Hindi copy is draft text pending native-speaker review. This work does not claim full multilingual support. Mobile CI and real-retailer usability acceptance are tracked separately from implementation and CI status.

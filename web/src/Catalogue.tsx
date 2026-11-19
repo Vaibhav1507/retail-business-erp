@@ -1,6 +1,6 @@
 import './product-form.css'
 import { Paged } from './Paged'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { SetupAssistant } from './SetupAssistant'
 import { ManufacturerRegistry } from './ManufacturerRegistry'
@@ -122,6 +122,9 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   const [editing, setEditing] = useState<Product | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [error, setError] = useState('')
+  // Prevent an older catalogue response from replacing results for a newer search/filter.
+  const loadSequence = useRef(0)
+  const masterLoadSequence = useRef(0)
   const [scanning, setScanning] = useState(false)
   const [scanned, setScanned] = useState<ScanResult | null>(null)
   type Suggestion = { id: string; name: string; brand: string | null; model: string | null; sku: string; match: string }
@@ -148,12 +151,18 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   }
 
   const load = useCallback(async () => {
+    const requestId = ++loadSequence.current
     const params = new URLSearchParams()
     if (q.trim()) params.set('q', q.trim())
     if (categoryId) params.set('categoryId', categoryId)
     if (showInactive) params.set('includeInactive', 'true')
-    const [p, c] = await Promise.all([api<Product[]>('GET', `/products?${params}`), api<Category[]>('GET', '/categories')])
-    setItems(p); setCategories(c)
+    try {
+      const [p, c] = await Promise.all([api<Product[]>('GET', `/products?${params}`), api<Category[]>('GET', '/categories')])
+      if (requestId !== loadSequence.current) return
+      setItems(p); setCategories(c)
+    } catch (err) {
+      if (requestId === loadSequence.current) throw err
+    }
   }, [q, categoryId, showInactive])
 
   useEffect(() => { const t = setTimeout(() => { load().catch(e => setError(msg(e))) }, 200); return () => clearTimeout(t) }, [load])
@@ -161,9 +170,15 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   const saved = () => { setEditing(null); setView('list'); load().catch(() => undefined); reload() }
 
   const loadMaster = useCallback(async () => {
+    const requestId = ++masterLoadSequence.current
     const params = new URLSearchParams()
     if (q.trim()) params.set('q', q.trim())
-    setMasterItems(await api<MasterProduct[]>('GET', `/products/master?${params}`))
+    try {
+      const rows = await api<MasterProduct[]>('GET', `/products/master?${params}`)
+      if (requestId === masterLoadSequence.current) setMasterItems(rows)
+    } catch (err) {
+      if (requestId === masterLoadSequence.current) throw err
+    }
   }, [q])
 
   async function addFromMaster(id: string) {

@@ -49,3 +49,36 @@ All opening documents share a tenant **opening date** (the day before go-live). 
 - "Business type" change after products exist is blocked in 1A.
 - GSTIN, if entered, must pass format and checksum validation; the system never generates one.
 - The setup review lists unresolved items (draft stock without cost, missing GST profile) instead of hiding them.
+
+
+## PR C — first-shop Home guide (2026-11-18)
+
+The Home screen provides a five-step guide for an owner-operator starting with one electronics/appliance shop:
+
+1. Shop details (existing Business Setup / Business Settings).
+2. Products (existing catalogue, master search, barcode and Setup Assistant/import).
+3. Starting stock (existing controlled opening-stock document).
+4. First purchase (existing supplier and purchase-receipt workflow).
+5. First sale (existing Generate Invoice workflow).
+
+### Completion evidence and resume
+
+The guide re-reads server-owned tenant records when Home is mounted or refreshed:
+- Shop details: `business_profile.onboarding_completed` via `GET /business-profile`.
+- Products: one or more products returned by `GET /products`.
+- Starting stock: positive on-hand stock from `GET /stock`, or a saved purchase receipt (which itself adds stock).
+- First purchase: one or more persisted receipts from `GET /purchases`.
+- First sale: one or more persisted sales from `GET /sales`.
+
+Opening a page, starting an import or typing an unsaved draft does not complete a step. The checklist has no separate progress table, browser-storage source of truth or migration. Each step can be reopened. The owner can leave the guide, use other application areas and return to Home; incomplete guided steps do not disable ordinary navigation. When a shop has empty shelves, the owner can proceed with the first purchase rather than creating artificial starting stock.
+
+The existing Business Setup is the first required profile experience before Home access. Its existing required-field validation and profile save are unchanged. Pausing between saved steps is supported by returning to Home; unsaved fields in an active form remain in that component's current session and are not copied into localStorage or a new server draft model.
+
+### Safe action sequence
+
+- Product creation and stock entry are distinct.
+- Opening-stock lines require positive owner-entered actual or estimated unit cost; MRP is not a cost. The server continues to enforce its existing posting rules and recomputes the posted total. Review is separate from the final post action.
+- Purchase lines are checked against the supplier bill and reviewed before the existing receipt-post endpoint is called. GST is only entered when recorded on the supplier document. No receipt posts from guide navigation.
+- Sale price is entered by the owner. MRP is not used as a selling-price default, and the existing invoice review and confirmation remains authoritative.
+
+The illustrative invoice preview is explicitly labelled as a sample, not a bill or a tax calculation. New Hindi guide and helper copy uses the existing typed catalogue and is draft pending native-speaker review.

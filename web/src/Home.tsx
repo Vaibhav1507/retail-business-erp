@@ -3,6 +3,7 @@ import { api } from './api'
 import { BusinessSetup, categoryLabel } from './BusinessSetup'
 import type { Profile } from './BusinessSetup'
 import './launcher.css'
+import { FirstShopOnboarding } from './FirstShopOnboarding'
 import { t, getLanguage, setLanguage, toLang, formatInr } from './i18n'
 import type { MessageKey } from './i18n'
 
@@ -20,7 +21,7 @@ const AREAS: [string, MessageKey, MessageKey, string][] = [
 
 type Summary = { salesToday: { bills: number; total: number }; moneyToCollect: number; moneyToPay: number; lowStockCount: number; cashAndBank: number }
 
-export function HomePage({ businessName }: { businessName?: string }) {
+export function HomePage({ businessName, offlineMode = false }: { businessName?: string; offlineMode?: boolean }) {
   const [sum, setSum] = useState<Summary | null>(null)
   const [sumError, setSumError] = useState(false)
   const [rem, setRem] = useState<{ kind: string; count: number | null }[]>([])
@@ -29,11 +30,12 @@ export function HomePage({ businessName }: { businessName?: string }) {
   return (
     <div className="launcher-page">
       <div className="page-title"><h2>{businessName ? t('home.welcomeNamed', { name: businessName }) : t('home.welcome')}</h2><p>{t('home.prompt')}</p></div>
+      {!offlineMode && <FirstShopOnboarding offlineMode={offlineMode} />}
       {sumError && <p role="alert">{t('dash.error')}</p>}
       {sum && <div className="dash-tiles">
         <a className="dash-tile" href="#/sell"><small>{t('dash.salesToday')}</small><strong>{formatInr(sum.salesToday.total)}</strong><small>{sum.salesToday.bills} {t('dash.bills')}</small></a>
         <a className="dash-tile" href="#/sell/collect"><small>{t('dash.collect')}</small><strong>{formatInr(sum.moneyToCollect)}</strong></a>
-        <a className="dash-tile" href="#/parties/suppliers"><small>{t('area.suppliers')}</small><strong>{formatInr(sum.moneyToPay)}</strong></a>
+        <a className="dash-tile" href="#/parties/suppliers"><small>{t('home.toPay')}</small><strong>{formatInr(sum.moneyToPay)}</strong></a>
         <a className="dash-tile" href="#/stock"><small>{t('dash.lowStock')}</small><strong>{sum.lowStockCount}</strong></a>
         <a className="dash-tile" href="#/money"><small>{t('dash.cash')}</small><strong>{formatInr(sum.cashAndBank)}</strong></a>
       </div>}

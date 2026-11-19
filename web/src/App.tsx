@@ -32,51 +32,64 @@ function OpeningStock({ products, locations, reload }: { products: Product[]; lo
   const [qty, setQty] = useState('')
   const [cost, setCost] = useState('')
   const [lines, setLines] = useState<{ productId: string; quantity: number; unitCost: number }[]>([])
+  const [review, setReview] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
   const loc = locationId || locations[0]?.id || ''
-  const nameOf = (id: string) => products.find(p => p.id === id)?.name ?? id
+  const productOf = (id: string) => products.find(p => p.id === id)
+  const nameOf = (id: string) => productOf(id)?.name ?? id
+  const lineValue = (line: { quantity: number; unitCost: number }) => Math.round(line.quantity * line.unitCost * 100) / 100
   function addLine() {
 	setError('')
 	const quantity = Number(qty), unitCost = Number(cost)
 	if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError('Choose a product, quantity > 0 and unit cost > 0.'); return }
-	if (lines.some(l => l.productId === productId)) { setError('Product already added.'); return }
-	setLines([...lines, { productId, quantity, unitCost }]); setQty(''); setCost('')
+	if (lines.some(l => l.productId === productId)) { setError('Product already added. Remove the existing line before adding this product again.'); return }
+	setLines([...lines, { productId, quantity, unitCost }]); setQty(''); setCost(''); setReview(false)
   }
   async function post() {
 	setError(''); setDone('')
 	try {
 	  const r = await api<{ total: number; replayed: boolean }>('POST', '/opening-stock', { locationId: loc, effectiveDate: date, lines }, key)
 	  setDone(`Posted. Inventory and Opening Balance Equity total: ${r.total.toFixed(2)} INR${r.replayed ? ' (already posted earlier)' : ''}`)
-	  setLines([]); setKey(newKey()); reload()
+	  setLines([]); setReview(false); setKey(newKey()); reload()
 	} catch (err) {
 	  setError(err instanceof ApiError && err.status >= 500 ? 'Server error. Retrying is safe.' : msg(err))
 	}
   }
   return (
 	<section aria-label="Opening stock" className="billing-screen">
-	  <h2>Opening stock</h2>
-	  <p>Enter the quantity and an actual or owner-estimated unit cost for every item. Cost is required to value inventory and create the opening journal entry. RBOS will not guess a cost or post zero value.</p>
-	  <label>Location
+	  <h2>Starting stock in your shop</h2>
+	  <p>{t('onboarding.stockIntro')}</p>
+	  <p className="hint-line">{t('onboarding.stockCostHelp')}</p>
+	  <label>Stock location
 		<select value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
 	  </label>
-	  <label>Effective date <input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+	  <label>Stock counted as of <input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
 	  <div>
 		<label>Product
 		  <select value={productId} onChange={e => setProductId(e.target.value)}>
-			<option value="">Select</option>
+			<option value="">Select a product</option>
 			{products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
 		  </select>
 		</label>
 		<label>Quantity <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
-		<label>Unit cost (INR) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
-		<button type="button" onClick={addLine}>Add line</button>
+		<label>Cost for one item (₹) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
+		<button type="button" onClick={addLine}>Add item</button>
 	  </div>
-	  <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}</li>)}</ul>
-	  <p data-testid="estimated-total">Estimated total (the server recomputes this): {lines.reduce((s, l) => s + Math.round(l.quantity * l.unitCost * 100) / 100, 0).toFixed(2)} INR</p>
-	  <button type="button" onClick={post} disabled={lines.length === 0}>Post opening stock</button>
-	  {error && <p role="alert">{error}</p>}
-	  {done && <p role="status">{done}</p>}
+	  <div className="table-scroll"><table aria-label="Starting stock entries">
+		<thead><tr><th>Product</th><th>Unit</th><th>Quantity</th><th>Unit cost</th><th>Stock value</th><th>Action</th></tr></thead>
+		<tbody>{lines.map(l => <tr key={l.productId}><td>{nameOf(l.productId)}</td><td>{productOf(l.productId)?.unit ?? '—'}</td><td>{l.quantity}</td><td>{l.unitCost.toFixed(2)}</td><td>{lineValue(l).toFixed(2)}</td>
+		<td><button type="button" className="secondary" onClick={() => { setLines(current => current.filter(x => x.productId !== l.productId)); setReview(false) }} aria-label={`Remove ${nameOf(l.productId)}`}>Remove</button></td></tr>)}</tbody>
+	  </table></div>
+	  <p data-testid="estimated-total">Estimated stock value (the server calculates the posted total): {lines.reduce((s, l) => s + lineValue(l), 0).toFixed(2)} INR</p>
+	  <button type="button" onClick={() => { setError(''); setReview(true) }} disabled={lines.length === 0 || !loc}>Review starting stock</button>
+	  {review && lines.length > 0 && <div className="billing-card" role="region" aria-label="Review opening stock">
+		<h3>Check before posting</h3><p>{t('onboarding.stockReviewNote')}</p>
+		<ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} {productOf(l.productId)?.unit ?? ''} × ₹{l.unitCost.toFixed(2)} = ₹{lineValue(l).toFixed(2)}</li>)}</ul>
+		<p><strong>Total stock value: ₹{lines.reduce((s, l) => s + lineValue(l), 0).toFixed(2)}</strong></p>
+		<div className="form-actions"><button type="button" className="secondary" onClick={() => setReview(false)}>Back to edit</button><button type="button" onClick={post}>Confirm &amp; post opening stock</button></div>
+	  </div>}
+	  {error && <p role="alert">{error}</p>}{done && <p role="status">{done}</p>}
 	</section>
   )
 }
@@ -164,6 +177,16 @@ export default function App() {
     if (!root) return
     const labelTables = () => {
       root.querySelectorAll<HTMLTableElement>('table').forEach(table => {
+        // Mobile CSS turns native table elements into block/grid cards. Restore explicit
+        // table roles so assistive technology still exposes the row/column relationships.
+        table.setAttribute('role', 'table')
+        table.querySelectorAll('thead, tbody, tfoot').forEach(group => group.setAttribute('role', 'rowgroup'))
+        table.querySelectorAll<HTMLTableRowElement>('tr').forEach(row => row.setAttribute('role', 'row'))
+        table.querySelectorAll<HTMLTableCellElement>('th').forEach(cell => {
+          cell.setAttribute('role', cell.scope === 'row' ? 'rowheader' : 'columnheader')
+        })
+        table.querySelectorAll<HTMLTableCellElement>('td').forEach(cell => cell.setAttribute('role', 'cell'))
+
         const labels = Array.from(table.tHead?.querySelectorAll('th') ?? []).map(th => (th.textContent ?? '').trim())
         if (labels.length === 0) return
         table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach(row => {
@@ -226,7 +249,7 @@ export default function App() {
 	case 'parties': body = <PartiesPage tab={first('customers')} c={c} />; break
 	case 'money': body = <MoneyPage tab={first('cash')} />; break
 	case 'more': body = <MorePage tab={tab} onLogout={logout} email={me.email} />; break
-	default: body = <HomePage businessName={businessName} />
+	default: body = <HomePage businessName={businessName} offlineMode={offlineMode} />
   }
   const active = NAV.some(n => n.key === page) ? page : 'home'
   return (

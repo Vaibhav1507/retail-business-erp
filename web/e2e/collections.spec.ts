@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, postInvoice } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
@@ -22,21 +22,21 @@ test('credit sale, outstanding balance, later collection, balance update', async
   await form.getByLabel('Name', { exact: true }).fill(item)
   await chooseCategory(form, 'Cables')
   await form.getByLabel('Generic / unbranded').setChecked(true)
-  await form.getByRole('button', { name: 'Add product' }).click()
-  await expect(page.getByRole('region', { name: 'Products' }).getByRole('cell', { name: item, exact: true })).toBeVisible()
+  await createProductAndVerify(page, form, item)
 
   await page.goto('/#/stock/opening')
   const stockForm = page.getByRole('region', { name: 'Opening stock' })
   await pick(page, 'Opening stock', 'Product', item)
   await stockForm.getByLabel('Quantity').fill('10')
-  await stockForm.getByLabel('Unit cost (INR)').fill('20')
-  await stockForm.getByRole('button', { name: 'Add line' }).click()
-  await stockForm.getByRole('button', { name: 'Post opening stock' }).click()
+  await stockForm.getByLabel('Cost for one item (₹)').fill('20')
+  await stockForm.getByRole('button', { name: 'Add item' }).click()
+  await stockForm.getByRole('button', { name: 'Review starting stock' }).click()
+  await stockForm.getByRole('button', { name: 'Confirm & post opening stock' }).click()
   await expect(stockForm.getByRole('status')).toContainText('200.00 INR')
 
   const sales = page.getByRole('region', { name: 'Sales', exact: true })
   await postInvoice(page, { product: item, qty: '3', price: '100', mode: 'Credit', paid: '100', name: customer, phone: randomMobile() })
-  await expect(page.getByRole('status')).toContainText('Saved as INV-')
+  await expectInvoiceSaved(page)
   await page.goto('/#/parties/customers')
   const custRow = page.getByRole('table', { name: 'Customers' }).getByRole('row', { name: new RegExp(customer) })
   await expect(custRow).toContainText('200.00')

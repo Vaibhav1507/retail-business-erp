@@ -391,6 +391,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   return (
     <section aria-label="Generate invoice" className="billing-page">
       <h2>Generate Invoice</h2>
+      <p className="billing-hint">{tr('onboarding.saleGuidance')}</p>
             {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => { void resume(h) }}>Resume</button> <button type="button" className="secondary" onClick={() => { void discardHeld(h.id) }}>Discard</button></li>)}</ul></div>}
       {offlineQueue.length > 0 && <div className="billing-card" aria-label="Offline bill queue">
         <h3>Offline bills and sync status</h3>
