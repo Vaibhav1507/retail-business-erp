@@ -17,53 +17,78 @@ public sealed class GeminiAiProviderAdapter(
     public async Task<AiProviderResponse> ExecuteAsync(
         AiGatewayRequest request, AiProviderCredential credential, string model, CancellationToken cancellationToken)
     {
-        var parts = new JsonArray();
-        foreach (var media in request.Media)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            parts.Add(new JsonObject
-            {
-                ["inline_data"] = new JsonObject
-                {
-                    ["mime_type"] = media.MimeType,
-                    ["data"] = Convert.ToBase64String(media.Bytes)
-                }
-            });
-        }
-
         var userText = request.Prompt;
         if (!string.IsNullOrWhiteSpace(request.InputText))
             userText = string.IsNullOrWhiteSpace(userText)
                 ? request.InputText
                 : request.Prompt + "\n\n" + request.InputText;
-        if (!string.IsNullOrWhiteSpace(userText)) parts.Add(new JsonObject { ["text"] = userText });
 
-        var body = new JsonObject
+        // Stream JSON directly to a MemoryStream. Building JsonNode + base64 strings +
+        // ToJsonString duplicated large invoice/catalogue payloads in memory and caused
+        // OutOfMemoryException for uploads that were within the endpoint's 8 MB limit.
+        using var payload = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(payload))
         {
-            ["contents"] = new JsonArray(new JsonObject { ["role"] = "user", ["parts"] = parts }),
-            ["generationConfig"] = new JsonObject
+            writer.WriteStartObject();
+            writer.WritePropertyName("contents");
+            writer.WriteStartArray();
+            writer.WriteStartObject();
+            writer.WriteString("role", "user");
+            writer.WriteStartArray("parts");
+            foreach (var media in request.Media)
             {
-                ["temperature"] = 0,
-                ["maxOutputTokens"] = Math.Clamp(request.MaxOutputTokens, 32, 32_000)
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WriteStartObject();
+                writer.WritePropertyName("inline_data");
+                writer.WriteStartObject();
+                writer.WriteString("mime_type", media.MimeType);
+                writer.WriteBase64String("data", media.Bytes);
+                writer.WriteEndObject();
+                writer.WriteEndObject();
             }
-        };
-        if (request.ResponseSchema is not null)
-        {
-            body["generationConfig"]!["responseMimeType"] = "application/json";
-            body["generationConfig"]!["responseSchema"] = request.ResponseSchema.DeepClone();
-        }
-        if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
-        {
-            body["systemInstruction"] = new JsonObject
+            if (!string.IsNullOrWhiteSpace(userText))
             {
-                ["parts"] = new JsonArray(new JsonObject { ["text"] = request.SystemPrompt })
-            };
+                writer.WriteStartObject();
+                writer.WriteString("text", userText);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+            writer.WriteEndArray();
+
+            writer.WritePropertyName("generationConfig");
+            writer.WriteStartObject();
+            writer.WriteNumber("temperature", 0);
+            writer.WriteNumber("maxOutputTokens", Math.Clamp(request.MaxOutputTokens, 32, 32_000));
+            if (request.ResponseSchema is not null)
+            {
+                writer.WriteString("responseMimeType", "application/json");
+                writer.WritePropertyName("responseSchema");
+                request.ResponseSchema.WriteTo(writer);
+            }
+            writer.WriteEndObject();
+
+            if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
+            {
+                writer.WritePropertyName("systemInstruction");
+                writer.WriteStartObject();
+                writer.WriteStartArray("parts");
+                writer.WriteStartObject();
+                writer.WriteString("text", request.SystemPrompt);
+                writer.WriteEndObject();
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+            writer.WriteEndObject();
+            writer.Flush();
         }
+        payload.Position = 0;
 
         using var message = new HttpRequestMessage(HttpMethod.Post,
             Endpoint + Uri.EscapeDataString(model) + ":generateContent");
         message.Headers.Add("x-goog-api-key", credential.ApiKey);
-        message.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        message.Content = new StreamContent(payload);
+        message.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
         using var client = clients.CreateClient("AiGateway.Gemini");
         using var response = await client.SendAsync(message, cancellationToken);
@@ -254,7 +279,11 @@ public sealed class GroqAiProviderAdapter(
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            log.LogWarning("Groq chat adapter returned HTTP {StatusCode}", (int)response.StatusCode);
+            var error = ReadErrorMetadata(responseBody);
+            // Log only bounded provider metadata. Never log the body, prompt, image or credential.
+            log.LogWarning(
+                "Groq chat adapter returned HTTP {StatusCode}; error type {ErrorType}, code {ErrorCode}, parameter {ErrorParameter}",
+                (int)response.StatusCode, error.Type, error.Code, error.Parameter);
             throw ProviderError(response.StatusCode, response.Headers.RetryAfter, responseBody);
         }
 
@@ -380,6 +409,39 @@ public sealed class GroqAiProviderAdapter(
                 merged[property.Key] = property.Value.DeepClone();
         }
         return merged;
+    }
+
+    private static (string? Type, string? Code, string? Parameter) ReadErrorMetadata(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("error", out var error) &&
+                error.ValueKind == JsonValueKind.Object)
+                root = error;
+
+            static string? ReadSafe(JsonElement element, string property)
+            {
+                if (element.ValueKind != JsonValueKind.Object ||
+                    !element.TryGetProperty(property, out var value) ||
+                    value.ValueKind != JsonValueKind.String)
+                    return null;
+
+                var raw = value.GetString();
+                if (string.IsNullOrWhiteSpace(raw)) return null;
+                return new string(raw.Take(64)
+                    .Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.')
+                    .ToArray());
+            }
+
+            return (ReadSafe(root, "type"), ReadSafe(root, "code"), ReadSafe(root, "param"));
+        }
+        catch (JsonException)
+        {
+            return (null, null, null);
+        }
     }
 
     private static AiProviderException ProviderError(HttpStatusCode status, RetryConditionHeaderValue? retryAfter, string body)

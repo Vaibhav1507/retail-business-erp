@@ -143,7 +143,7 @@ public sealed class AiGateway(
                     var retryCount = 0;
                     try
                     {
-                        var timeoutSeconds = Math.Clamp(configuration.GetValue("AiGateway:RequestTimeoutSeconds", 60), 3, 180);
+                        var timeoutSeconds = Math.Clamp(configuration.GetValue("AiGateway:RequestTimeoutSeconds", 100), 3, 180);
                         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
                         var response = await adapter.ExecuteAsync(request, credential, model, timeout.Token);
