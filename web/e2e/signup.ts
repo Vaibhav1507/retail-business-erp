@@ -77,7 +77,7 @@ export async function createProductAndVerify(page: Page, form: Locator, name: st
   expect(searchResponse.ok(), `GET /api/products?q=... returned ${searchResponse.status()}: ${searchBody}`).toBe(true)
   const matches = JSON.parse(searchBody) as { name: string }[]
   expect(matches.some(product => product.name === name), `Filtered product response did not contain ${name}: ${searchBody}`).toBe(true)
-  await expect(products.getByRole('cell', { name, exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(products.getByText(name, { exact: true })).toBeVisible({ timeout: 30_000 })
 }
 
 /** Category is a select: pick an existing one, otherwise choose "Other" and type a new one. */
