@@ -64,9 +64,19 @@ export async function createProductAndVerify(page: Page, form: Locator, name: st
   const responseBody = await response.text()
   expect(response.ok(), `POST /api/products returned ${response.status()}: ${responseBody}`).toBe(true)
 
-  // The catalogue is paged (10 rows by default). Search for the newly saved item instead
-  // of assuming it will be on the first page when the tenant already has many products.
+  // The catalogue is paged (10 rows by default). Verify the filtered API response first,
+  // then assert the same saved record is rendered in the catalogue.
+  const searchResponsePromise = page.waitForResponse(candidate => {
+    if (candidate.request().method() !== 'GET') return false
+    const url = new URL(candidate.url())
+    return url.pathname === '/api/products' && url.searchParams.get('q') === name
+  })
   await products.getByRole('search').getByLabel('Search', { exact: true }).fill(name)
+  const searchResponse = await searchResponsePromise
+  const searchBody = await searchResponse.text()
+  expect(searchResponse.ok(), `GET /api/products?q=... returned ${searchResponse.status()}: ${searchBody}`).toBe(true)
+  const matches = JSON.parse(searchBody) as { name: string }[]
+  expect(matches.some(product => product.name === name), `Filtered product response did not contain ${name}: ${searchBody}`).toBe(true)
   await expect(products.getByRole('cell', { name, exact: true })).toBeVisible({ timeout: 30_000 })
 }
 
