@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json.Nodes;
 using Rbos.Api.Application;
@@ -20,7 +21,7 @@ public sealed class VoiceNavigationIntentServiceTests
         var pool = new AiGatewayCredentialPool(config);
         var adapter = new AiGatewayTests.FakeAdapter(AiProviderKind.Gemini, (_, _, _, _) =>
             Task.FromResult(new AiProviderResponse(Navigate("stock.current", 0.96), null, 20, 10)));
-        var gateway = new AiGateway(config, pool, [adapter], new AiGatewayTests.FakeLedger(true), NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [adapter], new AiGatewayTests.FakeLedger(true), new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
         var service = new VoiceNavigationIntentService(config, NullLogger<VoiceNavigationIntentService>.Instance, gateway);
 
         var result = await service.ClassifyAsync(Guid.NewGuid(), Guid.NewGuid(),
@@ -55,7 +56,7 @@ public sealed class VoiceNavigationIntentServiceTests
             Task.FromResult(new AiProviderResponse(Navigate("https://evil.example", 0.99), null, 20, 10)));
         var groq = new AiGatewayTests.FakeAdapter(AiProviderKind.Groq, (_, _, _, _) =>
             Task.FromResult(new AiProviderResponse(Navigate("buy.receive", 0.91), null, 20, 10)));
-        var gateway = new AiGateway(config, pool, [gemini, groq], new AiGatewayTests.FakeLedger(true), NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [gemini, groq], new AiGatewayTests.FakeLedger(true), new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
         var service = new VoiceNavigationIntentService(config, NullLogger<VoiceNavigationIntentService>.Instance, gateway);
 
         var result = await service.ClassifyAsync(Guid.NewGuid(), Guid.NewGuid(),
@@ -75,7 +76,7 @@ public sealed class VoiceNavigationIntentServiceTests
         var pool = new AiGatewayCredentialPool(config);
         var adapter = new AiGatewayTests.FakeAdapter(AiProviderKind.Gemini, (_, _, _, _) =>
             throw new InvalidOperationException("Provider must not be called."));
-        var gateway = new AiGateway(config, pool, [adapter], new AiGatewayTests.FakeLedger(true), NullLogger<AiGateway>.Instance);
+        var gateway = new AiGateway(config, pool, [adapter], new AiGatewayTests.FakeLedger(true), new HttpContextAccessor(), NullLogger<AiGateway>.Instance);
         var service = new VoiceNavigationIntentService(config, NullLogger<VoiceNavigationIntentService>.Instance, gateway);
 
         Assert.False(service.Available);
