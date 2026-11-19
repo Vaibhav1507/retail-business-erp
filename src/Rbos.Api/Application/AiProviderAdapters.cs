@@ -279,7 +279,11 @@ public sealed class GroqAiProviderAdapter(
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            log.LogWarning("Groq chat adapter returned HTTP {StatusCode}", (int)response.StatusCode);
+            var error = ReadErrorMetadata(responseBody);
+            // Log only bounded provider metadata. Never log the body, prompt, image or credential.
+            log.LogWarning(
+                "Groq chat adapter returned HTTP {StatusCode}; error type {ErrorType}, code {ErrorCode}, parameter {ErrorParameter}",
+                (int)response.StatusCode, error.Type, error.Code, error.Parameter);
             throw ProviderError(response.StatusCode, response.Headers.RetryAfter, responseBody);
         }
 
@@ -405,6 +409,39 @@ public sealed class GroqAiProviderAdapter(
                 merged[property.Key] = property.Value.DeepClone();
         }
         return merged;
+    }
+
+    private static (string? Type, string? Code, string? Parameter) ReadErrorMetadata(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("error", out var error) &&
+                error.ValueKind == JsonValueKind.Object)
+                root = error;
+
+            static string? ReadSafe(JsonElement element, string property)
+            {
+                if (element.ValueKind != JsonValueKind.Object ||
+                    !element.TryGetProperty(property, out var value) ||
+                    value.ValueKind != JsonValueKind.String)
+                    return null;
+
+                var raw = value.GetString();
+                if (string.IsNullOrWhiteSpace(raw)) return null;
+                return new string(raw.Take(64)
+                    .Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.')
+                    .ToArray());
+            }
+
+            return (ReadSafe(root, "type"), ReadSafe(root, "code"), ReadSafe(root, "param"));
+        }
+        catch (JsonException)
+        {
+            return (null, null, null);
+        }
     }
 
     private static AiProviderException ProviderError(HttpStatusCode status, RetryConditionHeaderValue? retryAfter, string body)
