@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify } from './signup'
+import { signUp, openAddProduct, chooseCategory, createProductAndVerify } from './signup'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 // Synthetic data only. Unique suffix per run so the test is repeatable against the same database.
@@ -40,7 +40,7 @@ async function addLine(page: Page, product: string, qty: string, cost: string) {
   await s.getByRole('button', { name: 'Add item' }).click()
 }
 
-test('owner sets up business, posts opening stock once, and is isolated from another tenant', async ({ page, browser, baseURL }) => {
+test('owner sets up business, posts opening stock once, and is isolated from another tenant', async ({ page, browser }) => {
   // 1-3. Register + sign in, bootstrap tenant, default branch and stock location
   await signUp(page, { email: ownerA, businessName: `E2E Traders ${run}` })
   await page.goto('/#/stock/products')
