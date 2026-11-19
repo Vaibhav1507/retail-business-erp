@@ -53,6 +53,16 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
 }
 
+/** Reopens the workspace after a full page reload; the local privacy lock intentionally relocks on reload. */
+export async function unlockApp(page: Page) {
+  const unlockHeading = page.getByRole('heading', { name: 'Unlock this device' })
+  if (await unlockHeading.count()) {
+    await page.getByLabel('PIN', { exact: true }).fill('1234')
+    await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  }
+}
+
 /** Opens the Add product form from the Products list (the form is not shown by default). */
 export async function expectInvoiceSaved(page: Page) {
   await expect(page.getByText(/^Saved as INV-/)).toBeVisible()
