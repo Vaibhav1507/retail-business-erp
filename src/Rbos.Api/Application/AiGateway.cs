@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -11,6 +10,7 @@ public sealed class AiGateway(
     AiGatewayCredentialPool credentials,
     IEnumerable<IAiProviderAdapter> providerAdapters,
     IAiGatewayUsageLedger usageLedger,
+    IHttpContextAccessor httpContextAccessor,
     ILogger<AiGateway> log)
 {
     private readonly IReadOnlyDictionary<AiProviderKind, IAiProviderAdapter> _adapters =
@@ -45,9 +45,14 @@ public sealed class AiGateway(
 
         var allowPaid = configuration.GetValue("AiGateway:AllowPaidProviders", false);
         var maxAttempts = Math.Clamp(request.MaxAttemptsPerProvider, 1, 5);
-        var correlationId = string.IsNullOrWhiteSpace(request.CorrelationId)
-            ? Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N")
-            : request.CorrelationId.Trim()[..Math.Min(request.CorrelationId.Trim().Length, 64)];
+        // Prefer the HTTP correlation ID established by Program.cs so API, extraction,
+        // gateway and provider-attempt logs can be joined in one Cloud Run query.
+        var httpCorrelationId = httpContextAccessor.HttpContext?.TraceIdentifier;
+        var correlationId = !string.IsNullOrWhiteSpace(request.CorrelationId)
+            ? request.CorrelationId.Trim()[..Math.Min(request.CorrelationId.Trim().Length, 64)]
+            : !string.IsNullOrWhiteSpace(httpCorrelationId)
+                ? httpCorrelationId[..Math.Min(httpCorrelationId.Length, 64)]
+                : Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString("N");
         request = request with { CorrelationId = correlationId };
         var paidBudgetBlocked = false;
 
@@ -142,11 +147,12 @@ public sealed class AiGateway(
                         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
                         var response = await adapter.ExecuteAsync(request, credential, model, timeout.Token);
 
-                        if (request.ResponseSchema is not null &&
-                            (response.StructuredContent is null ||
-                             !AiStructuredOutputValidator.IsValid(response.StructuredContent, request.ResponseSchema)))
+                        // The provider receives the response schema (Gemini) or JSON mode (Groq).
+                        // Do not add a second gateway-side schema gate: the legacy extraction path
+                        // accepted provider JSON and let the feature parser handle partial fields.
+                        if (request.ResponseSchema is not null && response.StructuredContent is null)
                             throw new AiProviderException(AiFailureCategory.InvalidStructuredOutput,
-                                "The provider response does not match the required output schema.");
+                                "The provider returned no structured response.");
 
                         stopwatch.Stop();
                         var actualCost = credential.ActualCost(response.InputTokens, response.OutputTokens, request);
@@ -228,7 +234,7 @@ public sealed class AiGateway(
             }
         }
 
-        log.LogWarning("AI gateway has no eligible provider for feature {Feature}; correlation {CorrelationId}",
+        log.LogWarning("AI gateway exhausted configured providers for feature {Feature}; correlation {CorrelationId}",
             request.Feature, correlationId);
         return null;
     }
