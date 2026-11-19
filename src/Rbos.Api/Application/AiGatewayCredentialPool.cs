@@ -62,7 +62,9 @@ public sealed class AiGatewayCredentialPool
              (c.BillingMode == AiBillingMode.Paid && allowPaid && c.HasCompletePricing(capability))));
 
     public bool IsCredentialStillEligible(AiProviderCredential credential, AiCapability capability, string model, bool allowPaid) =>
-        ProviderEnabled(credential.Provider) && !IsCircuitOpen(credential.Provider) &&
+        // Circuit state is checked once before entering a provider's model loop.
+        // Do not let a failure mid-request suppress that request's remaining fallback models.
+        ProviderEnabled(credential.Provider) &&
         !_invalidCredentials.ContainsKey(credential.Id) &&
         (!_cooldowns.TryGetValue(credential.QuotaBucketId, out var until) || until <= DateTimeOffset.UtcNow) &&
         credential.Supports(capability, model) &&
