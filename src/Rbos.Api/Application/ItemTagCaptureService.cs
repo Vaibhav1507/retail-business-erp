@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Net.Http.Headers;
 using System.Text;
@@ -48,6 +49,7 @@ public sealed class ItemTagCaptureService(
         Guid uid, string? idempotencyKey, string? contentType, string? detectedBarcode,
         string? detectedSymbology, byte[] bytes, CancellationToken ct)
     {
+        var requestTimer = Stopwatch.StartNew();
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 100)
         {
             CryptographicOperations.ZeroMemory(bytes);
@@ -150,11 +152,14 @@ public sealed class ItemTagCaptureService(
         }
         byte[] aiBytes = bytes;
         var aiMime = contentType;
+        var prepTimer = Stopwatch.StartNew();
         try
         {
             // Preserve the original bytes in PostgreSQL as private sale evidence. A bounded
             // derivative is used only for model inference to reduce payload and vision cost.
             aiBytes = PrepareVisionImage(bytes, contentType, out aiMime);
+            prepTimer.Stop();
+            log.LogInformation("Item-tag AI image prepared. Capture {CaptureId}, original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms", id, bytes.Length, aiBytes.Length, prepTimer.ElapsedMilliseconds);
             var attempts = new List<VisionProviderAttempt>();
             var geminiKey = configuration["Gemini:ApiKey"];
             var geminiModels = VisionProviderFallback.ItemTagGeminiModels(configuration);
@@ -215,6 +220,7 @@ public sealed class ItemTagCaptureService(
         string? matchReason = null;
         if (status == "ReadyForReview")
         {
+            var matchTimer = Stopwatch.StartNew();
             try
             {
                 (suggestedProductId, matchReason) = await MatchProductAsync(uid, tenantId.Value, extracted, ct);
@@ -222,6 +228,12 @@ public sealed class ItemTagCaptureService(
             catch (Exception e) when (e is NpgsqlException or InvalidOperationException)
             {
                 log.LogWarning("Item-tag catalogue matching failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
+            }
+            finally
+            {
+                matchTimer.Stop();
+                log.LogInformation("Item-tag catalogue match completed. Capture {CaptureId}, matched {Matched}, duration {MatchMs}ms",
+                    id, suggestedProductId is not null, matchTimer.ElapsedMilliseconds);
             }
         }
 
@@ -240,7 +252,11 @@ public sealed class ItemTagCaptureService(
             await s.CommitAsync(ct);
         }
 
-        return await GetAsync(uid, id, ct);
+        var result = await GetAsync(uid, id, ct);
+        requestTimer.Stop();
+        log.LogInformation("Item-tag upload completed. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
+            id, contentType, bytes.Length, status, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
+        return result;
     }
 
     public async Task<ServiceResult<object>> GetAsync(Guid uid, Guid id, CancellationToken ct)
@@ -445,7 +461,7 @@ public sealed class ItemTagCaptureService(
                 from catalog.product p
                 where @name <> '' and p.is_active
                   and catalog.norm_text(p.name)=@name
-                  and (@brand::text='' or lower(coalesce(p.brand,''))=lower(@brand))
+                  and (@brand='' or lower(coalesce(p.brand,''))=lower(@brand))
             ),
             unambiguous as (
                 select priority, id, name, reason
