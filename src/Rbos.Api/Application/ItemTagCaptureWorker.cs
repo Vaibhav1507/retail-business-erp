@@ -22,7 +22,7 @@ public static class ItemTagCaptureWorker
         var groq = new GroqVisionClient(groqHttp, config, loggerFactory.CreateLogger<GroqVisionClient>());
         var service = new ItemTagCaptureService(
             db, geminiHttp, groq, config, loggerFactory.CreateLogger<ItemTagCaptureService>());
-        var maxJobsPerRun = Math.Clamp(config.GetValue("AiPerformance:ItemTagQueueMaxJobsPerRun", 5), 1, 20);
+        var maxJobsPerRun = Math.Clamp(config.GetValue("AiPerformance:ItemTagQueueMaxJobsPerRun", 5), 1, 5);
         var processed = 0;
         logger.LogInformation("Item-tag worker started. Maximum jobs this run {MaxJobs}.", maxJobsPerRun);
 
