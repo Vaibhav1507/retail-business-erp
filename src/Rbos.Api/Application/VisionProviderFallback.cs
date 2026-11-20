@@ -123,7 +123,7 @@ public static class VisionProviderFallback
 
                 // Credential/permission/billing errors apply to every model under this provider.
                 // Do not spend the request budget repeating the same bad key on fallback models.
-                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.PaymentRequired)
                     unavailableProviders.Add(attempt.Provider);
             }
             catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
