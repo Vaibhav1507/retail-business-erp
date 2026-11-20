@@ -4,7 +4,9 @@ namespace Rbos.Api.Security;
 public sealed class SecurityMiddleware(RequestDelegate next)
 {
     public const long MaxBodyBytes = 64 * 1024;
-    // The endpoint accepts legacy JSON/base64 (up to 12 MiB decoded) as well as multipart files.\n    // The route enforces a tighter 13 MiB multipart form limit and the service enforces 12 MiB of file bytes.\n    public const long MaxInvoiceBodyBytes = 18L * 1024 * 1024;
+    // The endpoint accepts legacy JSON/base64 (up to 12 MiB decoded) as well as multipart files.
+    // The route enforces a tighter 13 MiB multipart form limit and the service enforces 12 MiB of file bytes.
+    public const long MaxInvoiceBodyBytes = 18L * 1024 * 1024;
     /// <summary>Catalogue import carries a 12 MB file as base64 inside JSON (4/3 overhead) plus a small envelope.</summary>
     public const long MaxCatalogueImportBodyBytes = 12L * 1024 * 1024 / 3 * 4 + 16 * 1024;
     public const long MaxItemTagPhotoBodyBytes = 8L * 1024 * 1024;
