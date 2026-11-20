@@ -17,11 +17,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build RetailBusinessOs.slnx --nologo -c Release
-      # Temporarily disabled while invoice extraction / AI Gateway CI is stabilized:
-      # - dotnet test RetailBusinessOs.slnx --nologo -c Release --no-build
-      # - Playwright browser E2E (npm run test:e2e)
-      # Re-enable tests, PostgreSQL service/bootstrap, Noto fonts and Playwright
-      # browser installation together when the test suite is ready to gate merges.
+      - name: Run backend unit tests
+        run: dotnet test tests/Rbos.UnitTests/Rbos.UnitTests.csproj --nologo -c Release --no-build
+      # PostgreSQL integration tests and Playwright E2E remain disabled until their
+      # database/browser service fixtures are restored as explicit CI dependencies.
       - name: Build deployment container (no push)
         run: docker build --pull -t retail-business-os:ci .
 
