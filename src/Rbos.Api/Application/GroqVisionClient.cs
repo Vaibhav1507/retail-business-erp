@@ -50,47 +50,41 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
             }
             if (images.Count > 6) return null;
         }
-        // Independent page groups can be processed concurrently. Keep each Groq request
-        // at the model's three-image limit, then merge in page order for deterministic output.
+
         var batches = images.Chunk(3).ToArray();
         var partials = await Task.WhenAll(batches.Select(batch =>
             CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct)));
+        return MergeInvoicePageResults(partials);
+    }
 
+    public static JsonNode? MergeInvoicePageResults(IReadOnlyList<JsonNode?> partials)
+    {
         var merged = new JsonObject { ["lines"] = new JsonArray() };
         var identityFields = new[] { "supplierName", "invoiceNumber", "date" };
         var trailingSummaryFields = new[] { "total", "subtotal", "taxAmount" };
         foreach (var partial in partials)
         {
             if (partial is not JsonObject) return null;
-
-            // Identity fields should come from the first page batch that can read them.
-            // Later batches often omit these fields or hallucinate a different header.
             foreach (var key in identityFields)
             {
                 if (HasUsableScalar(merged[key])) continue;
                 if (HasUsableScalar(partial[key])) merged[key] = partial[key]!.DeepClone();
             }
-
-            // Totals are normally printed near the end of an invoice. Keep the last
-            // usable value in page order, rather than allowing blank values to erase it.
             foreach (var key in trailingSummaryFields)
                 if (HasUsableScalar(partial[key])) merged[key] = partial[key]!.DeepClone();
-
             if (partial["lines"] is JsonArray lines)
                 foreach (var line in lines)
                     if (line is not null) ((JsonArray)merged["lines"]!).Add(line.DeepClone());
         }
-
         return merged;
+    }
 
-        static bool HasUsableScalar(JsonNode? value)
-        {
-            if (value is null) return false;
-            if (value is JsonValue scalar && scalar.TryGetValue<string>(out var text))
-                return !string.IsNullOrWhiteSpace(text);
-            return value is JsonValue;
-        }
-        return merged;
+    static bool HasUsableScalar(JsonNode? value)
+    {
+        if (value is null) return false;
+        if (value is JsonValue scalar && scalar.TryGetValue<string>(out var text))
+            return !string.IsNullOrWhiteSpace(text);
+        return value is JsonValue;
     }
 
     public async Task<JsonNode?> ExtractPdfAsync(byte[] pdf, string prompt, CancellationToken ct)
