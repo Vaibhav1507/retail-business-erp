@@ -73,6 +73,8 @@ public class SchemaGuardTests
               has_function_privilege('rbos_app', 'integrations.enqueue_item_tag_capture(uuid,uuid,uuid)', 'EXECUTE'),
               has_function_privilege('rbos_app', 'integrations.claim_item_tag_captures(integer,integer)', 'EXECUTE'),
               has_function_privilege('rbos_app', 'integrations.finish_item_tag_capture(uuid,uuid,timestamptz)', 'EXECUTE'),
+              has_function_privilege('rbos_app', 'integrations.cancel_item_tag_capture(uuid,uuid,uuid)', 'EXECUTE'),
+              has_function_privilege('rbos_worker', 'integrations.cancel_item_tag_capture(uuid,uuid,uuid)', 'EXECUTE'),
               has_function_privilege('rbos_worker', 'integrations.claim_item_tag_captures(integer,integer)', 'EXECUTE'),
               has_function_privilege('rbos_worker', 'integrations.finish_item_tag_capture(uuid,uuid,timestamptz)', 'EXECUTE'),
               has_table_privilege('rbos_app', 'integrations.item_tag_capture_queue', 'SELECT'),
@@ -83,9 +85,11 @@ public class SchemaGuardTests
         Assert.False(reader.GetBoolean(1));
         Assert.False(reader.GetBoolean(2));
         Assert.True(reader.GetBoolean(3));
-        Assert.True(reader.GetBoolean(4));
-        Assert.False(reader.GetBoolean(5));
-        Assert.False(reader.GetBoolean(6));
+        Assert.False(reader.GetBoolean(4));
+        Assert.True(reader.GetBoolean(5));
+        Assert.True(reader.GetBoolean(6));
+        Assert.False(reader.GetBoolean(7));
+        Assert.False(reader.GetBoolean(8));
     }
 
 }
