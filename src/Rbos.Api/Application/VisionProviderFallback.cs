@@ -12,6 +12,9 @@ public sealed record VisionProviderAttempt(
     int TimeoutSeconds,
     Func<CancellationToken, Task<JsonNode?>> Execute);
 
+public sealed class VisionProviderRefusalException(string message) : Exception(message);
+
+
 /// <summary>
 /// Runs provider attempts in their declared order. A response is accepted only when the
 /// feature-specific validator says it contains useful structured data.
@@ -85,6 +88,14 @@ public static class VisionProviderFallback
                 logger.LogWarning(
                     "Vision provider returned empty or unusable structured output. Feature {Feature}, provider {Provider}, model {Model}, latency {LatencyMs}ms",
                     feature, attempt.Provider, attempt.Model, timer.ElapsedMilliseconds);
+            }
+            catch (VisionProviderRefusalException)
+            {
+                timer.Stop();
+                logger.LogWarning(
+                    "Vision provider refused the extraction. Feature {Feature}, provider {Provider}, model {Model}, latency {LatencyMs}ms",
+                    feature, attempt.Provider, attempt.Model, timer.ElapsedMilliseconds);
+                return null;
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
