@@ -434,6 +434,22 @@ public sealed class ItemTagCaptureService(
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("Capture not found.", 404);
         await using var s = await db.BeginAsync(uid, tid, ct);
+        var status = await SqlHelpers.Scalar<string>(s,
+            "select status from sales.item_tag_capture where id=@i and sale_id is null", ct, ("i", id));
+        if (status is null)
+            return ServiceResult<object>.Fail("Capture was not found or is already attached to a sale.", 404);
+
+        if (status == "ReadingTag")
+        {
+            // Atomically remove only an unclaimed/expired job. If a live worker lease
+            // exists, keep the evidence and ask the user to refresh after processing.
+            var cancelled = await SqlHelpers.Scalar<bool>(s,
+                "select integrations.cancel_item_tag_capture(@t,@i,@u)", ct,
+                ("t", tid.Value), ("i", id), ("u", uid));
+            if (!cancelled)
+                return ServiceResult<object>.Fail("This photo is currently being processed. Wait for the reading to finish, refresh its status, then remove it.", 409);
+        }
+
         var removed = await SqlHelpers.ExecCount(s, ct,
             "delete from sales.item_tag_capture where id=@i and sale_id is null and status <> 'Attached'", ("i", id));
         if (removed == 0) return ServiceResult<object>.Fail("Capture was not found or is already attached to a sale.", 404);
