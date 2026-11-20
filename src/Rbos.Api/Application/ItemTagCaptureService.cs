@@ -430,6 +430,11 @@ public sealed class ItemTagCaptureService(
         using var response = await http.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
         var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+        var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
+        var blockReason = root?["promptFeedback"]?["blockReason"]?.GetValue<string>();
+        if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrWhiteSpace(blockReason))
+            throw new VisionProviderRefusalException("Gemini declined the item-tag extraction request.");
         var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
