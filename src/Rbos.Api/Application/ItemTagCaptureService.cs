@@ -80,12 +80,20 @@ public sealed class ItemTagCaptureService(
         // upload; attached sale evidence is excluded by both predicates.
         if (TryBeginRetentionCleanup(tenantId.Value))
         {
-            await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
-            await SqlHelpers.Exec(cleanup, ct,
-                "update sales.item_tag_capture set status='NeedsAttention' where sale_id is null and status='ReadingTag' and created_at < now() - interval '5 minutes'");
-            await SqlHelpers.Exec(cleanup, ct,
-                "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
-            await cleanup.CommitAsync(ct);
+            try
+            {
+                await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
+                await SqlHelpers.Exec(cleanup, ct,
+                    "update sales.item_tag_capture set status='NeedsAttention' where sale_id is null and status='ReadingTag' and created_at < now() - interval '5 minutes'");
+                await SqlHelpers.Exec(cleanup, ct,
+                    "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
+                await cleanup.CommitAsync(ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Retention is opportunistic; maintenance failure must not block a new upload.
+                log.LogWarning("Item-tag retention cleanup deferred ({ErrorType}).", e.GetType().Name);
+            }
         }
 
         await using (var s = await db.BeginAsync(uid, tenantId, ct))
