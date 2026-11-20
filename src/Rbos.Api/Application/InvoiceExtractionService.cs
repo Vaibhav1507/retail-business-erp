@@ -92,7 +92,8 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             attempts,
             HasUsableInvoiceLines,
             log,
-            ct);
+            ct,
+            TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
         if (parsed is null)
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
 
