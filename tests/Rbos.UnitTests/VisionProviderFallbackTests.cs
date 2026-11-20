@@ -1,0 +1,179 @@
+using System.Net;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Rbos.Api.Application;
+
+namespace Rbos.UnitTests;
+
+public sealed class VisionProviderFallbackTests
+{
+    [Fact]
+    public void InvoiceGeminiModels_DefaultToStableExplicitModelIds()
+    {
+        var config = Config();
+
+        Assert.Equal(
+            new[] { "gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite" },
+            VisionProviderFallback.InvoiceGeminiModels(config));
+    }
+
+    [Fact]
+    public void LegacyFloatingAndRetiredAliasesAreReplacedByStableDefaults()
+    {
+        var config = Config(
+            ("Gemini:Model", "gemini-4-hydrogen"),
+            ("Gemini:FallbackModel", "gemini-flash-latest"),
+            ("Gemini:LastResortModel", "gemini-2.5-flash-lite"));
+
+        Assert.Equal(
+            new[] { "gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite" },
+            VisionProviderFallback.InvoiceGeminiModels(config));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UsesGroqBetweenPrimaryAndSecondaryGemini()
+    {
+        var order = new List<string>();
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ =>
+            {
+                order.Add("Gemini-primary");
+                throw new HttpRequestException("unavailable", null, HttpStatusCode.ServiceUnavailable);
+            }),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                order.Add("Groq");
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Cable" }) });
+            }),
+            Attempt("Gemini", "gemini-3.8-flash", _ =>
+            {
+                order.Add("Gemini-secondary");
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Should not run" }) });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Gemini-primary", "Groq" }, order);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ContinuesToGeminiWhenGroqFails()
+    {
+        var order = new List<string>();
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ =>
+            {
+                order.Add("Gemini-primary");
+                throw new HttpRequestException("unavailable", null, HttpStatusCode.ServiceUnavailable);
+            }),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                order.Add("Groq");
+                throw new HttpRequestException("bad request", null, HttpStatusCode.BadRequest);
+            }),
+            Attempt("Gemini", "gemini-3.8-flash", _ =>
+            {
+                order.Add("Gemini-secondary");
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Adapter" }) });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "Gemini-primary", "Groq", "Gemini-secondary" }, order);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SkipsRemainingGeminiModelsAfterCredentialFailure()
+    {
+        var groqAttempted = false;
+        var secondaryGeminiAttempted = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ =>
+                throw new HttpRequestException("unauthorized", null, HttpStatusCode.Unauthorized)),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                groqAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Adapter" }) });
+            }),
+            Attempt("Gemini", "gemini-3.8-flash", _ =>
+            {
+                secondaryGeminiAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject());
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(groqAttempted);
+        Assert.False(secondaryGeminiAttempted);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotAcceptEmptyOrUnusableStructuredOutput()
+    {
+        var fallbackCalled = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ =>
+                Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray() })),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                fallbackCalled = true;
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Charger" }) });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(fallbackCalled);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PropagatesCallerCancellationWithoutTryingFallback()
+    {
+        var fallbackCalled = false;
+        using var cts = new CancellationTokenSource();
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ => throw new OperationCanceledException()),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                fallbackCalled = true;
+                return Task.FromResult<JsonNode?>(new JsonObject());
+            })
+        };
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            VisionProviderFallback.ExecuteAsync("SupplierInvoice", attempts, _ => true, NullLogger.Instance, cts.Token));
+
+        Assert.False(fallbackCalled);
+    }
+
+    static VisionProviderAttempt Attempt(
+        string provider, string model, Func<CancellationToken, Task<JsonNode?>> execute) =>
+        new(provider, model, 5, execute);
+
+    static bool HasLines(JsonNode? value) =>
+        value?["lines"] is JsonArray { Count: > 0 } lines &&
+        lines.Any(line => !string.IsNullOrWhiteSpace(line?["description"]?.GetValue<string>()));
+
+    static IConfiguration Config(params (string Key, string Value)[] values) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(values.ToDictionary(x => x.Key, x => (string?)x.Value))
+            .Build();
+}
