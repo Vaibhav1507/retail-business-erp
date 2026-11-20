@@ -149,6 +149,54 @@ export function ItemTagCapture({
     return () => { active = false }
   }, [linkedIdsKey])
 
+  const processingIdsKey = entries
+    .filter(item => item.capture?.status === 'ReadingTag')
+    .map(item => item.capture!.id)
+    .sort()
+    .join(',')
+
+  useEffect(() => {
+    if (!processingIdsKey) return
+    let active = true
+    let polling = false
+    const poll = async () => {
+      if (polling) return
+      polling = true
+      try {
+        const ids = processingIdsKey.split(',').filter(Boolean)
+        await Promise.all(ids.map(async id => {
+          try {
+            const capture = await api<CaptureResponse>('GET', '/sales/item-tag-captures/' + id)
+            if (!active || capture.status === 'ReadingTag') return
+            setEntries(current => current.map(item => item.capture?.id === id ? {
+              ...item,
+              busy: false,
+              capture,
+              name: capture.extraction?.productName ?? item.name,
+              brand: capture.extraction?.brand ?? item.brand,
+              model: capture.extraction?.model ?? item.model,
+              barcode: capture.extraction?.barcode ?? item.barcode,
+              barcodeSymbology: capture.extraction?.barcodeSymbology ?? item.barcodeSymbology,
+              serial: capture.extraction?.serial ?? item.serial,
+              imei1: capture.extraction?.imei1 ?? item.imei1,
+              imei2: capture.extraction?.imei2 ?? item.imei2,
+              mrp: capture.extraction?.mrp == null ? item.mrp : String(capture.extraction.mrp),
+              hsn: capture.extraction?.hsn ?? item.hsn,
+              productId: capture.suggestedProduct?.id ?? item.productId
+            } : item))
+          } catch {
+            // A transient status-read failure must not discard saved evidence.
+          }
+        }))
+      } finally {
+        polling = false
+      }
+    }
+    void poll()
+    const timer = window.setInterval(() => { void poll() }, 2500)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [processingIdsKey])
+
   function patch(key: string, values: Partial<CaptureDraft>) {
     setEntries(current => current.map(item => item.key === key ? { ...item, ...values } : item))
   }
@@ -323,6 +371,7 @@ export function ItemTagCapture({
           <div className="item-tag-status" role="status">
             {item.busy ? 'Uploading photo and reading tag…'
               : item.added ? 'Added to bill — photo evidence is linked to this item'
+              : item.capture?.status === 'ReadingTag' ? 'Photo saved. Reading tag in the background…'
               : item.capture?.status === 'NeedsAttention' ? 'Photo saved. Automatic reading was unavailable; enter the details manually.'
               : item.capture ? 'Photo ready — review the extracted details'
               : item.error ? 'Needs attention'
@@ -334,7 +383,8 @@ export function ItemTagCapture({
             <button type="button" className="secondary" disabled={!available} onClick={() => void sendPhoto(item)}>Retry upload</button>}
           {!item.capture && item.error &&
             <button type="button" className="secondary" onClick={() => void removePhoto(item)}>Remove photo</button>}
-          {item.capture && !item.added && <>
+          {item.capture?.status === 'ReadingTag' && <button type="button" className="secondary" disabled={item.saving} onClick={() => void removePhoto(item)}>Remove photo</button>}
+          {item.capture && item.capture.status !== 'ReadingTag' && !item.added && <>
             {item.capture.suggestedProduct && <p className="billing-hint">Possible match: {item.capture.suggestedProduct.name} ({item.capture.suggestedProduct.reason}). Confirm it below.</p>}
             <div className="billing-grid">
               <div className="billing-field billing-col-12">

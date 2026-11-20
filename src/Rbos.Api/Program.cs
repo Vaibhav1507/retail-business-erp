@@ -34,6 +34,38 @@ if (args.Contains("--whatsapp-worker"))
     return;
 }
 
+if (args.Contains("--item-tag-worker"))
+{
+    var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
+    var database = config["Rbos:Database"] ?? "dev";
+    var appKey = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
+    var workerKey = database switch { "test" => "ConnectionStrings:RbosTestItemTagWorker", "prod" => "ConnectionStrings:RbosProdItemTagWorker", _ => "ConnectionStrings:RbosDevItemTagWorker" };
+    var appConnectionString = config[appKey] ?? throw new InvalidOperationException($"Missing secret {appKey}");
+    var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
+    await using var dataSource = Npgsql.NpgsqlDataSource.Create(appConnectionString);
+    await using var queueDataSource = Npgsql.NpgsqlDataSource.Create(workerConnectionString);
+    await using (var probe = await dataSource.OpenConnectionAsync())
+    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
+        if ((string?)await who.ExecuteScalarAsync() != "rbos_app")
+            throw new InvalidOperationException("Item-tag tenant data connection must use rbos_app.");
+    await using (var probe = await queueDataSource.OpenConnectionAsync())
+    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
+        if ((string?)await who.ExecuteScalarAsync() != "rbos_worker")
+            throw new InvalidOperationException("Item-tag queue connection must use rbos_worker.");
+
+    using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+    using var cancellation = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; cancellation.Cancel(); };
+    using var sigterm = System.Runtime.InteropServices.PosixSignalRegistration.Create(
+        System.Runtime.InteropServices.PosixSignal.SIGTERM, context =>
+        {
+            context.Cancel = true;
+            cancellation.Cancel();
+        });
+    await ItemTagCaptureWorker.RunAsync(dataSource, queueDataSource, config, loggerFactory, cancellation.Token);
+    return;
+}
+
 if (args.Contains("--emit-identity-sql"))
 {
 	var options = new DbContextOptionsBuilder<RbosIdentityDbContext>()

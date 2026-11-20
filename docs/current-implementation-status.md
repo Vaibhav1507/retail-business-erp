@@ -191,3 +191,14 @@ New regression coverage added for HTTP 402 versus HTTP 429 provider fallback and
 **Validation limitation:** workflow #658 passed on the earlier head `d7c8655` with 147 backend unit tests and frontend/build checks. No workflow run is currently associated with the newer review-fix head `21fe930`; therefore these new changes have not yet been validated by CI. PostgreSQL integration tests, Playwright E2E and frontend npm tests also remain unverified/skipped in the earlier workflow.
 
 Multipart invoice transport and durable asynchronous item-tag extraction remain separate follow-up work. No provider credentials, Cloud Run settings, billing, production database or deployment state were changed.
+
+
+## 20 November 2026 — PR #55 merged and durable item-tag processing
+
+- PR [#55](https://github.com/Vaibhav1507/retail-business-erp/pull/55) is merged to main at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7`.
+- Durable asynchronous item-tag processing is proposed in a separate branch, `feat/durable-async-item-tag-processing`; it is not merged or deployed.
+- The API persists the private capture and its queue row in the same PostgreSQL transaction, then returns `ReadingTag` without waiting for a vision provider.
+- A separate `--item-tag-worker` process claims durable jobs through restricted `rbos_worker` functions and uses the existing `rbos_app` tenant context to load and process photo evidence. The queue contains identifiers only, not image bytes or model content.
+- The Generate Invoice UI polls the authenticated capture GET route while the status is `ReadingTag`; review controls appear only after processing becomes `ReadyForReview` or `NeedsAttention`.
+- A separate worker deployment and `ConnectionStrings:RbosProdItemTagWorker` credential are operational prerequisites. This code does not provision secrets, deploy Cloud Run, apply a production migration or change provider flags.
+- Multipart supplier invoice upload remains a separate follow-up PR.

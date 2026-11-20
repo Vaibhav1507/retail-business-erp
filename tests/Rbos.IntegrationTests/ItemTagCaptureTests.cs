@@ -59,7 +59,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
         var id = firstBody.GetProperty("id").GetGuid();
-        Assert.Equal("NeedsAttention", firstBody.GetProperty("status").GetString());
+        Assert.Equal("ReadingTag", firstBody.GetProperty("status").GetString());
 
         var replay = await client.SendBytes("/sales/item-tag-captures", Jpeg, "image/jpeg", key);
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
@@ -97,9 +97,9 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
             "/sales/item-tag-captures", Jpeg, "image/jpeg", Key(), code, "EAN_13");
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         var body = await upload.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("ReadyForReview", body.GetProperty("status").GetString());
+        Assert.Equal("ReadingTag", body.GetProperty("status").GetString());
         Assert.Equal(code, body.GetProperty("extraction").GetProperty("barcode").GetString());
-        Assert.Equal(productId, body.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("suggestedProduct").ValueKind);
     }
 
     [Fact]
