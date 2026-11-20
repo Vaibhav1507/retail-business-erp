@@ -320,7 +320,7 @@ The following code changes have been made on this branch, on top of main. They a
 
 ### Not implemented yet — remain explicit follow-up items
 
-1. **Binary multipart supplier-invoice upload.** The browser still sends base64-encoded pages in JSON. This branch has not changed the upload contract. A separate compatible multipart endpoint is still needed to reduce transfer size and memory copies while preserving the current JSON route during migration.
+1. **Binary multipart supplier-invoice upload.** Implemented on the separate `perf/multipart-supplier-invoice-upload` branch, not merged/deployed. Browser photos are normalized to bounded JPEG and PDFs remain binary. Multipart uses a 12 MiB aggregate cap, 8 MiB per page and six pages maximum to preserve the existing 12 MiB invoice-file database constraint; the request cap is 13 MiB. The JSON/base64 endpoint remains for compatibility. Fresh PR CI and real browser/provider checks remain pending.
 2. **Durable asynchronous item-tag extraction.** The API still waits for provider extraction before returning the full capture. A durable queue/worker with tenant-safe claim/complete semantics is the next major perceived-latency improvement. Do not replace this with untracked `Task.Run` work.
 3. **Catalogue upload stage instrumentation and OCR routing.** OCR is bounded at 12 seconds, but PDF page text/render/OCR/provider stages are not yet individually timed, and the product import frontend does not yet provide upload-to-result timing.
 4. **Client/server upload-stage telemetry.** The code logs extraction durations and some payload sizes, but it does not yet separately measure browser file preparation, API request-body read, network transfer, cold-start pending latency and complete browser upload-to-review time.
@@ -336,7 +336,7 @@ The following code changes have been made on this branch, on top of main. They a
 
 - No API keys, secret values, database credentials, customer data or uploaded documents were added to source control.
 - No Cloud Run environment variables, Secret Manager mappings, model quotas, billing settings or service account permissions were modified.
-- No database migration was added or applied.
+- No database migration was added or applied for multipart; it reuses the existing 12 MiB invoice-file constraint.
 - No deployment or production test was performed.
 - The AI Gateway remains bypassed for supplier invoice and item-tag extraction as per PR #54; this branch does not re-enable it. Catalogue and voice Gateway paths are unchanged.
 - Do not merge/deploy until backend build, unit tests, frontend checks, container build and the remaining validation gaps are reviewed. After deployment approval, measure p50/p95 and extraction accuracy before declaring the improvement complete.
