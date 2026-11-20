@@ -23,8 +23,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-noto-core
       - name: Run backend unit tests
         run: dotnet test tests/Rbos.UnitTests/Rbos.UnitTests.csproj --nologo -c Release --no-build
-      # PostgreSQL integration tests and Playwright E2E remain disabled until their
-      # database/browser service fixtures are restored as explicit CI dependencies.
       - name: Build deployment container (no push)
         run: docker build --pull -t retail-business-os:ci .
 
