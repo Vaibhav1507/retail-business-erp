@@ -78,6 +78,31 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
 
+        // Prepare and bound retained evidence before any provider call. ZIP headers
+        // add a small amount beyond source bytes, so validating only after inference
+        // could spend AI budget on an upload that cannot be retained.
+        var storedMime = mime;
+        var stored = bytes;
+        if (providerPages.Count > 1)
+        {
+            using var archive = new MemoryStream();
+            using (var zip = new System.IO.Compression.ZipArchive(archive, System.IO.Compression.ZipArchiveMode.Create, true))
+            {
+                var pageNumber = 0;
+                foreach (var (pageMime, pageBytes) in providerPages)
+                {
+                    var extension = pageMime switch { "image/png" => "png", "image/webp" => "webp", "application/pdf" => "pdf", _ => "jpg" };
+                    var entry = zip.CreateEntry($"page-{++pageNumber}.{extension}", System.IO.Compression.CompressionLevel.NoCompression);
+                    await using var entryStream = entry.Open();
+                    await entryStream.WriteAsync(pageBytes, ct);
+                }
+            }
+            stored = archive.ToArray();
+            storedMime = "application/zip";
+            if (stored.Length > 12 * 1024 * 1024)
+                return ServiceResult<object>.Fail("The retained invoice pages together exceed the 12 MB storage limit.");
+        }
+
         var attempts = new List<VisionProviderAttempt>();
         var geminiModels = VisionProviderFallback.InvoiceGeminiModels(cfg);
         var geminiEnabled = !string.IsNullOrWhiteSpace(apiKey);
@@ -164,24 +189,6 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) date = null;
 
         var fileId = Guid.NewGuid();
-        var storedMime = mime; var stored = bytes;
-        if (providerPages.Count > 1)
-        {
-            using var ms = new MemoryStream();
-            using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
-            {
-                var n = 0;
-                foreach (var (pm, pb) in providerPages)
-                {
-                    var ext = pm switch { "image/png" => "png", "image/webp" => "webp", "application/pdf" => "pdf", _ => "jpg" };
-                    var entry = zip.CreateEntry($"page-{++n}.{ext}", System.IO.Compression.CompressionLevel.NoCompression);
-                    await using var es = entry.Open();
-                    await es.WriteAsync(pb, ct);
-                }
-            }
-            storedMime = "application/zip"; stored = ms.ToArray();
-            if (stored.Length > 12 * 1024 * 1024) return ServiceResult<object>.Fail("The retained invoice pages together exceed the 12 MB storage limit.");
-        }
         await using (var ins = s.Command("insert into procurement.invoice_file(tenant_id,id,content_type,size_bytes,content,created_by) values (@t,@i,@m,@z,@c,@u)"))
         {
             ins.Parameters.AddWithValue("t", tid.Value); ins.Parameters.AddWithValue("i", fileId); ins.Parameters.AddWithValue("m", storedMime);
