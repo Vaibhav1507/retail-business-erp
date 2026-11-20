@@ -158,6 +158,7 @@ export function ItemTagCapture({
     loadedIds.current.add(draft.key)
     patch(draft.key, { busy: true, error: '' })
     try {
+      const capture = await withItemTagUploadSlot(async () => {
       // Decode common retail barcodes locally before upload/AI processing.
       // QR/Data Matrix payloads are deliberately not treated as product barcodes.
       let decodedBarcode: { code: string; symbology: string } | null = null
@@ -178,12 +179,15 @@ export function ItemTagCapture({
 
       // The API validates the barcode hint and performs the catalogue match itself.
       // Do not serialize upload behind a second barcode lookup request.
-      const capture = await withItemTagUploadSlot(() => apiBinary<CaptureResponse>(
+      // The API validates the barcode hint and performs the catalogue match itself.
+      // The semaphore covers both local decode and the provider-backed request.
+      return await apiBinary<CaptureResponse>(
         '/sales/item-tag-captures', draft.file!, undefined, draft.key,
         decodedBarcode ? {
           'X-RBOS-Detected-Barcode': decodedBarcode.code,
           'X-RBOS-Detected-Symbology': decodedBarcode.symbology
-        } : undefined))
+        } : undefined)
+      })
       loadedIds.current.add(capture.id)
 
       patch(draft.key, {
