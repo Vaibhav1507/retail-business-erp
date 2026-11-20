@@ -69,7 +69,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     try {
       const pages = await Promise.all(files.map(prepare))
       const totalBytes = pages.reduce((total, file) => total + file.size, 0)
-      if (totalBytes > 24 * 1024 * 1024) throw new Error('The selected invoice pages together exceed 24 MB.')
+      if (totalBytes > 12 * 1024 * 1024) throw new Error('The selected invoice pages together exceed 12 MB.')
       const form = new FormData()
       pages.forEach(file => form.append('pages', file, file.name))
       const d = await apiForm<InvoiceDraft>('POST', '/purchases/extract', form)
