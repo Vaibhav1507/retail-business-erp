@@ -17,11 +17,14 @@ export const toBase64 = (blob: Blob): Promise<string> => new Promise((resolve, r
   reader.readAsDataURL(blob)
 })
 
-async function prepareImageBlob(file: File): Promise<Blob> {
-  if (file.size === 0 || file.size > 24 * 1024 * 1024)
-    throw new Error('The original photo must be 24 MB or smaller.')
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
-    throw new Error('Choose a JPEG, PNG, WebP photo or a PDF.')
+async function prepareImageBlob(file: File, invoicePage = false): Promise<Blob> {
+  if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
+  if (invoicePage) {
+    if (file.size === 0 || file.size > 24 * 1024 * 1024)
+      throw new Error('The original invoice photo must be 24 MB or smaller.')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
+      throw new Error('Choose a JPEG, PNG, WebP photo or a PDF.')
+  }
   const bitmap = await createImageBitmap(file)
   try {
     const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height))
@@ -33,7 +36,8 @@ async function prepareImageBlob(file: File): Promise<Blob> {
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
     if (!blob) throw new Error('Could not prepare the photo.')
-    if (blob.size === 0 || blob.size > MAX_BYTES) throw new Error('Prepared photo must be 8 MB or smaller.')
+    if (invoicePage && (blob.size === 0 || blob.size > MAX_BYTES))
+      throw new Error('Prepared invoice photo must be 8 MB or smaller.')
     return blob
   } finally {
     bitmap.close()
@@ -45,7 +49,7 @@ async function prepareImageBlob(file: File): Promise<Blob> {
 // purchases use prepareMultipartPage() below.
 export async function prepare(file: File): Promise<{ contentType: string; data: string }> {
   if (file.type === 'application/pdf') {
-    if (file.size === 0 || file.size > 12 * 1024 * 1024) throw new Error('PDF must be 12 MB or smaller.')
+    if (file.size > MAX_BYTES) throw new Error('PDF is larger than 8 MB.')
     return { contentType: file.type, data: await toBase64(file) }
   }
   const image = await prepareImageBlob(file)
@@ -58,7 +62,7 @@ async function prepareMultipartPage(file: File): Promise<File> {
     if (file.size === 0 || file.size > MAX_BYTES) throw new Error('PDF must be between 1 byte and 8 MB.')
     return file
   }
-  const image = await prepareImageBlob(file)
+  const image = await prepareImageBlob(file, true)
   return new File([image], 'invoice-page.jpg', { type: 'image/jpeg' })
 }
 
