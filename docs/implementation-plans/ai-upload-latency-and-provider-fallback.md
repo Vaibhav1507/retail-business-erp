@@ -340,3 +340,14 @@ The following code changes have been made on this branch, on top of main. They a
 - No deployment or production test was performed.
 - The AI Gateway remains bypassed for supplier invoice and item-tag extraction as per PR #54; this branch does not re-enable it. Catalogue and voice Gateway paths are unchanged.
 - Do not merge/deploy until backend build, unit tests, frontend checks, container build and the remaining validation gaps are reviewed. After deployment approval, measure p50/p95 and extraction accuracy before declaring the improvement complete.
+
+
+## Multipart supplier invoice transport — standalone follow-up
+
+PR #55 is merged. Multipart transport is intentionally proposed separately from durable asynchronous item-tag processing.
+
+The browser prepares photo pages as 1,800-pixel JPEGs at quality 0.85, preserves PDF bytes, validates the six-page/eight-megabyte-per-page/48-megabyte aggregate bounds, and appends files to FormData under the `pages` field. It does not base64-encode browser files or JSON-serialize the upload. The browser supplies the multipart Content-Type boundary; client code must not manually set that header.
+
+The API enforces a 50 MiB multipart request cap, validates page count and file sizes before reading, and delegates MIME/signature checks to InvoiceExtractionService. The binary service path retains byte arrays until the provider boundary, where Gemini/Groq payload formatting requires base64. Original bytes are used for the retained private invoice file or multi-page ZIP. The older JSON/base64 endpoint remains for backward compatibility.
+
+The extraction response remains an unsaved draft. Multipart does not post a purchase, update stock or bypass owner review. No production config, secret, deployment, migration, billing or provider flag is changed.

@@ -24,10 +24,14 @@ test('invoice extraction returns multi-line draft', async ({ page }) => {
   const data = fs.readFileSync(path.join(process.cwd(), 'e2e', 'test-invoice.png')).toString('base64')
   const result = await page.evaluate(async (d) => {
     const c = await (await fetch('/api/csrf', { credentials: 'same-origin' })).json()
+    const binary = atob(d)
+    const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0))
+    const form = new FormData()
+    form.append('pages', new Blob([bytes], { type: 'image/png' }), 'test-invoice.png')
     const r = await fetch('/api/purchases/extract', {
       method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': c.token ?? c.requestToken ?? '' },
-      body: JSON.stringify({ contentType: 'image/png', data: d }),
+      headers: { 'X-CSRF-TOKEN': c.token ?? c.requestToken ?? '' },
+      body: form,
     })
     return { status: r.status, body: await r.text() }
   }, data)

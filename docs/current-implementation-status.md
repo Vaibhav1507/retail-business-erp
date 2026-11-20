@@ -191,3 +191,14 @@ New regression coverage added for HTTP 402 versus HTTP 429 provider fallback and
 **Validation limitation:** workflow #658 passed on the earlier head `d7c8655` with 147 backend unit tests and frontend/build checks. No workflow run is currently associated with the newer review-fix head `21fe930`; therefore these new changes have not yet been validated by CI. PostgreSQL integration tests, Playwright E2E and frontend npm tests also remain unverified/skipped in the earlier workflow.
 
 Multipart invoice transport and durable asynchronous item-tag extraction remain separate follow-up work. No provider credentials, Cloud Run settings, billing, production database or deployment state were changed.
+
+
+## 20 November 2026 — PR #55 merged and multipart follow-up
+
+- PR #55 is merged to main at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7`.
+- Supplier invoice multipart transport is proposed on its own branch, `perf/multipart-supplier-invoice-upload`; it is not merged or deployed.
+- The browser prepares image files as JPEG (up to 1,800 pixels at quality 0.85), preserves PDF bytes, and sends selected pages as multipart binary files. It no longer creates base64 strings or a JSON request body for the new client.
+- The API enforces a 6-page limit, 8 MB per page and 48 MB aggregate file limit (50 MiB request limit including multipart boundaries). MIME and file-signature checks remain in the extraction service.
+- The existing JSON/base64 endpoint remains as a compatibility path. Gemini/Groq provider logic and the resulting unsaved draft flow are unchanged. Original page bytes are retained; no invoice is automatically posted.
+- The backend converts file bytes to base64 only at the Gemini/Groq provider payload boundary.
+- No migration, provider flag, credential, billing, production database or Cloud Run change is included.

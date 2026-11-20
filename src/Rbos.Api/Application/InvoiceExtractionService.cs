@@ -29,32 +29,53 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
     public async Task<ServiceResult<object>> ExtractAsync(Guid uid, string? mime, string? b64, CancellationToken ct)
         => await ExtractAsync(uid, [(mime, b64)], ct);
 
-    public async Task<ServiceResult<object>> ExtractAsync(Guid uid, IReadOnlyList<(string? Mime, string? B64)> pages, CancellationToken ct)
+    public async Task<ServiceResult<object>> ExtractAsync(
+        Guid uid, IReadOnlyList<(string? Mime, string? B64)> pages, CancellationToken ct)
+    {
+        if (pages.Count is 0 or > MaxPages)
+            return ServiceResult<object>.Fail($"Upload 1 to {MaxPages} pages of one invoice.");
+        var decoded = new List<(string? Mime, byte[] Bytes)>(pages.Count);
+        foreach (var (pageMime, base64) in pages)
+        {
+            if (pageMime is null || !Allowed.Contains(pageMime) || string.IsNullOrEmpty(base64) ||
+                base64.Length > MaxFileBytes / 3 * 4 + 8)
+                return ServiceResult<object>.Fail("A page is missing, too large or not a supported type.");
+            byte[] pageBytes;
+            try { pageBytes = Convert.FromBase64String(base64); }
+            catch (FormatException) { return ServiceResult<object>.Fail("A page could not be read."); }
+            if (pageBytes.Length is 0 or > MaxFileBytes || !MatchesType(pageBytes, pageMime))
+                return ServiceResult<object>.Fail("A page is empty, too large, or not the type it claims to be.");
+            decoded.Add((pageMime, pageBytes));
+        }
+        return await ExtractAsync(uid, decoded, ct);
+    }
+
+    public async Task<ServiceResult<object>> ExtractAsync(
+        Guid uid, IReadOnlyList<(string? Mime, byte[] Bytes)> pages, CancellationToken ct)
     {
         var requestTimer = Stopwatch.StartNew();
-        if (pages.Count is 0 or > MaxPages) return ServiceResult<object>.Fail($"Upload 1 to {MaxPages} pages of one invoice.");
-        var mime = pages[0].Mime; var b64 = pages[0].B64;
-        var extra = new List<(string Mime, string B64)>();
-        foreach (var (pm, pb) in pages.Skip(1))
+        if (pages.Count is 0 or > MaxPages)
+            return ServiceResult<object>.Fail($"Upload 1 to {MaxPages} pages of one invoice.");
+        var providerPages = new List<(string Mime, byte[] Bytes)>(pages.Count);
+        foreach (var (pageMime, pageBytes) in pages)
         {
-            if (pm is null || !Allowed.Contains(pm) || string.IsNullOrEmpty(pb) || pb.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<object>.Fail("A page is missing, too large or not a supported type.");
-            try { if (!MatchesType(Convert.FromBase64String(pb), pm)) return ServiceResult<object>.Fail("A page is not the type it claims to be."); }
-            catch (FormatException) { return ServiceResult<object>.Fail("A page could not be read."); }
-            extra.Add((pm, pb));
+            if (pageMime is null || !Allowed.Contains(pageMime))
+                return ServiceResult<object>.Fail("Upload a JPEG, PNG, WebP or PDF file.");
+            if (pageBytes is null || pageBytes.Length is 0 or > MaxFileBytes)
+                return ServiceResult<object>.Fail("File is empty or larger than 8 MB.");
+            if (!MatchesType(pageBytes, pageMime))
+                return ServiceResult<object>.Fail("File is empty, corrupt, or not the type it claims to be.");
+            providerPages.Add((pageMime, pageBytes));
         }
+        var mime = providerPages[0].Mime;
+        var bytes = providerPages[0].Bytes;
+        var suppliedBytes = providerPages.Sum(page => (long)page.Bytes.Length);
         var apiKey = cfg["Gemini:ApiKey"];
-
-        if (mime is null || !Allowed.Contains(mime)) return ServiceResult<object>.Fail("Upload a JPEG, PNG, WebP or PDF file.");
-        if (string.IsNullOrEmpty(b64) || b64.Length > MaxFileBytes / 3 * 4 + 8) return ServiceResult<object>.Fail("File is empty or larger than 8 MB.");
-        byte[] bytes;
-        try { bytes = Convert.FromBase64String(b64); } catch (FormatException) { return ServiceResult<object>.Fail("File could not be read."); }
-        if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, mime)) return ServiceResult<object>.Fail("File is empty, too large, or not the type it claims to be.");
 
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
-        var providerPages = new List<(string Mime, string B64)> { (mime, b64) };
-        providerPages.AddRange(extra);
+
         var attempts = new List<VisionProviderAttempt>();
         var geminiModels = VisionProviderFallback.InvoiceGeminiModels(cfg);
         var geminiEnabled = !string.IsNullOrWhiteSpace(apiKey);
@@ -99,14 +120,13 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             requestTimer.Stop();
             log.LogWarning(
                 "Supplier invoice extraction failed. Pages {PageCount}, uploaded bytes {UploadedBytes}, outcome {Outcome}, total latency {TotalMs}ms, trace {TraceId}",
-                providerPages.Count, bytes.Length + extra.Sum(page => (long)page.B64.Length * 3 / 4),
+                providerPages.Count, suppliedBytes,
                 "provider_chain_exhausted", requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
         }
 
 
         var draftTimer = Stopwatch.StartNew();
-        var suppliedBytes = bytes.Length + extra.Sum(page => (long)page.B64.Length * 3 / 4);
         await using var s = await db.BeginAsync(uid, tid, ct);
         var products = new List<(Guid Id, string Name)>();
         await using (var c = s.Command("select id, name from catalog.product where is_active"))
@@ -143,13 +163,13 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
 
         var fileId = Guid.NewGuid();
         var storedMime = mime; var stored = bytes;
-        if (extra.Count > 0)
+        if (providerPages.Count > 1)
         {
             using var ms = new MemoryStream();
             using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
             {
                 var n = 0;
-                foreach (var (pm, pb) in new[] { (mime, bytes) }.Concat(extra.Select(x => (x.Mime, Convert.FromBase64String(x.B64)))))
+                foreach (var (pm, pb) in providerPages)
                 {
                     var ext = pm switch { "image/png" => "png", "image/webp" => "webp", "application/pdf" => "pdf", _ => "jpg" };
                     var entry = zip.CreateEntry($"page-{++n}.{ext}", System.IO.Compression.CompressionLevel.NoCompression);
@@ -195,10 +215,10 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             (Num(line?["quantity"]) is > 0 || Num(line?["amount"]) is > 0));
     }
 
-    async Task<JsonNode?> CallModelAsync(string model, string apiKey, List<(string Mime, string B64)> pages, CancellationToken ct)
+    async Task<JsonNode?> CallModelAsync(string model, string apiKey, List<(string Mime, byte[] Bytes)> pages, CancellationToken ct)
     {
         var parts = new JsonArray();
-        foreach (var (m, d) in pages) parts.Add(new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = m, ["data"] = d } });
+        foreach (var (m, d) in pages) parts.Add(new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = m, ["data"] = Convert.ToBase64String(d) } });
         parts.Add(new JsonObject { ["text"] = Prompt });
         var body = new JsonObject
         {

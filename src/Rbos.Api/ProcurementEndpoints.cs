@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Rbos.Api.Application;
 using Rbos.Domain;
 
@@ -27,9 +29,56 @@ public static class ProcurementEndpoints
 		api.MapGet("/purchases", async (Guid? supplierId, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct) => Reply(await svc.ReceiptsAsync(Uid(p), supplierId, ct))).RequireAuthorization();
 		api.MapPost("/purchases", async (ReceiptRequest m, HttpRequest req, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct)
 			=> Reply(await svc.ReceiveAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.SupplierId, m.LocationId, m.ReceiptDate, m.SupplierRef, m.Lines, m.InvoiceFileId), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
-		api.MapPost("/purchases/extract", async (InvoiceUpload m, ClaimsPrincipal p, InvoiceExtractionService x, CancellationToken ct)
-			=> Reply(await x.ExtractAsync(Uid(p), m.Pages is { Count: > 0 } ? m.Pages.Select(g => (g.ContentType, g.Data)).ToList() : [(m.ContentType, m.Data)], ct))).RequireAuthorization();
-		api.MapGet("/purchases/{id:guid}/invoice", async (Guid id, ClaimsPrincipal p, InvoiceExtractionService x, CancellationToken ct) =>
+        const long maxMultipartBytes = 50L * 1024 * 1024;
+        var extractInvoice = api.MapPost("/purchases/extract", async (
+            HttpRequest request, ClaimsPrincipal p, InvoiceExtractionService x, CancellationToken ct) =>
+        {
+            if (request.HasFormContentType)
+            {
+                var form = await request.ReadFormAsync(ct);
+                if (form.Files.Count == 0 || form.Files.Any(file => file.Name != "pages"))
+                    return Fail(400, "Attach invoice page files using the 'pages' field.");
+                if (form.Files.Count > InvoiceExtractionService.MaxPages)
+                    return Fail(400, $"Upload at most {InvoiceExtractionService.MaxPages} pages of one invoice.");
+
+                long totalBytes = 0;
+                var pages = new List<(string? Mime, byte[] Bytes)>(form.Files.Count);
+                foreach (var file in form.Files)
+                {
+                    if (file.Length is 0 or > InvoiceExtractionService.MaxFileBytes)
+                        return Fail(413, "Each invoice page must be between 1 byte and 8 MB.");
+                    totalBytes += file.Length;
+                    if (totalBytes > InvoiceExtractionService.MaxPages * (long)InvoiceExtractionService.MaxFileBytes)
+                        return Fail(413, "The invoice pages together exceed 48 MB.");
+
+                    await using var buffer = new MemoryStream((int)file.Length);
+                    await file.CopyToAsync(buffer, ct);
+                    if (buffer.Length != file.Length || buffer.Length > InvoiceExtractionService.MaxFileBytes)
+                        return Fail(413, "An invoice page exceeded the allowed upload size.");
+                    pages.Add((file.ContentType, buffer.ToArray()));
+                }
+                return Reply(await x.ExtractAsync(Uid(p), pages, ct));
+            }
+
+            // Compatibility for clients still sending JSON/base64 payloads.
+            var legacy = await request.ReadFromJsonAsync<InvoiceUpload>(cancellationToken: ct);
+            if (legacy is null) return Fail(400, "Invoice upload body is missing.");
+            return Reply(await x.ExtractAsync(Uid(p),
+                legacy.Pages is { Count: > 0 }
+                    ? legacy.Pages.Select(page => (page.ContentType, page.Data)).ToList()
+                    : [(legacy.ContentType, legacy.Data)],
+                ct));
+        }).RequireAuthorization();
+        extractInvoice.WithMetadata(
+            new RequestSizeLimitAttribute(maxMultipartBytes),
+            new RequestFormLimitsAttribute
+            {
+                MultipartBodyLengthLimit = maxMultipartBytes,
+                ValueCountLimit = 8,
+                KeyLengthLimit = 128,
+                ValueLengthLimit = 1024
+            });
+api.MapGet("/purchases/{id:guid}/invoice", async (Guid id, ClaimsPrincipal p, InvoiceExtractionService x, CancellationToken ct) =>
 		{
 			var f = await x.FileAsync(Uid(p), id, ct);
 			return f is null ? Results.NotFound() : Results.File(f.Value.Bytes, f.Value.Mime, f.Value.Mime == "application/zip" ? "invoice-pages.zip" : null);

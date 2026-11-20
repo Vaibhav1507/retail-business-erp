@@ -1,6 +1,6 @@
 import './invoice-upload.css'
 import { useState } from 'react'
-import { api } from './api'
+import { api, apiForm } from './api'
 
 type Opt = { id: string; name: string }
 type DraftLine = { description: string; quantity: number | null; unitCost: number | null; amount: number | null; productId: string | null; productName: string | null; category?: string | null; brand?: string | null; gst?: number | null }
@@ -10,28 +10,26 @@ export type Picked = { productId: string; quantity: number; unitCost: number; gs
 
 const MAX_BYTES = 8 * 1024 * 1024
 
-export const toBase64 = (b: Blob) => new Promise<string>((resolve, reject) => {
-  const r = new FileReader()
-  r.onload = () => resolve(String(r.result).split(',')[1] ?? '')
-  r.onerror = () => reject(r.error)
-  r.readAsDataURL(b)
-})
-
-export async function prepare(file: File): Promise<{ contentType: string; data: string }> {
+export async function prepare(file: File): Promise<File> {
   if (file.type === 'application/pdf') {
     if (file.size > MAX_BYTES) throw new Error('PDF is larger than 8 MB.')
-    return { contentType: file.type, data: await toBase64(file) }
+    return file
   }
   if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
   const bmp = await createImageBitmap(file)
-  const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bmp.width * scale)
-  canvas.height = Math.round(bmp.height * scale)
-  canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height)
-  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-  if (!blob) throw new Error('Could not prepare the photo.')
-  return { contentType: 'image/jpeg', data: await toBase64(blob) }
+  try {
+    const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bmp.width * scale)
+    canvas.height = Math.round(bmp.height * scale)
+    canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+    if (!blob) throw new Error('Could not prepare the photo.')
+    if (blob.size > MAX_BYTES) throw new Error('Prepared photo is larger than 8 MB.')
+    return new File([blob], 'invoice-page.jpg', { type: 'image/jpeg' })
+  } finally {
+    bmp.close()
+  }
 }
 
 const NEW = '__new__'
@@ -70,7 +68,11 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     setBusy(true); setError(''); setDraft(null)
     try {
       const pages = await Promise.all(files.map(prepare))
-      const d = await api<InvoiceDraft>('POST', '/purchases/extract', { pages })
+      const totalBytes = pages.reduce((total, file) => total + file.size, 0)
+      if (totalBytes > MAX_BYTES * 6) throw new Error('The selected invoice pages together exceed 48 MB.')
+      const form = new FormData()
+      pages.forEach(file => form.append('pages', file, file.name))
+      const d = await apiForm<InvoiceDraft>('POST', '/purchases/extract', form)
       setDraft(d); setSupplierId(d.supplierId ?? '')
       setRows(withSpreadTax(d.lines.map(l => ({ description: l.description, productId: l.productId ?? '', qty: l.quantity?.toString() ?? '',
         cost: l.unitCost?.toString() ?? '', gst: l.gst?.toString() ?? '', category: l.category ?? undefined, brand: l.brand ?? undefined })), d.taxAmount ?? 0))
