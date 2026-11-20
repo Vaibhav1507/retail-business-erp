@@ -25,6 +25,25 @@ public sealed class ItemTagCaptureService(
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp"];
 
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, long> LastRetentionCleanup = new();
+    static readonly long RetentionCleanupIntervalMs = (long)TimeSpan.FromMinutes(15).TotalMilliseconds;
+
+    static bool TryBeginRetentionCleanup(Guid tenantId)
+    {
+        var now = Environment.TickCount64;
+        while (true)
+        {
+            if (!LastRetentionCleanup.TryGetValue(tenantId, out var previous))
+            {
+                if (LastRetentionCleanup.TryAdd(tenantId, now)) return true;
+                continue;
+            }
+
+            if (now - previous < RetentionCleanupIntervalMs) return false;
+            if (LastRetentionCleanup.TryUpdate(tenantId, now, previous)) return true;
+        }
+    }
+
     public async Task<ServiceResult<object>> UploadAsync(
         Guid uid, string? idempotencyKey, string? contentType, string? detectedBarcode,
         string? detectedSymbology, byte[] bytes, CancellationToken ct)
@@ -54,10 +73,12 @@ public sealed class ItemTagCaptureService(
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
         var id = Guid.NewGuid();
 
-        // Opportunistic cleanup: only expired captures that never became sale evidence.
-        // Attached images follow the sale/evidence retention policy and are never purged here.
-        await using (var cleanup = await db.BeginAsync(uid, tenantId, ct))
+        // Run opportunistic retention cleanup at most once per tenant per 15 minutes
+        // per instance. Cleanup must not open two extra database commands on every photo
+        // upload; attached sale evidence is excluded by both predicates.
+        if (TryBeginRetentionCleanup(tenantId.Value))
         {
+            await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
             await SqlHelpers.Exec(cleanup, ct,
                 "update sales.item_tag_capture set status='NeedsAttention' where sale_id is null and status='ReadingTag' and created_at < now() - interval '5 minutes'");
             await SqlHelpers.Exec(cleanup, ct,
