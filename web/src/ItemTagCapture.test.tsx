@@ -12,7 +12,7 @@ vi.mock('@zxing/browser', () => ({
 const fetchMock = vi.fn()
 const capture = {
   id: 'capture-1',
-  status: 'NeedsAttention',
+  status: 'ReadingTag',
   contentType: 'image/jpeg',
   sizeBytes: 4,
   extraction: { productName: 'Test Cable', brand: 'RBOS', model: 'CB-1', serial: null },
@@ -34,6 +34,9 @@ beforeEach(() => {
     if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
     if (url === '/api/sales/item-tag-captures' && method === 'POST') {
       return new Response(JSON.stringify(capture), { status: 200 })
+    }
+    if (url === '/api/sales/item-tag-captures/capture-1' && method === 'GET') {
+      return new Response(JSON.stringify({ ...capture, status: 'ReadyForReview' }), { status: 200 })
     }
     if (url === '/api/sales/item-tag-captures/capture-1/review' && method === 'PUT') {
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
