@@ -204,7 +204,8 @@ public sealed class ItemTagCaptureService(
                 attempts,
                 HasUsableItemTagExtraction,
                 log,
-                ct);
+                ct,
+                TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
 
             if (response is JsonObject json)
             {
