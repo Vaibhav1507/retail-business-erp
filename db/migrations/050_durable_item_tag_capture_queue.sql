@@ -71,6 +71,28 @@ begin
 end;
 $$;
 
+-- A tenant may cancel a queued capture only before a worker holds a live lease.
+-- The queue row lock serializes cancellation against SKIP LOCKED worker claims.
+create or replace function integrations.cancel_item_tag_capture(
+  p_tenant_id uuid, p_capture_id uuid, p_actor_user_id uuid
+) returns boolean
+language plpgsql security definer
+set search_path = pg_catalog, integrations, core
+as $
+begin
+  if p_tenant_id is distinct from core.current_tenant_id()
+     or p_actor_user_id is distinct from core.current_user_id() then
+    raise exception 'Tenant context mismatch' using errcode = '42501';
+  end if;
+  delete from integrations.item_tag_capture_queue
+   where capture_id = p_capture_id
+     and tenant_id = p_tenant_id
+     and actor_user_id = p_actor_user_id
+     and (lease_until is null or lease_until < now());
+  return found;
+end;
+$;
+
 create or replace function integrations.finish_item_tag_capture(
   p_capture_id uuid, p_lease_token uuid, p_retry_at timestamptz
 ) returns boolean
@@ -94,6 +116,8 @@ revoke all on integrations.item_tag_capture_queue from public, rbos_app, rbos_wo
 revoke all on function integrations.enqueue_item_tag_capture(uuid,uuid,uuid) from public;
 revoke all on function integrations.claim_item_tag_captures(integer,integer) from public;
 revoke all on function integrations.finish_item_tag_capture(uuid,uuid,timestamptz) from public;
+revoke all on function integrations.cancel_item_tag_capture(uuid,uuid,uuid) from public;
 grant execute on function integrations.enqueue_item_tag_capture(uuid,uuid,uuid) to rbos_app;
 grant execute on function integrations.claim_item_tag_captures(integer,integer) to rbos_worker;
 grant execute on function integrations.finish_item_tag_capture(uuid,uuid,timestamptz) to rbos_worker;
+grant execute on function integrations.cancel_item_tag_capture(uuid,uuid,uuid) to rbos_app;
