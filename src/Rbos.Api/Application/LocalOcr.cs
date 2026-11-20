@@ -37,22 +37,22 @@ public sealed class LocalOcr(IConfiguration cfg, ILogger<LocalOcr> log)
             timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
             // Drain both redirected streams concurrently; otherwise a verbose Tesseract
             // stderr stream can block the child process while the parent waits for stdout.
-            var stdout = p.StandardOutput.ReadToEndAsync(timeout.Token);
-            var stderr = p.StandardError.ReadToEndAsync(timeout.Token);
-            await p.WaitForExitAsync(timeout.Token);
+            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
             var text = await stdout;
             _ = await stderr;
-            return p.ExitCode == 0 ? ToRows(text) : null;
+            return process.ExitCode == 0 ? ToRows(text) : null;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            try { p?.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            TryKill(process)
             log.LogWarning("Local OCR exceeded its bounded {TimeoutSeconds}s time budget", Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60));
             return null;
         }
         catch (OperationCanceledException)
         {
-            try { p?.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            TryKill(process)
             throw;
         }
         catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception)
@@ -60,7 +60,21 @@ public sealed class LocalOcr(IConfiguration cfg, ILogger<LocalOcr> log)
             log.LogWarning(e, "Local OCR failed");
             return null;
         }
-        finally { try { File.Delete(tmp); } catch (IOException) { } }
+        finally
+        {
+            process?.Dispose();
+            try { File.Delete(tmp); } catch (IOException) { }
+        }
+    }
+
+    static void TryKill(Process? process)
+    {
+        try
+        {
+            if (process is not null && !process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
     }
 
     public static List<List<string>> ToRows(string text) =>
