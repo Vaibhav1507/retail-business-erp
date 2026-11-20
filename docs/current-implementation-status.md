@@ -177,7 +177,7 @@ English remains the verified default. New Hindi onboarding and guidance strings 
 
 ## AI upload performance follow-up — 20 November 2026
 
-PR #55 remains open and draft on branch `perf/ai-upload-latency-and-provider-fallback`. Latest reviewed head: `21fe930df131ed8ea07c2c8c5875289e0d0f1927`. It is not merged or deployed.
+PR #55 remains open and draft on branch `perf/ai-upload-latency-and-provider-fallback`. Latest reviewed head at the time of this status note: `21fe930df131ed8ea07c2c8c5875289e0d0f1927`; later PR-description/docs-only commits may advance the branch. It is not merged or deployed.
 
 Additional review fixes committed after the initial PR #55 review:
 - Gemini HTTP 402 Payment Required now marks Gemini unavailable for the current provider chain, skipping remaining Gemini models while still allowing an independently configured Groq fallback. HTTP 429 remains eligible for fallback.
