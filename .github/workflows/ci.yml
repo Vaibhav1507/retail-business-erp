@@ -23,8 +23,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-noto-core
       - name: Run backend unit tests
         run: dotnet test tests/Rbos.UnitTests/Rbos.UnitTests.csproj --nologo -c Release --no-build
-      # PostgreSQL integration tests and Playwright E2E remain disabled until their
-      # database/browser service fixtures are restored as explicit CI dependencies.
       - name: Build deployment container (no push)
         run: docker build --pull -t retail-business-os:ci .
 
@@ -42,9 +40,49 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
-      # Temporarily disabled with backend unit/integration and Playwright E2E tests.
-      # Re-enable npm test when the temporary CI test bypass is lifted.
+      - run: npm test
       - run: npm run lint
       - run: npm run build
       - name: Dependency audit (high and critical vulnerabilities fail CI)
         run: npm run audit:ci
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      Rbos__Database: test
+      ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
+      ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
+      ConnectionStrings__RbosTestWhatsAppWorker: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_worker;Password=ci_worker_only_2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install PostgreSQL client and PDF test fonts
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client fonts-noto-core
+      - name: Bootstrap isolated PostgreSQL roles and database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+      - name: Build solution
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+      - name: Apply migrations to disposable CI database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+      - name: Run PostgreSQL integration tests
+        run: dotnet test tests/Rbos.IntegrationTests/Rbos.IntegrationTests.csproj --nologo -c Release --no-build

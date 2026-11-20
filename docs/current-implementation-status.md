@@ -177,7 +177,7 @@ English remains the verified default. New Hindi onboarding and guidance strings 
 
 ## AI upload performance follow-up — 20 November 2026
 
-PR #55 remains open and draft on branch `perf/ai-upload-latency-and-provider-fallback`. Latest reviewed head at the time of this status note: `21fe930df131ed8ea07c2c8c5875289e0d0f1927`; later PR-description/docs-only commits may advance the branch. It is not merged or deployed.
+PR #55 was subsequently merged to `main` at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7` on 20 November 2026. The provider-fallback, image-preparation, telemetry and OCR changes below are part of the merged baseline.
 
 Additional review fixes committed after the initial PR #55 review:
 - Gemini HTTP 402 Payment Required now marks Gemini unavailable for the current provider chain, skipping remaining Gemini models while still allowing an independently configured Groq fallback. HTTP 429 remains eligible for fallback.
@@ -188,6 +188,38 @@ Additional review fixes committed after the initial PR #55 review:
 
 New regression coverage added for HTTP 402 versus HTTP 429 provider fallback and multi-page invoice metadata merge.
 
-**Validation limitation:** workflow #658 passed on the earlier head `d7c8655` with 147 backend unit tests and frontend/build checks. No workflow run is currently associated with the newer review-fix head `21fe930`; therefore these new changes have not yet been validated by CI. PostgreSQL integration tests, Playwright E2E and frontend npm tests also remain unverified/skipped in the earlier workflow.
+**Historical validation note:** workflow #658 was an earlier-head run only and is superseded by the merged PR #55 baseline. The two follow-up PRs have their own exact-head CI runs; see the latest follow-up status section below. PostgreSQL integration tests are being enabled through a disposable PostgreSQL 17 CI job; Playwright E2E and real provider uploads remain a separate pilot acceptance gate.
 
 Multipart invoice transport and durable asynchronous item-tag extraction remain separate follow-up work. No provider credentials, Cloud Run settings, billing, production database or deployment state were changed.
+
+
+## 20 November 2026 — PR #55 merged and durable item-tag processing
+
+- PR [#55](https://github.com/Vaibhav1507/retail-business-erp/pull/55) is merged to main at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7`.
+- Durable asynchronous item-tag processing is proposed in a separate branch, `feat/durable-async-item-tag-processing`; it is not merged or deployed.
+- The API persists the private capture and its queue row in the same PostgreSQL transaction, then returns `ReadingTag` without waiting for a vision provider.
+- The combined `--rbos-workers` one-shot process handles item-tag jobs first, then WhatsApp delivery, using the existing `rbos_worker` connection for queue functions and existing `rbos_app` connection for tenant-scoped photo evidence. It is designed to reuse the scheduled Cloud Run Job; no separate worker credential or queue service is required. The queue contains identifiers only, not image bytes or model content.
+- The Generate Invoice UI polls the authenticated capture GET route while the status is `ReadingTag`; review controls appear only after processing becomes `ReadyForReview` or `NeedsAttention`.
+- After merge approval, migration 050 and the existing Job command/secret mapping still need to be applied deliberately. No new worker-role credential is required. This code does not provision secrets, deploy Cloud Run, apply a production migration or change provider flags.
+- Multipart supplier invoice upload remains a separate follow-up PR.
+
+
+
+## Follow-up PR validation snapshot — 20 November 2026
+
+- PR #57 multipart supplier invoice upload remains draft/unmerged on `perf/multipart-supplier-invoice-upload`. Standard exact-head CI passed on `76455c459e567a9467337eba9e5e7086baf77741`: backend Release build, backend unit tests, container build, frontend typecheck/lint/build and high/critical dependency audit. The branch then adds a disposable PostgreSQL 17 integration-test job; its latest workflow run is still in progress. Playwright and a live AI-provider upload have not been run.
+- PR #56 durable asynchronous item-tag processing remains draft/unmerged on `feat/durable-async-item-tag-processing`. Standard backend Release build, unit tests, container build and frontend checks passed on the code head before the last migration cancellation guard. The new latest run applies migrations to disposable PostgreSQL 17 and runs the PostgreSQL integration suite, including item-tag queue permissions, queued cancellation, live-lease deletion rejection and expired-lease recovery. That workflow run (#706, commit `de4722372a70c5e1f48365fdad3b256729370af7`) completed successfully, including migration 050 application and the full PostgreSQL integration suite. Playwright E2E and a non-production Cloud Run Job smoke remain unrun.
+- Both PRs remain unmerged and undeployed. Migration 050 is not applied to the pilot database; the scheduled Cloud Run Job command and secret mapping are unchanged.
+
+
+## 20 November 2026 — durable asynchronous item-tag follow-up
+
+- Implemented separately on `feat/durable-async-item-tag-processing`; not merged or deployed.
+- Migration 050 adds an identifier-only PostgreSQL outbox/queue with forced RLS, atomic enqueue, exclusive `SKIP LOCKED` leasing, lease expiry and restricted SECURITY DEFINER enqueue/claim/finish/cancel functions. The `rbos_app` role can enqueue/cancel only for its current tenant/user and cannot read or claim queue rows. `rbos_worker` can claim/finish through functions only and has no direct table access.
+- Item-tag upload now stores the original photo and queue record in the same tenant transaction, then returns `ReadingTag` immediately. Existing idempotency semantics and photo retention remain. The original image is still the private sale evidence; resized derivatives are used only for model inference.
+- The existing authenticated capture GET route provides status. The UI polls with bounded backoff, provides a manual status refresh, and does not expose review/add-to-bill until the capture leaves `ReadingTag`. Queued-photo deletion is atomic with queue cancellation and succeeds only before a live worker lease; deletion during an active lease returns 409 so the photo is not discarded while a potentially paid provider call is running.
+- The one-shot worker uses the existing app connection (`rbos_app`) for tenant-scoped evidence and existing worker connection (`rbos_worker`) for queue functions. `--rbos-workers` processes up to five item-tag jobs per execution by default (configurable, bounded 1–5) before WhatsApp jobs, allowing the existing scheduled Cloud Run Job/Scheduler to be reused without an unbounded execution. No new queue service or new database role is introduced.
+- Worker lease recovery deliberately does not repeat a possibly-paid AI attempt: the capture becomes `NeedsAttention` for manual review. The Gemini primary/model fallback and the existing disabled-by-default Groq item-tag fallback are unchanged.
+- Integration tests now exercise the queue worker with Gemini/Groq credentials explicitly disabled, so they do not make real provider calls. Queue permission tests cover the app/worker privilege boundary. These PostgreSQL integration tests are still disabled in the current PR CI workflow.
+- Migration 050 is not applied to any database. The Cloud Run worker Job command and secret mapping have not been changed. After merge approval, migration 050 and the existing Job configuration must be applied/updated in the intended environment before enabling the asynchronous user flow.
+- No provider credentials, API keys, paid services, billing settings, production database, Cloud Run deployment or provider flags were modified.

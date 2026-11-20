@@ -50,129 +50,148 @@ public sealed class ItemTagCaptureService(
         string? detectedSymbology, byte[] bytes, CancellationToken ct)
     {
         var requestTimer = Stopwatch.StartNew();
-        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 100)
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-            return ServiceResult<object>.Fail("A valid Idempotency-Key header (8-100 characters) is required.");
-        }
-        if (contentType is null || !Allowed.Contains(contentType, StringComparer.OrdinalIgnoreCase))
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-            return ServiceResult<object>.Fail("Choose a JPEG, PNG or WebP photo.");
-        }
-        if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, contentType))
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-            return ServiceResult<object>.Fail("The photo is empty, larger than 8 MB, corrupt or not the type it claims to be.");
-        }
-
-        var tenantId = await db.FindTenantAsync(uid, ct);
-        if (tenantId is null)
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-            return ServiceResult<object>.Fail("Set up a business before uploading an item tag.", 409);
-        }
-        var hash = Convert.ToHexString(SHA256.HashData(bytes));
-        var id = Guid.NewGuid();
-
-        // Run opportunistic retention cleanup at most once per tenant per 15 minutes
-        // per instance. Cleanup must not open two extra database commands on every photo
-        // upload; attached sale evidence is excluded by both predicates.
-        if (TryBeginRetentionCleanup(tenantId.Value))
-        {
-            try
-            {
-                await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
-                await SqlHelpers.Exec(cleanup, ct,
-                    "update sales.item_tag_capture set status='NeedsAttention' where sale_id is null and status='ReadingTag' and created_at < now() - interval '5 minutes'");
-                await SqlHelpers.Exec(cleanup, ct,
-                    "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
-                await cleanup.CommitAsync(ct);
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                // Retention is opportunistic; maintenance failure must not block a new upload.
-                log.LogWarning("Item-tag retention cleanup deferred ({ErrorType}).", e.GetType().Name);
-            }
-        }
-
-        await using (var s = await db.BeginAsync(uid, tenantId, ct))
-        {
-            await using var existing = s.Command("select id, content_sha256 from sales.item_tag_capture where idempotency_key=@k");
-            existing.Parameters.AddWithValue("k", idempotencyKey);
-            await using var reader = await existing.ExecuteReaderAsync(ct);
-            if (await reader.ReadAsync(ct))
-            {
-                var existingId = reader.GetGuid(0);
-                var existingHash = reader.GetString(1).Trim();
-                if (!string.Equals(existingHash, hash, StringComparison.OrdinalIgnoreCase))
-                    return ServiceResult<object>.Fail("This upload key was already used for a different photo.", 409);
-                await reader.CloseAsync();
-                CryptographicOperations.ZeroMemory(bytes);
-                return await GetAsync(uid, existingId, ct);
-            }
-        }
-
-        await using (var s = await db.BeginAsync(uid, tenantId, ct))
-        {
-            await using var insert = s.Command(@"
-                insert into sales.item_tag_capture
-                  (tenant_id,id,idempotency_key,content_type,size_bytes,content_sha256,content,status,created_by)
-                values (@t,@i,@k,@m,@z,@h,@b,'ReadingTag',@u)
-                on conflict (tenant_id,idempotency_key) do nothing");
-            insert.Parameters.AddWithValue("t", tenantId.Value);
-            insert.Parameters.AddWithValue("i", id);
-            insert.Parameters.AddWithValue("k", idempotencyKey);
-            insert.Parameters.AddWithValue("m", contentType);
-            insert.Parameters.AddWithValue("z", bytes.Length);
-            insert.Parameters.AddWithValue("h", hash);
-            insert.Parameters.AddWithValue("b", bytes);
-            insert.Parameters.AddWithValue("u", uid);
-            var inserted = await insert.ExecuteNonQueryAsync(ct);
-            if (inserted == 0)
-            {
-                await using var existing = s.Command("select id,content_sha256 from sales.item_tag_capture where idempotency_key=@k");
-                existing.Parameters.AddWithValue("k", idempotencyKey);
-                await using var r = await existing.ExecuteReaderAsync(ct);
-                if (!await r.ReadAsync(ct)) return ServiceResult<object>.Fail("The photo could not be saved. Retry the upload.", 409);
-                var existingId = r.GetGuid(0);
-                var existingHash = r.GetString(1).Trim();
-                if (!string.Equals(existingHash, hash, StringComparison.OrdinalIgnoreCase))
-                    return ServiceResult<object>.Fail("This upload key was already used for a different photo.", 409);
-                await r.CloseAsync();
-                CryptographicOperations.ZeroMemory(bytes);
-                return await GetAsync(uid, existingId, ct);
-            }
-            await s.CommitAsync(ct);
-        }
-
-        // Barcode hints come from the untrusted browser and are normalised again on the server.
-        // A valid deterministic barcode is still useful when the optional AI Gateway is disabled.
-        var barcodeHint = BarcodeRules.Normalize(detectedBarcode);
-        var confirmedLocalBarcode = barcodeHint.Error is null ? barcodeHint.Code : null;
-        var localSymbology = BarcodeRules.CleanSymbology(detectedSymbology);
-        JsonObject extracted = new();
-        string status = confirmedLocalBarcode is null ? "NeedsAttention" : "ReadyForReview";
-        if (confirmedLocalBarcode is not null)
-        {
-            extracted["barcode"] = confirmedLocalBarcode;
-            extracted["barcodeSymbology"] = localSymbology;
-        }
-        byte[] aiBytes = bytes;
-        var aiMime = contentType;
-        var prepTimer = Stopwatch.StartNew();
         try
         {
-            // Preserve the original bytes in PostgreSQL as private sale evidence. A bounded
-            // derivative is used only for model inference to reduce payload and vision cost.
+            if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 100)
+                return ServiceResult<object>.Fail("A valid Idempotency-Key header (8-100 characters) is required.");
+            if (contentType is null || !Allowed.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+                return ServiceResult<object>.Fail("Choose a JPEG, PNG or WebP photo.");
+            if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, contentType))
+                return ServiceResult<object>.Fail("The photo is empty, larger than 8 MB, corrupt or not the type it claims to be.");
+
+            var tenantId = await db.FindTenantAsync(uid, ct);
+            if (tenantId is null)
+                return ServiceResult<object>.Fail("Set up a business before uploading an item tag.", 409);
+
+            var hash = Convert.ToHexString(SHA256.HashData(bytes));
+            var id = Guid.NewGuid();
+
+            // Expiry cleanup must never turn queued work into a terminal state merely
+            // because a worker is temporarily unavailable. Expired detached captures
+            // are deleted; the queue row cascades with the capture.
+            if (TryBeginRetentionCleanup(tenantId.Value))
+            {
+                try
+                {
+                    await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
+                    await SqlHelpers.Exec(cleanup, ct,
+                        "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
+                    await cleanup.CommitAsync(ct);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    log.LogWarning("Item-tag retention cleanup deferred ({ErrorType}).", e.GetType().Name);
+                }
+            }
+
+            await using (var session = await db.BeginAsync(uid, tenantId, ct))
+            {
+                await using var insert = session.Command(@"
+                    insert into sales.item_tag_capture
+                      (tenant_id,id,idempotency_key,content_type,size_bytes,content_sha256,content,status,extraction,created_by)
+                    values (@t,@i,@k,@m,@z,@h,@b,'ReadingTag',@e::jsonb,@u)
+                    on conflict (tenant_id,idempotency_key) do nothing");
+                var barcodeHint = BarcodeRules.Normalize(detectedBarcode);
+                var confirmedLocalBarcode = barcodeHint.Error is null ? barcodeHint.Code : null;
+                var localSymbology = BarcodeRules.CleanSymbology(detectedSymbology);
+                var initialExtraction = new JsonObject();
+                if (confirmedLocalBarcode is not null)
+                {
+                    initialExtraction["barcode"] = confirmedLocalBarcode;
+                    initialExtraction["barcodeSymbology"] = localSymbology;
+                }
+
+                insert.Parameters.AddWithValue("t", tenantId.Value);
+                insert.Parameters.AddWithValue("i", id);
+                insert.Parameters.AddWithValue("k", idempotencyKey);
+                insert.Parameters.AddWithValue("m", contentType);
+                insert.Parameters.AddWithValue("z", bytes.Length);
+                insert.Parameters.AddWithValue("h", hash);
+                insert.Parameters.AddWithValue("b", bytes);
+                insert.Parameters.AddWithValue("e", initialExtraction.ToJsonString());
+                insert.Parameters.AddWithValue("u", uid);
+                var inserted = await insert.ExecuteNonQueryAsync(ct);
+
+                if (inserted == 0)
+                {
+                    await using var existing = session.Command(
+                        "select id,content_sha256 from sales.item_tag_capture where idempotency_key=@k");
+                    existing.Parameters.AddWithValue("k", idempotencyKey);
+                    await using var reader = await existing.ExecuteReaderAsync(ct);
+                    if (!await reader.ReadAsync(ct))
+                        return ServiceResult<object>.Fail("The photo could not be saved. Retry the upload.", 409);
+                    var existingId = reader.GetGuid(0);
+                    var existingHash = reader.GetString(1).Trim();
+                    await reader.CloseAsync();
+                    if (!string.Equals(existingHash, hash, StringComparison.OrdinalIgnoreCase))
+                        return ServiceResult<object>.Fail("This upload key was already used for a different photo.", 409);
+                    await session.CommitAsync(ct);
+                    return await GetAsync(uid, existingId, ct);
+                }
+
+                // The image and its processing job commit atomically. The API never
+                // returns a successful acknowledgement for an unqueued capture.
+                await using var enqueue = session.Command(
+                    "select integrations.enqueue_item_tag_capture(@t,@i,@u)");
+                enqueue.Parameters.AddWithValue("t", tenantId.Value);
+                enqueue.Parameters.AddWithValue("i", id);
+                enqueue.Parameters.AddWithValue("u", uid);
+                await enqueue.ExecuteNonQueryAsync(ct);
+                await session.CommitAsync(ct);
+            }
+
+            requestTimer.Stop();
+            log.LogInformation(
+                "Item-tag capture saved and queued. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, enqueue latency {TotalMs}ms, trace {TraceId}",
+                id, contentType, bytes.Length, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
+            return await GetAsync(uid, id, ct);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    /// <summary>Processes a persisted capture from the durable queue.</summary>
+    public async Task ProcessAsync(Guid uid, Guid tenantId, Guid id, CancellationToken ct)
+    {
+        var requestTimer = Stopwatch.StartNew();
+        string contentType;
+        byte[] bytes;
+        JsonObject extracted;
+        await using (var session = await db.BeginAsync(uid, tenantId, ct))
+        {
+            await using var query = session.Command(@"
+                select content_type,content,extraction,status
+                from sales.item_tag_capture where id=@i");
+            query.Parameters.AddWithValue("i", id);
+            await using var reader = await query.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct) || reader.GetString(3) != "ReadingTag")
+                return;
+            contentType = reader.GetString(0);
+            bytes = reader.GetFieldValue<byte[]>(1);
+            extracted = JsonNode.Parse(reader.GetString(2)) as JsonObject ?? new JsonObject();
+        }
+
+        var barcodeHint = BarcodeRules.Normalize(ReadString(extracted["barcode"]));
+        var confirmedLocalBarcode = barcodeHint.Error is null ? barcodeHint.Code : null;
+        var localSymbology = BarcodeRules.CleanSymbology(ReadString(extracted["barcodeSymbology"]));
+        var status = confirmedLocalBarcode is null ? "NeedsAttention" : "ReadyForReview";
+        byte[] aiBytes = bytes;
+        var aiMime = contentType;
+        try
+        {
+            var prepTimer = Stopwatch.StartNew();
             aiBytes = PrepareVisionImage(bytes, contentType, out aiMime);
             prepTimer.Stop();
-            log.LogInformation("Item-tag AI image prepared. Capture {CaptureId}, original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms", id, bytes.Length, aiBytes.Length, prepTimer.ElapsedMilliseconds);
+            log.LogInformation(
+                "Item-tag AI image prepared. Capture {CaptureId}, original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms",
+                id, bytes.Length, aiBytes.Length, prepTimer.ElapsedMilliseconds);
+
             var attempts = new List<VisionProviderAttempt>();
             var geminiKey = configuration["Gemini:ApiKey"];
             var geminiModels = VisionProviderFallback.ItemTagGeminiModels(configuration);
             var geminiEnabled = !string.IsNullOrWhiteSpace(geminiKey);
-
             if (geminiEnabled)
             {
                 var primaryModel = geminiModels[0];
@@ -200,12 +219,9 @@ public sealed class ItemTagCaptureService(
             }
 
             var response = await VisionProviderFallback.ExecuteAsync(
-                "ItemTag",
-                attempts,
-                HasUsableItemTagExtraction,
-                log,
-                ct,
-                TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
+                "ItemTag", attempts, HasUsableItemTagExtraction, log, ct,
+                TimeSpan.FromSeconds(Math.Clamp(
+                    configuration.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
 
             if (response is JsonObject json)
             {
@@ -232,23 +248,26 @@ public sealed class ItemTagCaptureService(
             var matchTimer = Stopwatch.StartNew();
             try
             {
-                (suggestedProductId, matchReason) = await MatchProductAsync(uid, tenantId.Value, extracted, ct);
+                (suggestedProductId, matchReason) =
+                    await MatchProductAsync(uid, tenantId, extracted, ct);
             }
             catch (Exception e) when (e is NpgsqlException or InvalidOperationException)
             {
-                log.LogWarning("Item-tag catalogue matching failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
+                log.LogWarning("Item-tag catalogue matching failed for capture {CaptureId} ({ErrorType}).",
+                    id, e.GetType().Name);
             }
             finally
             {
                 matchTimer.Stop();
-                log.LogInformation("Item-tag catalogue match completed. Capture {CaptureId}, matched {Matched}, duration {MatchMs}ms",
+                log.LogInformation(
+                    "Item-tag catalogue match completed. Capture {CaptureId}, matched {Matched}, duration {MatchMs}ms",
                     id, suggestedProductId is not null, matchTimer.ElapsedMilliseconds);
             }
         }
 
-        await using (var s = await db.BeginAsync(uid, tenantId, ct))
+        await using (var session = await db.BeginAsync(uid, tenantId, ct))
         {
-            await using var update = s.Command(@"
+            await using var update = session.Command(@"
                 update sales.item_tag_capture
                 set extraction=@e::jsonb,status=@s,suggested_product_id=@p,match_reason=@r
                 where id=@i and status='ReadingTag'");
@@ -258,14 +277,25 @@ public sealed class ItemTagCaptureService(
             update.Parameters.AddWithValue("r", (object?)matchReason ?? DBNull.Value);
             update.Parameters.AddWithValue("i", id);
             await update.ExecuteNonQueryAsync(ct);
-            await s.CommitAsync(ct);
+            await session.CommitAsync(ct);
         }
 
-        var result = await GetAsync(uid, id, ct);
         requestTimer.Stop();
-        log.LogInformation("Item-tag upload completed. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
-            id, contentType, bytes.Length, status, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
-        return result;
+        log.LogInformation(
+            "Item-tag background processing completed. Capture {CaptureId}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
+            id, status, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
+    }
+
+    public async Task MarkNeedsAttentionAsync(Guid uid, Guid tenantId, Guid id, CancellationToken ct)
+    {
+        await using var session = await db.BeginAsync(uid, tenantId, ct);
+        await using var update = session.Command(@"
+            update sales.item_tag_capture
+            set status='NeedsAttention'
+            where id=@i and status='ReadingTag'");
+        update.Parameters.AddWithValue("i", id);
+        await update.ExecuteNonQueryAsync(ct);
+        await session.CommitAsync(ct);
     }
 
     public async Task<ServiceResult<object>> GetAsync(Guid uid, Guid id, CancellationToken ct)
@@ -404,6 +434,22 @@ public sealed class ItemTagCaptureService(
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("Capture not found.", 404);
         await using var s = await db.BeginAsync(uid, tid, ct);
+        var status = await SqlHelpers.Scalar<string>(s,
+            "select status from sales.item_tag_capture where id=@i and sale_id is null", ct, ("i", id));
+        if (status is null)
+            return ServiceResult<object>.Fail("Capture was not found or is already attached to a sale.", 404);
+
+        if (status == "ReadingTag")
+        {
+            // Atomically remove only an unclaimed/expired job. If a live worker lease
+            // exists, keep the evidence and ask the user to refresh after processing.
+            var cancelled = await SqlHelpers.Scalar<bool>(s,
+                "select integrations.cancel_item_tag_capture(@t,@i,@u)", ct,
+                ("t", tid.Value), ("i", id), ("u", uid));
+            if (!cancelled)
+                return ServiceResult<object>.Fail("This photo is currently being processed. Wait for the reading to finish, refresh its status, then remove it.", 409);
+        }
+
         var removed = await SqlHelpers.ExecCount(s, ct,
             "delete from sales.item_tag_capture where id=@i and sale_id is null and status <> 'Attached'", ("i", id));
         if (removed == 0) return ServiceResult<object>.Fail("Capture was not found or is already attached to a sale.", 404);

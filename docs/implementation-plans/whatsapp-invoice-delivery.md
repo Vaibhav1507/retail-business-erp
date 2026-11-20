@@ -76,11 +76,11 @@
 - API webhook does not need the Meta access token or template configuration.
 
 ### Worker Cloud Run Job
-- Command: `dotnet Rbos.Api.dll --whatsapp-worker`.
+- Command after migration 050: `dotnet Rbos.Api.dll --rbos-workers` (drains item-tag processing first, then WhatsApp delivery). The legacy `--whatsapp-worker` flag remains WhatsApp-only.
 - Tenant data connection: `ConnectionStrings__RbosProdApp` using `rbos_app`.
 - Queue connection: `ConnectionStrings__RbosProdWhatsAppWorker` using `rbos_worker`.
 - Meta sender configuration: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__TemplateName`, `WhatsApp__TemplateLanguage`, `WhatsApp__ApiVersion`, `WhatsApp__PilotTenantId`.
-- The worker does not need the Meta app secret, webhook verify token, pilot actor ID or migrator connection string.
+- The worker also receives the existing `Gemini__ApiKey` secret for queued item-tag extraction; keep `Groq__ItemTagFallbackEnabled=false` unless separately approved. It does not need the Meta app secret, webhook verify token, pilot actor ID or migrator connection string.
 - Store credentials in Google Secret Manager and grant each runtime only the secrets it needs.
 
 ### Customer permission

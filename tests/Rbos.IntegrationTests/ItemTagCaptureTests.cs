@@ -1,6 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using Rbos.Api.Application;
 
 namespace Rbos.IntegrationTests;
 
@@ -10,13 +14,41 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     static string Key() => Guid.NewGuid().ToString("N");
     static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xD9];
 
-    static async Task<Guid> Upload(Client client, byte[]? bytes = null, string? key = null)
+    static async Task<Guid> Upload(
+        Client client, byte[]? bytes = null, string? key = null, string? barcode = null, bool process = false)
     {
         var response = await client.SendBytes(
-            "/sales/item-tag-captures", bytes ?? Jpeg, "image/jpeg", key ?? Key());
+            "/sales/item-tag-captures", bytes ?? Jpeg, "image/jpeg", key ?? Key(),
+            barcode, barcode is null ? null : "EAN_13");
         Assert.True(response.StatusCode == HttpStatusCode.OK,
             $"Upload returned {(int)response.StatusCode} {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
-        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        if (process) await DrainItemTagQueueForTests();
+        return id;
+    }
+
+    // Use the real queue claim/finish functions but remove provider credentials from
+    // this deterministic test worker, so no external AI request or cost is possible.
+    static async Task DrainItemTagQueueForTests()
+    {
+        var cfg = new ConfigurationBuilder()
+            .AddUserSecrets<Program>()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Rbos:Database"] = "test",
+                ["Gemini:ApiKey"] = "",
+                ["Groq:ApiKey"] = "",
+                ["Groq:ItemTagFallbackEnabled"] = "false",
+                ["AiPerformance:TotalProviderBudgetSeconds"] = "1"
+            })
+            .Build();
+        await using var app = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestApp"]
+            ?? throw new InvalidOperationException("RbosTestApp connection is not configured."));
+        await using var worker = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestWhatsAppWorker"]
+            ?? throw new InvalidOperationException("RbosTestWhatsAppWorker connection is not configured."));
+        using var loggerFactory = LoggerFactory.Create(logging => logging.SetMinimumLevel(LogLevel.Warning));
+        await ItemTagCaptureWorker.RunAsync(app, worker, cfg, loggerFactory, CancellationToken.None);
     }
 
     static async Task<HttpResponseMessage> Review(
@@ -59,7 +91,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
         var id = firstBody.GetProperty("id").GetGuid();
-        Assert.Equal("NeedsAttention", firstBody.GetProperty("status").GetString());
+        Assert.Equal("ReadingTag", firstBody.GetProperty("status").GetString());
 
         var replay = await client.SendBytes("/sales/item-tag-captures", Jpeg, "image/jpeg", key);
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
@@ -97,9 +129,14 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
             "/sales/item-tag-captures", Jpeg, "image/jpeg", Key(), code, "EAN_13");
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         var body = await upload.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("ReadyForReview", body.GetProperty("status").GetString());
+        Assert.Equal("ReadingTag", body.GetProperty("status").GetString());
         Assert.Equal(code, body.GetProperty("extraction").GetProperty("barcode").GetString());
-        Assert.Equal(productId, body.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("suggestedProduct").ValueKind);
+
+        await DrainItemTagQueueForTests();
+        var processed = await client.GetJson("/sales/item-tag-captures/" + body.GetProperty("id").GetGuid());
+        Assert.Equal("ReadyForReview", processed.GetProperty("status").GetString());
+        Assert.Equal(productId, processed.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
     }
 
     [Fact]
@@ -110,7 +147,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var productId = await client.AddProduct("Existing LG Television");
         const string code = "4006381333931";
 
-        var captureId = await Upload(client);
+        var captureId = await Upload(client, barcode: code, process: true);
         var review = await Review(client, captureId, productId, code);
         Assert.Equal(HttpStatusCode.OK, review.StatusCode);
 
@@ -138,12 +175,87 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var originalId = (await original.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var otherProduct = await client.AddProduct("Different product");
 
-        var captureId = await Upload(client);
+        var captureId = await Upload(client, barcode: code, process: true);
         var conflict = await Review(client, captureId, otherProduct, code);
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
 
         var lookup = await client.GetJson("/products/by-barcode?code=" + code);
         Assert.Equal(originalId, lookup.GetProperty("productId").GetGuid());
+    }
+
+    [Fact]
+    public async Task Expired_item_tag_lease_is_exclusive_and_recovery_does_not_repeat_provider_calls()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        // Keep the assertion isolated from any stale test-fixture queue rows.
+        await DrainItemTagQueueForTests();
+        var id = await Upload(client);
+
+        var cfg = new ConfigurationBuilder()
+            .AddUserSecrets<Program>()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Rbos:Database"] = "test",
+                ["Gemini:ApiKey"] = "",
+                ["Groq:ApiKey"] = "",
+                ["Groq:ItemTagFallbackEnabled"] = "false"
+            })
+            .Build();
+        await using var worker = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestWhatsAppWorker"]
+            ?? throw new InvalidOperationException("RbosTestWhatsAppWorker connection is not configured."));
+
+        Guid firstLease;
+        await using (var connection = await worker.OpenConnectionAsync())
+        await using (var claim = new NpgsqlCommand(
+            "select capture_id,lease_token,attempt_count from integrations.claim_item_tag_captures(1,300)", connection))
+        await using (var reader = await claim.ExecuteReaderAsync())
+        {
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(id, reader.GetGuid(0));
+            firstLease = reader.GetGuid(1);
+            Assert.Equal(1, reader.GetInt32(2));
+        }
+
+        // A user must not be able to delete evidence while an active worker may
+        // already be making a paid provider call.
+        var activeDelete = await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id);
+        Assert.Equal(HttpStatusCode.Conflict, activeDelete.StatusCode);
+
+        // A second scheduled invocation must not claim a job with a live lease.
+        await using (var connection = await worker.OpenConnectionAsync())
+        await using (var claim = new NpgsqlCommand(
+            "select count(*) from integrations.claim_item_tag_captures(1,300)", connection))
+            Assert.Equal(0L, (long)(await claim.ExecuteScalarAsync())!);
+
+        await using (var connection = await worker.OpenConnectionAsync())
+        await using (var finish = new NpgsqlCommand(
+            "select integrations.finish_item_tag_capture(@id,@lease,null)", connection))
+        {
+            finish.Parameters.AddWithValue("id", id);
+            finish.Parameters.AddWithValue("lease", Guid.NewGuid());
+            Assert.False((bool)(await finish.ExecuteScalarAsync())!);
+        }
+
+        // Simulate process death after a possibly-paid provider attempt. Expire only
+        // this test row using the test migrator; the recovery worker must not call AI.
+        await using (var migrator = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]))
+        {
+            await migrator.OpenAsync();
+            await using var expire = new NpgsqlCommand(@"
+                update integrations.item_tag_capture_queue
+                   set lease_until = now() - interval '1 second'
+                 where capture_id = @id", migrator);
+            expire.Parameters.AddWithValue("id", id);
+            Assert.Equal(1, await expire.ExecuteNonQueryAsync());
+        }
+
+        await DrainItemTagQueueForTests();
+        var recovered = await client.GetJson("/sales/item-tag-captures/" + id);
+        Assert.Equal("NeedsAttention", recovered.GetProperty("status").GetString());
+        Assert.NotEqual(Guid.Empty, firstLease);
+        Assert.Equal(HttpStatusCode.OK, (await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id)).StatusCode);
     }
 
     [Fact]
@@ -170,7 +282,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var tenantA = new Client(factory);
         await tenantA.SignUpAndBootstrap();
         var productA = await tenantA.AddProduct("Tenant A Cable");
-        var id = await Upload(tenantA);
+        var id = await Upload(tenantA, barcode: "4006381333931", process: true);
         await Review(tenantA, id, productA);
 
         var tenantB = new Client(factory);
@@ -187,7 +299,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     public async Task Reviewed_photo_is_attached_atomically_to_sale_line_and_remains_retrievable()
     {
         var (client, location, product) = await Stocked(factory);
-        var captureId = await Upload(client);
+        var captureId = await Upload(client, barcode: "4006381333931", process: true);
         await Review(client, captureId, product);
 
         var sale = await client.Send(HttpMethod.Post, "/sales", new
