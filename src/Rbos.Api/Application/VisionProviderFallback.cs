@@ -61,17 +61,27 @@ public static class VisionProviderFallback
         IReadOnlyList<VisionProviderAttempt> attempts,
         Func<JsonNode?, bool> isUsable,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        TimeSpan? totalBudget = null)
     {
+        var budget = totalBudget ?? TimeSpan.FromSeconds(60);
+        budget = TimeSpan.FromMilliseconds(Math.Clamp(budget.TotalMilliseconds, 1000, 120_000));
+        var chainTimer = Stopwatch.StartNew();
         var unavailableProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var attempt in attempts)
         {
             ct.ThrowIfCancellationRequested();
             if (unavailableProviders.Contains(attempt.Provider))
                 continue;
+
+            var remainingBudget = budget - chainTimer.Elapsed;
+            if (remainingBudget <= TimeSpan.Zero) break;
+            var attemptBudget = TimeSpan.FromMilliseconds(
+                Math.Min(TimeSpan.FromSeconds(Math.Clamp(attempt.TimeoutSeconds, 5, 60)).TotalMilliseconds,
+                    remainingBudget.TotalMilliseconds));
             var timer = Stopwatch.StartNew();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(attempt.TimeoutSeconds, 5, 60)));
+            timeout.CancelAfter(attemptBudget);
 
             try
             {
@@ -101,8 +111,8 @@ public static class VisionProviderFallback
             {
                 timer.Stop();
                 logger.LogWarning(
-                    "Vision provider attempt timed out. Feature {Feature}, provider {Provider}, model {Model}, timeout {TimeoutSeconds}s, latency {LatencyMs}ms",
-                    feature, attempt.Provider, attempt.Model, attempt.TimeoutSeconds, timer.ElapsedMilliseconds);
+                    "Vision provider attempt timed out. Feature {Feature}, provider {Provider}, model {Model}, timeout {TimeoutMs}ms, latency {LatencyMs}ms",
+                    feature, attempt.Provider, attempt.Model, attemptBudget.TotalMilliseconds, timer.ElapsedMilliseconds);
             }
             catch (HttpRequestException e)
             {
@@ -125,7 +135,9 @@ public static class VisionProviderFallback
             }
         }
 
-        logger.LogWarning("Vision provider chain exhausted. Feature {Feature}, attempt count {AttemptCount}", feature, attempts.Count);
+        logger.LogWarning(
+            "Vision provider chain exhausted or budget reached. Feature {Feature}, attempts configured {AttemptCount}, total latency {TotalLatencyMs}ms, budget {BudgetMs}ms",
+            feature, attempts.Count, chainTimer.ElapsedMilliseconds, budget.TotalMilliseconds);
         return null;
     }
 }
