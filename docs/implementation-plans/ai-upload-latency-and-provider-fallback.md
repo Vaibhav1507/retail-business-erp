@@ -41,7 +41,7 @@ This order follows the proposed “Gemini primary → Groq → other Gemini fall
 - A refusal is not treated as a transient availability failure and must not be bypassed by trying another model to evade provider safety handling.
 - Caller cancellation always stops the chain immediately.
 
-Provider-specific attempt timeouts are configuration values with hard bounds. The branch defaults are **18 seconds for each Gemini attempt and 12 seconds for each Groq attempt**, configured by `AiPerformance:GeminiAttemptTimeoutSeconds` and `AiPerformance:GroqAttemptTimeoutSeconds`. A healthy primary should return much sooner; a slow provider is cut off before consuming the old 60–90 second typed-client timeouts. These values are initial safety caps and should be tuned only after measuring real invoice/tag results.
+Provider-specific attempt timeouts are configuration values with hard bounds. The branch defaults are **18 seconds for each Gemini attempt and 12 seconds for each Groq attempt**, configured by `AiPerformance:GeminiAttemptTimeoutSeconds` and `AiPerformance:GroqAttemptTimeoutSeconds`. The entire chain also has a **60-second total budget** (`AiPerformance:TotalProviderBudgetSeconds`), so the final provider attempt is shortened or skipped when the budget is exhausted. A healthy primary should return much sooner; the chain cannot stack multiple slow model timeouts indefinitely. These values are initial safety caps and should be tuned only after measuring real invoice/tag results.
 
 ## 2. Verified source findings
 
@@ -167,6 +167,26 @@ Recommended mapping to verify (not yet changed):
 
 The current application reads the key names shown above. Do not replace them with new variable names unless code and deployment documentation are changed together.
 
+The implementation branch adds optional configuration overrides below. They are **new code-supported names**, not confirmed values from the earlier Cloud Run screenshots. Defaults work without setting these explicitly:
+
+| Optional Cloud Run environment variable | Default | Purpose |
+|---|---:|---|
+| `AiPerformance__GeminiAttemptTimeoutSeconds` | `18` | Per Gemini model attempt cap |
+| `AiPerformance__GroqAttemptTimeoutSeconds` | `12` | Per Groq attempt cap |
+| `AiPerformance__TotalProviderBudgetSeconds` | `60` | Total time budget for the complete provider chain |
+| `Ocr__TimeoutSeconds` | `12` | Local Tesseract timeout |
+| `Gemini__InvoiceModel` | `gemini-4-hydrogen` | Supplier invoice primary model override |
+| `Gemini__InvoiceFallbackModel` | `gemini-3.8-flash` | Supplier invoice second Gemini model override |
+| `Gemini__InvoiceLastResortModel` | `gemini-3.5-flash-lite` | Supplier invoice final Gemini model override |
+| `Gemini__ItemTagModel` | `gemini-4-hydrogen` | Item-tag primary model override |
+| `Gemini__ItemTagFallbackModel` | `gemini-3.8-flash` | Item-tag second Gemini model override |
+| `Gemini__ItemTagLastResortModel` | `gemini-3.5-flash-lite` | Item-tag final Gemini model override |
+| `Groq__Model` | `qwen/qwen3.8-27b` | Groq Vision model override |
+| `Groq__ItemTagFallbackEnabled` | `false` | Enables Groq for item-tag fallback only when explicitly set |
+
+Existing `Gemini__Model`, `Gemini__FallbackModel` and `Gemini__LastResortModel` remain shared compatibility overrides. The workflow-specific settings above take precedence. Existing `Groq__InvoiceFallbackEnabled` remains the separate supplier-invoice fallback switch. Do not enable `Groq__ItemTagFallbackEnabled` without checking the Groq account's current credit/rate limits and confirming owner approval.
+
+
 ## 6. Performance design and implementation sequence
 
 ### A. Provider chain and model governance — P0
@@ -283,7 +303,7 @@ The following code changes have been made on this branch, on top of main. They a
 - The fallback runner makes one bounded attempt per model. It does not repeat a slow model, and it removes the former multi-second 2s/4s sleep delays.
 - A 401/403 stops further attempts against that provider's key but still permits an independently configured fallback provider.
 - Invalid/empty structured output continues to the next eligible provider. A Gemini safety/block response or Groq safety refusal stops the chain rather than silently falling through.
-- Configured attempt defaults: Gemini 18 seconds; Groq 12 seconds. The appsettings defaults match the code defaults.
+- Configured attempt defaults: Gemini 18 seconds; Groq 12 seconds; total provider chain 60 seconds. The appsettings defaults match the code defaults.
 - Supplier invoice extraction now uses the new order and validates that a response contains at least one line with a description and quantity or amount. Invoice output remains an unsaved draft.
 - Item-tag extraction now uses the same order and validates that the response contains at least one meaningful tag field. A locally detected barcode remains preserved even when AI extraction cannot provide other fields.
 - Item-tag photos retain the original upload in `sales.item_tag_capture`; when the long edge exceeds 2,200 pixels, a JPEG quality-88 derivative is sent to AI only.
