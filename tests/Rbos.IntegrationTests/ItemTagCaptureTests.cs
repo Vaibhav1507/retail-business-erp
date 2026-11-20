@@ -184,6 +184,75 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [Fact]
+    public async Task Expired_item_tag_lease_is_exclusive_and_recovery_does_not_repeat_provider_calls()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        var id = await Upload(client);
+
+        var cfg = new ConfigurationBuilder()
+            .AddUserSecrets<Program>()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Rbos:Database"] = "test",
+                ["Gemini:ApiKey"] = "",
+                ["Groq:ApiKey"] = "",
+                ["Groq:ItemTagFallbackEnabled"] = "false"
+            })
+            .Build();
+        await using var worker = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestWhatsAppWorker"]
+            ?? throw new InvalidOperationException("RbosTestWhatsAppWorker connection is not configured."));
+
+        Guid firstLease;
+        await using (var connection = await worker.OpenConnectionAsync())
+        await using (var claim = new NpgsqlCommand(
+            "select capture_id,lease_token,attempt_count from integrations.claim_item_tag_captures(1,300)", connection))
+        await using (var reader = await claim.ExecuteReaderAsync())
+        {
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(id, reader.GetGuid(0));
+            firstLease = reader.GetGuid(1);
+            Assert.Equal(1, reader.GetInt32(2));
+        }
+
+        // A second scheduled invocation must not claim a job with a live lease.
+        await using (var connection = await worker.OpenConnectionAsync())
+        await using (var claim = new NpgsqlCommand(
+            "select count(*) from integrations.claim_item_tag_captures(1,300)", connection))
+            Assert.Equal(0L, (long)(await claim.ExecuteScalarAsync())!);
+
+        await using (var connection = await worker.OpenConnectionAsync())
+        await using (var finish = new NpgsqlCommand(
+            "select integrations.finish_item_tag_capture(@id,@lease,null)", connection))
+        {
+            finish.Parameters.AddWithValue("id", id);
+            finish.Parameters.AddWithValue("lease", Guid.NewGuid());
+            Assert.False((bool)(await finish.ExecuteScalarAsync())!);
+        }
+
+        // Simulate process death after a possibly-paid provider attempt. Expire only
+        // this test row using the test migrator; the recovery worker must not call AI.
+        await using (var migrator = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]))
+        {
+            await migrator.OpenAsync();
+            await using var expire = new NpgsqlCommand(@"
+                update integrations.item_tag_capture_queue
+                   set lease_until = now() - interval '1 second'
+                 where capture_id = @id", migrator);
+            expire.Parameters.AddWithValue("id", id);
+            Assert.Equal(1, await expire.ExecuteNonQueryAsync());
+        }
+
+        await DrainItemTagQueueForTests();
+        var recovered = await client.GetJson("/sales/item-tag-captures/" + id);
+        Assert.Equal("NeedsAttention", recovered.GetProperty("status").GetString());
+        Assert.Equal("NeedsAttention", recovered.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id)).StatusCode);
+        Assert.NotEqual(Guid.Empty, firstLease);
+    }
+
+    [Fact]
     public async Task Upload_rejects_unsupported_type_bad_signature_and_oversized_photo()
     {
         var client = new Client(factory);
