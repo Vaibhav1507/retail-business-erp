@@ -175,7 +175,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var originalId = (await original.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var otherProduct = await client.AddProduct("Different product");
 
-        var captureId = await Upload(client);
+        var captureId = await Upload(client, barcode: code, process: true);
         var conflict = await Review(client, captureId, otherProduct, code);
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
 
