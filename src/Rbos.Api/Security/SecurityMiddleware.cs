@@ -4,7 +4,7 @@ namespace Rbos.Api.Security;
 public sealed class SecurityMiddleware(RequestDelegate next)
 {
     public const long MaxBodyBytes = 64 * 1024;
-    public const long MaxInvoiceBodyBytes = 12 * 1024 * 1024;
+    // The endpoint accepts legacy JSON/base64 (up to 12 MiB decoded) as well as multipart files.\n    // The route enforces a tighter 13 MiB multipart form limit and the service enforces 12 MiB of file bytes.\n    public const long MaxInvoiceBodyBytes = 18L * 1024 * 1024;
     /// <summary>Catalogue import carries a 12 MB file as base64 inside JSON (4/3 overhead) plus a small envelope.</summary>
     public const long MaxCatalogueImportBodyBytes = 12L * 1024 * 1024 / 3 * 4 + 16 * 1024;
     public const long MaxItemTagPhotoBodyBytes = 8L * 1024 * 1024;
@@ -26,8 +26,12 @@ public sealed class SecurityMiddleware(RequestDelegate next)
             if (!HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method))
             {
                 var isItemTagPhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/item-tag-captures");
+                var isInvoiceExtraction = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/purchases/extract");
+                var contentType = ctx.Request.ContentType?.Split(';')[0].Trim();
+                var isMultipartInvoiceUpload = isInvoiceExtraction
+                    && string.Equals(contentType, "multipart/form-data", StringComparison.OrdinalIgnoreCase);
                 var limit = isItemTagPhotoUpload ? MaxItemTagPhotoBodyBytes
-                    : ctx.Request.Path.Equals("/api/purchases/extract") ? MaxInvoiceBodyBytes
+                    : isInvoiceExtraction ? MaxInvoiceBodyBytes
                     : ctx.Request.Path.Equals("/api/products/import/read") ? MaxCatalogueImportBodyBytes
                     : MaxBodyBytes;
                 if (ctx.Request.ContentLength > limit)
@@ -52,7 +56,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                         return;
                     }
                 }
-                else if (hasBody && !ctx.Request.HasJsonContentType())
+                else if (hasBody && !ctx.Request.HasJsonContentType() && !isMultipartInvoiceUpload)
                 {
                     ctx.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
                     await ctx.Response.WriteAsJsonAsync(new { error = "Content-Type must be application/json." });
