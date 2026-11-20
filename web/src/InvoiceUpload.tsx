@@ -18,6 +18,8 @@ export const toBase64 = (blob: Blob): Promise<string> => new Promise((resolve, r
 })
 
 async function prepareImageBlob(file: File): Promise<Blob> {
+  if (file.size === 0 || file.size > 24 * 1024 * 1024)
+    throw new Error('The original photo must be 24 MB or smaller.')
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
     throw new Error('Choose a JPEG, PNG, WebP photo or a PDF.')
   const bitmap = await createImageBitmap(file)
