@@ -32,6 +32,29 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public void GroqInvoiceMerge_PreservesFirstIdentityAndLastUsableTotalsInPageOrder()
+    {
+        var first = JsonNode.Parse("""
+            {"supplierName":"Acme Ltd","invoiceNumber":"INV-42","date":"2026-11-20","lines":[{"description":"Cable"}]}
+            """)!;
+        var second = JsonNode.Parse("""
+            {"supplierName":"Wrong Supplier","invoiceNumber":"OTHER","date":"2026-11-21","total":1250,"lines":[{"description":"Charger"}]}
+            """)!;
+        var third = JsonNode.Parse("""
+            {"supplierName":"","invoiceNumber":null,"date":null,"total":null,"subtotal":1000,"lines":[{"description":"Adapter"}]}
+            """)!;
+
+        var merged = GroqVisionClient.MergeInvoicePageResults(new JsonNode?[] { first, second, third });
+
+        Assert.Equal("Acme Ltd", merged?["supplierName"]?.GetValue<string>());
+        Assert.Equal("INV-42", merged?["invoiceNumber"]?.GetValue<string>());
+        Assert.Equal("2026-11-20", merged?["date"]?.GetValue<string>());
+        Assert.Equal(1250, merged?["total"]?.GetValue<int>());
+        Assert.Equal(1000, merged?["subtotal"]?.GetValue<int>());
+        Assert.Equal(3, (merged?["lines"] as JsonArray)?.Count);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_UsesGroqBetweenPrimaryAndSecondaryGemini()
     {
         var order = new List<string>();
