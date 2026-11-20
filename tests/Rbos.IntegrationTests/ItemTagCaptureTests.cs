@@ -188,6 +188,8 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     {
         var client = new Client(factory);
         await client.SignUpAndBootstrap();
+        // Keep the assertion isolated from any stale test-fixture queue rows.
+        await DrainItemTagQueueForTests();
         var id = await Upload(client);
 
         var cfg = new ConfigurationBuilder()
