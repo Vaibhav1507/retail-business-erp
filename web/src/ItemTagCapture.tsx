@@ -3,6 +3,25 @@ import { api, apiBinary, ApiError } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat } from '@zxing/library'
 
+// Bound concurrent provider-backed uploads from a multi-select gallery.
+let activeItemTagUploads = 0;
+const waitingItemTagUploads: Array<() => void> = [];
+
+async function withItemTagUploadSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (activeItemTagUploads >= 2) {
+    await new Promise<void>(resolve => waitingItemTagUploads.push(resolve));
+  } else {
+    activeItemTagUploads++;
+  }
+  try {
+    return await work();
+  } finally {
+    const next = waitingItemTagUploads.shift();
+    if (next) next();
+    else activeItemTagUploads--;
+  }
+}
+
 type ProductOption = { id: string; name: string }
 type Extraction = {
   productName?: string | null
@@ -142,7 +161,6 @@ export function ItemTagCapture({
       // Decode common retail barcodes locally before upload/AI processing.
       // QR/Data Matrix payloads are deliberately not treated as product barcodes.
       let decodedBarcode: { code: string; symbology: string } | null = null
-      let barcodeProduct: { productId: string; name: string } | null = null
       try {
         const reader = new BrowserMultiFormatReader()
         const decoded = await reader.decodeFromImageUrl(draft.preview)
@@ -154,21 +172,18 @@ export function ItemTagCapture({
           : format === BarcodeFormat.CODE_128 ? 'CODE_128'
           : null
         if (symbology) {
-          const code = decoded.getText()
-          decodedBarcode = { code, symbology }
-          try {
-            barcodeProduct = await api<{ productId: string; name: string }>(
-              'GET', '/products/by-barcode?code=' + encodeURIComponent(code))
-          } catch { /* unknown local code remains visible for manual review */ }
+          decodedBarcode = { code: decoded.getText(), symbology }
         }
       } catch { /* glare/blur/unsupported symbols fall back to the reviewable AI/manual path */ }
 
-      const capture = await apiBinary<CaptureResponse>(
-        '/sales/item-tag-captures', draft.file, undefined, draft.key,
+      // The API validates the barcode hint and performs the catalogue match itself.
+      // Do not serialize upload behind a second barcode lookup request.
+      const capture = await withItemTagUploadSlot(() => apiBinary<CaptureResponse>(
+        '/sales/item-tag-captures', draft.file!, undefined, draft.key,
         decodedBarcode ? {
           'X-RBOS-Detected-Barcode': decodedBarcode.code,
           'X-RBOS-Detected-Symbology': decodedBarcode.symbology
-        } : undefined)
+        } : undefined))
       loadedIds.current.add(capture.id)
 
       patch(draft.key, {
@@ -183,7 +198,7 @@ export function ItemTagCapture({
         imei2: capture.extraction?.imei2 ?? '',
         mrp: capture.extraction?.mrp == null ? '' : String(capture.extraction.mrp),
         hsn: capture.extraction?.hsn ?? '',
-        productId: barcodeProduct?.productId ?? capture.suggestedProduct?.id ?? ''
+        productId: capture.suggestedProduct?.id ?? ''
       })
     } catch (e) {
       patch(draft.key, { busy: false, error: e instanceof Error ? e.message : 'Photo upload failed. Try again.' })
