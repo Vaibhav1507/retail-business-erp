@@ -26,17 +26,24 @@ public sealed class LocalOcr(IConfiguration cfg, ILogger<LocalOcr> log)
     {
         if (exe.Value is null) return null;
         var tmp = Path.Combine(Path.GetTempPath(), "rbos-ocr-" + Guid.NewGuid().ToString("N"));
+        Process? process = null;
+        var timeoutSeconds = Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60);
         try
         {
             await File.WriteAllBytesAsync(tmp, image, ct);
-            var psi = new ProcessStartInfo(exe.Value, [tmp, "stdout", "--psm", "6"]) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            using var p = Process.Start(psi);
-            if (p is null) return null;
+            var psi = new ProcessStartInfo(exe.Value, [tmp, "stdout", "--psm", "6"])
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            process = Process.Start(psi);
+            if (process is null) return null;
+
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var timeoutSeconds = Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60);
             timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-            // Drain both redirected streams concurrently; otherwise a verbose Tesseract
-            // stderr stream can block the child process while the parent waits for stdout.
+            // Drain both redirected streams concurrently to avoid child-process pipe deadlocks.
             var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
             var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
             await process.WaitForExitAsync(timeout.Token);
@@ -46,13 +53,13 @@ public sealed class LocalOcr(IConfiguration cfg, ILogger<LocalOcr> log)
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            TryKill(process)
-            log.LogWarning("Local OCR exceeded its bounded {TimeoutSeconds}s time budget", Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60));
+            TryKill(process);
+            log.LogWarning("Local OCR exceeded its bounded {TimeoutSeconds}s time budget", timeoutSeconds);
             return null;
         }
         catch (OperationCanceledException)
         {
-            TryKill(process)
+            TryKill(process);
             throw;
         }
         catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception)
