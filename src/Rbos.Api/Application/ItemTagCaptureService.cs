@@ -1,4 +1,7 @@
 using System.Security.Cryptography;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Npgsql;
@@ -14,10 +17,10 @@ public sealed record ItemTagReviewCommand(
 
 /// <summary>
 /// Stores one private image per physical item, obtains structured tag extraction through
-/// the central AI Gateway, and keeps review/attachment state under tenant RLS.
+/// direct Gemini/Groq provider calls, and keeps review/attachment state under tenant RLS.
 /// </summary>
 public sealed class ItemTagCaptureService(
-    TenantDb db, AiGateway gateway, IConfiguration configuration, ILogger<ItemTagCaptureService> log)
+    TenantDb db, HttpClient http, GroqVisionClient groq, IConfiguration configuration, ILogger<ItemTagCaptureService> log)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp"];
@@ -126,23 +129,24 @@ public sealed class ItemTagCaptureService(
         }
         try
         {
-            var providers = configuration.GetValue("Groq:ItemTagFallbackEnabled", false)
-                ? new[] { AiProviderKind.Gemini, AiProviderKind.Groq }
-                : new[] { AiProviderKind.Gemini };
-            var response = await gateway.ExecuteAsync(new AiGatewayRequest
+            JsonNode? response = null;
+            var geminiKey = configuration["Gemini:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(geminiKey))
             {
-                TenantId = tenantId.Value,
-                ActorUserId = uid,
-                Feature = "InvoiceItemTagExtraction",
-                Task = AiTaskKind.StructuredExtraction,
-                Prompt = Prompt,
-                ResponseSchema = Schema(),
-                Media = [new AiMedia(contentType, bytes, 1)],
-                ProviderOrder = providers,
-                MaxOutputTokens = 2048,
-                MaxAttemptsPerProvider = 1
-            }, ct);
-            if (response?.StructuredContent is JsonObject json)
+                try { response = await ExtractWithGeminiAsync(geminiKey, contentType, bytes, ct); }
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+                { log.LogWarning("Direct Gemini item-tag extraction failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name); }
+            }
+
+            if (response is not JsonObject && groq.Available &&
+                configuration.GetValue("Groq:ItemTagFallbackEnabled", false))
+            {
+                try { response = await groq.ExtractImageAsync(contentType, Convert.ToBase64String(bytes), Prompt, ct); }
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
+                { log.LogWarning("Direct Groq item-tag fallback failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name); }
+            }
+
+            if (response is JsonObject json)
             {
                 extracted = CleanExtraction(json);
                 if (confirmedLocalBarcode is not null)
@@ -152,14 +156,6 @@ public sealed class ItemTagCaptureService(
                 }
                 status = "ReadyForReview";
             }
-        }
-        catch (AiProviderException e) when (e.Category == AiFailureCategory.ContentSafetyRefusal)
-        {
-            log.LogWarning("Item-tag extraction was declined by the configured provider.");
-        }
-        catch (AiProviderException e)
-        {
-            log.LogWarning("Item-tag extraction was unavailable for capture {CaptureId} ({FailureCategory}).", id, e.Category);
         }
         catch (TaskCanceledException e) when (!ct.IsCancellationRequested)
         {
@@ -351,6 +347,35 @@ public sealed class ItemTagCaptureService(
             ("t", tid.Value), ("a", Guid.NewGuid()), ("u", uid), ("d", id));
         await s.CommitAsync(ct);
         return ServiceResult<object>.Ok(new { id, deleted = true });
+    }
+
+    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string mime, byte[] bytes, CancellationToken ct)
+    {
+        var model = configuration["Gemini:ItemTagModel"] ?? configuration["Gemini:Model"] ?? "gemini-3.5-flash";
+        var parts = new JsonArray
+        {
+            new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = mime, ["data"] = Convert.ToBase64String(bytes) } },
+            new JsonObject { ["text"] = Prompt }
+        };
+        var body = new JsonObject
+        {
+            ["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
+            ["generationConfig"] = new JsonObject
+            {
+                ["responseMimeType"] = "application/json",
+                ["responseSchema"] = Schema(),
+                ["temperature"] = 0
+            }
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
+        request.Headers.Add("x-goog-api-key", apiKey);
+        request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        using var response = await http.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+        var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
+        return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
 
     async Task<(Guid? ProductId, string? Reason)> MatchProductAsync(
