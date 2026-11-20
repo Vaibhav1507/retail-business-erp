@@ -198,7 +198,16 @@ Multipart invoice transport and durable asynchronous item-tag extraction remain 
 - PR #55 is merged to main at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7`.
 - Supplier invoice multipart transport is proposed on its own branch, `perf/multipart-supplier-invoice-upload`; it is not merged or deployed.
 - The browser prepares image files as JPEG (up to 1,800 pixels at quality 0.85), preserves PDF bytes, and sends selected pages as multipart binary files. It no longer creates base64 strings or a JSON request body for the new client.
-- The API enforces a 6-page limit, 8 MB per page and 48 MB aggregate file limit (50 MiB request limit including multipart boundaries). MIME and file-signature checks remain in the extraction service.
+- The API enforces a 6-page limit, 8 MB per page and 12 MB aggregate file limit (13 MiB request limit including multipart boundaries; the retained ZIP stays within the existing 12 MiB database constraint). MIME and file-signature checks remain in the extraction service.
 - The existing JSON/base64 endpoint remains as a compatibility path. Gemini/Groq provider logic and the resulting unsaved draft flow are unchanged. Original page bytes are retained; no invoice is automatically posted.
 - The backend converts file bytes to base64 only at the Gemini/Groq provider payload boundary.
 - No migration, provider flag, credential, billing, production database or Cloud Run change is included.
+
+
+### Multipart follow-up validation correction — 20 November 2026
+
+- Multipart upload is implemented on `perf/multipart-supplier-invoice-upload`; it is not merged or deployed.
+- The request cap is 13 MiB and the aggregate file cap is 12 MiB. This deliberately preserves the existing 12 MiB `procurement.invoice_file` storage constraint and rejects oversized groups before provider inference. Each selected file remains limited to 8 MiB and six pages maximum.
+- Browser image preparation accepts only JPEG, PNG and WebP; PDFs retain their original bytes. The browser sends multipart `pages` fields without setting Content-Type manually. The API retains the JSON/base64 compatibility route.
+- Original bytes remain the retained evidence; base64 conversion occurs only at the Gemini/Groq provider request boundary. Extraction output remains a reviewable draft and is never posted automatically.
+- Latest CI and E2E validation are pending; do not treat this branch as merge-ready until a fresh PR workflow passes.
