@@ -145,12 +145,12 @@ The Meta webhook callback URL is `https://<application-domain>/webhooks/meta/wha
 ### Worker Cloud Run Job
 
 1. Create a Cloud Run Job from the same container image as the API.
-2. Override the command to `dotnet Rbos.Api.dll --whatsapp-worker`.
-3. Set `Rbos__Database=prod` and inject `ConnectionStrings__RbosProdApp` (tenant data, `rbos_app`) and `ConnectionStrings__RbosProdWhatsAppWorker` (queue-only, `rbos_worker`).
-4. Inject only the worker's Meta secrets: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__TemplateName`, `WhatsApp__TemplateLanguage`, `WhatsApp__ApiVersion` and `WhatsApp__PilotTenantId`. The job does not need the Meta app secret, webhook verify token or pilot actor ID.
+2. After migration 050 is applied, override the command to `dotnet Rbos.Api.dll --rbos-workers`. This drains the item-tag queue first and then the WhatsApp delivery queue. The legacy `--whatsapp-worker` flag remains available for WhatsApp-only runs.
+3. Set `Rbos__Database=prod` and inject `ConnectionStrings__RbosProdApp` (tenant data, `rbos_app`) and `ConnectionStrings__RbosProdWhatsAppWorker` (queue-only, `rbos_worker`). Reuse this existing worker-role connection for both queues; do not provision a new queue role or expose table access.
+4. Inject the worker's Meta secrets: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__TemplateName`, `WhatsApp__TemplateLanguage`, `WhatsApp__ApiVersion` and `WhatsApp__PilotTenantId`. Also inject the existing `Gemini__ApiKey` secret for item-tag extraction. Keep `Groq__ItemTagFallbackEnabled=false` unless separately approved. The job does not need the Meta app secret, webhook verify token or pilot actor ID.
 5. The worker role can only call the queue claim/finish functions; it has no direct queue-table access or tenant business-data permissions. The worker uses the separate `rbos_app` connection for tenant-scoped invoice/customer access.
 6. Use a service account with access only to the required worker Secret Manager secrets and Cloud Run Job execution. Do not provide any migrator connection string.
-7. Create a Cloud Scheduler job to execute the Cloud Run Job on a short cadence (for example, once per minute). Configure a single task with no parallel tasks; database queue leases protect against overlapping executions. The worker drains currently available queue items and exits.
+7. Keep the existing Cloud Scheduler trigger and run the Job on its current short cadence (the documented default is once per minute). Configure a single task with no parallel tasks; database queue leases protect against overlapping executions. The combined worker drains currently available queue items and exits.
 8. Before live use, test using Meta's test sender/recipient and verify media upload, template send, sent/delivered/read/failed statuses, inbound opt-out, retry and uncertain-send handling.
 
 ### Customer permission
