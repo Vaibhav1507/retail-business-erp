@@ -19,7 +19,7 @@ public sealed record ProductFileResult(
 /// Turns an uploaded product list into plain table rows (header row first).
 /// Excel and Word files are parsed locally; catalogue photos/PDFs use the central AI gateway with local OCR/manual recovery.
 /// </summary>
-public sealed class ProductFileReader(ILogger<ProductFileReader> log, LocalOcr ocr, AiGateway gateway, TenantDb db)
+public sealed class ProductFileReader(ILogger<ProductFileReader> log, LocalOcr ocr, AiGateway gateway, TenantDb db, IConfiguration cfg)
 {
 	public const int MaxFileBytes = 12 * 1024 * 1024;
 	const long MaxEntryBytes = 20L * 1024 * 1024;
@@ -91,16 +91,49 @@ public sealed class ProductFileReader(ILogger<ProductFileReader> log, LocalOcr o
 		var pages = PdfPageReader.Read(bytes);
 		if (pages is null) return (CatalogueFileParsers.ReadPdfPaged(bytes), skipped);
 		var rows = new List<CatalogueFileParsers.PdfRow>();
-		foreach (var p in pages)
+		var totalBudgetSeconds = Math.Clamp(cfg.GetValue("Ocr:PdfTotalTimeoutSeconds", 30), 3, 120);
+		using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+		budget.CancelAfter(TimeSpan.FromSeconds(totalBudgetSeconds));
+		for (var index = 0; index < pages.Count; index++)
 		{
-			var cells = p.Rows;
-			if (p.NeedsOcr)
+			var page = pages[index];
+			if (budget.IsCancellationRequested)
 			{
-				if (!ocr.Available) { log.LogWarning("PDF page {Page} has no text layer and local OCR (Tesseract) is not available; page skipped", p.Page); skipped.Add(p.Page); continue; }
-				var png = PdfPageReader.RenderPng(bytes, p.Page);
-				cells = png is null ? [] : await ocr.ReadImageAsync(png, ct) ?? [];
+				skipped.AddRange(pages.Skip(index).Select(item => item.Page));
+				log.LogWarning("Catalogue PDF OCR budget exhausted after {ProcessedPages} of {TotalPages} pages; skipped pages {SkippedPages}",
+					index, pages.Count, string.Join(",", pages.Skip(index).Select(item => item.Page)));
+				break;
 			}
-			rows.AddRange(cells.Select(c => new CatalogueFileParsers.PdfRow(p.Page, c)));
+
+			var cells = page.Rows;
+			if (page.NeedsOcr)
+			{
+				if (!ocr.Available)
+				{
+					log.LogWarning("PDF page {Page} has no usable text layer and local OCR is unavailable; page skipped", page.Page);
+					skipped.Add(page.Page);
+					continue;
+				}
+				var png = PdfPageReader.RenderPng(bytes, page.Page);
+				if (png is null)
+				{
+					log.LogWarning("Could not render catalogue PDF page {Page}; page skipped", page.Page);
+					skipped.Add(page.Page);
+					continue;
+				}
+				try
+				{
+					cells = await ocr.ReadImageAsync(png, budget.Token) ?? [];
+					if (cells.Count == 0) skipped.Add(page.Page);
+				}
+				catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+				{
+					skipped.AddRange(pages.Skip(index).Select(item => item.Page));
+					log.LogWarning("Catalogue PDF OCR budget exhausted while processing page {Page}; remaining pages skipped", page.Page);
+					break;
+				}
+			}
+			rows.AddRange(cells.Select(cell => new CatalogueFileParsers.PdfRow(page.Page, cell)));
 		}
 		return (rows, skipped);
 	}
