@@ -42,11 +42,13 @@ if (runWhatsAppWorker || runItemTagWorker)
 
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
     QuestPDF.Settings.UseSystemFonts = true;
+    // Process interactive item-tag jobs first; WhatsApp delivery can be slower and
+    // must not delay the cashier's product-tag review queue.
+    if (runItemTagWorker)
+        await ItemTagCaptureWorker.RunAsync(dataSource, queueDataSource, config, loggerFactory, cancellation.Token);
     if (runWhatsAppWorker)
         await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config,
             loggerFactory.CreateLogger("WhatsAppInvoiceWorker"), cancellation.Token);
-    if (runItemTagWorker)
-        await ItemTagCaptureWorker.RunAsync(dataSource, queueDataSource, config, loggerFactory, cancellation.Token);
     return;
 }
 
