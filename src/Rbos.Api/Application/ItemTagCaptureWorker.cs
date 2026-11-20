@@ -22,12 +22,15 @@ public static class ItemTagCaptureWorker
         var groq = new GroqVisionClient(groqHttp, config, loggerFactory.CreateLogger<GroqVisionClient>());
         var service = new ItemTagCaptureService(
             db, geminiHttp, groq, config, loggerFactory.CreateLogger<ItemTagCaptureService>());
-        logger.LogInformation("Item-tag worker started. Processing all currently available durable jobs.");
+        var maxJobsPerRun = Math.Clamp(config.GetValue("AiPerformance:ItemTagQueueMaxJobsPerRun", 5), 1, 20);
+        var processed = 0;
+        logger.LogInformation("Item-tag worker started. Maximum jobs this run {MaxJobs}.", maxJobsPerRun);
 
-        while (!ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested && processed < maxJobsPerRun)
         {
             var claimed = await ClaimAsync(queueDataSource, ct);
             if (claimed is null) break;
+            processed++;
 
             // A lease that had to be reclaimed means the previous process may have
             // completed a paid provider call but crashed before persisting the result.
@@ -61,7 +64,7 @@ public static class ItemTagCaptureWorker
             }
         }
 
-        logger.LogInformation("Item-tag worker finished draining available jobs.");
+        logger.LogInformation("Item-tag worker finished. Jobs handled {ProcessedJobs}, run limit {MaxJobs}.", processed, maxJobsPerRun);
     }
 
     static async Task<Claimed?> ClaimAsync(NpgsqlDataSource source, CancellationToken ct)
