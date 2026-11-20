@@ -50,7 +50,10 @@ test('first-time electronics retailer completes and resumes the saved first-shop
 
   await page.goto('/#/buy/receive')
   const purchase = page.getByRole('region', { name: 'Purchasing' })
-  await purchase.getByLabel('Supplier', { exact: true }).selectOption({ label: supplier })
+  const supplierSelect = page.getByRole('combobox', { name: 'Supplier', exact: true }).first()
+  await expect(supplierSelect).toBeVisible()
+  await expect(supplierSelect.locator('option')).toContainText(supplier)
+  await supplierSelect.selectOption({ label: supplier })
   await purchase.getByLabel('Product').selectOption(productOption!)
   await purchase.getByLabel('Quantity').fill('1')
   await purchase.getByLabel('Unit cost (INR, before GST)').fill('11500')

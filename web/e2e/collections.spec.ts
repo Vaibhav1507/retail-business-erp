@@ -1,4 +1,4 @@
-import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
+import { signUp, PASSWORD, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved, unlockApp } from './signup'
 import { expect, test, type Page } from '@playwright/test'
 
 const run = Date.now().toString(36)
@@ -51,6 +51,7 @@ test('credit sale, outstanding balance, later collection, balance update', async
   await coll.getByRole('button', { name: 'Record payment' }).click()
   await expect(coll.getByRole('status')).toContainText('now owes 125.00')
   await page.reload()
+  await unlockApp(page)
   await page.goto('/#/parties/customers')
   await expect(custRow).toContainText('125.00')
   await page.goto('/#/sell/collect')
