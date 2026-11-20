@@ -144,6 +144,28 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ContinuesToNextGeminiModelAfterRateLimit()
+    {
+        var secondaryGeminiAttempted = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ =>
+                throw new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests)),
+            Attempt("Gemini", "gemini-3.8-flash", _ =>
+            {
+                secondaryGeminiAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Adapter" }) });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(secondaryGeminiAttempted);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_SkipsRemainingGeminiModelsAfterCredentialFailure()
     {
         var groqAttempted = false;
