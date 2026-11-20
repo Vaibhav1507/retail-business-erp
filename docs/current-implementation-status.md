@@ -177,7 +177,7 @@ English remains the verified default. New Hindi onboarding and guidance strings 
 
 ## AI upload performance follow-up — 20 November 2026
 
-PR #55 was subsequently merged to `main` at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7` on 20 November 2026. The provider-fallback, image-preparation, telemetry and OCR changes below are part of the merged baseline.
+PR #55 remains open and draft on branch `perf/ai-upload-latency-and-provider-fallback`. Latest reviewed head at the time of this status note: `21fe930df131ed8ea07c2c8c5875289e0d0f1927`; later PR-description/docs-only commits may advance the branch. It is not merged or deployed.
 
 Additional review fixes committed after the initial PR #55 review:
 - Gemini HTTP 402 Payment Required now marks Gemini unavailable for the current provider chain, skipping remaining Gemini models while still allowing an independently configured Groq fallback. HTTP 429 remains eligible for fallback.
@@ -188,33 +188,6 @@ Additional review fixes committed after the initial PR #55 review:
 
 New regression coverage added for HTTP 402 versus HTTP 429 provider fallback and multi-page invoice metadata merge.
 
-**Historical validation note:** workflow #658 was an earlier-head run only and is superseded by the merged PR #55 baseline. The two follow-up PRs have their own exact-head CI runs; see the latest follow-up status section below. PostgreSQL integration tests are being enabled through a disposable PostgreSQL 17 CI job; Playwright E2E and real provider uploads remain a separate pilot acceptance gate.
+**Validation limitation:** workflow #658 passed on the earlier head `d7c8655` with 147 backend unit tests and frontend/build checks. No workflow run is currently associated with the newer review-fix head `21fe930`; therefore these new changes have not yet been validated by CI. PostgreSQL integration tests, Playwright E2E and frontend npm tests also remain unverified/skipped in the earlier workflow.
 
 Multipart invoice transport and durable asynchronous item-tag extraction remain separate follow-up work. No provider credentials, Cloud Run settings, billing, production database or deployment state were changed.
-
-
-## 20 November 2026 — PR #55 merged and multipart follow-up
-
-- PR #55 is merged to main at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7`.
-- Supplier invoice multipart transport is proposed on its own branch, `perf/multipart-supplier-invoice-upload`; it is not merged or deployed.
-- The browser prepares image files as JPEG (up to 1,800 pixels at quality 0.85), preserves PDF bytes, and sends selected pages as multipart binary files. It no longer creates base64 strings or a JSON request body for the new client.
-- The API enforces a 6-page limit, 8 MB per page and 12 MB aggregate file limit (13 MiB request limit including multipart boundaries; the retained ZIP stays within the existing 12 MiB database constraint). MIME and file-signature checks remain in the extraction service.
-- The existing JSON/base64 endpoint remains as a compatibility path. Gemini/Groq provider logic and the resulting unsaved draft flow are unchanged. Original page bytes are retained; no invoice is automatically posted.
-- The backend converts file bytes to base64 only at the Gemini/Groq provider payload boundary.
-- No migration, provider flag, credential, billing, production database or Cloud Run change is included.
-
-
-### Multipart follow-up validation correction — 20 November 2026
-
-- Multipart upload is implemented on `perf/multipart-supplier-invoice-upload`; it is not merged or deployed.
-- The request cap is 13 MiB and the aggregate file cap is 12 MiB. This deliberately preserves the existing 12 MiB `procurement.invoice_file` storage constraint and rejects oversized groups before provider inference. Each selected file remains limited to 8 MiB and six pages maximum.
-- Browser image preparation accepts only JPEG, PNG and WebP; PDFs retain their original bytes. The browser sends multipart `pages` fields without setting Content-Type manually. The API retains the JSON/base64 compatibility route.
-- Original bytes remain the retained evidence; base64 conversion occurs only at the Gemini/Groq provider request boundary. Extraction output remains a reviewable draft and is never posted automatically.
-- Latest CI and E2E validation are pending; do not treat this branch as merge-ready until a fresh PR workflow passes.
-
-
-## Follow-up PR validation snapshot — 20 November 2026
-
-- PR #57 multipart supplier invoice upload remains draft/unmerged on branch perf/multipart-supplier-invoice-upload. Standard exact-head CI passed on 76455c459e567a9467337eba9e5e7086baf77741: backend Release build, backend unit tests, container build, frontend typecheck/lint/build and high/critical dependency audit. The branch then adds a disposable PostgreSQL 17 integration-test job; workflow #707 on commit `d5d12876b00ebe7d6ce18f5770d208baaf8d3763` passed. Six additional multipart API integration tests were added afterward on head `a64986ff668148f3fb09a06895b3b035cb25fd45` and are under validation in workflow #711. Playwright and a live AI-provider upload have not been run.
-- PR #56 durable asynchronous item-tag processing remains draft/unmerged on branch feat/durable-async-item-tag-processing. Standard backend Release build, unit tests, container build and frontend checks passed on the code head before the last migration cancellation guard. The PostgreSQL integration run #706 applies migrations to disposable PostgreSQL 17 and passes the full suite, including item-tag queue permissions, queued cancellation, live-lease deletion rejection and expired-lease recovery.
-- Both PRs remain unmerged and undeployed. Migration 050 is not applied to the pilot database; the scheduled Cloud Run Job command and secret mapping are unchanged.
