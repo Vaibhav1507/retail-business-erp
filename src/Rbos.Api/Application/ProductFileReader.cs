@@ -229,7 +229,7 @@ public sealed class ProductFileReader(ILogger<ProductFileReader> log, LocalOcr o
 			if (localRows.Count >= 2)
 				return ServiceResult<ProductFileResult>.Ok(new(localRows, false, local.Rows.Select(x => x.Page).ToList(), "catalogue",
 					Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(), false,
-					"AI catalogue extraction is disabled or unavailable. Text/OCR was extracted locally; map the columns manually."));
+					$"AI catalogue extraction is disabled or unavailable. Text/OCR was extracted locally; map the columns manually.{(local.Skipped.Count > 0 ? " Pages not extracted: " + string.Join(", ", local.Skipped) + "." : "")}"));
 			return ServiceResult<ProductFileResult>.Fail("AI catalogue extraction is not enabled and this PDF has no readable text. Upload a searchable PDF or use Excel/CSV.");
 		}
 
@@ -278,7 +278,7 @@ public sealed class ProductFileReader(ILogger<ProductFileReader> log, LocalOcr o
 			if (localRows.Count >= 2)
 				return ServiceResult<ProductFileResult>.Ok(new(localRows, false, local.Rows.Select(x => x.Page).ToList(), "catalogue",
 					Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant(), false,
-					"AI could not identify products. Text/OCR was extracted locally; map the columns manually."));
+					$"AI could not identify products. Text/OCR was extracted locally; map the columns manually.{(local.Skipped.Count > 0 ? " Pages not extracted: " + string.Join(", ", local.Skipped) + "." : "")}"));
 			return ServiceResult<ProductFileResult>.Fail("The PDF was received, but the configured AI providers could not identify a structured product/model list. Try a clearer catalogue or split a large PDF into smaller parts.");
 		}
 
