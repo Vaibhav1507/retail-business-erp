@@ -143,6 +143,32 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_StopsWhenTotalProviderBudgetIsExhausted()
+    {
+        var fallbackCalled = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", async ct =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                return new JsonObject { ["lines"] = new JsonArray() };
+            }),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                fallbackCalled = true;
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray() });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None,
+            TimeSpan.FromSeconds(1));
+
+        Assert.Null(result);
+        Assert.False(fallbackCalled);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DoesNotFallBackAfterSafetyRefusal()
     {
         var groqCalled = false;
