@@ -192,21 +192,26 @@ export function ItemTagCapture({
         polling = false
       }
     }
-    void poll()
-    let checks = 0
-    const timer = window.setInterval(() => {
-      checks += 1
-      if (checks >= 36) {
-        window.clearInterval(timer)
-        setEntries(current => current.map(item => item.capture && idsForCurrentPoll.has(item.capture.id)
-          ? { ...item, warning: 'Still queued or processing. Automatic checks are paused; use “Check status” to refresh.' }
-          : item))
-        return
-      }
-      void poll()
-    }, 2500)
     const idsForCurrentPoll = new Set(processingIdsKey.split(',').filter(Boolean))
-    return () => { active = false; window.clearInterval(timer) }
+    let checks = 0
+    let timer = 0
+    const scheduleNext = () => {
+      const delay = Math.min(2500 * (checks + 1), 15000)
+      timer = window.setTimeout(async () => {
+        checks += 1
+        if (checks >= 12) {
+          setEntries(current => current.map(item => item.capture && idsForCurrentPoll.has(item.capture.id)
+            ? { ...item, warning: 'Still queued or processing. Automatic checks are paused; use “Check status” to refresh.' }
+            : item))
+          return
+        }
+        await poll()
+        if (active) scheduleNext()
+      }, delay)
+    }
+    void poll()
+    scheduleNext()
+    return () => { active = false; window.clearTimeout(timer) }
   }, [processingIdsKey])
 
   function patch(key: string, values: Partial<CaptureDraft>) {
