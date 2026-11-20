@@ -183,6 +183,9 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         }
 
         var root = JsonNode.Parse(responseBody);
+        var finishReason = root?["choices"]?[0]?["finish_reason"]?.GetValue<string>();
+        if (finishReason is "content_filter" or "safety" or "refusal")
+            throw new VisionProviderRefusalException("Groq declined the vision extraction request.");
         var text = root?["choices"]?[0]?["message"]?["content"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
