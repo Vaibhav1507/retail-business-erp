@@ -1,12 +1,13 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Net.Http.Headers;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Npgsql;
 using Rbos.Api.Persistence;
 using Rbos.Domain;
+using SkiaSharp;
 
 namespace Rbos.Api.Application;
 
@@ -25,10 +26,30 @@ public sealed class ItemTagCaptureService(
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp"];
 
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, long> LastRetentionCleanup = new();
+    static readonly long RetentionCleanupIntervalMs = (long)TimeSpan.FromMinutes(15).TotalMilliseconds;
+
+    static bool TryBeginRetentionCleanup(Guid tenantId)
+    {
+        var now = Environment.TickCount64;
+        while (true)
+        {
+            if (!LastRetentionCleanup.TryGetValue(tenantId, out var previous))
+            {
+                if (LastRetentionCleanup.TryAdd(tenantId, now)) return true;
+                continue;
+            }
+
+            if (now - previous < RetentionCleanupIntervalMs) return false;
+            if (LastRetentionCleanup.TryUpdate(tenantId, now, previous)) return true;
+        }
+    }
+
     public async Task<ServiceResult<object>> UploadAsync(
         Guid uid, string? idempotencyKey, string? contentType, string? detectedBarcode,
         string? detectedSymbology, byte[] bytes, CancellationToken ct)
     {
+        var requestTimer = Stopwatch.StartNew();
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 100)
         {
             CryptographicOperations.ZeroMemory(bytes);
@@ -54,15 +75,25 @@ public sealed class ItemTagCaptureService(
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
         var id = Guid.NewGuid();
 
-        // Opportunistic cleanup: only expired captures that never became sale evidence.
-        // Attached images follow the sale/evidence retention policy and are never purged here.
-        await using (var cleanup = await db.BeginAsync(uid, tenantId, ct))
+        // Run opportunistic retention cleanup at most once per tenant per 15 minutes
+        // per instance. Cleanup must not open two extra database commands on every photo
+        // upload; attached sale evidence is excluded by both predicates.
+        if (TryBeginRetentionCleanup(tenantId.Value))
         {
-            await SqlHelpers.Exec(cleanup, ct,
-                "update sales.item_tag_capture set status='NeedsAttention' where sale_id is null and status='ReadingTag' and created_at < now() - interval '5 minutes'");
-            await SqlHelpers.Exec(cleanup, ct,
-                "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
-            await cleanup.CommitAsync(ct);
+            try
+            {
+                await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
+                await SqlHelpers.Exec(cleanup, ct,
+                    "update sales.item_tag_capture set status='NeedsAttention' where sale_id is null and status='ReadingTag' and created_at < now() - interval '5 minutes'");
+                await SqlHelpers.Exec(cleanup, ct,
+                    "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
+                await cleanup.CommitAsync(ct);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Retention is opportunistic; maintenance failure must not block a new upload.
+                log.LogWarning("Item-tag retention cleanup deferred ({ErrorType}).", e.GetType().Name);
+            }
         }
 
         await using (var s = await db.BeginAsync(uid, tenantId, ct))
@@ -127,24 +158,54 @@ public sealed class ItemTagCaptureService(
             extracted["barcode"] = confirmedLocalBarcode;
             extracted["barcodeSymbology"] = localSymbology;
         }
+        byte[] aiBytes = bytes;
+        var aiMime = contentType;
+        var prepTimer = Stopwatch.StartNew();
         try
         {
-            JsonNode? response = null;
+            // Preserve the original bytes in PostgreSQL as private sale evidence. A bounded
+            // derivative is used only for model inference to reduce payload and vision cost.
+            aiBytes = PrepareVisionImage(bytes, contentType, out aiMime);
+            prepTimer.Stop();
+            log.LogInformation("Item-tag AI image prepared. Capture {CaptureId}, original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms", id, bytes.Length, aiBytes.Length, prepTimer.ElapsedMilliseconds);
+            var attempts = new List<VisionProviderAttempt>();
             var geminiKey = configuration["Gemini:ApiKey"];
-            if (!string.IsNullOrWhiteSpace(geminiKey))
+            var geminiModels = VisionProviderFallback.ItemTagGeminiModels(configuration);
+            var geminiEnabled = !string.IsNullOrWhiteSpace(geminiKey);
+
+            if (geminiEnabled)
             {
-                try { response = await ExtractWithGeminiAsync(geminiKey, contentType, bytes, ct); }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-                { log.LogWarning("Direct Gemini item-tag extraction failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name); }
+                var primaryModel = geminiModels[0];
+                attempts.Add(new VisionProviderAttempt("Gemini", primaryModel,
+                    VisionProviderFallback.GeminiTimeoutSeconds(configuration),
+                    token => ExtractWithGeminiAsync(geminiKey!, primaryModel, aiMime, aiBytes, token)));
             }
 
-            if (response is not JsonObject && groq.Available &&
-                configuration.GetValue("Groq:ItemTagFallbackEnabled", false))
+            if (groq.Available && configuration.GetValue("Groq:ItemTagFallbackEnabled", false))
             {
-                try { response = await groq.ExtractImageAsync(contentType, Convert.ToBase64String(bytes), Prompt, ct); }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-                { log.LogWarning("Direct Groq item-tag fallback failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name); }
+                attempts.Add(new VisionProviderAttempt("Groq", groq.Model,
+                    VisionProviderFallback.GroqTimeoutSeconds(configuration),
+                    token => groq.ExtractImageAsync(aiMime, Convert.ToBase64String(aiBytes), Prompt, token)));
             }
+
+            if (geminiEnabled)
+            {
+                foreach (var model in geminiModels.Skip(1))
+                {
+                    var fallbackModel = model;
+                    attempts.Add(new VisionProviderAttempt("Gemini", fallbackModel,
+                        VisionProviderFallback.GeminiTimeoutSeconds(configuration),
+                        token => ExtractWithGeminiAsync(geminiKey!, fallbackModel, aiMime, aiBytes, token)));
+                }
+            }
+
+            var response = await VisionProviderFallback.ExecuteAsync(
+                "ItemTag",
+                attempts,
+                HasUsableItemTagExtraction,
+                log,
+                ct,
+                TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
 
             if (response is JsonObject json)
             {
@@ -157,16 +218,10 @@ public sealed class ItemTagCaptureService(
                 status = "ReadyForReview";
             }
         }
-        catch (TaskCanceledException e) when (!ct.IsCancellationRequested)
-        {
-            log.LogWarning("Item-tag extraction timed out for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
-        }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            log.LogWarning("Item-tag extraction failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
-        }
         finally
         {
+            if (!ReferenceEquals(aiBytes, bytes))
+                CryptographicOperations.ZeroMemory(aiBytes);
             CryptographicOperations.ZeroMemory(bytes);
         }
 
@@ -174,6 +229,7 @@ public sealed class ItemTagCaptureService(
         string? matchReason = null;
         if (status == "ReadyForReview")
         {
+            var matchTimer = Stopwatch.StartNew();
             try
             {
                 (suggestedProductId, matchReason) = await MatchProductAsync(uid, tenantId.Value, extracted, ct);
@@ -181,6 +237,12 @@ public sealed class ItemTagCaptureService(
             catch (Exception e) when (e is NpgsqlException or InvalidOperationException)
             {
                 log.LogWarning("Item-tag catalogue matching failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
+            }
+            finally
+            {
+                matchTimer.Stop();
+                log.LogInformation("Item-tag catalogue match completed. Capture {CaptureId}, matched {Matched}, duration {MatchMs}ms",
+                    id, suggestedProductId is not null, matchTimer.ElapsedMilliseconds);
             }
         }
 
@@ -199,7 +261,11 @@ public sealed class ItemTagCaptureService(
             await s.CommitAsync(ct);
         }
 
-        return await GetAsync(uid, id, ct);
+        var result = await GetAsync(uid, id, ct);
+        requestTimer.Stop();
+        log.LogInformation("Item-tag upload completed. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
+            id, contentType, bytes.Length, status, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
+        return result;
     }
 
     public async Task<ServiceResult<object>> GetAsync(Guid uid, Guid id, CancellationToken ct)
@@ -349,9 +415,8 @@ public sealed class ItemTagCaptureService(
         return ServiceResult<object>.Ok(new { id, deleted = true });
     }
 
-    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string mime, byte[] bytes, CancellationToken ct)
+    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string model, string mime, byte[] bytes, CancellationToken ct)
     {
-        var model = configuration["Gemini:ItemTagModel"] ?? configuration["Gemini:Model"] ?? "gemini-3.5-flash";
         var parts = new JsonArray
         {
             new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = mime, ["data"] = Convert.ToBase64String(bytes) } },
@@ -374,6 +439,11 @@ public sealed class ItemTagCaptureService(
         using var response = await http.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
         var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+        var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
+        var blockReason = root?["promptFeedback"]?["blockReason"]?.GetValue<string>();
+        if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrWhiteSpace(blockReason))
+            throw new VisionProviderRefusalException("Gemini declined the item-tag extraction request.");
         var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
@@ -381,50 +451,94 @@ public sealed class ItemTagCaptureService(
     async Task<(Guid? ProductId, string? Reason)> MatchProductAsync(
         Guid uid, Guid tenantId, JsonObject extraction, CancellationToken ct)
     {
-        var rawBarcode = ReadString(extraction["barcode"]);
-        var (normalisedBarcode, barcodeError) = BarcodeRules.Normalize(rawBarcode);
-        await using var s = await db.BeginAsync(uid, tenantId, ct);
-        if (barcodeError is null && normalisedBarcode is not null)
-        {
-            await using var barcode = s.Command(@"
-                select p.id from catalog.product_barcode b
-                join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
-                where b.code=@code and p.is_active");
-            barcode.Parameters.AddWithValue("code", normalisedBarcode);
-            var found = await barcode.ExecuteScalarAsync(ct);
-            if (found is Guid productId) return (productId, "Exact local barcode");
-        }
-
+        var barcodeHint = BarcodeRules.Normalize(ReadString(extraction["barcode"]));
+        var barcode = barcodeHint.Error is null ? barcodeHint.Code : null;
         var model = ProductRules.Normalize(ReadString(extraction["model"]));
         var brand = ReadString(extraction["brand"])?.Trim() ?? "";
-        var matches = new List<Guid>();
-        if (model.Length > 0)
-        {
-            await using var models = s.Command(@"
-                select id from catalog.product
-                where is_active and catalog.norm_text(model)=@model
-                  and (@brand='' or lower(coalesce(brand,''))=lower(@brand))
-                order by name limit 2");
-            models.Parameters.AddWithValue("model", model);
-            models.Parameters.AddWithValue("brand", brand);
-            await using (var reader = await models.ExecuteReaderAsync(ct))
-                while (await reader.ReadAsync(ct)) matches.Add(reader.GetGuid(0));
-            if (matches.Count == 1) return (matches[0], "Exact brand/model");
-        }
-
         var name = ProductRules.Normalize(ReadString(extraction["productName"]));
-        if (name.Length == 0) return (null, null);
-        await using var names = s.Command(@"
-            select id from catalog.product
-            where is_active and catalog.norm_text(name)=@name
-              and (@brand='' or lower(coalesce(brand,''))=lower(@brand))
-            order by name limit 2");
-        names.Parameters.AddWithValue("name", name);
-        names.Parameters.AddWithValue("brand", brand);
-        matches.Clear();
-        await using (var reader = await names.ExecuteReaderAsync(ct))
-            while (await reader.ReadAsync(ct)) matches.Add(reader.GetGuid(0));
-        return matches.Count == 1 ? (matches[0], "Exact local product name") : (null, null);
+
+        await using var s = await db.BeginAsync(uid, tenantId, ct);
+        await using var query = s.Command(@"
+            with candidates as (
+                select p.id, p.name, 1 as priority, 'Exact local barcode'::text as reason
+                from catalog.product_barcode b
+                join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
+                where @barcode <> '' and b.code=@barcode and p.is_active
+                union all
+                select p.id, p.name, 2 as priority, 'Exact brand/model'::text as reason
+                from catalog.product p
+                where @model <> '' and p.is_active
+                  and catalog.norm_text(p.model)=@model
+                  and (@brand='' or lower(coalesce(p.brand,''))=lower(@brand))
+                union all
+                select p.id, p.name, 3 as priority, 'Exact local product name'::text as reason
+                from catalog.product p
+                where @name <> '' and p.is_active
+                  and catalog.norm_text(p.name)=@name
+                  and (@brand='' or lower(coalesce(p.brand,''))=lower(@brand))
+            ),
+            unambiguous as (
+                select priority, id, name, reason
+                from candidates c
+                where (select count(distinct candidate.id) from candidates candidate where candidate.priority=c.priority)=1
+            )
+            select id,name,reason
+            from unambiguous
+            order by priority
+            limit 1");
+        query.Parameters.AddWithValue("barcode", barcode ?? "");
+        query.Parameters.AddWithValue("model", model);
+        query.Parameters.AddWithValue("brand", brand);
+        query.Parameters.AddWithValue("name", name);
+
+        await using var reader = await query.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct)
+            ? (reader.GetGuid(0), reader.GetString(2))
+            : (null, null);
+    }
+
+    static bool HasUsableItemTagExtraction(JsonNode? value)
+    {
+        if (value is not JsonObject obj) return false;
+        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn", "warranty", "specifications", "otherText" })
+            if (!string.IsNullOrWhiteSpace(ReadString(obj[key]))) return true;
+        try { return obj["mrp"]?.GetValue<decimal?>() is >= 0; }
+        catch (Exception e) when (e is InvalidOperationException or FormatException) { return false; }
+    }
+
+    static byte[] PrepareVisionImage(byte[] original, string mime, out string outputMime)
+    {
+        outputMime = mime;
+        try
+        {
+            using var source = SKBitmap.Decode(original);
+            if (source is null) return original;
+            var maxDimension = Math.Max(source.Width, source.Height);
+            const int maxAiDimension = 2200;
+            if (maxDimension <= maxAiDimension) return original;
+
+            var scale = (double)maxAiDimension / maxDimension;
+            var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+            var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+            using var resized = new SKBitmap(new SKImageInfo(width, height, source.ColorType, source.AlphaType));
+            using (var canvas = new SKCanvas(resized))
+            {
+                canvas.Clear(SKColors.White);
+                canvas.DrawBitmap(source, new SKRect(0, 0, width, height));
+                canvas.Flush();
+            }
+            using var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, 88);
+            if (encoded is null) return original;
+            using var stream = new MemoryStream();
+            encoded.SaveTo(stream);
+            outputMime = "image/jpeg";
+            return stream.ToArray();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            // Keep the original file for AI if this image format cannot be decoded here.
+            return original;
+        }
     }
 
     static JsonObject CleanExtraction(JsonObject source)

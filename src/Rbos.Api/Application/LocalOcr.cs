@@ -26,24 +26,62 @@ public sealed class LocalOcr(IConfiguration cfg, ILogger<LocalOcr> log)
     {
         if (exe.Value is null) return null;
         var tmp = Path.Combine(Path.GetTempPath(), "rbos-ocr-" + Guid.NewGuid().ToString("N"));
+        Process? process = null;
+        var timeoutSeconds = Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60);
         try
         {
             await File.WriteAllBytesAsync(tmp, image, ct);
-            var psi = new ProcessStartInfo(exe.Value, [tmp, "stdout", "--psm", "6"]) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            using var p = Process.Start(psi);
-            if (p is null) return null;
+            var psi = new ProcessStartInfo(exe.Value, [tmp, "stdout", "--psm", "6"])
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            process = Process.Start(psi);
+            if (process is null) return null;
+
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(60));
-            var text = await p.StandardOutput.ReadToEndAsync(timeout.Token);
-            await p.WaitForExitAsync(timeout.Token);
-            return p.ExitCode == 0 ? ToRows(text) : null;
+            timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            // Drain both redirected streams concurrently to avoid child-process pipe deadlocks.
+            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            var text = await stdout;
+            _ = await stderr;
+            return process.ExitCode == 0 ? ToRows(text) : null;
         }
-        catch (Exception e) when (e is IOException or OperationCanceledException or System.ComponentModel.Win32Exception)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            TryKill(process);
+            log.LogWarning("Local OCR exceeded its bounded {TimeoutSeconds}s time budget", timeoutSeconds);
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            TryKill(process);
+            throw;
+        }
+        catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception)
         {
             log.LogWarning(e, "Local OCR failed");
             return null;
         }
-        finally { try { File.Delete(tmp); } catch (IOException) { } }
+        finally
+        {
+            process?.Dispose();
+            try { File.Delete(tmp); } catch (IOException) { }
+        }
+    }
+
+    static void TryKill(Process? process)
+    {
+        try
+        {
+            if (process is not null && !process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
     }
 
     public static List<List<string>> ToRows(string text) =>

@@ -173,3 +173,21 @@ The discovery report and knowledge-transfer system snapshots are historical inve
 ### Language and demo qualification
 
 English remains the verified default. New Hindi onboarding and guidance strings are editable entries in the existing typed catalogue but remain draft translations pending a native Hindi speaker's review; this increment does not establish complete Hindi coverage. CI onboarding scenarios use synthetic tenants and disposable test data. The Development-only demo login is not an isolated in-app production demo; PR C does not introduce a production demo mode. No live shop data or AI provider credentials are used by the deterministic onboarding guide.
+
+
+## AI upload performance follow-up — 20 November 2026
+
+PR #55 remains open and draft on branch `perf/ai-upload-latency-and-provider-fallback`. Latest reviewed head at the time of this status note: `21fe930df131ed8ea07c2c8c5875289e0d0f1927`; later PR-description/docs-only commits may advance the branch. It is not merged or deployed.
+
+Additional review fixes committed after the initial PR #55 review:
+- Gemini HTTP 402 Payment Required now marks Gemini unavailable for the current provider chain, skipping remaining Gemini models while still allowing an independently configured Groq fallback. HTTP 429 remains eligible for fallback.
+- Groq multi-page invoice merge now preserves the first usable supplier/invoice-number/date fields, takes the last usable totals in page order, and concatenates line items in deterministic page order.
+- Item-tag upload concurrency now covers both local ZXing decoding and the upload/provider wait, capped at two gallery items.
+- Catalogue local PDF OCR now has a total processing budget (default 30 seconds; configurable 3–120 seconds) in addition to the per-image Tesseract timeout. Unrenderable, OCR-empty, and budget-skipped pages are reported in the local extraction warning.
+- Failed invoice provider-chain outcomes now log total request latency and a sanitized outcome.
+
+New regression coverage added for HTTP 402 versus HTTP 429 provider fallback and multi-page invoice metadata merge.
+
+**Validation limitation:** workflow #658 passed on the earlier head `d7c8655` with 147 backend unit tests and frontend/build checks. No workflow run is currently associated with the newer review-fix head `21fe930`; therefore these new changes have not yet been validated by CI. PostgreSQL integration tests, Playwright E2E and frontend npm tests also remain unverified/skipped in the earlier workflow.
+
+Multipart invoice transport and durable asynchronous item-tag extraction remain separate follow-up work. No provider credentials, Cloud Run settings, billing, production database or deployment state were changed.

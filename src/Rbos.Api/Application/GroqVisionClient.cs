@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Rbos.Api.Application;
@@ -13,6 +14,7 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
     const string DefaultModel = "qwen/qwen3.8-27b";
 
     public bool Available => !string.IsNullOrWhiteSpace(cfg["Groq:ApiKey"]);
+    public string Model => cfg["Groq:Model"] ?? DefaultModel;
 
     public async Task<JsonNode?> ExtractImageAsync(string mime, string base64, string prompt, CancellationToken ct)
     {
@@ -48,18 +50,41 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
             }
             if (images.Count > 6) return null;
         }
+
+        var batches = images.Chunk(3).ToArray();
+        var partials = await Task.WhenAll(batches.Select(batch =>
+            CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct)));
+        return MergeInvoicePageResults(partials);
+    }
+
+    public static JsonNode? MergeInvoicePageResults(IReadOnlyList<JsonNode?> partials)
+    {
         var merged = new JsonObject { ["lines"] = new JsonArray() };
-        foreach (var batch in images.Chunk(3))
+        var identityFields = new[] { "supplierName", "invoiceNumber", "date" };
+        var trailingSummaryFields = new[] { "total", "subtotal", "taxAmount" };
+        foreach (var partial in partials)
         {
-            var partial = await CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct);
             if (partial is not JsonObject) return null;
-            foreach (var key in new[] { "supplierName", "invoiceNumber", "date", "total", "subtotal", "taxAmount" })
-                if (partial[key] is not null) merged[key] = partial[key]!.DeepClone();
+            foreach (var key in identityFields)
+            {
+                if (HasUsableScalar(merged[key])) continue;
+                if (HasUsableScalar(partial[key])) merged[key] = partial[key]!.DeepClone();
+            }
+            foreach (var key in trailingSummaryFields)
+                if (HasUsableScalar(partial[key])) merged[key] = partial[key]!.DeepClone();
             if (partial["lines"] is JsonArray lines)
                 foreach (var line in lines)
                     if (line is not null) ((JsonArray)merged["lines"]!).Add(line.DeepClone());
         }
         return merged;
+    }
+
+    static bool HasUsableScalar(JsonNode? value)
+    {
+        if (value is null) return false;
+        if (value is JsonValue scalar && scalar.TryGetValue<string>(out var text))
+            return !string.IsNullOrWhiteSpace(text);
+        return value is JsonValue;
     }
 
     public async Task<JsonNode?> ExtractPdfAsync(byte[] pdf, string prompt, CancellationToken ct)
@@ -96,6 +121,38 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         return new JsonObject { ["products"] = combined };
     }
 
+    static (string? Type, string? Code, string? Parameter) ReadErrorMetadata(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("error", out var error) &&
+                error.ValueKind == JsonValueKind.Object)
+                root = error;
+
+            static string? ReadSafe(JsonElement element, string property)
+            {
+                if (element.ValueKind != JsonValueKind.Object ||
+                    !element.TryGetProperty(property, out var value) ||
+                    value.ValueKind != JsonValueKind.String)
+                    return null;
+                var raw = value.GetString();
+                if (string.IsNullOrWhiteSpace(raw)) return null;
+                return new string(raw.Take(64)
+                    .Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.')
+                    .ToArray());
+            }
+
+            return (ReadSafe(root, "type"), ReadSafe(root, "code"), ReadSafe(root, "param"));
+        }
+        catch (JsonException)
+        {
+            return (null, null, null);
+        }
+    }
+
     async Task<JsonNode?> CallAsync(IReadOnlyList<string> images, string prompt, CancellationToken ct)
     {
         var key = cfg["Groq:ApiKey"];
@@ -113,7 +170,7 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
 
         var body = new JsonObject
         {
-            ["model"] = cfg["Groq:Model"] ?? DefaultModel,
+            ["model"] = Model,
             ["temperature"] = 0,
             ["response_format"] = new JsonObject { ["type"] = "json_object" },
             ["messages"] = new JsonArray
@@ -134,12 +191,19 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         var responseBody = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
-            // Never log the request, authorization header, uploaded image or response payload.
-            log.LogWarning("Groq vision request failed with HTTP {StatusCode}", (int)response.StatusCode);
+            // Capture only bounded provider diagnostics. Never log the response body,
+            // prompt, uploaded image, authorization header or credential.
+            var metadata = ReadErrorMetadata(responseBody);
+            log.LogWarning(
+                "Groq vision request failed with HTTP {StatusCode}; error type {ErrorType}, code {ErrorCode}, parameter {ErrorParameter}",
+                (int)response.StatusCode, metadata.Type, metadata.Code, metadata.Parameter);
             response.EnsureSuccessStatusCode();
         }
 
         var root = JsonNode.Parse(responseBody);
+        var finishReason = root?["choices"]?[0]?["finish_reason"]?.GetValue<string>();
+        if (finishReason is "content_filter" or "safety" or "refusal")
+            throw new VisionProviderRefusalException("Groq declined the vision extraction request.");
         var text = root?["choices"]?[0]?["message"]?["content"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
