@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using Rbos.Api.Persistence;
@@ -30,6 +31,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
 
     public async Task<ServiceResult<object>> ExtractAsync(Guid uid, IReadOnlyList<(string? Mime, string? B64)> pages, CancellationToken ct)
     {
+        var requestTimer = Stopwatch.StartNew();
         if (pages.Count is 0 or > MaxPages) return ServiceResult<object>.Fail($"Upload 1 to {MaxPages} pages of one invoice.");
         var mime = pages[0].Mime; var b64 = pages[0].B64;
         var extra = new List<(string Mime, string B64)>();
@@ -95,6 +97,8 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
 
 
+        var draftTimer = Stopwatch.StartNew();
+        var suppliedBytes = bytes.Length + extra.Sum(page => (long)page.B64.Length * 3 / 4);
         await using var s = await db.BeginAsync(uid, tid, ct);
         var products = new List<(Guid Id, string Name)>();
         await using (var c = s.Command("select id, name from catalog.product where is_active"))
@@ -155,6 +159,12 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             await ins.ExecuteNonQueryAsync(ct);
         }
         await s.CommitAsync(ct);
+        draftTimer.Stop();
+        requestTimer.Stop();
+        log.LogInformation(
+            "Supplier invoice draft created. Pages {PageCount}, uploaded bytes {UploadedBytes}, stored bytes {StoredBytes}, lines {LineCount}, draft processing {DraftMs}ms, total latency {TotalMs}ms, trace {TraceId}",
+            providerPages.Count, suppliedBytes, stored.Length, lines.Count, draftTimer.ElapsedMilliseconds,
+            requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
         return ServiceResult<object>.Ok(new InvoiceDraft(fileId, supplierName, supplier?.Id, Clip(Str(parsed?["invoiceNumber"]), 60), date, total, lines, warnings, subtotal, tax));
     }
 
