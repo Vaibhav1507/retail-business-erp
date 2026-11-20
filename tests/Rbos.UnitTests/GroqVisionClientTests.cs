@@ -76,6 +76,36 @@ public sealed class GroqVisionClientTests
     }
 
     [Fact]
+    public async Task ExtractInvoiceAsync_BinaryPages_EncodesOnlyWhenBuildingProviderPayload()
+    {
+        string? capturedBody = null;
+        var handler = new StubHandler(async request =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"choices":[{"message":{"content":"{\"supplierName\":\"Acme\",\"lines\":[{\"description\":\"USB cable\",\"quantity\":1,\"unitCost\":10,\"amount\":10}]}"}}]}""",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        });
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Groq:ApiKey"] = "test-key",
+            ["Groq:Model"] = "qwen/qwen3.8-27b"
+        }).Build();
+        using var http = new HttpClient(handler);
+        var client = new GroqVisionClient(http, config, NullLogger<GroqVisionClient>.Instance);
+
+        var result = await client.ExtractInvoiceAsync(
+            [("image/png", new byte[] { 1, 2, 3 })], "Extract invoice", CancellationToken.None);
+
+        Assert.Equal("Acme", result?["supplierName"]?.GetValue<string>());
+        Assert.Contains("data:image/png;base64,AQID", capturedBody);
+    }
+
+    [Fact]
     public async Task ExtractInvoiceAsync_BatchesAtMostThreeImagesAndMergesLines()
     {
         var calls = 0;
