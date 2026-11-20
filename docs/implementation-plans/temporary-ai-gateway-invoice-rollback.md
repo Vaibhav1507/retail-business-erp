@@ -1,7 +1,7 @@
-# Temporary AI Gateway bypass for supplier invoice extraction
+# Temporary AI Gateway bypass for invoice and item-tag extraction
 
 **Status:** Temporary diagnostic rollback, introduced on 2026-11-20  
-**Tracking PR:** [#54 — restore legacy invoice providers for controlled comparison](https://github.com/Vaibhav1507/retail-business-erp/pull/54)  
+**Tracking PR:** [#54 — restore direct invoice providers for controlled comparison](https://github.com/Vaibhav1507/retail-business-erp/pull/54)  
 **Baseline:** `main` at `34d838cb60ea2c35f0e54139de2882e0bfa3d7d1`  
 **Purpose:** Isolate the supplier-invoice extraction failure by restoring the pre-AI-Gateway provider path without undoing later product features.
 
@@ -16,9 +16,9 @@ Supplier invoice photo/PDF extraction in `InvoiceExtractionService` temporarily 
 
 This is an intentional feature-level bypass, not a revert of the complete AI Gateway implementation. The gateway source, adapters, credential pool, usage ledger, configuration and migrations are retained in the repository.
 
-## Explicitly preserved: Generate Invoice item-tag photo AI detection
+## Explicitly preserved: Generate Invoice item-tag photo capture and evidence
 
-Do **not** remove or revert PR #46 (item-tag photo capture and sale evidence). It was implemented after the gateway and its `ItemTagCaptureService` currently calls `AiGateway` for optional structured extraction.
+Do **not** remove or revert PR #46 (item-tag photo capture and sale evidence). Its capture, barcode, review and evidence workflow is retained, but its optional AI extraction is now temporarily switched to direct provider calls in `ItemTagCaptureService`.
 
 The following PR #46 behaviour must remain intact:
 
@@ -30,14 +30,25 @@ The following PR #46 behaviour must remain intact:
 - Private photo evidence, tenant isolation, idempotency and atomic association with the posted sale line.
 - Migration `049_invoice_item_tag_captures.sql` and its retention/security rules.
 
-The item-tag workflow continues to use the AI Gateway during this temporary supplier-invoice bypass. Keep the gateway services and registrations required by `ItemTagCaptureService` in place. Do not remove migration 048 or its usage-ledger schema as part of this rollback.
+The item-tag AI extraction bypasses the AI Gateway too: it calls Gemini directly using `Gemini:ItemTagModel` (falling back to `Gemini:Model`, then `gemini-3.5-flash`) and optionally calls the existing direct Groq vision client when `Groq:ItemTagFallbackEnabled=true`. The typed item-tag HTTP client has a 90-second timeout. Keep the AI Gateway implementation, adapters, credential pool, usage ledger, configuration and migration 048 in the repository for future restoration; they remain available to other features.
 
 Reference: [PR #46 — capture invoice item tag photos and retain sale evidence](https://github.com/Vaibhav1507/retail-business-erp/pull/46).
+
+## Provider routing during the temporary bypass
+
+| Workflow | Temporary provider route |
+|---|---|
+| Supplier invoice photo/PDF extraction | Direct Gemini model chain; optional direct Groq Vision fallback |
+| Generate Invoice item-tag photo extraction | Direct Gemini; optional direct Groq Vision fallback |
+| Catalogue/product photo and PDF extraction | Existing AI Gateway route |
+| Voice workflows | Existing provider routing unchanged |
+
+The direct item-tag route does not create AI Gateway usage-ledger reservations. Provider keys remain server-side configuration only; uploaded photos and provider response bodies are not logged.
 
 ## What is not being reverted
 
 - Catalogue/product photo and PDF extraction.
-- Generate Invoice item-tag photo capture and AI extraction.
+- Generate Invoice item-tag photo capture, review and evidence (AI extraction now uses direct providers).
 - Voice navigation, local Shruti transcription, and their provider boundaries.
 - Gateway infrastructure and its provider adapters, credential pool, cost controls, usage ledger, tests, configuration and migration.
 - Any later RBOS business functionality, schema migrations, security controls or frontend changes.
