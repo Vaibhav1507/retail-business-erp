@@ -62,6 +62,35 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_SkipsRemainingGeminiModelsAfterPaymentRequiredButStillTriesGroq()
+    {
+        var groqAttempted = false;
+        var secondaryGeminiAttempted = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-4-hydrogen", _ =>
+                throw new HttpRequestException("payment required", null, HttpStatusCode.PaymentRequired)),
+            Attempt("Groq", "qwen/qwen3.8-27b", _ =>
+            {
+                groqAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Adapter" }) });
+            }),
+            Attempt("Gemini", "gemini-3.8-flash", _ =>
+            {
+                secondaryGeminiAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject { ["lines"] = new JsonArray(new JsonObject { ["description"] = "Should not run" }) });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice", attempts, HasLines, NullLogger.Instance, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(groqAttempted);
+        Assert.False(secondaryGeminiAttempted);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ContinuesToGeminiWhenGroqFails()
     {
         var order = new List<string>();
