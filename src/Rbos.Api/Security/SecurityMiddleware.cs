@@ -48,10 +48,10 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                 var hasBody = ctx.Request.ContentLength is > 0 || ctx.Request.Headers.ContainsKey("Transfer-Encoding");
                 if (hasBody && isItemTagPhotoUpload)
                 {
-                    var contentType = ctx.Request.ContentType?.Split(';')[0].Trim();
-                    if (!string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase))
+                    var imageContentType = ctx.Request.ContentType?.Split(';')[0].Trim();
+                    if (!string.Equals(imageContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(imageContentType, "image/png", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(imageContentType, "image/webp", StringComparison.OrdinalIgnoreCase))
                     {
                         ctx.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
                         await ctx.Response.WriteAsJsonAsync(new { error = "Choose a JPEG, PNG or WebP photo." });
