@@ -412,38 +412,38 @@ public sealed class ItemTagCaptureService(
                 select p.id, p.name, 1 as priority, 'Exact local barcode'::text as reason
                 from catalog.product_barcode b
                 join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
-                where @barcode::text is not null and b.code=@barcode and p.is_active
+                where @barcode <> '' and b.code=@barcode and p.is_active
                 union all
                 select p.id, p.name, 2 as priority, 'Exact brand/model'::text as reason
                 from catalog.product p
-                where @model::text <> '' and p.is_active
+                where @model <> '' and p.is_active
                   and catalog.norm_text(p.model)=@model
-                  and (@brand::text='' or lower(coalesce(p.brand,''))=lower(@brand))
+                  and (@brand='' or lower(coalesce(p.brand,''))=lower(@brand))
                 union all
                 select p.id, p.name, 3 as priority, 'Exact local product name'::text as reason
                 from catalog.product p
-                where @name::text <> '' and p.is_active
+                where @name <> '' and p.is_active
                   and catalog.norm_text(p.name)=@name
                   and (@brand::text='' or lower(coalesce(p.brand,''))=lower(@brand))
             ),
-            best_priority as (select min(priority) as priority from candidates)
-            select c.id,c.name,c.reason
-            from candidates c
-            join best_priority b on b.priority=c.priority
-            group by c.id,c.name,c.reason
-            order by c.name
-            limit 2");
-        query.Parameters.AddWithValue("barcode", (object?)barcode ?? DBNull.Value);
+            unambiguous as (
+                select priority, id, name, reason
+                from candidates c
+                where (select count(distinct candidate.id) from candidates candidate where candidate.priority=c.priority)=1
+            )
+            select id,name,reason
+            from unambiguous
+            order by priority
+            limit 1");
+        query.Parameters.AddWithValue("barcode", barcode ?? "");
         query.Parameters.AddWithValue("model", model);
         query.Parameters.AddWithValue("brand", brand);
         query.Parameters.AddWithValue("name", name);
 
-        var matches = new List<(Guid Id, string Reason)>();
-        await using (var reader = await query.ExecuteReaderAsync(ct))
-            while (await reader.ReadAsync(ct))
-                matches.Add((reader.GetGuid(0), reader.GetString(2)));
-
-        return matches.Count == 1 ? (matches[0].Id, matches[0].Reason) : (null, null);
+        await using var reader = await query.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct)
+            ? (reader.GetGuid(0), reader.GetString(2))
+            : (null, null);
     }
 
     static bool HasUsableItemTagExtraction(JsonNode? value)
