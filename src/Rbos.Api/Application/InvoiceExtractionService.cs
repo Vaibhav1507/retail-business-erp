@@ -51,22 +51,46 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
 
-        JsonNode? parsed = null;
-        if (!string.IsNullOrWhiteSpace(apiKey))
+        var providerPages = new List<(string Mime, string B64)> { (mime, b64) };
+        providerPages.AddRange(extra);
+        var attempts = new List<VisionProviderAttempt>();
+        var geminiModels = VisionProviderFallback.InvoiceGeminiModels(cfg);
+        var geminiEnabled = !string.IsNullOrWhiteSpace(apiKey);
+        var groqEnabled = groq.Available && cfg.GetValue("Groq:InvoiceFallbackEnabled", false);
+
+        if (geminiEnabled)
         {
-            try { parsed = await CallGeminiAsync(apiKey, [(mime, b64), .. extra], ct); }
-            catch (HttpRequestException e) when (e.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            { log.LogWarning("Gemini invoice extraction rate limited; trying configured fallback providers"); }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
-            { log.LogWarning(e, "Gemini invoice extraction failed; trying configured fallback providers"); }
+            var primaryModel = geminiModels[0];
+            attempts.Add(new VisionProviderAttempt("Gemini", primaryModel,
+                VisionProviderFallback.GeminiTimeoutSeconds(cfg),
+                token => CallModelAsync(primaryModel, apiKey!, providerPages, token)));
         }
 
-        if ((parsed is null || parsed["lines"] is not JsonArray { Count: > 0 }) && groq.Available && string.Equals(cfg["Groq:InvoiceFallbackEnabled"], "true", StringComparison.OrdinalIgnoreCase))
+        // The independent Groq provider is deliberately attempted before secondary Gemini models.
+        if (groqEnabled)
         {
-            try { parsed = await groq.ExtractInvoiceAsync([(mime, b64), .. extra], Prompt, ct); }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or InvalidOperationException)
-            { log.LogWarning(e, "Groq invoice extraction fallback failed"); }
+            attempts.Add(new VisionProviderAttempt("Groq", groq.Model,
+                VisionProviderFallback.GroqTimeoutSeconds(cfg),
+                token => groq.ExtractInvoiceAsync(providerPages, Prompt, token)));
         }
+
+        if (geminiEnabled)
+        {
+            foreach (var model in geminiModels.Skip(1))
+            {
+                var fallbackModel = model;
+                attempts.Add(new VisionProviderAttempt("Gemini", fallbackModel,
+                    VisionProviderFallback.GeminiTimeoutSeconds(cfg),
+                    token => CallModelAsync(fallbackModel, apiKey!, providerPages, token)));
+            }
+        }
+
+        var parsed = await VisionProviderFallback.ExecuteAsync(
+            "SupplierInvoice",
+            attempts,
+            HasUsableInvoiceLines,
+            log,
+            ct);
         if (parsed is null)
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
 
@@ -145,24 +169,12 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         return await r.ReadAsync(ct) ? (r.GetString(0), (byte[])r[1]) : null;
     }
 
-    async Task<JsonNode?> CallGeminiAsync(string apiKey, List<(string Mime, string B64)> pages, CancellationToken ct)
+    static bool HasUsableInvoiceLines(JsonNode? parsed)
     {
-        var models = new[] { cfg["Gemini:Model"] ?? "gemini-3.5-flash", cfg["Gemini:FallbackModel"] ?? "gemini-flash-latest", cfg["Gemini:LastResortModel"] ?? "gemini-2.5-flash-lite" }.Distinct().ToArray();
-        HttpRequestException? last = null;
-        foreach (var model in models)
-            for (var attempt = 0; attempt < 2; attempt++)
-            {
-                try { return await CallModelAsync(model, apiKey, pages, ct); }
-                catch (HttpRequestException e) when (e.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.InternalServerError or System.Net.HttpStatusCode.BadGateway or System.Net.HttpStatusCode.GatewayTimeout or System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.NotFound)
-                {
-                    last = e;
-                    log.LogWarning("Gemini model {Model} attempt {Attempt} failed with {Status}", model, attempt + 1, (int?)e.StatusCode);
-                    if (e.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.TooManyRequests) break;
-                    await Task.Delay(2000 * (attempt + 1), ct);
-                }
-            }
-        if (last is not null) throw last;
-        throw new InvalidOperationException("No Gemini model configured.");
+        if (parsed?["lines"] is not JsonArray { Count: > 0 } lines) return false;
+        return lines.Any(line =>
+            !string.IsNullOrWhiteSpace(Str(line?["description"])) &&
+            (Num(line?["quantity"]) is > 0 || Num(line?["amount"]) is > 0));
     }
 
     async Task<JsonNode?> CallModelAsync(string model, string apiKey, List<(string Mime, string B64)> pages, CancellationToken ct)
