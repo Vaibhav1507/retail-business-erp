@@ -203,6 +203,11 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         using var res = await http.SendAsync(req, ct);
         res.EnsureSuccessStatusCode();
         var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+        var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
+        var blockReason = root?["promptFeedback"]?["blockReason"]?.GetValue<string>();
+        if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrWhiteSpace(blockReason))
+            throw new VisionProviderRefusalException("Gemini declined the invoice extraction request.");
         var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
         return text is null ? null : JsonNode.Parse(text);
     }
