@@ -78,7 +78,7 @@ create or replace function integrations.cancel_item_tag_capture(
 ) returns boolean
 language plpgsql security definer
 set search_path = pg_catalog, integrations, core
-as $
+as $cancel$
 begin
   if p_tenant_id is distinct from core.current_tenant_id()
      or p_actor_user_id is distinct from core.current_user_id() then
@@ -91,7 +91,7 @@ begin
      and (lease_until is null or lease_until < now());
   return found;
 end;
-$;
+$cancel$;
 
 create or replace function integrations.finish_item_tag_capture(
   p_capture_id uuid, p_lease_token uuid, p_retry_at timestamptz
