@@ -22,15 +22,21 @@ public static class ItemTagCaptureWorker
         var groq = new GroqVisionClient(groqHttp, config, loggerFactory.CreateLogger<GroqVisionClient>());
         var service = new ItemTagCaptureService(
             db, geminiHttp, groq, config, loggerFactory.CreateLogger<ItemTagCaptureService>());
-        var pollSeconds = Math.Clamp(config.GetValue("AiPerformance:ItemTagQueuePollSeconds", 2), 1, 15);
+        logger.LogInformation("Item-tag worker started. Processing all currently available durable jobs.");
 
-        logger.LogInformation("Item-tag worker started. Poll interval {PollSeconds}s.", pollSeconds);
         while (!ct.IsCancellationRequested)
         {
             var claimed = await ClaimAsync(queueDataSource, ct);
-            if (claimed is null)
+            if (claimed is null) break;
+
+            // A lease that had to be reclaimed means the previous process may have
+            // completed a paid provider call but crashed before persisting the result.
+            // Do not repeat the AI request blindly; preserve the photo for manual review.
+            if (claimed.AttemptCount > 1)
             {
-                await Task.Delay(TimeSpan.FromSeconds(pollSeconds), ct);
+                await service.MarkNeedsAttentionAsync(claimed.ActorUserId, claimed.TenantId, claimed.CaptureId, ct);
+                await FinishAsync(queueDataSource, claimed, null, ct);
+                logger.LogWarning("Item-tag job lease was recovered after an uncertain attempt. Capture {CaptureId} moved to NeedsAttention without replaying provider calls.", claimed.CaptureId);
                 continue;
             }
 
@@ -41,7 +47,8 @@ public static class ItemTagCaptureWorker
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                // Keep the lease. Another process can safely reclaim it after expiry.
+                // Keep the lease. A later scheduled execution will recover it, without
+                // repeating a possibly-paid provider attempt.
                 throw;
             }
             catch (Exception ex)
@@ -49,14 +56,12 @@ public static class ItemTagCaptureWorker
                 logger.LogError(ex,
                     "Item-tag job failed. Capture {CaptureId}, attempt {AttemptCount}, error type {ErrorType}.",
                     claimed.CaptureId, claimed.AttemptCount, ex.GetType().Name);
-                DateTimeOffset? retryAt = claimed.AttemptCount < 5
-                    ? DateTimeOffset.UtcNow.AddSeconds(Math.Min(300, 10 * Math.Pow(2, claimed.AttemptCount - 1)))
-                    : null;
-                if (retryAt is null)
-                    await service.MarkNeedsAttentionAsync(claimed.ActorUserId, claimed.TenantId, claimed.CaptureId, ct);
-                await FinishAsync(queueDataSource, claimed, retryAt, ct);
+                await service.MarkNeedsAttentionAsync(claimed.ActorUserId, claimed.TenantId, claimed.CaptureId, ct);
+                await FinishAsync(queueDataSource, claimed, null, ct);
             }
         }
+
+        logger.LogInformation("Item-tag worker finished draining available jobs.");
     }
 
     static async Task<Claimed?> ClaimAsync(NpgsqlDataSource source, CancellationToken ct)
