@@ -29,7 +29,7 @@ public static class ProcurementEndpoints
 		api.MapGet("/purchases", async (Guid? supplierId, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct) => Reply(await svc.ReceiptsAsync(Uid(p), supplierId, ct))).RequireAuthorization();
 		api.MapPost("/purchases", async (ReceiptRequest m, HttpRequest req, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct)
 			=> Reply(await svc.ReceiveAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.SupplierId, m.LocationId, m.ReceiptDate, m.SupplierRef, m.Lines, m.InvoiceFileId), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
-        const long maxMultipartBytes = 26L * 1024 * 1024;
+        const long maxMultipartBytes = 13L * 1024 * 1024;
         var extractInvoice = api.MapPost("/purchases/extract", async (
             HttpRequest request, ClaimsPrincipal p, InvoiceExtractionService x, CancellationToken ct) =>
         {
@@ -48,8 +48,8 @@ public static class ProcurementEndpoints
                     if (file.Length is 0 or > InvoiceExtractionService.MaxFileBytes)
                         return Fail(413, "Each invoice page must be between 1 byte and 8 MB.");
                     totalBytes += file.Length;
-                    if (totalBytes > 24L * 1024 * 1024)
-                        return Fail(413, "The invoice pages together exceed 24 MB.");
+                    if (totalBytes > 12L * 1024 * 1024)
+                        return Fail(413, "The invoice pages together exceed 12 MB.");
 
                     await using var buffer = new MemoryStream((int)file.Length);
                     await file.CopyToAsync(buffer, ct);
