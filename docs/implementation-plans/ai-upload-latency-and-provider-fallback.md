@@ -41,7 +41,7 @@ This order follows the proposed “Gemini primary → Groq → other Gemini fall
 - A refusal is not treated as a transient availability failure and must not be bypassed by trying another model to evade provider safety handling.
 - Caller cancellation always stops the chain immediately.
 
-Provider-specific attempt timeouts are configuration values with conservative defaults and hard bounds. The initial defaults are 25 seconds for Gemini and 18 seconds for Groq. They are not a promise that every extraction should take that long: a healthy primary should return much sooner, while a slow provider is cut off before consuming the old 60–90 second typed-client timeouts. We will adjust these values after measuring real invoice/tag results.
+Provider-specific attempt timeouts are configuration values with hard bounds. The branch defaults are **18 seconds for each Gemini attempt and 12 seconds for each Groq attempt**, configured by `AiPerformance:GeminiAttemptTimeoutSeconds` and `AiPerformance:GroqAttemptTimeoutSeconds`. A healthy primary should return much sooner; a slow provider is cut off before consuming the old 60–90 second typed-client timeouts. These values are initial safety caps and should be tuned only after measuring real invoice/tag results.
 
 ## 2. Verified source findings
 
@@ -267,3 +267,56 @@ After deployment approval and real test uploads, compare p50/p95 by workflow and
 - Change WhatsApp or GST workflows.
 - Deploy, modify production secrets, rotate keys, create paid subscriptions, alter database roles or run migrations against production.
 - Automatically post supplier purchases or sales based only on AI output.
+
+
+## 11. Implementation status on branch `perf/ai-upload-latency-and-provider-fallback`
+
+The following code changes have been made on this branch, on top of main. They are **not merged or deployed**.
+
+### Implemented in code
+
+- Added a shared direct-provider fallback runner for supplier invoices and item tags:
+  1. Gemini primary (`gemini-4-hydrogen` by default).
+  2. Groq Vision (`qwen/qwen3.8-27b`) if the workflow's existing feature flag is enabled and a Groq key is configured.
+  3. Gemini secondary (`gemini-3.8-flash` by default).
+  4. Gemini final fallback (`gemini-3.5-flash-lite` by default).
+- The fallback runner makes one bounded attempt per model. It does not repeat a slow model, and it removes the former multi-second 2s/4s sleep delays.
+- A 401/403 stops further attempts against that provider's key but still permits an independently configured fallback provider.
+- Invalid/empty structured output continues to the next eligible provider. A Gemini safety/block response or Groq safety refusal stops the chain rather than silently falling through.
+- Configured attempt defaults: Gemini 18 seconds; Groq 12 seconds. The appsettings defaults match the code defaults.
+- Supplier invoice extraction now uses the new order and validates that a response contains at least one line with a description and quantity or amount. Invoice output remains an unsaved draft.
+- Item-tag extraction now uses the same order and validates that the response contains at least one meaningful tag field. A locally detected barcode remains preserved even when AI extraction cannot provide other fields.
+- Item-tag photos retain the original upload in `sales.item_tag_capture`; when the long edge exceeds 2,200 pixels, a JPEG quality-88 derivative is sent to AI only.
+- Removed the separate pre-upload barcode lookup request in the browser. The server still normalizes/validates the barcode and makes the catalogue suggestion.
+- Limited simultaneous item-tag uploads to two in the browser.
+- Item-tag catalogue matching now uses one priority-ordered query (barcode, exact brand/model, exact local name) and returns a suggestion only when the best-priority match is unique.
+- Expiry/stale-capture cleanup is now throttled to once per tenant per 15 minutes per API instance instead of running on every item-tag photo upload. Attached sale evidence remains excluded from cleanup.
+- Groq invoice batches are executed concurrently in groups of up to three images and merged in page order. The maximum six-page invoice therefore creates at most two concurrent Groq calls.
+- Groq HTTP failures now log only safe bounded metadata (HTTP status, error type, code and parameter); raw response bodies, images and credentials are not logged.
+- Local Tesseract OCR now has a configurable 12-second default limit (3–60 seconds), drains stdout/stderr concurrently and terminates a timed-out OCR process.
+- Added safe timing telemetry for provider attempts, item-tag image preparation, item-tag catalogue matching, item-tag total upload time and supplier-invoice total draft time. Logs include bounded metadata only.
+- Added unit tests for model defaults/legacy alias filtering, Gemini → Groq → Gemini order, Groq failure, invalid structured output, credential failure, cancellation and refusal handling.
+- CI has been changed to run the backend unit-test project. PostgreSQL integration tests and Playwright E2E remain disabled pending their service fixtures.
+
+### Not implemented yet — remain explicit follow-up items
+
+1. **Binary multipart supplier-invoice upload.** The browser still sends base64-encoded pages in JSON. This branch has not changed the upload contract. A separate compatible multipart endpoint is still needed to reduce transfer size and memory copies while preserving the current JSON route during migration.
+2. **Durable asynchronous item-tag extraction.** The API still waits for provider extraction before returning the full capture. A durable queue/worker with tenant-safe claim/complete semantics is the next major perceived-latency improvement. Do not replace this with untracked `Task.Run` work.
+3. **Catalogue upload stage instrumentation and OCR routing.** OCR is bounded at 12 seconds, but PDF page text/render/OCR/provider stages are not yet individually timed, and the product import frontend does not yet provide upload-to-result timing.
+4. **Client/server upload-stage telemetry.** The code logs extraction durations and some payload sizes, but it does not yet separately measure browser file preparation, API request-body read, network transfer, cold-start pending latency and complete browser upload-to-review time.
+5. **Representative accuracy/latency benchmark.** No real document batch has been run against the new models from this branch. No measured p50/p95 or percentage speed improvement can be claimed yet.
+6. **Live Google project model/quotas.** The repo and historical screenshots cannot prove that the configured Google AI Studio project currently has API access and Free Tier quota for each model. Verify from that project without exposing API-key values.
+7. **Current Cloud Run secret mapping.** The 18 November screenshots show the Secret Manager resources and API-key environment-variable names, but do not prove the mapping in the current serving revision. Verify the secret *resource names and environment variable targets* with values redacted before deployment.
+8. **Groq account and item-tag fallback.** The existing screenshot shows `Groq__InvoiceFallbackEnabled=true` at that point in time. It does not show `Groq__ItemTagFallbackEnabled`; item-tag fallback remains off by default. Do not enable it without confirming account quota/cost and owner approval.
+9. **Integration/E2E tests.** The unit test project is now configured to run in CI. PostgreSQL integration and Playwright E2E are still skipped; a green build/unit run is not a full production verification.
+10. **Cloud Run sizing/cold starts.** The runbook still uses `--min-instances 0` and `--max-instances 1`. No infrastructure setting has been changed. Measure pending latency and instance saturation before considering a warm instance or different capacity.
+11. **Provider timeout tuning.** 18s/12s are initial caps. After representative usage, tune by workflow/model and p95. Do not increase these just to mask a slow or unavailable model.
+
+### Safety and rollout state
+
+- No API keys, secret values, database credentials, customer data or uploaded documents were added to source control.
+- No Cloud Run environment variables, Secret Manager mappings, model quotas, billing settings or service account permissions were modified.
+- No database migration was added or applied.
+- No deployment or production test was performed.
+- The AI Gateway remains bypassed for supplier invoice and item-tag extraction as per PR #54; this branch does not re-enable it. Catalogue and voice Gateway paths are unchanged.
+- Do not merge/deploy until backend build, unit tests, frontend checks, container build and the remaining validation gaps are reviewed. After deployment approval, measure p50/p95 and extraction accuracy before declaring the improvement complete.
