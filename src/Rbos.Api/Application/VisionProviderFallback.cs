@@ -60,9 +60,12 @@ public static class VisionProviderFallback
         ILogger logger,
         CancellationToken ct)
     {
+        var unavailableProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var attempt in attempts)
         {
             ct.ThrowIfCancellationRequested();
+            if (unavailableProviders.Contains(attempt.Provider))
+                continue;
             var timer = Stopwatch.StartNew();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(attempt.TimeoutSeconds, 5, 60)));
@@ -96,6 +99,11 @@ public static class VisionProviderFallback
                 logger.LogWarning(
                     "Vision provider attempt failed. Feature {Feature}, provider {Provider}, model {Model}, HTTP {StatusCode}, latency {LatencyMs}ms",
                     feature, attempt.Provider, attempt.Model, (int?)e.StatusCode, timer.ElapsedMilliseconds);
+
+                // Credential/permission/billing errors apply to every model under this provider.
+                // Do not spend the request budget repeating the same bad key on fallback models.
+                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                    unavailableProviders.Add(attempt.Provider);
             }
             catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
             {
