@@ -15,7 +15,7 @@ export async function prepare(file: File): Promise<File> {
     if (file.size > MAX_BYTES) throw new Error('PDF is larger than 8 MB.')
     return file
   }
-  if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a JPEG, PNG, WebP photo or a PDF.')
   const bmp = await createImageBitmap(file)
   try {
     const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height))
@@ -69,7 +69,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     try {
       const pages = await Promise.all(files.map(prepare))
       const totalBytes = pages.reduce((total, file) => total + file.size, 0)
-      if (totalBytes > MAX_BYTES * 6) throw new Error('The selected invoice pages together exceed 48 MB.')
+      if (totalBytes > 24 * 1024 * 1024) throw new Error('The selected invoice pages together exceed 24 MB.')
       const form = new FormData()
       pages.forEach(file => form.append('pages', file, file.name))
       const d = await apiForm<InvoiceDraft>('POST', '/purchases/extract', form)
@@ -146,7 +146,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     <div role="region" aria-label="Read invoice" className="invoice-upload">
       <label className="invoice-upload-pick">
         Upload invoice photo or PDF (optional). Select all pages of one invoice together.
-        <input type="file" accept="image/*,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
       </label>
       {busy && <p role="status">Reading invoice...</p>}
       {error && <p role="alert">{error}</p>}
