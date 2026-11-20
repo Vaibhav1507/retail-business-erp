@@ -218,6 +218,11 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
             Assert.Equal(1, reader.GetInt32(2));
         }
 
+        // A user must not be able to delete evidence while an active worker may
+        // already be making a paid provider call.
+        var activeDelete = await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id);
+        Assert.Equal(HttpStatusCode.Conflict, activeDelete.StatusCode);
+
         // A second scheduled invocation must not claim a job with a live lease.
         await using (var connection = await worker.OpenConnectionAsync())
         await using (var claim = new NpgsqlCommand(
