@@ -57,6 +57,38 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         return MergeInvoicePageResults(partials);
     }
 
+    public async Task<JsonNode?> ExtractInvoiceAsync(IReadOnlyList<(string Mime, byte[] Bytes)> pages, string prompt, CancellationToken ct)
+    {
+        if (!Available || pages.Count is 0 or > 6) return null;
+        var images = new List<string>();
+        foreach (var (mime, bytes) in pages)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (mime == "application/pdf")
+            {
+                var pdfPages = PdfPageReader.Read(bytes);
+                if (pdfPages is null || pdfPages.Count is 0 or > 6) return null;
+                foreach (var page in pdfPages)
+                {
+                    var png = PdfPageReader.RenderPng(bytes, page.Page);
+                    if (png is null) return null;
+                    images.Add("data:image/png;base64," + Convert.ToBase64String(png));
+                }
+            }
+            else
+            {
+                if (mime is not ("image/jpeg" or "image/png" or "image/webp")) return null;
+                images.Add("data:" + mime + ";base64," + Convert.ToBase64String(bytes));
+            }
+            if (images.Count > 6) return null;
+        }
+
+        var batches = images.Chunk(3).ToArray();
+        var partials = await Task.WhenAll(batches.Select(batch =>
+            CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct)));
+        return MergeInvoicePageResults(partials);
+    }
+
     public static JsonNode? MergeInvoicePageResults(IReadOnlyList<JsonNode?> partials)
     {
         var merged = new JsonObject { ["lines"] = new JsonArray() };

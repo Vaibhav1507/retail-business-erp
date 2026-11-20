@@ -1,6 +1,6 @@
 import './invoice-upload.css'
 import { useState } from 'react'
-import { api } from './api'
+import { api, apiForm } from './api'
 
 type Opt = { id: string; name: string }
 type DraftLine = { description: string; quantity: number | null; unitCost: number | null; amount: number | null; productId: string | null; productName: string | null; category?: string | null; brand?: string | null; gst?: number | null }
@@ -10,28 +10,60 @@ export type Picked = { productId: string; quantity: number; unitCost: number; gs
 
 const MAX_BYTES = 8 * 1024 * 1024
 
-export const toBase64 = (b: Blob) => new Promise<string>((resolve, reject) => {
-  const r = new FileReader()
-  r.onload = () => resolve(String(r.result).split(',')[1] ?? '')
-  r.onerror = () => reject(r.error)
-  r.readAsDataURL(b)
+export const toBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+  reader.onerror = () => reject(reader.error ?? new Error('Could not read the file.'))
+  reader.readAsDataURL(blob)
 })
 
+async function prepareImageBlob(file: File, invoicePage = false): Promise<Blob> {
+  if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
+  if (invoicePage) {
+    if (file.size === 0 || file.size > 24 * 1024 * 1024)
+      throw new Error('The original invoice photo must be 24 MB or smaller.')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
+      throw new Error('Choose a JPEG, PNG, WebP photo or a PDF.')
+  }
+  const bitmap = await createImageBitmap(file)
+  try {
+    const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not prepare the photo.')
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+    if (!blob) throw new Error('Could not prepare the photo.')
+    if (invoicePage && (blob.size === 0 || blob.size > MAX_BYTES))
+      throw new Error('Prepared invoice photo must be 8 MB or smaller.')
+    return blob
+  } finally {
+    bitmap.close()
+  }
+}
+
+// Compatibility helper used by the Stock Setup Assistant's existing JSON/base64
+// product-catalogue import route. Keep that workflow unchanged while invoice
+// purchases use prepareMultipartPage() below.
 export async function prepare(file: File): Promise<{ contentType: string; data: string }> {
   if (file.type === 'application/pdf') {
     if (file.size > MAX_BYTES) throw new Error('PDF is larger than 8 MB.')
     return { contentType: file.type, data: await toBase64(file) }
   }
-  if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
-  const bmp = await createImageBitmap(file)
-  const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bmp.width * scale)
-  canvas.height = Math.round(bmp.height * scale)
-  canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height)
-  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-  if (!blob) throw new Error('Could not prepare the photo.')
-  return { contentType: 'image/jpeg', data: await toBase64(blob) }
+  const image = await prepareImageBlob(file)
+  return { contentType: 'image/jpeg', data: await toBase64(image) }
+}
+
+// Binary-only preparation for the supplier invoice multipart route.
+async function prepareMultipartPage(file: File): Promise<File> {
+  if (file.type === 'application/pdf') {
+    if (file.size === 0 || file.size > MAX_BYTES) throw new Error('PDF must be between 1 byte and 8 MB.')
+    return file
+  }
+  const image = await prepareImageBlob(file, true)
+  return new File([image], 'invoice-page.jpg', { type: 'image/jpeg' })
 }
 
 const NEW = '__new__'
@@ -69,8 +101,12 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     if (files.length > 6) { setError('Choose at most 6 pages of one invoice.'); return }
     setBusy(true); setError(''); setDraft(null)
     try {
-      const pages = await Promise.all(files.map(prepare))
-      const d = await api<InvoiceDraft>('POST', '/purchases/extract', { pages })
+      const pages = await Promise.all(files.map(prepareMultipartPage))
+      const totalBytes = pages.reduce((total, file) => total + file.size, 0)
+      if (totalBytes > 12 * 1024 * 1024) throw new Error('The selected invoice pages together exceed 12 MB.')
+      const form = new FormData()
+      pages.forEach(file => form.append('pages', file, file.name))
+      const d = await apiForm<InvoiceDraft>('POST', '/purchases/extract', form)
       setDraft(d); setSupplierId(d.supplierId ?? '')
       setRows(withSpreadTax(d.lines.map(l => ({ description: l.description, productId: l.productId ?? '', qty: l.quantity?.toString() ?? '',
         cost: l.unitCost?.toString() ?? '', gst: l.gst?.toString() ?? '', category: l.category ?? undefined, brand: l.brand ?? undefined })), d.taxAmount ?? 0))
@@ -144,7 +180,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     <div role="region" aria-label="Read invoice" className="invoice-upload">
       <label className="invoice-upload-pick">
         Upload invoice photo or PDF (optional). Select all pages of one invoice together.
-        <input type="file" accept="image/*,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
       </label>
       {busy && <p role="status">Reading invoice...</p>}
       {error && <p role="alert">{error}</p>}

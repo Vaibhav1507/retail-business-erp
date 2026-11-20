@@ -36,6 +36,26 @@ export async function api<T>(method: string, path: string, body?: unknown, idemp
   return data as T
 }
 
+export async function apiForm<T>(method: string, path: string, body: FormData, signal?: AbortSignal): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (method !== 'GET') headers['X-CSRF-TOKEN'] = await token()
+  const r = await fetch('/api' + path, {
+    method,
+    headers,
+    credentials: 'same-origin',
+    body,
+    signal,
+  })
+  if (method !== 'GET' && r.status === 400) csrf = null
+  const text = await r.text()
+  const data = text ? JSON.parse(text) : undefined
+  if (!r.ok) {
+    const d = data as { error?: string; detail?: string; title?: string } | undefined
+    throw new ApiError(r.status, d?.error ?? d?.detail ?? d?.title ?? 'Request failed')
+  }
+  return data as T
+}
+
 export async function apiBinary<T>(path: string, body: Blob, signal?: AbortSignal, idempotencyKey?: string, extraHeaders?: Record<string, string>): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': body.type || 'application/octet-stream', 'X-CSRF-TOKEN': await token() }
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey
