@@ -30,6 +30,7 @@ public static class ProcurementEndpoints
 		api.MapPost("/purchases", async (ReceiptRequest m, HttpRequest req, ClaimsPrincipal p, ProcurementService svc, CancellationToken ct)
 			=> Reply(await svc.ReceiveAsync(Uid(p), req.Headers["Idempotency-Key"].ToString(), new(m.SupplierId, m.LocationId, m.ReceiptDate, m.SupplierRef, m.Lines, m.InvoiceFileId), req.HttpContext.TraceIdentifier, ct))).RequireAuthorization();
         const long maxMultipartBytes = 13L * 1024 * 1024;
+        const long maxRequestBytes = 18L * 1024 * 1024;
         var extractInvoice = api.MapPost("/purchases/extract", async (
             HttpRequest request, ClaimsPrincipal p, InvoiceExtractionService x, CancellationToken ct) =>
         {
@@ -70,7 +71,7 @@ public static class ProcurementEndpoints
                 ct));
         }).RequireAuthorization();
         extractInvoice.WithMetadata(
-            new RequestSizeLimitAttribute(maxMultipartBytes),
+            new RequestSizeLimitAttribute(maxRequestBytes),
             new RequestFormLimitsAttribute
             {
                 MultipartBodyLengthLimit = maxMultipartBytes,
