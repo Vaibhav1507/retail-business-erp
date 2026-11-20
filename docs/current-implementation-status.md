@@ -177,7 +177,7 @@ English remains the verified default. New Hindi onboarding and guidance strings 
 
 ## AI upload performance follow-up — 20 November 2026
 
-PR #55 remains open and draft on branch `perf/ai-upload-latency-and-provider-fallback`. Latest reviewed head at the time of this status note: `21fe930df131ed8ea07c2c8c5875289e0d0f1927`; later PR-description/docs-only commits may advance the branch. It is not merged or deployed.
+PR #55 was subsequently merged to `main` at `b1cfffcca6e7d91bc000112966d3acc6c2518ca7` on 20 November 2026. The provider-fallback, image-preparation, telemetry and OCR changes below are part of the merged baseline.
 
 Additional review fixes committed after the initial PR #55 review:
 - Gemini HTTP 402 Payment Required now marks Gemini unavailable for the current provider chain, skipping remaining Gemini models while still allowing an independently configured Groq fallback. HTTP 429 remains eligible for fallback.
@@ -188,7 +188,7 @@ Additional review fixes committed after the initial PR #55 review:
 
 New regression coverage added for HTTP 402 versus HTTP 429 provider fallback and multi-page invoice metadata merge.
 
-**Validation limitation:** workflow #658 passed on the earlier head `d7c8655` with 147 backend unit tests and frontend/build checks. No workflow run is currently associated with the newer review-fix head `21fe930`; therefore these new changes have not yet been validated by CI. PostgreSQL integration tests, Playwright E2E and frontend npm tests also remain unverified/skipped in the earlier workflow.
+**Historical validation note:** workflow #658 was an earlier-head run only and is superseded by the merged PR #55 baseline. The two follow-up PRs have their own exact-head CI runs; see the latest follow-up status section below. PostgreSQL integration tests are being enabled through a disposable PostgreSQL 17 CI job; Playwright E2E and real provider uploads remain a separate pilot acceptance gate.
 
 Multipart invoice transport and durable asynchronous item-tag extraction remain separate follow-up work. No provider credentials, Cloud Run settings, billing, production database or deployment state were changed.
 
@@ -211,3 +211,10 @@ Multipart invoice transport and durable asynchronous item-tag extraction remain 
 - Browser image preparation accepts only JPEG, PNG and WebP; PDFs retain their original bytes. The browser sends multipart `pages` fields without setting Content-Type manually. The API retains the JSON/base64 compatibility route.
 - Original bytes remain the retained evidence; base64 conversion occurs only at the Gemini/Groq provider request boundary. Extraction output remains a reviewable draft and is never posted automatically.
 - Latest CI and E2E validation are pending; do not treat this branch as merge-ready until a fresh PR workflow passes.
+
+
+## Follow-up PR validation snapshot — 20 November 2026
+
+- PR #57 multipart supplier invoice upload remains draft/unmerged on branch perf/multipart-supplier-invoice-upload. Standard exact-head CI passed on 76455c459e567a9467337eba9e5e7086baf77741: backend Release build, backend unit tests, container build, frontend typecheck/lint/build and high/critical dependency audit. The branch then adds a disposable PostgreSQL 17 integration-test job; its latest workflow run is still in progress. Playwright and a live AI-provider upload have not been run.
+- PR #56 durable asynchronous item-tag processing remains draft/unmerged on branch feat/durable-async-item-tag-processing. Standard backend Release build, unit tests, container build and frontend checks passed on the code head before the last migration cancellation guard. The new latest run applies migrations to disposable PostgreSQL 17 and runs the PostgreSQL integration suite, including item-tag queue permissions, queued cancellation, live-lease deletion rejection and expired-lease recovery. That run is still in progress; do not call SQL/runtime behavior fully validated until it succeeds.
+- Both PRs remain unmerged and undeployed. Migration 050 is not applied to the pilot database; the scheduled Cloud Run Job command and secret mapping are unchanged.
