@@ -301,20 +301,20 @@ The following code changes have been made on this branch, on top of main. They a
   3. Gemini secondary (`gemini-3.8-flash` by default).
   4. Gemini final fallback (`gemini-3.5-flash-lite` by default).
 - The fallback runner makes one bounded attempt per model. It does not repeat a slow model, and it removes the former multi-second 2s/4s sleep delays.
-- A 401/403 stops further attempts against that provider's key but still permits an independently configured fallback provider.
+- A 401/403/402 stops further attempts against that provider's credentials or exhausted prepaid balance but still permits an independently configured fallback provider. HTTP 429 remains eligible for normal fallback.
 - Invalid/empty structured output continues to the next eligible provider. A Gemini safety/block response or Groq safety refusal stops the chain rather than silently falling through.
 - Configured attempt defaults: Gemini 18 seconds; Groq 12 seconds; total provider chain 60 seconds. The appsettings defaults match the code defaults.
 - Supplier invoice extraction now uses the new order and validates that a response contains at least one line with a description and quantity or amount. Invoice output remains an unsaved draft.
 - Item-tag extraction now uses the same order and validates that the response contains at least one meaningful tag field. A locally detected barcode remains preserved even when AI extraction cannot provide other fields.
 - Item-tag photos retain the original upload in `sales.item_tag_capture`; when the long edge exceeds 2,200 pixels, a JPEG quality-88 derivative is sent to AI only.
 - Removed the separate pre-upload barcode lookup request in the browser. The server still normalizes/validates the barcode and makes the catalogue suggestion.
-- Limited simultaneous item-tag uploads to two in the browser.
+- Limited simultaneous item-tag uploads to two in the browser, covering both local ZXing decoding and the provider-backed upload.
 - Item-tag catalogue matching now uses one priority-ordered query (barcode, exact brand/model, exact local name) and returns a suggestion only when the best-priority match is unique.
 - Expiry/stale-capture cleanup is now throttled to once per tenant per 15 minutes per API instance instead of running on every item-tag photo upload. Attached sale evidence remains excluded from cleanup.
-- Groq invoice batches are executed concurrently in groups of up to three images and merged in page order. The maximum six-page invoice therefore creates at most two concurrent Groq calls.
+- Groq invoice batches are executed concurrently in groups of up to three images and merged in page order. Supplier/invoice/date identity fields retain the first usable value; totals/subtotal/tax retain the last usable value in page order. The maximum six-page invoice therefore creates at most two concurrent Groq calls.
 - Groq HTTP failures now log only safe bounded metadata (HTTP status, error type, code and parameter); raw response bodies, images and credentials are not logged.
-- Local Tesseract OCR now has a configurable 12-second default limit (3–60 seconds), drains stdout/stderr concurrently and terminates a timed-out OCR process.
-- Added safe timing telemetry for provider attempts, item-tag image preparation, item-tag catalogue matching, item-tag total upload time and supplier-invoice total draft time. Logs include bounded metadata only.
+- Local Tesseract OCR now has a configurable 12-second default limit (3–60 seconds), drains stdout/stderr concurrently and terminates a timed-out OCR process. Catalogue PDF OCR also has a configurable total 30-second budget (Ocr:PdfTotalTimeoutSeconds, bounded 3–120 seconds) and reports pages skipped because rendering/OCR failed or the total budget expired.
+- Added safe timing telemetry for provider attempts, item-tag image preparation, item-tag catalogue matching, item-tag total upload time and supplier-invoice total draft time. Failed supplier-invoice provider chains also log total request latency and a sanitized outcome.
 - Added unit tests for model defaults/legacy alias filtering, Gemini → Groq → Gemini order, Groq failure, invalid structured output, credential failure, cancellation and refusal handling.
 - CI has been changed to run the backend unit-test project. PostgreSQL integration tests and Playwright E2E remain disabled pending their service fixtures.
 
