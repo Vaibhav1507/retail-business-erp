@@ -247,9 +247,8 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         await DrainItemTagQueueForTests();
         var recovered = await client.GetJson("/sales/item-tag-captures/" + id);
         Assert.Equal("NeedsAttention", recovered.GetProperty("status").GetString());
-        Assert.Equal("NeedsAttention", recovered.GetProperty("status").GetString());
-        Assert.Equal(HttpStatusCode.OK, (await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id)).StatusCode);
         Assert.NotEqual(Guid.Empty, firstLease);
+        Assert.Equal(HttpStatusCode.OK, (await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id)).StatusCode);
     }
 
     [Fact]
