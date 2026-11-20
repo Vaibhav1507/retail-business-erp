@@ -70,8 +70,8 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         var mime = providerPages[0].Mime;
         var bytes = providerPages[0].Bytes;
         var suppliedBytes = providerPages.Sum(page => (long)page.Bytes.Length);
-        if (suppliedBytes > 24L * 1024 * 1024)
-            return ServiceResult<object>.Fail("The invoice pages together must be 24 MB or smaller.");
+        if (suppliedBytes > 12L * 1024 * 1024)
+            return ServiceResult<object>.Fail("The invoice pages together must be 12 MB or smaller.");
         var apiKey = cfg["Gemini:ApiKey"];
 
         var tid = await db.FindTenantAsync(uid, ct);
@@ -180,7 +180,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
                 }
             }
             storedMime = "application/zip"; stored = ms.ToArray();
-            if (stored.Length > 25 * 1024 * 1024) return ServiceResult<object>.Fail("The retained invoice pages together are too large.");
+            if (stored.Length > 12 * 1024 * 1024) return ServiceResult<object>.Fail("The retained invoice pages together exceed the 12 MB storage limit.");
         }
         await using (var ins = s.Command("insert into procurement.invoice_file(tenant_id,id,content_type,size_bytes,content,created_by) values (@t,@i,@m,@z,@c,@u)"))
         {
