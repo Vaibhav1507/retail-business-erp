@@ -33,12 +33,29 @@ public sealed class LocalOcr(IConfiguration cfg, ILogger<LocalOcr> log)
             using var p = Process.Start(psi);
             if (p is null) return null;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(60));
-            var text = await p.StandardOutput.ReadToEndAsync(timeout.Token);
+            var timeoutSeconds = Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60);
+            timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            // Drain both redirected streams concurrently; otherwise a verbose Tesseract
+            // stderr stream can block the child process while the parent waits for stdout.
+            var stdout = p.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderr = p.StandardError.ReadToEndAsync(timeout.Token);
             await p.WaitForExitAsync(timeout.Token);
+            var text = await stdout;
+            _ = await stderr;
             return p.ExitCode == 0 ? ToRows(text) : null;
         }
-        catch (Exception e) when (e is IOException or OperationCanceledException or System.ComponentModel.Win32Exception)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            try { p?.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            log.LogWarning("Local OCR exceeded its bounded {TimeoutSeconds}s time budget", Math.Clamp(cfg.GetValue("Ocr:TimeoutSeconds", 12), 3, 60));
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            try { p?.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            throw;
+        }
+        catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception)
         {
             log.LogWarning(e, "Local OCR failed");
             return null;
