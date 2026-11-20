@@ -95,7 +95,14 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             ct,
             TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
         if (parsed is null)
+        {
+            requestTimer.Stop();
+            log.LogWarning(
+                "Supplier invoice extraction failed. Pages {PageCount}, uploaded bytes {UploadedBytes}, outcome {Outcome}, total latency {TotalMs}ms, trace {TraceId}",
+                providerPages.Count, bytes.Length + extra.Sum(page => (long)page.B64.Length * 3 / 4),
+                "provider_chain_exhausted", requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
+        }
 
 
         var draftTimer = Stopwatch.StartNew();
