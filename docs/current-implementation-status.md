@@ -202,3 +202,16 @@ Multipart invoice transport and durable asynchronous item-tag extraction remain 
 - The Generate Invoice UI polls the authenticated capture GET route while the status is `ReadingTag`; review controls appear only after processing becomes `ReadyForReview` or `NeedsAttention`.
 - A separate worker deployment and `ConnectionStrings:RbosProdItemTagWorker` credential are operational prerequisites. This code does not provision secrets, deploy Cloud Run, apply a production migration or change provider flags.
 - Multipart supplier invoice upload remains a separate follow-up PR.
+
+
+## 20 November 2026 — durable asynchronous item-tag follow-up
+
+- Implemented separately on `feat/durable-async-item-tag-processing`; not merged or deployed.
+- Migration 050 adds an identifier-only PostgreSQL outbox/queue with forced RLS, atomic enqueue, exclusive `SKIP LOCKED` leasing, lease expiry and restricted SECURITY DEFINER claim/finish functions. The `rbos_app` role can enqueue only for its current tenant/user and cannot read or claim queue rows. `rbos_worker` can claim/finish through functions only and has no direct table access.
+- Item-tag upload now stores the original photo and queue record in the same tenant transaction, then returns `ReadingTag` immediately. Existing idempotency semantics and photo retention remain. The original image is still the private sale evidence; resized derivatives are used only for model inference.
+- The existing authenticated capture GET route provides status. The UI polls with bounded backoff, provides a manual status refresh, and does not expose review/add-to-bill until the capture leaves `ReadingTag`. Removing a queued capture cascades its queue row.
+- The one-shot worker uses the existing app connection (`rbos_app`) for tenant-scoped evidence and existing worker connection (`rbos_worker`) for queue functions. `--rbos-workers` drains item-tag jobs before WhatsApp jobs, allowing the existing scheduled Cloud Run Job/Scheduler to be reused. No new queue service or new database role is introduced.
+- Worker lease recovery deliberately does not repeat a possibly-paid AI attempt: the capture becomes `NeedsAttention` for manual review. The Gemini primary/model fallback and the existing disabled-by-default Groq item-tag fallback are unchanged.
+- Integration tests now exercise the queue worker with Gemini/Groq credentials explicitly disabled, so they do not make real provider calls. Queue permission tests cover the app/worker privilege boundary. These PostgreSQL integration tests are still disabled in the current PR CI workflow.
+- Migration 050 is not applied to any database. The Cloud Run worker Job command and secret mapping have not been changed. After merge approval, migration 050 and the existing Job configuration must be applied/updated in the intended environment before enabling the asynchronous user flow.
+- No provider credentials, API keys, paid services, billing settings, production database, Cloud Run deployment or provider flags were modified.
