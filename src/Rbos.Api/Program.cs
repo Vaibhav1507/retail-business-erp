@@ -8,38 +8,15 @@ using Rbos.Api.Persistence;
 using Rbos.Api.Application;
 
 // Tooling modes (no web server). Normal startup is added in a later stage.
-if (args.Contains("--whatsapp-worker"))
-{
-    var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
-    var database = config["Rbos:Database"] ?? "dev";
-    var key = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
-    var connectionString = config[key] ?? throw new InvalidOperationException($"Missing secret {key}");
-    var workerKey = database switch { "test" => "ConnectionStrings:RbosTestWhatsAppWorker", "prod" => "ConnectionStrings:RbosProdWhatsAppWorker", _ => "ConnectionStrings:RbosDevWhatsAppWorker" };
-    var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
-    await using var dataSource = Npgsql.NpgsqlDataSource.Create(connectionString);
-    await using var queueDataSource = Npgsql.NpgsqlDataSource.Create(workerConnectionString);
-    await using (var probe = await dataSource.OpenConnectionAsync())
-    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
-        if ((string?)await who.ExecuteScalarAsync() != "rbos_app")
-            throw new InvalidOperationException("WhatsApp tenant data connection must use rbos_app.");
-    await using (var probe = await queueDataSource.OpenConnectionAsync())
-    await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
-        if ((string?)await who.ExecuteScalarAsync() != "rbos_worker")
-            throw new InvalidOperationException("WhatsApp queue connection must use rbos_worker.");
-    using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
-    var logger = loggerFactory.CreateLogger("WhatsAppInvoiceWorker");
-    QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
-    QuestPDF.Settings.UseSystemFonts = true;
-    await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config, logger, CancellationToken.None);
-    return;
-}
-
-if (args.Contains("--item-tag-worker"))
+var runWhatsAppWorker = args.Contains("--whatsapp-worker") || args.Contains("--rbos-workers");
+var runItemTagWorker = args.Contains("--item-tag-worker") || args.Contains("--rbos-workers");
+if (runWhatsAppWorker || runItemTagWorker)
 {
     var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
     var database = config["Rbos:Database"] ?? "dev";
     var appKey = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
-    var workerKey = database switch { "test" => "ConnectionStrings:RbosTestItemTagWorker", "prod" => "ConnectionStrings:RbosProdItemTagWorker", _ => "ConnectionStrings:RbosDevItemTagWorker" };
+    // Both durable queues use the existing least-privilege rbos_worker role/secret.
+    var workerKey = database switch { "test" => "ConnectionStrings:RbosTestWhatsAppWorker", "prod" => "ConnectionStrings:RbosProdWhatsAppWorker", _ => "ConnectionStrings:RbosDevWhatsAppWorker" };
     var appConnectionString = config[appKey] ?? throw new InvalidOperationException($"Missing secret {appKey}");
     var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
     await using var dataSource = Npgsql.NpgsqlDataSource.Create(appConnectionString);
@@ -47,11 +24,11 @@ if (args.Contains("--item-tag-worker"))
     await using (var probe = await dataSource.OpenConnectionAsync())
     await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
         if ((string?)await who.ExecuteScalarAsync() != "rbos_app")
-            throw new InvalidOperationException("Item-tag tenant data connection must use rbos_app.");
+            throw new InvalidOperationException("Worker tenant data connection must use rbos_app.");
     await using (var probe = await queueDataSource.OpenConnectionAsync())
     await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
         if ((string?)await who.ExecuteScalarAsync() != "rbos_worker")
-            throw new InvalidOperationException("Item-tag queue connection must use rbos_worker.");
+            throw new InvalidOperationException("Worker queue connection must use rbos_worker.");
 
     using var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
     using var cancellation = new CancellationTokenSource();
@@ -62,7 +39,14 @@ if (args.Contains("--item-tag-worker"))
             context.Cancel = true;
             cancellation.Cancel();
         });
-    await ItemTagCaptureWorker.RunAsync(dataSource, queueDataSource, config, loggerFactory, cancellation.Token);
+
+    QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+    QuestPDF.Settings.UseSystemFonts = true;
+    if (runWhatsAppWorker)
+        await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config,
+            loggerFactory.CreateLogger("WhatsAppInvoiceWorker"), cancellation.Token);
+    if (runItemTagWorker)
+        await ItemTagCaptureWorker.RunAsync(dataSource, queueDataSource, config, loggerFactory, cancellation.Token);
     return;
 }
 
