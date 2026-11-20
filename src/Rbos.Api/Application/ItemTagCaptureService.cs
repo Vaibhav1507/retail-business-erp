@@ -2,11 +2,11 @@ using System.Security.Cryptography;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Npgsql;
 using Rbos.Api.Persistence;
 using Rbos.Domain;
+using SkiaSharp;
 
 namespace Rbos.Api.Application;
 
@@ -127,24 +127,50 @@ public sealed class ItemTagCaptureService(
             extracted["barcode"] = confirmedLocalBarcode;
             extracted["barcodeSymbology"] = localSymbology;
         }
+        byte[] aiBytes = bytes;
+        var aiMime = contentType;
         try
         {
-            JsonNode? response = null;
+            // Preserve the original bytes in PostgreSQL as private sale evidence. A bounded
+            // derivative is used only for model inference to reduce payload and vision cost.
+            aiBytes = PrepareVisionImage(bytes, contentType, out aiMime);
+            var attempts = new List<VisionProviderAttempt>();
             var geminiKey = configuration["Gemini:ApiKey"];
-            if (!string.IsNullOrWhiteSpace(geminiKey))
+            var geminiModels = VisionProviderFallback.ItemTagGeminiModels(configuration);
+            var geminiEnabled = !string.IsNullOrWhiteSpace(geminiKey);
+
+            if (geminiEnabled)
             {
-                try { response = await ExtractWithGeminiAsync(geminiKey, contentType, bytes, ct); }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-                { log.LogWarning("Direct Gemini item-tag extraction failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name); }
+                var primaryModel = geminiModels[0];
+                attempts.Add(new VisionProviderAttempt("Gemini", primaryModel,
+                    VisionProviderFallback.GeminiTimeoutSeconds(configuration),
+                    token => ExtractWithGeminiAsync(geminiKey!, primaryModel, aiMime, aiBytes, token)));
             }
 
-            if (response is not JsonObject && groq.Available &&
-                configuration.GetValue("Groq:ItemTagFallbackEnabled", false))
+            if (groq.Available && configuration.GetValue("Groq:ItemTagFallbackEnabled", false))
             {
-                try { response = await groq.ExtractImageAsync(contentType, Convert.ToBase64String(bytes), Prompt, ct); }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
-                { log.LogWarning("Direct Groq item-tag fallback failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name); }
+                attempts.Add(new VisionProviderAttempt("Groq", groq.Model,
+                    VisionProviderFallback.GroqTimeoutSeconds(configuration),
+                    token => groq.ExtractImageAsync(aiMime, Convert.ToBase64String(aiBytes), Prompt, token)));
             }
+
+            if (geminiEnabled)
+            {
+                foreach (var model in geminiModels.Skip(1))
+                {
+                    var fallbackModel = model;
+                    attempts.Add(new VisionProviderAttempt("Gemini", fallbackModel,
+                        VisionProviderFallback.GeminiTimeoutSeconds(configuration),
+                        token => ExtractWithGeminiAsync(geminiKey!, fallbackModel, aiMime, aiBytes, token)));
+                }
+            }
+
+            var response = await VisionProviderFallback.ExecuteAsync(
+                "ItemTag",
+                attempts,
+                HasUsableItemTagExtraction,
+                log,
+                ct);
 
             if (response is JsonObject json)
             {
@@ -157,16 +183,10 @@ public sealed class ItemTagCaptureService(
                 status = "ReadyForReview";
             }
         }
-        catch (TaskCanceledException e) when (!ct.IsCancellationRequested)
-        {
-            log.LogWarning("Item-tag extraction timed out for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
-        }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            log.LogWarning("Item-tag extraction failed for capture {CaptureId} ({ErrorType}).", id, e.GetType().Name);
-        }
         finally
         {
+            if (!ReferenceEquals(aiBytes, bytes))
+                CryptographicOperations.ZeroMemory(aiBytes);
             CryptographicOperations.ZeroMemory(bytes);
         }
 
@@ -349,9 +369,8 @@ public sealed class ItemTagCaptureService(
         return ServiceResult<object>.Ok(new { id, deleted = true });
     }
 
-    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string mime, byte[] bytes, CancellationToken ct)
+    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string model, string mime, byte[] bytes, CancellationToken ct)
     {
-        var model = configuration["Gemini:ItemTagModel"] ?? configuration["Gemini:Model"] ?? "gemini-3.5-flash";
         var parts = new JsonArray
         {
             new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = mime, ["data"] = Convert.ToBase64String(bytes) } },
@@ -381,50 +400,94 @@ public sealed class ItemTagCaptureService(
     async Task<(Guid? ProductId, string? Reason)> MatchProductAsync(
         Guid uid, Guid tenantId, JsonObject extraction, CancellationToken ct)
     {
-        var rawBarcode = ReadString(extraction["barcode"]);
-        var (normalisedBarcode, barcodeError) = BarcodeRules.Normalize(rawBarcode);
-        await using var s = await db.BeginAsync(uid, tenantId, ct);
-        if (barcodeError is null && normalisedBarcode is not null)
-        {
-            await using var barcode = s.Command(@"
-                select p.id from catalog.product_barcode b
-                join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
-                where b.code=@code and p.is_active");
-            barcode.Parameters.AddWithValue("code", normalisedBarcode);
-            var found = await barcode.ExecuteScalarAsync(ct);
-            if (found is Guid productId) return (productId, "Exact local barcode");
-        }
-
+        var barcodeHint = BarcodeRules.Normalize(ReadString(extraction["barcode"]));
+        var barcode = barcodeHint.Error is null ? barcodeHint.Code : null;
         var model = ProductRules.Normalize(ReadString(extraction["model"]));
         var brand = ReadString(extraction["brand"])?.Trim() ?? "";
-        var matches = new List<Guid>();
-        if (model.Length > 0)
-        {
-            await using var models = s.Command(@"
-                select id from catalog.product
-                where is_active and catalog.norm_text(model)=@model
-                  and (@brand='' or lower(coalesce(brand,''))=lower(@brand))
-                order by name limit 2");
-            models.Parameters.AddWithValue("model", model);
-            models.Parameters.AddWithValue("brand", brand);
-            await using (var reader = await models.ExecuteReaderAsync(ct))
-                while (await reader.ReadAsync(ct)) matches.Add(reader.GetGuid(0));
-            if (matches.Count == 1) return (matches[0], "Exact brand/model");
-        }
-
         var name = ProductRules.Normalize(ReadString(extraction["productName"]));
-        if (name.Length == 0) return (null, null);
-        await using var names = s.Command(@"
-            select id from catalog.product
-            where is_active and catalog.norm_text(name)=@name
-              and (@brand='' or lower(coalesce(brand,''))=lower(@brand))
-            order by name limit 2");
-        names.Parameters.AddWithValue("name", name);
-        names.Parameters.AddWithValue("brand", brand);
-        matches.Clear();
-        await using (var reader = await names.ExecuteReaderAsync(ct))
-            while (await reader.ReadAsync(ct)) matches.Add(reader.GetGuid(0));
-        return matches.Count == 1 ? (matches[0], "Exact local product name") : (null, null);
+
+        await using var s = await db.BeginAsync(uid, tenantId, ct);
+        await using var query = s.Command(@"
+            with candidates as (
+                select p.id, p.name, 1 as priority, 'Exact local barcode'::text as reason
+                from catalog.product_barcode b
+                join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
+                where @barcode::text is not null and b.code=@barcode and p.is_active
+                union all
+                select p.id, p.name, 2 as priority, 'Exact brand/model'::text as reason
+                from catalog.product p
+                where @model::text <> '' and p.is_active
+                  and catalog.norm_text(p.model)=@model
+                  and (@brand::text='' or lower(coalesce(p.brand,''))=lower(@brand))
+                union all
+                select p.id, p.name, 3 as priority, 'Exact local product name'::text as reason
+                from catalog.product p
+                where @name::text <> '' and p.is_active
+                  and catalog.norm_text(p.name)=@name
+                  and (@brand::text='' or lower(coalesce(p.brand,''))=lower(@brand))
+            ),
+            best_priority as (select min(priority) as priority from candidates)
+            select c.id,c.name,c.reason
+            from candidates c
+            join best_priority b on b.priority=c.priority
+            group by c.id,c.name,c.reason
+            order by c.name
+            limit 2");
+        query.Parameters.AddWithValue("barcode", (object?)barcode ?? DBNull.Value);
+        query.Parameters.AddWithValue("model", model);
+        query.Parameters.AddWithValue("brand", brand);
+        query.Parameters.AddWithValue("name", name);
+
+        var matches = new List<(Guid Id, string Reason)>();
+        await using (var reader = await query.ExecuteReaderAsync(ct))
+            while (await reader.ReadAsync(ct))
+                matches.Add((reader.GetGuid(0), reader.GetString(2)));
+
+        return matches.Count == 1 ? (matches[0].Id, matches[0].Reason) : (null, null);
+    }
+
+    static bool HasUsableItemTagExtraction(JsonNode? value)
+    {
+        if (value is not JsonObject obj) return false;
+        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn", "warranty", "specifications", "otherText" })
+            if (!string.IsNullOrWhiteSpace(ReadString(obj[key]))) return true;
+        try { return obj["mrp"]?.GetValue<decimal?>() is >= 0; }
+        catch (Exception e) when (e is InvalidOperationException or FormatException) { return false; }
+    }
+
+    static byte[] PrepareVisionImage(byte[] original, string mime, out string outputMime)
+    {
+        outputMime = mime;
+        try
+        {
+            using var source = SKBitmap.Decode(original);
+            if (source is null) return original;
+            var maxDimension = Math.Max(source.Width, source.Height);
+            const int maxAiDimension = 2200;
+            if (maxDimension <= maxAiDimension) return original;
+
+            var scale = (double)maxAiDimension / maxDimension;
+            var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+            var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+            using var resized = new SKBitmap(new SKImageInfo(width, height, source.ColorType, source.AlphaType));
+            using (var canvas = new SKCanvas(resized))
+            {
+                canvas.Clear(SKColors.White);
+                canvas.DrawBitmap(source, new SKRect(0, 0, width, height));
+                canvas.Flush();
+            }
+            using var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, 88);
+            if (encoded is null) return original;
+            using var stream = new MemoryStream();
+            encoded.SaveTo(stream);
+            outputMime = "image/jpeg";
+            return stream.ToArray();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            // Keep the original file for AI if this image format cannot be decoded here.
+            return original;
+        }
     }
 
     static JsonObject CleanExtraction(JsonObject source)
