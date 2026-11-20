@@ -19,10 +19,10 @@ public sealed record VisionProviderAttempt(
 public static class VisionProviderFallback
 {
     public static int GeminiTimeoutSeconds(IConfiguration cfg) =>
-        Math.Clamp(cfg.GetValue("AiPerformance:GeminiAttemptTimeoutSeconds", 25), 5, 60);
+        Math.Clamp(cfg.GetValue("AiPerformance:GeminiAttemptTimeoutSeconds", 18), 5, 60);
 
     public static int GroqTimeoutSeconds(IConfiguration cfg) =>
-        Math.Clamp(cfg.GetValue("AiPerformance:GroqAttemptTimeoutSeconds", 18), 5, 45);
+        Math.Clamp(cfg.GetValue("AiPerformance:GroqAttemptTimeoutSeconds", 12), 5, 45);
 
     public static IReadOnlyList<string> InvoiceGeminiModels(IConfiguration cfg) =>
         Models(
