@@ -6,7 +6,7 @@ create table catalog.master_product_barcode (
     'electronics_mobile','electrical_hardware','general_retail','garments_apparel',
     'automobile_spares','sports_fitness','pharmacy_medical','other_retail'
   )),
-  code text not null check (length(code) between 4 and 64 and code !~ '\\s'),
+  code text not null check (length(code) between 4 and 64 and code !~ '[[:space:]]'),
   master_product_id uuid not null references catalog.master_product(id),
   symbology varchar(20) null,
   confirmed_business_count integer not null default 0 check (confirmed_business_count >= 0),
