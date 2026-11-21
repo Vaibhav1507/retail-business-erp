@@ -195,4 +195,53 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         await transaction.RollbackAsync(); // Keep the shared CI queue unchanged for other tests.
     }
 
+
+    [Fact] public async Task Scanned_barcode_is_learned_only_after_successful_invoice_and_cannot_be_reassigned()
+    {
+        var (client, location, product) = await Stocked(f, qty: 5);
+        const string code = "4006381333931";
+        var failed = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = product, quantity = 6m, unitPrice = 100m, discount = 0m,
+                serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.BadRequest, failed.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.Raw("/products/by-barcode?code=" + code)).StatusCode);
+
+        var posted = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = product, quantity = 1m, unitPrice = 100m, discount = 0m,
+                serials = new[] { "SERIAL12345" }, barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, posted.StatusCode);
+
+        var lookup = await client.GetJson("/products/by-barcode?code=" + code);
+        Assert.Equal(product, lookup.GetProperty("productId").GetGuid());
+
+        var otherProduct = await client.AddProduct("Different product cannot claim barcode");
+        var conflict = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = otherProduct, quantity = 1m, unitPrice = 100m, discount = 0m,
+                serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal(product, (await client.GetJson("/products/by-barcode?code=" + code))
+            .GetProperty("productId").GetGuid());
+    }
 }
