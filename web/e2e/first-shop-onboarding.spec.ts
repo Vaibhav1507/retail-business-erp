@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
+import { unlockApp, signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 
 const run = Date.now().toString(36)
 const owner = `e2e-first-shop-${run}@example.test`
@@ -75,5 +75,6 @@ test('first-time electronics retailer completes and resumes the saved first-shop
   const completedGuide = page.getByRole('region', { name: 'First shop setup' })
   await expect(completedGuide.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
   await page.reload()
+  await unlockApp(page)
   await expect(page.getByRole('region', { name: 'First shop setup' }).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
 })
