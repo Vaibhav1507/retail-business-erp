@@ -12,9 +12,8 @@ using SkiaSharp;
 namespace Rbos.Api.Application;
 
 /// <summary>
-/// Provides transient, synchronous product-tag extraction for invoice entry. New scans
-/// are never persisted; the legacy capture routines remain only for rows created by
-/// earlier deployed versions and are not used by the invoice scan endpoint.
+/// Provides transient, synchronous product-tag extraction for invoice entry. Tag images
+/// are processed in memory and are never persisted or queued.
 /// </summary>
 public sealed class ItemTagCaptureService(
     TenantDb db, HttpClient http, GroqVisionClient groq, LocalOcr localOcr, CatalogueService catalogue,

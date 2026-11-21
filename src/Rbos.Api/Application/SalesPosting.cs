@@ -133,7 +133,7 @@ public sealed class SalesService(TenantDb db)
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
         await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
-            l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, p.model, p.brand, p.hsn_code,
+            l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, p.model, p.brand, p.hsn_code
             from sales.sale_line l join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
             where l.sale_id=@i order by p.name"))
         {
