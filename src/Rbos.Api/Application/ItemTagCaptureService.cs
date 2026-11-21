@@ -205,9 +205,9 @@ public sealed class ItemTagCaptureService(
                     var shared = await MatchOrImportSharedBarcodeAsync(uid, tenantId.Value, barcode!, ct);
                     if (shared.ProductId is not null)
                     {
-                        if (match.Reason == "Exact local barcode" && match.ProductId != shared.ProductId)
+                        if (match.ProductId is not null && match.ProductId != shared.ProductId)
                         {
-                            warnings.Add("This barcode conflicts with an existing verified shared mapping. Select the correct product manually; the mapping will not be overwritten.");
+                            warnings.Add("The barcode conflicts with the product identified by the model/name on this tag. Select the correct product manually; no mapping will be overwritten.");
                             match = (null, null, null);
                         }
                         else
