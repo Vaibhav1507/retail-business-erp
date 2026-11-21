@@ -190,23 +190,6 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks().AddCheck<Rbos.Api.DatabaseHealthCheck>("database");
 var app = builder.Build();
 app.UseForwardedHeaders();
-app.MapGet("/.well-known/assetlinks.json", (IConfiguration configuration) =>
-{
-    var configured = configuration["Android:AssetLinksJson"];
-    if (string.IsNullOrWhiteSpace(configured))
-        return Results.Json(Array.Empty<object>());
-    try
-    {
-        using var document = System.Text.Json.JsonDocument.Parse(configured);
-        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
-            return Results.Problem("Android asset links configuration must be a JSON array.", statusCode: 500);
-        return Results.Content(document.RootElement.GetRawText(), "application/json");
-    }
-    catch (System.Text.Json.JsonException)
-    {
-        return Results.Problem("Android asset links configuration is not valid JSON.", statusCode: 500);
-    }
-}).AllowAnonymous();
 app.MapOpenApi("/api/openapi/{documentName}.json").AllowAnonymous();
 await using (var probe = await app.Services.GetRequiredService<Npgsql.NpgsqlDataSource>().OpenConnectionAsync())
 await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))
@@ -249,6 +232,23 @@ app.UseAuthorization();
 app.MapHealthChecks("/api/health").AllowAnonymous();
 Rbos.Api.Endpoints.Map(app);
 Rbos.Api.WhatsAppWebhookEndpoints.Map(app);
+app.MapGet("/.well-known/assetlinks.json", (IConfiguration configuration) =>
+{
+    var configured = configuration["Android:AssetLinksJson"];
+    if (string.IsNullOrWhiteSpace(configured))
+        return Results.Json(Array.Empty<object>());
+    try
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(configured);
+        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+            return Results.Problem("Android asset links configuration must be a JSON array.", statusCode: 500);
+        return Results.Content(document.RootElement.GetRawText(), "application/json");
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return Results.Problem("Android asset links configuration is not valid JSON.", statusCode: 500);
+    }
+}).AllowAnonymous();
 app.MapFallback("/api/{**path}", () => Results.NotFound()).AllowAnonymous();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 app.Run();
