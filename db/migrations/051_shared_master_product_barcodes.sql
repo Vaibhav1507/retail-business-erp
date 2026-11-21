@@ -77,7 +77,8 @@ with check (exists (
     and bp.business_category=catalog.master_product_barcode.business_category
     and core.is_active_member(bp.tenant_id)
 ));
-grant select,insert,update on catalog.master_product_barcode to rbos_app;
+grant select,insert on catalog.master_product_barcode to rbos_app;
+grant update (confirmed_business_count,last_verified_at) on catalog.master_product_barcode to rbos_app;
 
 alter table catalog.master_product_barcode_confirmation enable row level security;
 alter table catalog.master_product_barcode_confirmation force row level security;
