@@ -344,7 +344,11 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     skipSearch.current = true
     setCustomerId(d.customerId); setPhone(d.phone); setName(d.name); setAddress(d.address); setCity(d.city); setState(d.state); setPin(d.pin)
     setDate(d.date); setMode(d.mode); setPaid(d.paid); setPayMethod(d.payMethod); setPaid2(d.paid2); setPayMethod2(d.payMethod2)
-    setGst(d.gst); setRate(d.rate); setItems(d.items); setBillDisc(d.billDisc ?? '')
+    setGst(d.gst); setRate(d.rate);
+    setItems((d.items ?? []).map((item: Item) => ({
+      ...item, imei1s: item.imei1s ?? [], imei2s: item.imei2s ?? []
+    })));
+    setBillDisc(d.billDisc ?? '')
     const next = held.filter(x => x.id !== h.id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
