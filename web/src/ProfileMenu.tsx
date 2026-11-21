@@ -29,6 +29,7 @@ export function ProfileMenu({ businessName, email, dark, onToggleDark, onLogout 
       {open && (
         <div className="profile-dropdown" role="menu">
           <p className="profile-email">{email}</p>
+          <a role="menuitem" href="#/more/setup" onClick={() => setOpen(false)}>Shop setup &amp; help</a>
           <a role="menuitem" href="#/settings" onClick={() => setOpen(false)}>{t('area.settings')}</a>
           <a role="menuitem" href="#/devices" onClick={() => setOpen(false)}>{t('app.devices')}</a>
           <button type="button" role="menuitem" onClick={run(() => window.dispatchEvent(new Event('rbos:lock')))}>Lock app</button>
