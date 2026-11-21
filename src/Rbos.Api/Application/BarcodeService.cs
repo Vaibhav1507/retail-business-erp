@@ -50,10 +50,12 @@ public sealed class BarcodeService(TenantDb db, CatalogueService catalogue)
         // Prefer the tenant's own verified mapping.
         await using (var s = await db.BeginAsync(uid, tid.Value, ct))
         await using (var c = s.Command(@"select p.id,p.name,p.internal_sku,p.brand,p.model,p.base_unit,p.is_active,p.track_serials,
-                b.pack_quantity,b.code,cat.name
+                b.pack_quantity,b.code,cat.name,p.master_product_id,mb.master_product_id
             from catalog.product_barcode b
             join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
             join catalog.category cat on cat.tenant_id=p.tenant_id and cat.id=p.category_id
+            left join core.business_profile bp on bp.tenant_id=p.tenant_id
+            left join catalog.master_product_barcode mb on mb.business_category=bp.business_category and mb.code=b.code
             where b.code=@c"))
         {
             c.Parameters.AddWithValue("c", norm!);
@@ -61,11 +63,16 @@ public sealed class BarcodeService(TenantDb db, CatalogueService catalogue)
             if (await r.ReadAsync(ct))
             {
                 string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
-                return ServiceResult<object>.Ok(new
+                var localMasterId = r.IsDBNull(11) ? (Guid?)null : r.GetGuid(11);
+                var sharedMasterId = r.IsDBNull(12) ? (Guid?)null : r.GetGuid(12);
+                var product = new
                 {
                     productId = r.GetGuid(0), name = r.GetString(1), sku = r.GetString(2), brand = S(3), model = S(4), unit = r.GetString(5),
                     isActive = r.GetBoolean(6), trackSerials = r.GetBoolean(7), packQuantity = r.GetInt32(8), code = r.GetString(9), category = r.GetString(10),
-                });
+                };
+                if (sharedMasterId is not null && sharedMasterId != localMasterId)
+                    return ServiceResult<object>.Fail("This tenant barcode mapping conflicts with the verified shared product mapping. Review it before scanning this item.", 409);
+                return ServiceResult<object>.Ok(product);
             }
         }
 
