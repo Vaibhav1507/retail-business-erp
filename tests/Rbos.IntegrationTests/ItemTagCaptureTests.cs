@@ -39,6 +39,23 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [Fact]
+    public async Task Scan_does_not_replace_an_invalid_locally_decoded_barcode_with_an_ai_guess()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        const string invalidEan13 = "4006381333932";
+
+        var response = await client.SendBytes(
+            "/sales/item-tag-scan", Jpeg, "image/jpeg", Key(), invalidEan13, "EAN_13");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.True(body.GetProperty("extraction").GetProperty("barcode").ValueKind == JsonValueKind.Null);
+        Assert.Contains(body.GetProperty("warnings").EnumerateArray(),
+            warning => warning.GetString()!.Contains("not replaced with an AI guess", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Scan_without_barcode_or_provider_returns_a_manual_review_result_not_a_queued_job()
     {
         var client = new Client(factory);
