@@ -14,7 +14,8 @@ const scan = {
   status: 'ReadyForReview',
   extraction: {
     productName: 'Test Cable', brand: 'RBOS', model: 'CB-1',
-    barcode: '4006381333931', barcodeSymbology: 'EAN_13', serial: 'SER12345'
+    barcode: '4006381333931', barcodeSymbology: 'EAN_13', serial: 'SER12345',
+    imei1: '490154203237518', imei2: '490154203237526'
   },
   suggestedProduct: { id: 'p1', name: 'Test Cable', reason: 'Exact brand/model' },
   warnings: []
@@ -61,7 +62,7 @@ describe('ItemTagCapture', () => {
     await waitFor(() => expect(onAdd).toHaveBeenCalledWith({
       productId: 'p1', name: 'Test Cable', brand: 'RBOS', model: 'CB-1',
       category: '', barcode: '4006381333931', barcodeSymbology: 'EAN_13',
-      serials: ['SER12345'], imei1: '', imei2: '', mrp: null, hsn: ''
+      serials: ['SER12345'], imei1: '490154203237518', imei2: '490154203237526', mrp: null, hsn: ''
     }))
     expect(fetchMock).toHaveBeenCalledWith('/api/sales/item-tag-scan', expect.objectContaining({
       method: 'POST',
