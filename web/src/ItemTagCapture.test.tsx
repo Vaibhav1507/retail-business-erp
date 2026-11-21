@@ -14,7 +14,7 @@ const scan = {
   status: 'ReadyForReview',
   extraction: {
     productName: 'Test Cable', brand: 'RBOS', model: 'CB-1',
-    barcode: '4006381333931', barcodeSymbology: 'EAN_13', serial: 'SER12345',
+    barcode: '4006381333931', barcodeSymbology: 'EAN_13', serial: 'abC-01oI',
     imei1: '490154203237518', imei2: '490154203237526'
   },
   suggestedProduct: { id: 'p1', name: 'Test Cable', reason: 'Exact brand/model' },
@@ -56,13 +56,13 @@ describe('ItemTagCapture', () => {
     expect(await screen.findByText(/Tag read — verify/)).toBeInTheDocument()
     expect(await screen.findByAltText('Captured product tag preview')).toBeInTheDocument()
     expect(screen.getAllByDisplayValue('Test Cable')).toHaveLength(2)
-    expect(screen.getByDisplayValue('SER12345')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('abC-01oI')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Use details in invoice' }))
 
     await waitFor(() => expect(onAdd).toHaveBeenCalledWith({
       productId: 'p1', name: 'Test Cable', brand: 'RBOS', model: 'CB-1',
       category: '', barcode: '4006381333931', barcodeSymbology: 'EAN_13',
-      serials: ['SER12345'], imei1: '490154203237518', imei2: '490154203237526', mrp: null, hsn: ''
+      serials: ['abC-01oI'], imei1: '490154203237518', imei2: '490154203237526', mrp: null, hsn: ''
     }))
     expect(fetchMock).toHaveBeenCalledWith('/api/sales/item-tag-scan', expect.objectContaining({
       method: 'POST',
