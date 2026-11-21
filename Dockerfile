@@ -36,7 +36,7 @@ RUN find /etc/apt -type f \( -name '*.sources' -o -name '*.list' \) \
 
 COPY --from=api /app ./
 COPY --from=web /web/dist ./wwwroot
-ENV ASPNETCORE_URLS=http://+:8080 ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:8080 ASPNETCORE_ENVIRONMENT=Production Ocr__TesseractPath=/usr/bin/tesseract
 EXPOSE 8080
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Rbos.Api.dll"]

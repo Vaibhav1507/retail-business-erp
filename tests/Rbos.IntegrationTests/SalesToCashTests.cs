@@ -73,6 +73,24 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(8m, (await Stock(c)).GetProperty("quantity").GetDecimal());
         Assert.Single((await c.GetJson("/sales")).EnumerateArray());
     }
+    [Fact] public async Task Sale_search_matches_serial_case_insensitively_and_preserves_original_value()
+    {
+        var (c, loc, p) = await Stocked(f);
+        const string serial = "abC-01oI";
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = loc, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new { productId = p, quantity = 1m, unitPrice = 80m, discount = 0m, serials = new[] { serial } } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + saleId);
+        Assert.Equal(serial, detail.GetProperty("lines")[0].GetProperty("serials")[0].GetString());
+        Assert.Single((await c.GetJson("/sales?q=ABC-01OI")).EnumerateArray());
+        Assert.Single((await c.GetJson("/sales?q=abC-01oI")).EnumerateArray());
+    }
+
     [Fact] public async Task Sale_detail_and_search_work()
     {
         var (c, loc, p) = await Stocked(f); var cust = await Customer(c, "Meera Stores", "12 Market Road | Bhagalpur | Bihar | 812001");

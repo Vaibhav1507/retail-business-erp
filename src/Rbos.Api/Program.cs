@@ -9,13 +9,12 @@ using Rbos.Api.Application;
 
 // Tooling modes (no web server). Normal startup is added in a later stage.
 var runWhatsAppWorker = args.Contains("--whatsapp-worker") || args.Contains("--rbos-workers");
-var runItemTagWorker = args.Contains("--item-tag-worker") || args.Contains("--rbos-workers");
-if (runWhatsAppWorker || runItemTagWorker)
+if (runWhatsAppWorker)
 {
     var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
     var database = config["Rbos:Database"] ?? "dev";
     var appKey = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
-    // Both durable queues use the existing least-privilege rbos_worker role/secret.
+    // WhatsApp delivery uses the existing least-privilege rbos_worker role/secret.
     var workerKey = database switch { "test" => "ConnectionStrings:RbosTestWhatsAppWorker", "prod" => "ConnectionStrings:RbosProdWhatsAppWorker", _ => "ConnectionStrings:RbosDevWhatsAppWorker" };
     var appConnectionString = config[appKey] ?? throw new InvalidOperationException($"Missing secret {appKey}");
     var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
@@ -42,10 +41,6 @@ if (runWhatsAppWorker || runItemTagWorker)
 
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
     QuestPDF.Settings.UseSystemFonts = true;
-    // Process interactive item-tag jobs first; WhatsApp delivery can be slower and
-    // must not delay the cashier's product-tag review queue.
-    if (runItemTagWorker)
-        await ItemTagCaptureWorker.RunAsync(dataSource, queueDataSource, config, loggerFactory, cancellation.Token);
     if (runWhatsAppWorker)
         await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config,
             loggerFactory.CreateLogger("WhatsAppInvoiceWorker"), cancellation.Token);
@@ -195,6 +190,23 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks().AddCheck<Rbos.Api.DatabaseHealthCheck>("database");
 var app = builder.Build();
 app.UseForwardedHeaders();
+app.MapGet("/.well-known/assetlinks.json", (IConfiguration configuration) =>
+{
+    var configured = configuration["Android:AssetLinksJson"];
+    if (string.IsNullOrWhiteSpace(configured))
+        return Results.Json(Array.Empty<object>());
+    try
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(configured);
+        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+            return Results.Problem("Android asset links configuration must be a JSON array.", statusCode: 500);
+        return Results.Content(document.RootElement.GetRawText(), "application/json");
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return Results.Problem("Android asset links configuration is not valid JSON.", statusCode: 500);
+    }
+}).AllowAnonymous();
 app.MapOpenApi("/api/openapi/{documentName}.json").AllowAnonymous();
 await using (var probe = await app.Services.GetRequiredService<Npgsql.NpgsqlDataSource>().OpenConnectionAsync())
 await using (var who = new Npgsql.NpgsqlCommand("select current_user", probe))

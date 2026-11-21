@@ -100,7 +100,7 @@ public sealed class SalesService(TenantDb db)
             where (@c::uuid is null or x.customer_id=@c)
               and (@q::text is null or lower(coalesce(c.name,'walk-in')) like '%' || lower(@q) || '%'
               or x.number::text = @q or lower(x.sale_type)=lower(@q) or coalesce(c.phone,'') like '%' || @q || '%'
-              or exists (select 1 from sales.sale_line sl where sl.sale_id=x.id and upper(btrim(@q)) = any(sl.serials)))
+              or exists (select 1 from sales.sale_line sl where sl.sale_id=x.id and exists (select 1 from unnest(coalesce(sl.serials, array[]::text[])) serial_value where upper(btrim(serial_value)) = upper(btrim(@q)))))
             order by x.sale_date desc, x.created_at desc limit 100");
         c.Parameters.AddWithValue("c", (object?)customerId ?? DBNull.Value);
         c.Parameters.AddWithValue("q", (object?)Blank(q) ?? DBNull.Value);
@@ -134,8 +134,6 @@ public sealed class SalesService(TenantDb db)
         var lines = new List<object>();
         await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
             l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, p.model, p.brand, p.hsn_code,
-            coalesce((select array_agg(tc.id) from sales.item_tag_capture tc
-                      where tc.tenant_id=l.tenant_id and tc.sale_id=l.sale_id and tc.sale_product_id=l.product_id), array[]::uuid[])
             from sales.sale_line l join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
             where l.sale_id=@i order by p.name"))
         {
@@ -152,8 +150,7 @@ public sealed class SalesService(TenantDb db)
                     barcodeSymbology = r.IsDBNull(10) ? null : r.GetString(10),
                     model = r.IsDBNull(11) ? null : r.GetString(11),
                     brand = r.IsDBNull(12) ? null : r.GetString(12),
-                    hsnCode = r.IsDBNull(13) ? null : r.GetString(13),
-                    captureIds = r.GetFieldValue<Guid[]>(14)
+                    hsnCode = r.IsDBNull(13) ? null : r.GetString(13)
                 });
         }
         return ServiceResult<object>.Ok(new { sale = head, lines });
@@ -265,11 +262,8 @@ public sealed class SalesService(TenantDb db)
             return ServiceResult<object>.Fail(err!);
         var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
         if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
-        var allCaptureIds = lines.SelectMany(l => l.CaptureIds ?? []).ToArray();
-        if (allCaptureIds.Distinct().Count() != allCaptureIds.Length)
-            return ServiceResult<object>.Fail("An item-tag photo can be attached to only one sale line.");
         var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{string.Join(',', l.CaptureIds ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
+            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -301,25 +295,6 @@ public sealed class SalesService(TenantDb db)
                     s, tenantId, line.ProductId, line.Barcode!, line.BarcodeSymbology, ct))
                     return ServiceResult<object>.Fail(
                         "This barcode is already associated with a different product in this business or shared catalogue.", 409);
-            }
-
-            // Lock and validate every reviewed photo before any ledger or stock mutation.
-            // The database row is tenant-scoped and the sale-line association is committed atomically below.
-            foreach (var line in lines.Where(x => x.CaptureIds is { Length: > 0 }))
-            {
-                var found = new List<(Guid Id, Guid ProductId)>();
-                await using var captures = s.Command(@"
-                    select id,product_id from sales.item_tag_capture
-                    where id=any(@ids) and status='Reviewed' and sale_id is null
-                    for update");
-                captures.Parameters.AddWithValue("ids", line.CaptureIds!);
-                await using (var reader = await captures.ExecuteReaderAsync(ct))
-                    while (await reader.ReadAsync(ct))
-                        found.Add((reader.GetGuid(0), reader.GetGuid(1)));
-                if (found.Count != line.CaptureIds!.Length ||
-                    found.Any(x => x.ProductId != line.ProductId) ||
-                    line.CaptureIds.Any(id => found.All(x => x.Id != id)))
-                    return ServiceResult<object>.Fail("One or more item-tag photos are unavailable, not reviewed, or belong to a different product. Review the photos again.", 409);
             }
 
             var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next)>();
@@ -359,17 +334,6 @@ public sealed class SalesService(TenantDb db)
             {
                 await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr,@i1,@i2,@bc,@bs)",
                     ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
-                if (l.CaptureIds is { Length: > 0 })
-                {
-                    var attached = await SqlHelpers.ExecCount(s, ct, @"
-                        update sales.item_tag_capture
-                        set status='Attached',sale_id=@s,sale_product_id=@p,attached_at=now()
-                        where tenant_id=@t and id=any(@ids) and product_id=@p
-                          and status='Reviewed' and sale_id is null",
-                        ("t", tenantId), ("s", id), ("p", l.ProductId), ("ids", l.CaptureIds));
-                    if (attached != l.CaptureIds.Length)
-                        return ServiceResult<object>.Fail("The item-tag photo could not be attached. The sale was not posted.", 409);
-                }
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'Sale',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
                 await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", l.ProductId), ("l", m.LocationId));
@@ -402,11 +366,7 @@ public sealed class SalesService(TenantDb db)
                         'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials),
                         'imei1s', to_jsonb(sl.imei1s), 'imei2s', to_jsonb(sl.imei2s),
                         'barcode', sl.barcode, 'barcodeSymbology', sl.barcode_symbology,
-                        'model', p.model, 'brand', p.brand, 'hsnCode', p.hsn_code,
-                        'itemTagCaptureIds', coalesce((
-                          select to_jsonb(array_agg(tc.id)) from sales.item_tag_capture tc
-                          where tc.tenant_id=sl.tenant_id and tc.sale_id=sl.sale_id and tc.sale_product_id=sl.product_id
-                        ), '[]'::jsonb)
+                        'model', p.model, 'brand', p.brand, 'hsnCode', p.hsn_code
                       ) order by p.name)
                       from sales.sale_line sl
                       join catalog.product p on p.tenant_id=sl.tenant_id and p.id=sl.product_id

@@ -93,6 +93,17 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [Fact]
+    public async Task Android_asset_links_endpoint_is_public_and_returns_json_array()
+    {
+        var client = new Client(factory);
+        var response = await client.Raw("/.well-known/assetlinks.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("application/json", response.Content.Headers.ContentType?.MediaType);
+        using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        Assert.Equal(JsonValueKind.Array, body.RootElement.ValueKind);
+    }
+
+    [Fact]
     public async Task Scan_route_requires_authentication()
     {
         var client = new Client(factory);
