@@ -156,6 +156,7 @@ public static class ApiRouteAccess
 
         new("POST", "/api/sales/{id:guid}/invoice/whatsapp/retry", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("POST", "/api/sales", ApiAccessKind.Permission, Permissions.SalesCreate),
+        new("POST", "/api/sales/item-tag-scan", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("POST", "/api/sales/item-tag-captures", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("PUT",  "/api/sales/item-tag-captures/{id:guid}/review", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("DELETE", "/api/sales/item-tag-captures/{id:guid}", ApiAccessKind.Permission, Permissions.SalesCreate),
