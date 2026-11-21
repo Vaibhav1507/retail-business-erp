@@ -36,6 +36,14 @@ public sealed class SaleLineCaptureRulesTests
     }
 
     [Fact]
+    public void Serial_number_characters_are_preserved_exactly()
+    {
+        const string serial = "abC-01oI";
+        Assert.True(Validate(new SaleLineInput(Product, 1m, 100m, 0m, [serial]), out var lines, out var error), error);
+        Assert.Equal(serial, Assert.Single(Assert.Single(lines).Serials!));
+    }
+
+    [Fact]
     public void Existing_sale_lines_remain_valid_when_capture_ids_are_omitted()
     {
         Assert.True(Validate(new SaleLineInput(Product, 1m, 100m, 0m), out var lines, out var error), error);
