@@ -133,7 +133,7 @@ public sealed class ItemTagCaptureService(
                 }
 
                 var providerBudget = Math.Clamp(
-                    configuration.GetValue("AiPerformance:ItemTagTotalProviderBudgetSeconds", 15), 5, 30);
+                    configuration.GetValue("AiPerformance:ItemTagTotalProviderBudgetSeconds", 10), 5, 30);
                 var response = await VisionProviderFallback.ExecuteAsync(
                     "ItemTagScan", attempts, HasUsableItemTagExtraction, log, ct,
                     TimeSpan.FromSeconds(providerBudget));
