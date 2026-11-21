@@ -54,7 +54,7 @@ describe('ItemTagCapture', () => {
 
     expect(await screen.findByText(/Tag read — verify/)).toBeInTheDocument()
     expect(await screen.findByAltText('Captured product tag preview')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Test Cable')).toBeInTheDocument()
+    expect(screen.getAllByDisplayValue('Test Cable')).toHaveLength(2)
     expect(screen.getByDisplayValue('SER12345')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Use details in invoice' }))
 
