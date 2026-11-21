@@ -40,7 +40,7 @@ public static class SalesRules
             if (discount < 0 || decimal.Round(discount, 2) != discount) return Fail("Discount must be zero or positive with at most 2 decimal places.", out error);
             var gross = Money.Of(q.Value * l.UnitPrice).Amount;
             if (discount > gross) return Fail("Discount cannot exceed the line amount.", out error);
-            var serials = (l.Serials ?? []).Select(x => (x ?? "").Trim().ToUpperInvariant()).Where(x => x.Length > 0).ToArray();
+            var serials = (l.Serials ?? []).Select(x => (x ?? "").Trim()).Where(x => x.Length > 0).ToArray();
             if (serials.Length > q.Value) return Fail("A line cannot have more serial numbers than its quantity.", out error);
             if (serials.Any(x => x.Length is < 4 or > 40 || x.Any(char.IsWhiteSpace))) return Fail("Each serial number must be 4 to 40 characters with no spaces.", out error);
             if (serials.Distinct().Count() != serials.Length) return Fail("The same serial number is entered twice on a line.", out error);
