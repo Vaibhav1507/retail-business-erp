@@ -689,9 +689,16 @@ public sealed class ItemTagCaptureService(
             if (source is null) return original;
             var maxDimension = Math.Max(source.Width, source.Height);
             const int maxAiDimension = 3000;
-            if (maxDimension <= maxAiDimension) return original;
+            const int reencodeAboveBytes = 1_500_000;
+            var resizeRequired = maxDimension > maxAiDimension;
+            var reencodeRequired = resizeRequired || !string.Equals(mime, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                || original.Length > reencodeAboveBytes;
+            if (!reencodeRequired) return original;
 
-            var scale = (double)maxAiDimension / maxDimension;
+            // Preserve the full pixel dimensions for ordinary label photos, but normalize
+            // PNG/WebP/large JPEG inputs into a high-quality JPEG to reduce request size.
+            // Only downscale very large images; never shrink small serial-number text.
+            var scale = resizeRequired ? (double)maxAiDimension / maxDimension : 1d;
             var width = Math.Max(1, (int)Math.Round(source.Width * scale));
             var height = Math.Max(1, (int)Math.Round(source.Height * scale));
             using var resized = new SKBitmap(new SKImageInfo(width, height, source.ColorType, source.AlphaType));
