@@ -103,7 +103,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var body = await upload.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("ReadyForReview", body.GetProperty("status").GetString());
         Assert.Equal(code, body.GetProperty("extraction").GetProperty("barcode").GetString());
-        Assert.Equal(JsonValueKind.Null, body.GetProperty("suggestedProduct").ValueKind);
+        Assert.Equal(productId, body.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
 
         Assert.Equal(productId, body.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
     }
