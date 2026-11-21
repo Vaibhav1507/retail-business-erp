@@ -17,8 +17,9 @@ public sealed record ItemTagReviewCommand(
     decimal? Mrp, string? HsnCode);
 
 /// <summary>
-/// Stores one private image per physical item, obtains structured tag extraction through
-/// direct Gemini/Groq provider calls, and keeps review/attachment state under tenant RLS.
+/// Provides transient, synchronous product-tag extraction for invoice entry. New scans
+/// are never persisted; the legacy capture routines remain only for rows created by
+/// earlier deployed versions and are not used by the invoice scan endpoint.
 /// </summary>
 public sealed class ItemTagCaptureService(
     TenantDb db, HttpClient http, GroqVisionClient groq, LocalOcr localOcr, CatalogueService catalogue,
@@ -673,7 +674,7 @@ public sealed class ItemTagCaptureService(
     static bool HasUsableItemTagExtraction(JsonNode? value)
     {
         if (value is not JsonObject obj) return false;
-        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn", "warranty", "specifications", "otherText" })
+        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn" })
             if (!string.IsNullOrWhiteSpace(ReadString(obj[key]))) return true;
         try { return obj["mrp"]?.GetValue<decimal?>() is >= 0; }
         catch (Exception e) when (e is InvalidOperationException or FormatException) { return false; }
