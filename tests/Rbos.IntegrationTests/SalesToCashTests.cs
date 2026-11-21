@@ -299,4 +299,29 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var secondLookup = await second.GetJson("/products/by-barcode?code=" + code);
         Assert.Equal(sharedLookup.GetProperty("productId").GetGuid(), secondLookup.GetProperty("productId").GetGuid());
     }
+
+    [Fact] public async Task Dual_sim_phone_keeps_two_imeis_separate_from_one_physical_serial()
+    {
+        var (client, location, product) = await Stocked(f, qty: 2);
+        const string serial = "SERIAL12345";
+        const string imei1 = "490154203237518";
+        const string imei2 = "490154203237526";
+        var response = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = product, quantity = 1m, unitPrice = 1000m, discount = 0m,
+                serials = new[] { serial }, imei1s = new[] { imei1 }, imei2s = new[] { imei2 }
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await client.GetJson("/sales/" + saleId);
+        var line = detail.GetProperty("lines")[0];
+        Assert.Equal(new[] { serial }, line.GetProperty("serials").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(new[] { imei1 }, line.GetProperty("imei1s").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(new[] { imei2 }, line.GetProperty("imei2s").EnumerateArray().Select(x => x.GetString()).ToArray());
+    }
 }
