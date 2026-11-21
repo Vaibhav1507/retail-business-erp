@@ -68,6 +68,10 @@ public sealed class ItemTagCaptureService(
 
             var barcodeResult = BarcodeRules.Normalize(detectedBarcode);
             var localBarcode = barcodeResult.Error is null ? barcodeResult.Code : null;
+            // A barcode decoded from the pixels is authoritative input. If its check
+            // digit/format is invalid, do not let a vision model silently replace it
+            // with a different guessed code.
+            var invalidLocalBarcode = !string.IsNullOrWhiteSpace(detectedBarcode) && barcodeResult.Error is not null;
             var localSymbology = BarcodeRules.CleanSymbology(detectedSymbology);
             var extracted = new JsonObject();
             if (localBarcode is not null)
@@ -149,6 +153,8 @@ public sealed class ItemTagCaptureService(
                 }
 
                 var warnings = new List<string>();
+                if (invalidLocalBarcode)
+                    warnings.Add("The barcode decoded from the photo failed validation. It was not replaced with an AI guess; scan it again or enter it manually.");
                 var serial = ReadString(extracted["serial"]);
                 if (!string.IsNullOrWhiteSpace(serial) &&
                     (serial.Trim().Length is < 4 or > 40 || serial.Any(char.IsWhiteSpace)))
@@ -175,7 +181,12 @@ public sealed class ItemTagCaptureService(
                 }
 
                 var modelBarcode = ReadString(extracted["barcode"]);
-                if (localBarcode is null && !string.IsNullOrWhiteSpace(modelBarcode))
+                if (invalidLocalBarcode)
+                {
+                    extracted["barcode"] = null;
+                    extracted["barcodeSymbology"] = null;
+                }
+                else if (localBarcode is null && !string.IsNullOrWhiteSpace(modelBarcode))
                 {
                     var normalized = BarcodeRules.Normalize(modelBarcode);
                     if (normalized.Error is not null)
