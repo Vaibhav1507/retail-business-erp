@@ -149,6 +149,31 @@ public sealed class ItemTagCaptureService(
                 }
 
                 var warnings = new List<string>();
+                var serial = ReadString(extracted["serial"]);
+                if (!string.IsNullOrWhiteSpace(serial) &&
+                    (serial.Trim().Length is < 4 or > 40 || serial.Any(char.IsWhiteSpace)))
+                {
+                    extracted["serial"] = null;
+                    warnings.Add("The serial number could not pass format validation. Check the printed value before adding it to the invoice.");
+                }
+
+                foreach (var imeiField in new[] { "imei1", "imei2" })
+                {
+                    var imei = ReadString(extracted[imeiField]);
+                    if (!string.IsNullOrWhiteSpace(imei) && !IsValidImei(imei))
+                    {
+                        extracted[imeiField] = null;
+                        warnings.Add($"{imeiField.ToUpperInvariant()} could not pass its 15-digit check. Verify it on the tag before adding it.");
+                    }
+                }
+
+                var hsn = ReadString(extracted["hsn"]);
+                if (!string.IsNullOrWhiteSpace(hsn) && !GstCalculator.IsValidHsn(hsn.Trim()))
+                {
+                    extracted["hsn"] = null;
+                    warnings.Add("The HSN value could not pass validation. Verify it before adding it to the invoice.");
+                }
+
                 var modelBarcode = ReadString(extracted["barcode"]);
                 if (localBarcode is null && !string.IsNullOrWhiteSpace(modelBarcode))
                 {
@@ -777,6 +802,25 @@ public sealed class ItemTagCaptureService(
         "image/webp" => b.Length > 12 && b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 && b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50,
         _ => false
     };
+
+    static bool IsValidImei(string value)
+    {
+        if (value.Length != 15 || !value.All(char.IsAsciiDigit)) return false;
+        var sum = value[^1] - '0'; // IMEI's final digit is the Luhn check digit.
+        var doubleDigit = true;
+        for (var i = value.Length - 2; i >= 0; i--)
+        {
+            var digit = value[i] - '0';
+            if (doubleDigit)
+            {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+            doubleDigit = !doubleDigit;
+        }
+        return sum % 10 == 0;
+    }
 
     static string? ReadString(JsonNode? node)
     {
