@@ -20,7 +20,7 @@ const AREAS: [string, MessageKey, MessageKey, string][] = [
 
 type Summary = { salesToday: { bills: number; total: number }; moneyToCollect: number; moneyToPay: number; lowStockCount: number; cashAndBank: number }
 
-export function HomePage({ businessName, offlineMode = false }: { businessName?: string; offlineMode?: boolean }) {
+export function HomePage({ businessName }: { businessName?: string }) {
   const [sum, setSum] = useState<Summary | null>(null)
   const [sumError, setSumError] = useState(false)
   const [rem, setRem] = useState<{ kind: string; count: number | null }[]>([])
