@@ -212,7 +212,7 @@ export function ItemTagCapture({
       patch(item.key, { error: 'Enter a valid MRP.' })
       return
     }
-    const serial = item.serial.trim().toUpperCase()
+    const serial = item.serial.trim()
     const accepted = onAdd({
       productId: item.productId,
       name: item.name.trim(),
