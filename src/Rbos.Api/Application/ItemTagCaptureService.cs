@@ -137,8 +137,9 @@ public sealed class ItemTagCaptureService(
             // matching have finished. This avoids a separate worker/scheduler dependency.
             await ProcessAsync(uid, tenantId.Value, id, ct);
 
-            requestTimer.Stop();          log.LogInformation(
-                "Item-tag capture saved and queued. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, enqueue latency {TotalMs}ms, trace {TraceId}",
+            requestTimer.Stop();
+            log.LogInformation(
+                "Item-tag upload and extraction completed. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, total latency {TotalMs}ms, trace {TraceId}",
                 id, contentType, bytes.Length, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
             return await GetAsync(uid, id, ct);
         }
@@ -148,7 +149,7 @@ public sealed class ItemTagCaptureService(
         }
     }
 
-    /// <summary>Processes a persisted capture from the durable queue.</summary>
+    /// <summary>Extracts a previously saved item-tag photo within the upload request.</summary>
     public async Task ProcessAsync(Guid uid, Guid tenantId, Guid id, CancellationToken ct)
     {
         var requestTimer = Stopwatch.StartNew();
@@ -278,7 +279,7 @@ public sealed class ItemTagCaptureService(
 
         requestTimer.Stop();
         log.LogInformation(
-            "Item-tag background processing completed. Capture {CaptureId}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
+            "Item-tag extraction completed. Capture {CaptureId}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
             id, status, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
     }
 
