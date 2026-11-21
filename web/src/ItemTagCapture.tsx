@@ -212,8 +212,7 @@ export function ItemTagCapture({
       patch(item.key, { error: 'Enter a valid MRP.' })
       return
     }
-    const identifiers = [item.serial, item.imei1, item.imei2]
-      .map(value => value.trim().toUpperCase()).filter(Boolean)
+    const serial = item.serial.trim().toUpperCase()
     const accepted = onAdd({
       productId: item.productId,
       name: item.name.trim(),
@@ -222,7 +221,7 @@ export function ItemTagCapture({
       category: item.category.trim(),
       barcode: item.barcode.trim(),
       barcodeSymbology: item.barcodeSymbology.trim(),
-      serials: [...new Set(identifiers)],
+      serials: serial ? [serial] : [],
       imei1: item.imei1.trim(),
       imei2: item.imei2.trim(),
       mrp,
