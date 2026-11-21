@@ -1,8 +1,8 @@
 namespace Rbos.Domain;
 
-public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount, List<string>? Serials = null, List<Guid>? CaptureIds = null);
+public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount, List<string>? Serials = null, List<Guid>? CaptureIds = null, string? Barcode = null, string? BarcodeSymbology = null);
 
-public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal, string[]? Serials = null, Guid[]? CaptureIds = null);
+public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal, string[]? Serials = null, Guid[]? CaptureIds = null, string? Barcode = null, string? BarcodeSymbology = null);
 
 /// <summary>Pure rules for customer sales (Slice 4): validation, totals and the balanced journal.</summary>
 public static class SalesRules
@@ -46,7 +46,7 @@ public static class SalesRules
             if (captureIds.Length > 0 && (decimal.Truncate(q.Value) != q.Value || captureIds.Length > q.Value))
                 return Fail("There cannot be more item-tag photos than physical units on a whole-number quantity line.", out error);
             list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount,
-                serials.Length == 0 ? null : serials, captureIds.Length == 0 ? null : captureIds));
+                serials.Length == 0 ? null : serials, captureIds.Length == 0 ? null : captureIds, l.Barcode, l.BarcodeSymbology));
         }
         total = list.Aggregate(Money.Zero, (a, l) => a + Money.Of(l.LineTotal));
         if (total.Amount <= 0) return Fail("Sale total must be greater than zero.", out error);
