@@ -93,6 +93,11 @@ public sealed class BarcodeService(TenantDb db, CatalogueService catalogue)
         if (sharedMasterId is null)
             return ServiceResult<object>.Fail("No product has this barcode.", 404);
 
+        var role = await db.FindRoleAsync(uid, ct);
+        if (!Permissions.Has(role, Permissions.CatalogueManage))
+            return ServiceResult<object>.Fail(
+                "This barcode matches the shared RBOS catalogue. Ask a catalogue manager to add the product to this shop before using it.", 403);
+
         // Materialize a tenant-owned catalogue product from the verified shared master.
         // Stock, SKU, price and unit serial tracking remain business-specific.
         _ = await catalogue.AddFromMasterAsync(uid, sharedMasterId.Value, ct);
