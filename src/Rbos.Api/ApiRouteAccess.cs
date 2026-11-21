@@ -53,6 +53,7 @@ public static class ApiRouteAccess
         // Public infrastructure routes mapped outside the /api group.
         new("GET", "/api/openapi/{documentName}.json", ApiAccessKind.Anonymous),
         new("*",   "/api/health", ApiAccessKind.Anonymous),
+        new("GET",  "/api/.well-known/assetlinks.json", ApiAccessKind.Anonymous),
         new("*",   "/api/{**path}", ApiAccessKind.Anonymous),
 
         // Authenticated tenant-member routes. These preserve the previous policy
