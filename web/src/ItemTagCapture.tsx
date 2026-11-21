@@ -267,6 +267,8 @@ export function ItemTagCapture({
                 <label>Match to catalogue product</label>
                 <select value={item.productId} onChange={e => patch(item.key, { productId: e.target.value })}>
                   <option value="">Create product from tag details when invoice is confirmed</option>
+                  {item.scan.suggestedProduct && !products.some(product => product.id === item.scan?.suggestedProduct?.id) &&
+                    <option value={item.scan.suggestedProduct.id}>{item.scan.suggestedProduct.name}</option>}
                   {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
                 </select>
               </div>
