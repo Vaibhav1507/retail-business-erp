@@ -171,8 +171,25 @@ public sealed class ItemTagCaptureService(
                 var barcode = ReadString(extracted["barcode"]);
                 var matchTimer = Stopwatch.StartNew();
                 var match = await MatchProductAsync(uid, tenantId.Value, extracted, ct);
-                if (match.ProductId is null && !string.IsNullOrWhiteSpace(barcode))
-                    match = await MatchOrImportSharedBarcodeAsync(uid, tenantId.Value, barcode!, ct);
+                if (!string.IsNullOrWhiteSpace(barcode))
+                {
+                    // A barcode verified by another business in this retail vertical
+                    // outranks a fuzzy brand/model guess. If our tenant's exact local
+                    // barcode disagrees, surface a conflict rather than choosing silently.
+                    var shared = await MatchOrImportSharedBarcodeAsync(uid, tenantId.Value, barcode!, ct);
+                    if (shared.ProductId is not null)
+                    {
+                        if (match.Reason == "Exact local barcode" && match.ProductId != shared.ProductId)
+                        {
+                            warnings.Add("This barcode conflicts with an existing verified shared mapping. Select the correct product manually; the mapping will not be overwritten.");
+                            match = (null, null, null);
+                        }
+                        else
+                        {
+                            match = shared;
+                        }
+                    }
+                }
                 matchTimer.Stop();
 
                 var status = HasUsableItemTagExtraction(extracted) ? "ReadyForReview" : "NeedsAttention";
