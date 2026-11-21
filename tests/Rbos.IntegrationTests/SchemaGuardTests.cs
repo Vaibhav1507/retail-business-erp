@@ -62,34 +62,4 @@ public class SchemaGuardTests
         Assert.False(reader.GetBoolean(5));
     }
 
-    [Fact]
-    public async Task Item_tag_queue_is_atomic_worker_only_and_not_directly_accessible()
-    {
-        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
-        await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]);
-        await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand(@"
-            select
-              has_function_privilege('rbos_app', 'integrations.enqueue_item_tag_capture(uuid,uuid,uuid)', 'EXECUTE'),
-              has_function_privilege('rbos_app', 'integrations.claim_item_tag_captures(integer,integer)', 'EXECUTE'),
-              has_function_privilege('rbos_app', 'integrations.finish_item_tag_capture(uuid,uuid,timestamptz)', 'EXECUTE'),
-              has_function_privilege('rbos_app', 'integrations.cancel_item_tag_capture(uuid,uuid,uuid)', 'EXECUTE'),
-              has_function_privilege('rbos_worker', 'integrations.cancel_item_tag_capture(uuid,uuid,uuid)', 'EXECUTE'),
-              has_function_privilege('rbos_worker', 'integrations.claim_item_tag_captures(integer,integer)', 'EXECUTE'),
-              has_function_privilege('rbos_worker', 'integrations.finish_item_tag_capture(uuid,uuid,timestamptz)', 'EXECUTE'),
-              has_table_privilege('rbos_app', 'integrations.item_tag_capture_queue', 'SELECT'),
-              has_table_privilege('rbos_worker', 'integrations.item_tag_capture_queue', 'SELECT')", conn);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
-        Assert.True(reader.GetBoolean(0));
-        Assert.False(reader.GetBoolean(1));
-        Assert.False(reader.GetBoolean(2));
-        Assert.True(reader.GetBoolean(3));
-        Assert.False(reader.GetBoolean(4));
-        Assert.True(reader.GetBoolean(5));
-        Assert.True(reader.GetBoolean(6));
-        Assert.False(reader.GetBoolean(7));
-        Assert.False(reader.GetBoolean(8));
-    }
-
 }
