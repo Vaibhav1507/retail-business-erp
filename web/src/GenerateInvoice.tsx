@@ -13,7 +13,7 @@ import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
 type Opt = { id: string; name: string }
 type Customer = { id: string; name: string; phone: string | null; notes: string | null; isActive: boolean }
 type Biz = { businessName: string; address: string; city: string; state: string; pinCode: string; mobile: string; gstin: string | null }
-type Item = { productId: string; name: string; quantity: number; unitPrice: number; discount: number; serials: string[]; barcode?: string; barcodeSymbology?: string; brand?: string; model?: string; category?: string; mrp?: number | null; hsn?: string }
+type Item = { productId: string; name: string; quantity: number; unitPrice: number; discount: number; serials: string[]; imei1s: string[]; imei2s: string[]; barcode?: string; barcodeSymbology?: string; brand?: string; model?: string; category?: string; mrp?: number | null; hsn?: string }
 
 const GST_RATES = [0, 3, 5, 12, 18, 28]
 const money = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -215,6 +215,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     }
     const newItem: Item = {
       productId, name: match?.name ?? pname.trim(), quantity, unitPrice, discount, serials,
+      imei1s: tagDetails?.imei1 ? [tagDetails.imei1.trim()] : [],
+      imei2s: tagDetails?.imei2 ? [tagDetails.imei2.trim()] : [],
       ...(tagDetails ? {
         barcode: tagDetails.barcode || undefined,
         barcodeSymbology: tagDetails.barcodeSymbology || undefined,
@@ -229,6 +231,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     if (existing) {
       setItems(current => current.map(item => item.productId === productId
         ? { ...item, quantity: item.quantity + quantity, serials: [...item.serials, ...serials],
+            imei1s: [...item.imei1s, ...newItem.imei1s], imei2s: [...item.imei2s, ...newItem.imei2s],
             barcode: item.barcode ?? newItem.barcode, barcodeSymbology: item.barcodeSymbology ?? newItem.barcodeSymbology }
         : item))
     } else {
@@ -280,7 +283,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           })
           productId = product.id
         }
-        lines.push({ productId, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount, serials: item.serials,
+        lines.push({ productId, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount,
+          serials: item.serials, imei1s: item.imei1s, imei2s: item.imei2s,
           barcode: item.barcode ?? null, barcodeSymbology: item.barcodeSymbology ?? null })
       }
       const credit = mode === 'Credit'
@@ -446,7 +450,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </div>
         {items.length > 0 && <table className="billing-table">
           <thead><tr><th>{tr('bill.item')}</th><th>{tr('bill.qty')}</th><th>{tr('bill.price')}</th><th>{tr('bill.disc')}</th><th>{tr('bill.amount')}</th><th /></tr></thead>
-          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.serials.length > 0 && <small> Serial/IMEI: {i.serials.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
+          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
         </table>}
       </div>
 
