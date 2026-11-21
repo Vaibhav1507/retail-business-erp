@@ -129,19 +129,15 @@ public sealed class ItemTagCaptureService(
                     return await GetAsync(uid, existingId, ct);
                 }
 
-                // The image and its processing job commit atomically. The API never
-                // returns a successful acknowledgement for an unqueued capture.
-                await using var enqueue = session.Command(
-                    "select integrations.enqueue_item_tag_capture(@t,@i,@u)");
-                enqueue.Parameters.AddWithValue("t", tenantId.Value);
-                enqueue.Parameters.AddWithValue("i", id);
-                enqueue.Parameters.AddWithValue("u", uid);
-                await enqueue.ExecuteNonQueryAsync(ct);
                 await session.CommitAsync(ct);
             }
 
-            requestTimer.Stop();
-            log.LogInformation(
+            // Keep the original synchronous extraction contract: the upload request
+            // completes only after image preparation, vision extraction and catalogue
+            // matching have finished. This avoids a separate worker/scheduler dependency.
+            await ProcessAsync(uid, tenantId.Value, id, ct);
+
+            requestTimer.Stop();          log.LogInformation(
                 "Item-tag capture saved and queued. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, enqueue latency {TotalMs}ms, trace {TraceId}",
                 id, contentType, bytes.Length, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
             return await GetAsync(uid, id, ct);
