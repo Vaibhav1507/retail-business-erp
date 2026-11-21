@@ -81,14 +81,6 @@ grant select,insert,update on catalog.master_product_barcode to rbos_app;
 
 alter table catalog.master_product_barcode_confirmation enable row level security;
 alter table catalog.master_product_barcode_confirmation force row level security;
-create policy master_product_barcode_confirmation_select_same_vertical
-on catalog.master_product_barcode_confirmation for select to rbos_app
-using (exists (
-  select 1 from core.business_profile bp
-  where bp.tenant_id=core.current_tenant_id()
-    and bp.business_category=catalog.master_product_barcode_confirmation.business_category
-    and core.is_active_member(bp.tenant_id)
-));
 create policy master_product_barcode_confirmation_insert_own_business
 on catalog.master_product_barcode_confirmation for insert to rbos_app
 with check (
@@ -100,4 +92,4 @@ with check (
       and core.is_active_member(bp.tenant_id)
   )
 );
-grant select,insert on catalog.master_product_barcode_confirmation to rbos_app;
+grant insert on catalog.master_product_barcode_confirmation to rbos_app;
