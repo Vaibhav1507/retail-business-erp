@@ -133,7 +133,7 @@ public sealed class SalesService(TenantDb db)
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
         await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
-            l.imei1s, l.imei2s,
+            l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, p.model, p.brand, p.hsn_code,
             coalesce((select array_agg(tc.id) from sales.item_tag_capture tc
                       where tc.tenant_id=l.tenant_id and tc.sale_id=l.sale_id and tc.sale_product_id=l.product_id), array[]::uuid[])
             from sales.sale_line l join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
@@ -148,7 +148,12 @@ public sealed class SalesService(TenantDb db)
                     unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5),
                     serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6),
                     imei1s = r.GetFieldValue<string[]>(7), imei2s = r.GetFieldValue<string[]>(8),
-                    captureIds = r.GetFieldValue<Guid[]>(9)
+                    barcode = r.IsDBNull(9) ? null : r.GetString(9),
+                    barcodeSymbology = r.IsDBNull(10) ? null : r.GetString(10),
+                    model = r.IsDBNull(11) ? null : r.GetString(11),
+                    brand = r.IsDBNull(12) ? null : r.GetString(12),
+                    hsnCode = r.IsDBNull(13) ? null : r.GetString(13),
+                    captureIds = r.GetFieldValue<Guid[]>(14)
                 });
         }
         return ServiceResult<object>.Ok(new { sale = head, lines });
@@ -352,8 +357,8 @@ public sealed class SalesService(TenantDb db)
 
             foreach (var (l, unitCost, cost, next) in costed)
             {
-                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr,@i1,@i2)",
-                    ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials), ("i1", l.Imei1s), ("i2", l.Imei2s));
+                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr,@i1,@i2,@bc,@bs)",
+                    ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
                 if (l.CaptureIds is { Length: > 0 })
                 {
                     var attached = await SqlHelpers.ExecCount(s, ct, @"
@@ -396,6 +401,8 @@ public sealed class SalesService(TenantDb db)
                         'unitPrice', sl.unit_price, 'discount', sl.discount,
                         'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials),
                         'imei1s', to_jsonb(sl.imei1s), 'imei2s', to_jsonb(sl.imei2s),
+                        'barcode', sl.barcode, 'barcodeSymbology', sl.barcode_symbology,
+                        'model', p.model, 'brand', p.brand, 'hsnCode', p.hsn_code,
                         'itemTagCaptureIds', coalesce((
                           select to_jsonb(array_agg(tc.id)) from sales.item_tag_capture tc
                           where tc.tenant_id=sl.tenant_id and tc.sale_id=sl.sale_id and tc.sale_product_id=sl.product_id
