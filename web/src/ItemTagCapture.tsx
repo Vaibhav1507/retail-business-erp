@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { apiBinary, ApiError } from './api'
+import { apiBinary } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat } from '@zxing/library'
 
