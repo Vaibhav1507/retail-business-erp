@@ -1,8 +1,12 @@
 namespace Rbos.Domain;
 
-public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount, List<string>? Serials = null, List<Guid>? CaptureIds = null, string? Barcode = null, string? BarcodeSymbology = null);
+public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount,
+    List<string>? Serials = null, List<Guid>? CaptureIds = null, string? Barcode = null,
+    string? BarcodeSymbology = null, List<string>? Imei1s = null, List<string>? Imei2s = null);
 
-public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal, string[]? Serials = null, Guid[]? CaptureIds = null, string? Barcode = null, string? BarcodeSymbology = null);
+public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal,
+    string[]? Serials = null, Guid[]? CaptureIds = null, string? Barcode = null,
+    string? BarcodeSymbology = null, string[]? Imei1s = null, string[]? Imei2s = null);
 
 /// <summary>Pure rules for customer sales (Slice 4): validation, totals and the balanced journal.</summary>
 public static class SalesRules
@@ -40,13 +44,24 @@ public static class SalesRules
             if (serials.Length > q.Value) return Fail("A line cannot have more serial numbers than its quantity.", out error);
             if (serials.Any(x => x.Length is < 4 or > 40 || x.Any(char.IsWhiteSpace))) return Fail("Each serial number must be 4 to 40 characters with no spaces.", out error);
             if (serials.Distinct().Count() != serials.Length) return Fail("The same serial number is entered twice on a line.", out error);
+            // IMEI1 and IMEI2 are identifiers for one physical unit, not additional serials.
+            var imei1s = (l.Imei1s ?? []).Select(x => (x ?? "").Trim()).Where(x => x.Length > 0).ToArray();
+            var imei2s = (l.Imei2s ?? []).Select(x => (x ?? "").Trim()).Where(x => x.Length > 0).ToArray();
+            if (imei1s.Length > q.Value || imei2s.Length > q.Value)
+                return Fail("There cannot be more IMEI identifiers than physical units on a sale line.", out error);
+            if (imei1s.Any(x => !IsValidImei(x)) || imei2s.Any(x => !IsValidImei(x)))
+                return Fail("IMEI values must contain 15 digits and pass their check digit.", out error);
+            if (imei1s.Distinct().Count() != imei1s.Length || imei2s.Distinct().Count() != imei2s.Length ||
+                imei1s.Intersect(imei2s, StringComparer.Ordinal).Any())
+                return Fail("The same IMEI cannot appear twice on a sale line.", out error);
             var captureIds = (l.CaptureIds ?? []).ToArray();
             if (captureIds.Any(id => id == Guid.Empty) || captureIds.Distinct().Count() != captureIds.Length)
                 return Fail("Item-tag photo references must be valid and unique.", out error);
             if (captureIds.Length > 0 && (decimal.Truncate(q.Value) != q.Value || captureIds.Length > q.Value))
                 return Fail("There cannot be more item-tag photos than physical units on a whole-number quantity line.", out error);
             list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount,
-                serials.Length == 0 ? null : serials, captureIds.Length == 0 ? null : captureIds, l.Barcode, l.BarcodeSymbology));
+                serials.Length == 0 ? null : serials, captureIds.Length == 0 ? null : captureIds,
+                l.Barcode, l.BarcodeSymbology, imei1s.Length == 0 ? null : imei1s, imei2s.Length == 0 ? null : imei2s));
         }
         total = list.Aggregate(Money.Zero, (a, l) => a + Money.Of(l.LineTotal));
         if (total.Amount <= 0) return Fail("Sale total must be greater than zero.", out error);
@@ -90,6 +105,25 @@ public static class SalesRules
         if ((phone?.Trim().Length ?? 0) > 30) return Fail("Phone is too long.", out error);
         if ((notes?.Trim().Length ?? 0) > 300) return Fail("Notes are too long.", out error);
         error = null; return true;
+    }
+
+    public static bool IsValidImei(string value)
+    {
+        if (value.Length != 15 || !value.All(char.IsAsciiDigit)) return false;
+        var sum = value[^1] - '0';
+        var doubleDigit = true;
+        for (var i = value.Length - 2; i >= 0; i--)
+        {
+            var digit = value[i] - '0';
+            if (doubleDigit)
+            {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+            doubleDigit = !doubleDigit;
+        }
+        return sum % 10 == 0;
     }
 
     static bool Fail(string message, out string? error) { error = message; return false; }
