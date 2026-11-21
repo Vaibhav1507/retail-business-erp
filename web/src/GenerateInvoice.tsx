@@ -13,7 +13,7 @@ import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
 type Opt = { id: string; name: string }
 type Customer = { id: string; name: string; phone: string | null; notes: string | null; isActive: boolean }
 type Biz = { businessName: string; address: string; city: string; state: string; pinCode: string; mobile: string; gstin: string | null }
-type Item = { productId: string; name: string; quantity: number; unitPrice: number; discount: number; serials: string[]; captureIds?: string[] }
+type Item = { productId: string; name: string; quantity: number; unitPrice: number; discount: number; serials: string[]; barcode?: string; barcodeSymbology?: string; brand?: string; model?: string; category?: string; mrp?: number | null; hsn?: string }
 
 const GST_RATES = [0, 3, 5, 12, 18, 28]
 const money = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -59,8 +59,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [items, setItems] = useState<Item[]>([])
   const [pname, setPname] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [pendingCaptureIds, setPendingCaptureIds] = useState<string[]>([])
-  const [captureResetVersion, setCaptureResetVersion] = useState(0)
+  const [tagDetails, setTagDetails] = useState<CapturedInvoiceItem | null>(null)
   const [showProducts, setShowProducts] = useState(false)
   const [qty, setQty] = useState('1')
   const [price, setPrice] = useState('')
@@ -173,7 +172,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const total = effItems.reduce((s, i) => s + itemTotal(i), 0)
   const taxable = gst ? total / (1 + rate / 100) : total
   const tax = total - taxable
-  const linkedCaptureIds = useMemo(() => items.flatMap(item => item.captureIds ?? []), [items])
   const typed = pname.trim().toLowerCase()
   const match = products.find(p => p.name.toLowerCase() === typed)
   const suggestions = useMemo(() => (typed ? products.filter(p => p.name.toLowerCase().includes(typed)) : products).slice(0, 8), [products, typed])
@@ -187,68 +185,56 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function acceptCapturedItem(item: CapturedInvoiceItem): boolean {
-    if (pname.trim() || price.trim() || serialText.trim() || pendingCaptureIds.length > 0) return false
+    if (pname.trim() || price.trim() || serialText.trim() || tagDetails) return false
     setPname(item.name)
     setSelectedProductId(item.productId)
     setQty('1')
     setSerialText(item.serials.join(', '))
-    setPendingCaptureIds([item.captureId])
+    setTagDetails(item)
     setError('')
     return true
   }
 
-  function removeCapturedItem(captureId: string, identifiers: string[]) {
-    setPendingCaptureIds(current => current.filter(id => id !== captureId))
-    setItems(current => current.flatMap(item => {
-      if (!item.captureIds?.includes(captureId)) return [item]
-      const captureIds = item.captureIds.filter(id => id !== captureId)
-      const quantity = Math.max(0, item.quantity - 1)
-      const removeSet = new Set(identifiers)
-      let removedOne = false
-      const serials = item.serials.filter(value => {
-        if (!removedOne && removeSet.has(value)) { removedOne = true; return false }
-        return true
-      })
-      if (quantity <= 0) return []
-      return [{ ...item, quantity, serials, captureIds }]
-    }))
-  }
-
-  async function removeInvoiceItem(index: number, item: Item) {
+  async function removeInvoiceItem(index: number) {
     setItems(current => current.filter((_, i) => i !== index))
-    if (item.captureIds?.length) {
-      await Promise.all(item.captureIds.map(id => api('DELETE', '/sales/item-tag-captures/' + id).catch(() => undefined)))
-    }
   }
 
   function addItem() {
-    const serials = serialText.split(/[\s,;]+/).map(x => x.trim().toUpperCase()).filter(Boolean)
+    const serials = serialText.split(/[\\s,;]+/).map(x => x.trim().toUpperCase()).filter(Boolean)
     const quantity = Number(qty), unitPrice = Number(price), discount = Number(disc || 0)
     if (!typed || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product, quantity and price.'); return }
-    if (pendingCaptureIds.length > quantity || (pendingCaptureIds.length > 0 && !selectedProductId && !match?.id)) {
-      setError('Choose the matching catalogue product and check the quantity for the captured item.')
-      return
-    }
     const productId = selectedProductId || match?.id || ''
     const existing = productId ? items.find(item => item.productId === productId) : undefined
     if (existing && (existing.unitPrice !== unitPrice || existing.discount !== discount)) {
       setError('This product is already on the bill with a different price or discount. Keep one price per product line.')
       return
     }
+    if (existing && tagDetails?.barcode && existing.barcode && existing.barcode !== tagDetails.barcode) {
+      setError('This product already has a different barcode on this bill. Verify the product or add a separate catalogue product.')
+      return
+    }
     const newItem: Item = {
       productId, name: match?.name ?? pname.trim(), quantity, unitPrice, discount, serials,
-      ...(pendingCaptureIds.length ? { captureIds: pendingCaptureIds } : {})
+      ...(tagDetails ? {
+        barcode: tagDetails.barcode || undefined,
+        barcodeSymbology: tagDetails.barcodeSymbology || undefined,
+        brand: tagDetails.brand || undefined,
+        model: tagDetails.model || undefined,
+        category: tagDetails.category || undefined,
+        mrp: tagDetails.mrp,
+        hsn: tagDetails.hsn || undefined
+      } : {})
     }
     setError('')
     if (existing) {
       setItems(current => current.map(item => item.productId === productId
         ? { ...item, quantity: item.quantity + quantity, serials: [...item.serials, ...serials],
-            captureIds: [...(item.captureIds ?? []), ...pendingCaptureIds] }
+            barcode: item.barcode ?? newItem.barcode, barcodeSymbology: item.barcodeSymbology ?? newItem.barcodeSymbology }
         : item))
     } else {
       setItems(current => [...current, newItem])
     }
-    setPname(''); setSelectedProductId(''); setPendingCaptureIds([])
+    setPname(''); setSelectedProductId(''); setTagDetails(null)
     setQty('1'); setPrice(''); setDisc(''); setSerialText('')
   }
 
@@ -287,10 +273,15 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         let productId = item.productId
         if (!productId) {
           if (offlineMode || !navigator.onLine) throw new Error('New products can be added to a bill only while online.')
-          const product = await api<{ id: string }>('POST', '/products', { name: item.name, categoryName: 'Uncategorised', isGeneric: true, baseUnit: 'pcs' })
+          const product = await api<{ id: string }>('POST', '/products', {
+            name: item.name, categoryName: item.category || 'Uncategorised',
+            isGeneric: !item.brand && !item.model, baseUnit: 'pcs',
+            brand: item.brand || null, model: item.model || null, mrp: item.mrp ?? null, hsnCode: item.hsn || null
+          })
           productId = product.id
         }
-        lines.push({ productId, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount, serials: item.serials, captureIds: item.captureIds ?? [] })
+        lines.push({ productId, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount, serials: item.serials,
+          barcode: item.barcode ?? null, barcodeSymbology: item.barcodeSymbology ?? null })
       }
       const credit = mode === 'Credit'
       const part = Number(paid || 0)
@@ -333,7 +324,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function clearForm() {
-    setCaptureResetVersion(value => value + 1); setItems([]); setSelectedProductId(''); setPendingCaptureIds([]); setPname(''); setPrice(''); setSerialText(''); setBillDisc(''); setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
+    setItems([]); setSelectedProductId(''); setTagDetails(null); setPname(''); setPrice(''); setSerialText(''); setBillDisc(''); setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
   async function hold() {
@@ -356,8 +347,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   async function discardHeld(id: string) {
     if (!window.confirm('Discard this held bill?')) return
     const heldBill = held.find(x => x.id === id)
-    const captureIds = (heldBill?.data?.items ?? []).flatMap((item: Item) => item.captureIds ?? [])
-    await Promise.all(captureIds.map((captureId: string) => api('DELETE', '/sales/item-tag-captures/' + captureId).catch(() => undefined)))
     const next = held.filter(x => x.id !== id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
@@ -439,8 +428,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       <div className="billing-card">
         <h3>{tr('bill.products')}</h3>
           <div className="billing-row"><button type="button" onClick={addItem}>{tr('bill.add')}</button><button type="button" className="secondary" onClick={() => setScanning(true)}>{tr('bill.scan')}</button>{pname.trim() && !match && <span className="billing-hint">Not in your products. It will be added as a new product when you confirm.</span>}</div>
-        <ItemTagCapture key={captureResetVersion} products={products} disabled={offlineMode || !navigator.onLine}
-          linkedCaptureIds={linkedCaptureIds} onAdd={acceptCapturedItem} onRemove={removeCapturedItem} />
+        <ItemTagCapture products={products} disabled={offlineMode || !navigator.onLine} onAdd={acceptCapturedItem} />
         <div className="billing-grid">
           <div className="billing-field billing-col-6 billing-rel">
             <label htmlFor="billing-prod">{tr('bill.product')}</label>
@@ -459,7 +447,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </div>
         {items.length > 0 && <table className="billing-table">
           <thead><tr><th>{tr('bill.item')}</th><th>{tr('bill.qty')}</th><th>{tr('bill.price')}</th><th>{tr('bill.disc')}</th><th>{tr('bill.amount')}</th><th /></tr></thead>
-          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.serials.length > 0 && <small> Serial/IMEI: {i.serials.join(', ')}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td>{i.captureIds?.length ? <small>Remove this captured item using its photo card above.</small> : <button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n, i) }}>{tr('bill.remove')}</button>}</td></tr>)}</tbody>
+          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.serials.length > 0 && <small> Serial/IMEI: {i.serials.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
         </table>}
       </div>
 
