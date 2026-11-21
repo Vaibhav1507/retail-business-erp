@@ -346,7 +346,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
   async function discardHeld(id: string) {
     if (!window.confirm('Discard this held bill?')) return
-    const heldBill = held.find(x => x.id === id)
     const next = held.filter(x => x.id !== id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
