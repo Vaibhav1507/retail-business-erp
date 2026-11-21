@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace Rbos.IntegrationTests;
 
@@ -143,7 +144,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var originalId = (await original.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var otherProduct = await client.AddProduct("Different product");
 
-        var captureId = await Upload(client, barcode: code, process: true);
+        var captureId = await Upload(client, barcode: code);
         var conflict = await Review(client, captureId, otherProduct, code);
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
 
@@ -201,7 +202,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         var tenantA = new Client(factory);
         await tenantA.SignUpAndBootstrap();
         var productA = await tenantA.AddProduct("Tenant A Cable");
-        var id = await Upload(tenantA, barcode: "4006381333931", process: true);
+        var id = await Upload(tenantA, barcode: "4006381333931");
         await Review(tenantA, id, productA);
 
         var tenantB = new Client(factory);
@@ -218,7 +219,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     public async Task Reviewed_photo_is_attached_atomically_to_sale_line_and_remains_retrievable()
     {
         var (client, location, product) = await Stocked(factory);
-        var captureId = await Upload(client, barcode: "4006381333931", process: true);
+        var captureId = await Upload(client, barcode: "4006381333931");
         await Review(client, captureId, product);
 
         var sale = await client.Send(HttpMethod.Post, "/sales", new
