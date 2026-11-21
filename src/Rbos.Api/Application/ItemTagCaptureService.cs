@@ -200,10 +200,15 @@ public sealed class ItemTagCaptureService(
                 if (!string.IsNullOrWhiteSpace(barcode))
                 {
                     // A barcode verified by another business in this retail vertical
-                    // outranks a fuzzy brand/model guess. If our tenant's exact local
-                    // barcode disagrees, surface a conflict rather than choosing silently.
+                    // outranks a fuzzy brand/model guess. If our tenant's product match
+                    // disagrees, surface the conflict rather than choosing silently.
                     var shared = await MatchOrImportSharedBarcodeAsync(uid, tenantId.Value, barcode!, ct);
-                    if (shared.ProductId is not null)
+                    if (shared.Name is not null && shared.ProductId is null)
+                    {
+                        warnings.Add($"This barcode matches the shared RBOS product '{shared.Name}', but a catalogue manager must add it to this shop before it can be selected.");
+                        match = (null, null, null);
+                    }
+                    else if (shared.ProductId is not null)
                     {
                         if (match.ProductId is not null && match.ProductId != shared.ProductId)
                         {
@@ -284,6 +289,10 @@ public sealed class ItemTagCaptureService(
         if (masterProductId is null) return (null, null, null);
         if (localProductId is null)
         {
+            var role = await db.FindRoleAsync(uid, ct);
+            if (!Permissions.Has(role, Permissions.CatalogueManage))
+                return (null, masterName, "Shared catalogue match requires catalogue-manager access.");
+
             _ = await catalogue.AddFromMasterAsync(uid, masterProductId.Value, ct);
             await using var session = await db.BeginAsync(uid, tenantId, ct);
             await using var query = session.Command(@"
