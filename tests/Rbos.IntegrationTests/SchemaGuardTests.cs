@@ -39,6 +39,25 @@ public class SchemaGuardTests
         Assert.Equal(0L, rd.GetInt64(1));
     }
     [Fact]
+    public async Task Legacy_item_tag_capture_queue_and_photo_store_are_removed()
+    {
+        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
+        await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(@"
+            select
+              to_regclass('integrations.item_tag_capture_queue') is null,
+              to_regclass('sales.item_tag_capture') is null,
+              to_regprocedure('integrations.enqueue_item_tag_capture(uuid,uuid,uuid)') is null,
+              to_regprocedure('integrations.claim_item_tag_captures(integer,integer)') is null,
+              to_regprocedure('integrations.finish_item_tag_capture(uuid,uuid,timestamp with time zone)') is null,
+              to_regprocedure('integrations.cancel_item_tag_capture(uuid,uuid,uuid)') is null", conn);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        for (var i = 0; i < 6; i++) Assert.True(reader.GetBoolean(i));
+    }
+
+    [Fact]
     public async Task WhatsApp_queue_operations_are_worker_only()
     {
         var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
