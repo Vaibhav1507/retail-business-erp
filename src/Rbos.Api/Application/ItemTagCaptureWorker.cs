@@ -20,8 +20,11 @@ public static class ItemTagCaptureWorker
         using var geminiHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
         using var groqHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var groq = new GroqVisionClient(groqHttp, config, loggerFactory.CreateLogger<GroqVisionClient>());
+        var localOcr = new LocalOcr(config, loggerFactory.CreateLogger<LocalOcr>());
+        var catalogue = new CatalogueService(db);
         var service = new ItemTagCaptureService(
-            db, geminiHttp, groq, config, loggerFactory.CreateLogger<ItemTagCaptureService>());
+            db, geminiHttp, groq, localOcr, catalogue, config,
+            loggerFactory.CreateLogger<ItemTagCaptureService>());
         var maxJobsPerRun = Math.Clamp(config.GetValue("AiPerformance:ItemTagQueueMaxJobsPerRun", 5), 1, 5);
         var processed = 0;
         logger.LogInformation("Item-tag worker started. Maximum jobs this run {MaxJobs}.", maxJobsPerRun);
