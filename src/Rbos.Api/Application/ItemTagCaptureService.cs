@@ -79,6 +79,11 @@ public sealed class ItemTagCaptureService(
                 extracted["barcode"] = localBarcode;
                 extracted["barcodeSymbology"] = localSymbology;
             }
+            else if (invalidLocalBarcode)
+            {
+                extracted["barcode"] = null;
+                extracted["barcodeSymbology"] = null;
+            }
 
             byte[] aiBytes = bytes;
             var aiMime = contentType;
