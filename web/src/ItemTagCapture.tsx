@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiBinary } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
-import { BarcodeFormat } from '@zxing/library'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 
 let activeUploads = 0
 const waitingUploads: Array<() => void> = []
@@ -107,7 +107,13 @@ export function ItemTagCapture({
         // Decode the original photo on-device before upload. This avoids OCR/AI digit
         // transcription for the most important identifier and saves model latency.
         try {
-          const reader = new BrowserMultiFormatReader()
+          const hints = new Map()
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A,
+            BarcodeFormat.UPC_E, BarcodeFormat.CODE_128
+          ])
+          hints.set(DecodeHintType.TRY_HARDER, true)
+          const reader = new BrowserMultiFormatReader(hints)
           const decoded = await reader.decodeFromImageUrl(draft.preview)
           const format = decoded.getBarcodeFormat()
           const symbology = format === BarcodeFormat.EAN_13 ? 'EAN_13'
