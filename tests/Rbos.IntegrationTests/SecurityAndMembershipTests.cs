@@ -19,7 +19,9 @@ public class SecurityControlTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal("no-store", r.Headers.CacheControl?.ToString());
         Assert.Equal("nosniff", r.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", r.Headers.GetValues("X-Frame-Options").Single());
-        Assert.Contains("frame-ancestors 'none'", r.Headers.GetValues("Content-Security-Policy").Single());
+        var csp = r.Headers.GetValues("Content-Security-Policy").Single();
+        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.Contains("img-src 'self' blob:", csp);
     }
 
     [Fact]
