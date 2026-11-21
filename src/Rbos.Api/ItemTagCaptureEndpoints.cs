@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Rbos.Api.Application;
 using static Rbos.Api.ApiResults;
 
@@ -15,6 +16,8 @@ public static class ItemTagCaptureEndpoints
                 return Fail(400, "Photo must be between 1 byte and 8 MB.");
             await using var buffer = new MemoryStream();
             var chunk = new byte[81920];
+            try
+            {
             while (true)
             {
                 var read = await request.Body.ReadAsync(chunk, ct);
@@ -26,13 +29,28 @@ public static class ItemTagCaptureEndpoints
             if (buffer.Length == 0) return Fail(400, "Choose a photo before scanning.");
 
             var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var result = await service.ScanAsync(
-                userId,
-                request.ContentType?.Split(';')[0].Trim().ToLowerInvariant(),
-                request.Headers["X-RBOS-Detected-Barcode"].ToString(),
-                request.Headers["X-RBOS-Detected-Symbology"].ToString(),
-                buffer.ToArray(), ct);
-            return Reply(result);
+            var photo = buffer.ToArray();
+            try
+            {
+                var result = await service.ScanAsync(
+                    userId,
+                    request.ContentType?.Split(';')[0].Trim().ToLowerInvariant(),
+                    request.Headers["X-RBOS-Detected-Barcode"].ToString(),
+                    request.Headers["X-RBOS-Detected-Symbology"].ToString(),
+                    photo, ct);
+                return Reply(result);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(photo);
+            }
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(chunk);
+                if (buffer.TryGetBuffer(out var internalBuffer))
+                    CryptographicOperations.ZeroMemory(internalBuffer.AsSpan());
+            }
         }).RequireAuthorization();
     }
 }
