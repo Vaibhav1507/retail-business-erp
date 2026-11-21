@@ -220,6 +220,26 @@ public sealed class SalesService(TenantDb db)
     {
         key ??= "";
         if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
+        if (m.Lines is not null)
+        {
+            var normalizedLines = new List<SaleLineInput>(m.Lines.Count);
+            foreach (var line in m.Lines)
+            {
+                if (string.IsNullOrWhiteSpace(line.Barcode))
+                {
+                    normalizedLines.Add(line with { Barcode = null, BarcodeSymbology = null });
+                    continue;
+                }
+                var (normalizedBarcode, barcodeError) = BarcodeRules.Normalize(line.Barcode);
+                if (barcodeError is not null) return ServiceResult<object>.Fail(barcodeError);
+                normalizedLines.Add(line with
+                {
+                    Barcode = normalizedBarcode,
+                    BarcodeSymbology = BarcodeRules.CleanSymbology(line.BarcodeSymbology)
+                });
+            }
+            m = m with { Lines = normalizedLines };
+        }
         var amountPaid = m.AmountPaid; var payMethod = m.PayMethod;
         var split = new List<(string Method, decimal Amount)>();
         if (m.Payments is { Count: > 0 })
@@ -236,7 +256,7 @@ public sealed class SalesService(TenantDb db)
         if (allCaptureIds.Distinct().Count() != allCaptureIds.Length)
             return ServiceResult<object>.Fail("An item-tag photo can be attached to only one sale line.");
         var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{string.Join(',', l.CaptureIds ?? [])}"))) + splitKey);
+            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{string.Join(',', l.CaptureIds ?? [])}:{l.Barcode}:{l.BarcodeSymbology}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -258,6 +278,16 @@ public sealed class SalesService(TenantDb db)
             {
                 q.Parameters.AddWithValue("i", ids);
                 if ((long)(await q.ExecuteScalarAsync(ct))! != ids.Length) return ServiceResult<object>.Fail("Unknown or inactive product.");
+            }
+
+            // Barcode learning is part of this transaction, not the scan request.
+            // A failed sale cannot leave either a tenant-private or shared mapping behind.
+            foreach (var line in lines.Where(x => !string.IsNullOrWhiteSpace(x.Barcode)))
+            {
+                if (!await BarcodeService.LearnFromCompletedSaleAsync(
+                    s, tenantId, line.ProductId, line.Barcode!, line.BarcodeSymbology, ct))
+                    return ServiceResult<object>.Fail(
+                        "This barcode is already associated with a different product in this business or shared catalogue.", 409);
             }
 
             // Lock and validate every reviewed photo before any ledger or stock mutation.
