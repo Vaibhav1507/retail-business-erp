@@ -3,7 +3,6 @@ import { api } from './api'
 import { BusinessSetup, categoryLabel } from './BusinessSetup'
 import type { Profile } from './BusinessSetup'
 import './launcher.css'
-import { FirstShopOnboarding } from './FirstShopOnboarding'
 import { t, getLanguage, setLanguage, toLang, formatInr } from './i18n'
 import type { MessageKey } from './i18n'
 
@@ -30,7 +29,6 @@ export function HomePage({ businessName, offlineMode = false }: { businessName?:
   return (
     <div className="launcher-page">
       <div className="page-title"><h2>{businessName ? t('home.welcomeNamed', { name: businessName }) : t('home.welcome')}</h2><p>{t('home.prompt')}</p></div>
-      {!offlineMode && <FirstShopOnboarding offlineMode={offlineMode} />}
       {sumError && <p role="alert">{t('dash.error')}</p>}
       {sum && <div className="dash-tiles">
         <a className="dash-tile" href="#/sell"><small>{t('dash.salesToday')}</small><strong>{formatInr(sum.salesToday.total)}</strong><small>{sum.salesToday.bills} {t('dash.bills')}</small></a>
