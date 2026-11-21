@@ -34,8 +34,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
 
         // The old evidence-upload API is deliberately no longer exposed. A tag image
         // exists only in the scan request and the browser's temporary preview.
-        var oldUpload = await client.SendBytes(
-            "/sales/item-tag-captures", Jpeg, "image/jpeg", Key());
+        var oldUpload = await client.Send(HttpMethod.Post, "/sales/item-tag-captures", new { });
         Assert.Equal(HttpStatusCode.NotFound, oldUpload.StatusCode);
     }
 
@@ -73,7 +72,7 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
         oversized[0] = 0xFF; oversized[1] = 0xD8; oversized[2] = 0xFF; oversized[3] = 0xD9;
         var tooLarge = await client.SendBytes(
             "/sales/item-tag-scan", oversized, "image/jpeg", Key());
-        Assert.Equal(HttpStatusCode.BadRequest, tooLarge.StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, tooLarge.StatusCode);
     }
 
     [Fact]
