@@ -82,6 +82,10 @@ grant update (confirmed_business_count,last_verified_at) on catalog.master_produ
 
 alter table catalog.master_product_barcode_confirmation enable row level security;
 alter table catalog.master_product_barcode_confirmation force row level security;
+create policy master_product_barcode_confirmation_select_own_business
+on catalog.master_product_barcode_confirmation for select to rbos_app
+using (tenant_id=core.current_tenant_id() and core.is_active_member(tenant_id));
+
 create policy master_product_barcode_confirmation_insert_own_business
 on catalog.master_product_barcode_confirmation for insert to rbos_app
 with check (
@@ -93,4 +97,4 @@ with check (
       and core.is_active_member(bp.tenant_id)
   )
 );
-grant insert on catalog.master_product_barcode_confirmation to rbos_app;
+grant select,insert on catalog.master_product_barcode_confirmation to rbos_app;
