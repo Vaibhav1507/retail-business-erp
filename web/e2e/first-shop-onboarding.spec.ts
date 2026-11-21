@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
+import { unlockApp, signUp, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 
 const run = Date.now().toString(36)
 const owner = `e2e-first-shop-${run}@example.test`
@@ -11,6 +11,7 @@ test('first-time electronics retailer completes and resumes the saved first-shop
   test.setTimeout(180_000)
   await signUp(page, { email: owner, businessName, city: 'Bengaluru', state: 'Karnataka', pin: '560001' })
 
+  await page.goto('/#/more/setup')
   const guide = page.getByRole('region', { name: 'First shop setup' })
   await expect(guide.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
   await expect(guide.getByRole('link', { name: 'Continue setup' })).toHaveAttribute('href', '#/stock/products')
@@ -68,7 +69,12 @@ test('first-time electronics retailer completes and resumes the saved first-shop
 
   // A fresh Home load derives completion from saved tenant records, not browser memory or a page visit.
   await page.goto('/#/')
-  await expect(page.getByRole('region', { name: 'First shop setup' }).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
+  await expect(page.getByRole('region', { name: 'First shop setup' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Profile menu' }).click()
+  await page.getByRole('menuitem', { name: 'Shop setup & help' }).click()
+  const completedGuide = page.getByRole('region', { name: 'First shop setup' })
+  await expect(completedGuide.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
   await page.reload()
+  await unlockApp(page)
   await expect(page.getByRole('region', { name: 'First shop setup' }).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
 })

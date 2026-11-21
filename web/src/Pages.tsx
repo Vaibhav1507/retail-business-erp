@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api'
 import { Catalogue } from './Catalogue'
 import { SetupAssistant } from './SetupAssistant'
+import { FirstShopOnboarding } from './FirstShopOnboarding'
 import { Procurement } from './Procurement'
 import { SalesHistory } from './SalesHistory'
 import { Customers } from './Customers'
@@ -179,7 +180,8 @@ export function MoneyPage({ tab }: { tab: string }) {
 }
 
 export function MorePage({ tab, onLogout, email }: { tab: string; onLogout: () => void; email: string }) {
-  const moreTabs: [string, string][] = [['reports', tr('more.reports')], ['print', tr('more.print')], ['lock', tr('more.lock')], ['audit', tr('hist.title')], ['gst', 'GST'], ['staff', 'Staff'], ['branches', 'Branches'], ['transfers', 'Transfers'], ['orders', 'Orders'], ['reconcile', 'Reconcile'], ['loans', 'Loans']]
+  const moreTabs: [string, string][] = [['reports', tr('more.reports')], ['print', tr('more.print')], ['lock', tr('more.lock')], ['audit', tr('hist.title')], ['gst', 'GST'], ['staff', 'Staff'], ['branches', 'Branches'], ['transfers', 'Transfers'], ['orders', 'Orders'], ['reconcile', 'Reconcile'], ['loans', 'Loans'], ['setup', 'Shop setup & help']]
+  if (tab === 'setup') return <div><Title title="Shop setup &amp; help" hint="Review the guided steps whenever you need a refresher." /><Tabs page="more" tab="setup" items={moreTabs} /><FirstShopOnboarding /></div>
   if (tab === 'reports') return <div><Title title={tr('more.reports')} hint={tr('more.reportsHint')} /><Tabs page="more" tab="reports" items={moreTabs} /><Finance key="reports" only={['reports']} /></div>
   if (tab === 'print') return <div><Title title={tr('more.print')} /><Tabs page="more" tab="print" items={moreTabs} /><AfterSales reload={() => undefined} show="print" /></div>
   if (tab === 'gst') return <div><Title title="GST" /><Tabs page="more" tab="gst" items={moreTabs} /><GstWorkspace /></div>
@@ -195,6 +197,7 @@ export function MorePage({ tab, onLogout, email }: { tab: string; onLogout: () =
     <div>
       <Title title={tr('more.title')} hint={email} />
       <div className="linklist">
+        <a href="#/more/setup"><span className="ico">{'\u{1F4D6}'}</span>Shop setup &amp; help</a>
         <a href="#/more/reports"><span className="ico">{'\u{1F4CA}'}</span>{tr('more.reportsLink')}</a>
         <a href="#/more/print"><span className="ico">{'\u{1F5A8}\uFE0F'}</span>{tr('more.printLink')}</a>
         <a href="#/more/lock"><span className="ico">{'\u{1F512}'}</span>{tr('more.lock')}</a>

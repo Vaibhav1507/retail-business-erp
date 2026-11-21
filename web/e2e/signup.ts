@@ -9,6 +9,16 @@ export const randomMobile = () => '9' + Math.floor(100_000_000 + Math.random() *
  * Creates an account through the single signup flow: account + mobile OTP, business, address and tax, preferences, review.
  * Relies on the Development API showing the OTP on screen (no real SMS is sent).
  */
+/** Reopens the workspace after a full page reload; the local privacy lock intentionally relocks on reload. */
+export async function unlockApp(page: Page) {
+  const unlockHeading = page.getByRole('heading', { name: 'Unlock this device' })
+  if (await unlockHeading.count()) {
+    await page.getByLabel('PIN', { exact: true }).fill('1234')
+    await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+  }
+}
+
 export async function signUp(page: Page, opts: { email: string; businessName: string; city?: string; state?: string; pin?: string; mobile?: string }) {
   // The app intentionally asks for confirmation before leaving protected workflows.
   // Playwright dismisses dialogs by default, which silently cancels page.goto() and leaves
