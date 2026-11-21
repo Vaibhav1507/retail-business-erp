@@ -28,7 +28,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
 
             if (!HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method))
             {
-                var isItemTagPhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/item-tag-captures");
+                var isItemTagPhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/item-tag-scan");
                 var isInvoiceExtraction = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/purchases/extract");
                 var contentType = ctx.Request.ContentType?.Split(';')[0].Trim();
                 var isMultipartInvoiceUpload = isInvoiceExtraction

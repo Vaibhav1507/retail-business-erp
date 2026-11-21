@@ -1,24 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, apiBinary, ApiError } from './api'
+import { apiBinary } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
-import { BarcodeFormat } from '@zxing/library'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 
-// Bound concurrent provider-backed uploads from a multi-select gallery.
-let activeItemTagUploads = 0;
-const waitingItemTagUploads: Array<() => void> = [];
+let activeUploads = 0
+const waitingUploads: Array<() => void> = []
 
-async function withItemTagUploadSlot<T>(work: () => Promise<T>): Promise<T> {
-  if (activeItemTagUploads >= 2) {
-    await new Promise<void>(resolve => waitingItemTagUploads.push(resolve));
-  } else {
-    activeItemTagUploads++;
-  }
+async function withUploadSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (activeUploads >= 2) await new Promise<void>(resolve => waitingUploads.push(resolve))
+  else activeUploads++
   try {
-    return await work();
+    return await work()
   } finally {
-    const next = waitingItemTagUploads.shift();
-    if (next) next();
-    else activeItemTagUploads--;
+    const next = waitingUploads.shift()
+    if (next) next()
+    else activeUploads--
   }
 }
 
@@ -39,38 +35,39 @@ type Extraction = {
   specifications?: string | null
   otherText?: string | null
 }
-type CaptureResponse = {
-  id: string
+type ScanResponse = {
   status: string
-  contentType: string
-  sizeBytes: number
   extraction: Extraction
   suggestedProduct?: { id: string; name: string; reason?: string | null } | null
-  review?: {
-    productId?: string
-    name?: string | null
-    brand?: string | null
-    model?: string | null
-    barcode?: string | null
-    barcodeSymbology?: string | null
-    serial?: string | null
-    imei1?: string | null
-    imei2?: string | null
-    mrp?: number | null
-    hsnCode?: string | null
-  } | null
+  warnings?: string[]
 }
-type CaptureDraft = {
+export type CapturedInvoiceItem = {
+  productId: string
+  name: string
+  brand: string
+  model: string
+  category: string
+  barcode: string
+  barcodeSymbology: string
+  serials: string[]
+  imei1: string
+  imei2: string
+  mrp: number | null
+  hsn: string
+}
+
+type ScanDraft = {
   key: string
-  file: File | null
+  file: File
   preview: string
   busy: boolean
   error: string
   warning: string
-  capture?: CaptureResponse
+  scan?: ScanResponse
   name: string
   brand: string
   model: string
+  category: string
   barcode: string
   barcodeSymbology: string
   serial: string
@@ -79,221 +76,87 @@ type CaptureDraft = {
   mrp: string
   hsn: string
   productId: string
-  saving: boolean
-  added: boolean
-}
-
-export type CapturedInvoiceItem = {
-  captureId: string
-  productId: string
-  name: string
-  serials: string[]
 }
 
 export function ItemTagCapture({
-  products, disabled, onAdd, onRemove, linkedCaptureIds = []
+  products, disabled, onAdd
 }: {
   products: ProductOption[]
   disabled: boolean
-  linkedCaptureIds?: string[]
   onAdd: (item: CapturedInvoiceItem) => boolean
-  onRemove: (captureId: string, identifiers: string[]) => void
 }) {
-  const [entries, setEntries] = useState<CaptureDraft[]>([])
+  const [entries, setEntries] = useState<ScanDraft[]>([])
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
   const urls = useRef(new Set<string>())
-  const loadedIds = useRef(new Set<string>())
 
   useEffect(() => () => {
     for (const url of urls.current) URL.revokeObjectURL(url)
     urls.current.clear()
   }, [])
 
-  const linkedIdsKey = linkedCaptureIds.join('|')
-  useEffect(() => {
-    let active = true
-    for (const id of linkedCaptureIds) {
-      if (loadedIds.current.has(id)) continue
-      loadedIds.current.add(id)
-      void (async () => {
-        try {
-          const capture = await api<CaptureResponse>('GET', '/sales/item-tag-captures/' + id)
-          const response = await fetch('/api/sales/item-tag-captures/' + id + '/image', { credentials: 'same-origin' })
-          if (!response.ok) throw new Error('Saved photo could not be loaded.')
-          const blob = await response.blob()
-          const preview = URL.createObjectURL(blob)
-          urls.current.add(preview)
-          if (!active) { URL.revokeObjectURL(preview); urls.current.delete(preview); return }
-          const review = capture.review
-          setEntries(current => current.some(item => item.capture?.id === id) ? current : [...current, {
-            key: 'saved:' + id, file: null, preview, busy: false, error: '', warning: '',
-            capture, name: review?.name ?? capture.extraction?.productName ?? '',
-            brand: review?.brand ?? capture.extraction?.brand ?? '',
-            model: review?.model ?? capture.extraction?.model ?? '',
-            barcode: review?.barcode ?? capture.extraction?.barcode ?? '',
-            barcodeSymbology: review?.barcodeSymbology ?? capture.extraction?.barcodeSymbology ?? '',
-            serial: review?.serial ?? capture.extraction?.serial ?? '',
-            imei1: review?.imei1 ?? capture.extraction?.imei1 ?? '',
-            imei2: review?.imei2 ?? capture.extraction?.imei2 ?? '',
-            mrp: review?.mrp == null ? (capture.extraction?.mrp == null ? '' : String(capture.extraction.mrp)) : String(review.mrp),
-            hsn: review?.hsnCode ?? capture.extraction?.hsn ?? '',
-            productId: review?.productId ?? capture.suggestedProduct?.id ?? '',
-            saving: false, added: capture.status === 'Reviewed' || capture.status === 'Attached'
-          }])
-        } catch {
-          loadedIds.current.delete(id)
-        }
-      })()
-    }
-    return () => { active = false }
-  }, [linkedIdsKey])
-
-  const processingIdsKey = entries
-    .filter(item => item.capture?.status === 'ReadingTag')
-    .map(item => item.capture!.id)
-    .sort()
-    .join(',')
-
-  useEffect(() => {
-    if (!processingIdsKey) return
-    let active = true
-    let polling = false
-    const poll = async () => {
-      if (polling) return
-      polling = true
-      try {
-        const ids = processingIdsKey.split(',').filter(Boolean)
-        await Promise.all(ids.map(async id => {
-          try {
-            const capture = await api<CaptureResponse>('GET', '/sales/item-tag-captures/' + id)
-            if (!active || capture.status === 'ReadingTag') return
-            setEntries(current => current.map(item => item.capture?.id === id ? {
-              ...item,
-              busy: false,
-              capture,
-              name: capture.extraction?.productName ?? item.name,
-              brand: capture.extraction?.brand ?? item.brand,
-              model: capture.extraction?.model ?? item.model,
-              barcode: capture.extraction?.barcode ?? item.barcode,
-              barcodeSymbology: capture.extraction?.barcodeSymbology ?? item.barcodeSymbology,
-              serial: capture.extraction?.serial ?? item.serial,
-              imei1: capture.extraction?.imei1 ?? item.imei1,
-              imei2: capture.extraction?.imei2 ?? item.imei2,
-              mrp: capture.extraction?.mrp == null ? item.mrp : String(capture.extraction.mrp),
-              hsn: capture.extraction?.hsn ?? item.hsn,
-              productId: capture.suggestedProduct?.id ?? item.productId
-            } : item))
-          } catch {
-            // A transient status-read failure must not discard saved evidence.
-          }
-        }))
-      } finally {
-        polling = false
-      }
-    }
-    const idsForCurrentPoll = new Set(processingIdsKey.split(',').filter(Boolean))
-    let checks = 0
-    let timer = 0
-    const scheduleNext = () => {
-      const delay = Math.min(2500 * (checks + 1), 15000)
-      timer = window.setTimeout(async () => {
-        checks += 1
-        if (checks >= 12) {
-          setEntries(current => current.map(item => item.capture && idsForCurrentPoll.has(item.capture.id)
-            ? { ...item, warning: 'Still queued or processing. Automatic checks are paused; use “Check status” to refresh.' }
-            : item))
-          return
-        }
-        await poll()
-        if (active) scheduleNext()
-      }, delay)
-    }
-    void poll()
-    scheduleNext()
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [processingIdsKey])
-
-  function patch(key: string, values: Partial<CaptureDraft>) {
+  function patch(key: string, values: Partial<ScanDraft>) {
     setEntries(current => current.map(item => item.key === key ? { ...item, ...values } : item))
   }
 
-  async function checkStatus(item: CaptureDraft) {
-    if (!item.capture) return
+  async function sendPhoto(draft: ScanDraft) {
+    patch(draft.key, { busy: true, error: '', warning: '' })
     try {
-      const capture = await api<CaptureResponse>('GET', '/sales/item-tag-captures/' + item.capture.id)
-      patch(item.key, {
-        capture,
-        warning: capture.status === 'ReadingTag' ? 'Still queued or processing. Check again shortly.' : '',
-        name: capture.extraction?.productName ?? item.name,
-        brand: capture.extraction?.brand ?? item.brand,
-        model: capture.extraction?.model ?? item.model,
-        barcode: capture.extraction?.barcode ?? item.barcode,
-        barcodeSymbology: capture.extraction?.barcodeSymbology ?? item.barcodeSymbology,
-        serial: capture.extraction?.serial ?? item.serial,
-        imei1: capture.extraction?.imei1 ?? item.imei1,
-        imei2: capture.extraction?.imei2 ?? item.imei2,
-        mrp: capture.extraction?.mrp == null ? item.mrp : String(capture.extraction.mrp),
-        hsn: capture.extraction?.hsn ?? item.hsn,
-        productId: capture.suggestedProduct?.id ?? item.productId
-      })
-    } catch (e) {
-      patch(item.key, { error: e instanceof Error ? e.message : 'Could not refresh processing status.' })
-    }
-  }
+      const result = await withUploadSlot(async () => {
+        let decodedBarcode: { code: string; symbology: string } | null = null
+        // Decode the original photo on-device before upload. This avoids OCR/AI digit
+        // transcription for the most important identifier and saves model latency.
+        try {
+          const hints = new Map()
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A,
+            BarcodeFormat.UPC_E, BarcodeFormat.CODE_128
+          ])
+          hints.set(DecodeHintType.TRY_HARDER, true)
+          const reader = new BrowserMultiFormatReader(hints)
+          const decoded = await reader.decodeFromImageUrl(draft.preview)
+          const format = decoded.getBarcodeFormat()
+          const symbology = format === BarcodeFormat.EAN_13 ? 'EAN_13'
+            : format === BarcodeFormat.EAN_8 ? 'EAN_8'
+            : format === BarcodeFormat.UPC_A ? 'UPC_A'
+            : format === BarcodeFormat.UPC_E ? 'UPC_E'
+            : format === BarcodeFormat.CODE_128 ? 'CODE_128'
+            : null
+          if (symbology) decodedBarcode = { code: decoded.getText(), symbology }
+        } catch { /* Vision extraction remains available for difficult or damaged barcodes. */ }
 
-  async function sendPhoto(draft: CaptureDraft) {
-    if (!draft.file) return
-    loadedIds.current.add(draft.key)
-    patch(draft.key, { busy: true, error: '' })
-    try {
-      const { capture, decodedBarcode } = await withItemTagUploadSlot(async () => {
-      // Decode common retail barcodes locally before upload/AI processing.
-      // QR/Data Matrix payloads are deliberately not treated as product barcodes.
-      let decodedBarcode: { code: string; symbology: string } | null = null
-      try {
-        const reader = new BrowserMultiFormatReader()
-        const decoded = await reader.decodeFromImageUrl(draft.preview)
-        const format = decoded.getBarcodeFormat()
-        const symbology = format === BarcodeFormat.EAN_13 ? 'EAN_13'
-          : format === BarcodeFormat.EAN_8 ? 'EAN_8'
-          : format === BarcodeFormat.UPC_A ? 'UPC_A'
-          : format === BarcodeFormat.UPC_E ? 'UPC_E'
-          : format === BarcodeFormat.CODE_128 ? 'CODE_128'
-          : null
-        if (symbology) {
-          decodedBarcode = { code: decoded.getText(), symbology }
-        }
-      } catch { /* glare/blur/unsupported symbols fall back to the reviewable AI/manual path */ }
-
-      // The API validates the barcode hint and performs the catalogue match itself.
-      // The semaphore covers both local decode and the provider-backed request.
-      const uploadedCapture = await apiBinary<CaptureResponse>(
-        '/sales/item-tag-captures', draft.file!, undefined, draft.key,
-        decodedBarcode ? {
-          'X-RBOS-Detected-Barcode': decodedBarcode.code,
-          'X-RBOS-Detected-Symbology': decodedBarcode.symbology
-        } : undefined)
-      return { capture: uploadedCapture, decodedBarcode }
+        const scan = await apiBinary<ScanResponse>(
+          '/sales/item-tag-scan', draft.file, undefined, draft.key,
+          decodedBarcode ? {
+            'X-RBOS-Detected-Barcode': decodedBarcode.code,
+            'X-RBOS-Detected-Symbology': decodedBarcode.symbology
+          } : undefined)
+        return { scan, decodedBarcode }
       })
-      loadedIds.current.add(capture.id)
 
       patch(draft.key, {
-        busy: false, warning: '', capture,
-        name: capture.extraction?.productName ?? '',
-        brand: capture.extraction?.brand ?? '',
-        model: capture.extraction?.model ?? '',
-        barcode: decodedBarcode?.code ?? capture.extraction?.barcode ?? '',
-        barcodeSymbology: decodedBarcode?.symbology ?? capture.extraction?.barcodeSymbology ?? '',
-        serial: capture.extraction?.serial ?? '',
-        imei1: capture.extraction?.imei1 ?? '',
-        imei2: capture.extraction?.imei2 ?? '',
-        mrp: capture.extraction?.mrp == null ? '' : String(capture.extraction.mrp),
-        hsn: capture.extraction?.hsn ?? '',
-        productId: capture.suggestedProduct?.id ?? ''
+        busy: false,
+        scan: result.scan,
+        warning: [...(result.scan.warnings ?? []), ...(result.scan.status === 'NeedsAttention'
+          ? ['Some tag details could not be read. Complete the fields manually before adding the invoice row.'] : [])].join(' '),
+        name: result.scan.extraction?.productName ?? '',
+        brand: result.scan.extraction?.brand ?? '',
+        category: result.scan.extraction?.category ?? '',
+        model: result.scan.extraction?.model ?? '',
+        barcode: result.decodedBarcode?.code ?? result.scan.extraction?.barcode ?? '',
+        barcodeSymbology: result.decodedBarcode?.symbology ?? result.scan.extraction?.barcodeSymbology ?? '',
+        serial: result.scan.extraction?.serial ?? '',
+        imei1: result.scan.extraction?.imei1 ?? '',
+        imei2: result.scan.extraction?.imei2 ?? '',
+        mrp: result.scan.extraction?.mrp == null ? '' : String(result.scan.extraction.mrp),
+        hsn: result.scan.extraction?.hsn ?? '',
+        productId: result.scan.suggestedProduct?.id ?? ''
       })
     } catch (e) {
-      patch(draft.key, { busy: false, error: e instanceof Error ? e.message : 'Photo upload failed. Try again.' })
+      patch(draft.key, {
+        busy: false,
+        error: e instanceof Error ? e.message : 'Could not read this tag. Try another photo or enter the details manually.'
+      })
     }
   }
 
@@ -303,45 +166,34 @@ export function ItemTagCapture({
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
         setEntries(current => [...current, {
           key: crypto.randomUUID(), file, preview: '', busy: false,
-          error: 'Use a JPEG, PNG or WebP photo.', warning: '', name: '', brand: '', model: '',
-          barcode: '', barcodeSymbology: '', serial: '', imei1: '', imei2: '', mrp: '', hsn: '',
-          productId: '', saving: false, added: false
+          error: 'Use a JPEG, PNG or WebP photo.', warning: '',
+          name: '', brand: '', model: '', category: '', barcode: '', barcodeSymbology: '',
+          serial: '', imei1: '', imei2: '', mrp: '', hsn: '', productId: ''
         }])
         continue
       }
       if (file.size <= 0 || file.size > 8 * 1024 * 1024) {
         setEntries(current => [...current, {
           key: crypto.randomUUID(), file, preview: '', busy: false,
-          error: 'Photo must be 8 MB or smaller.', warning: '', name: '', brand: '', model: '',
-          barcode: '', barcodeSymbology: '', serial: '', imei1: '', imei2: '', mrp: '', hsn: '',
-          productId: '', saving: false, added: false
+          error: 'Photo must be 8 MB or smaller.', warning: '',
+          name: '', brand: '', model: '', category: '', barcode: '', barcodeSymbology: '',
+          serial: '', imei1: '', imei2: '', mrp: '', hsn: '', productId: ''
         }])
         continue
       }
       const preview = URL.createObjectURL(file)
       urls.current.add(preview)
-      const draft: CaptureDraft = {
-        key: crypto.randomUUID(), file, preview, busy: false, error: '',
-        name: '', brand: '', model: '', barcode: '', barcodeSymbology: '', warning: '',
-        serial: '', imei1: '', imei2: '', mrp: '', hsn: '', productId: '',
-        saving: false, added: false
+      const draft: ScanDraft = {
+        key: crypto.randomUUID(), file, preview, busy: false, error: '', warning: '',
+        name: '', brand: '', model: '', category: '', barcode: '', barcodeSymbology: '',
+        serial: '', imei1: '', imei2: '', mrp: '', hsn: '', productId: ''
       }
       setEntries(current => [...current, draft])
       void sendPhoto(draft)
     }
   }
 
-  async function removePhoto(item: CaptureDraft) {
-    if (item.capture) {
-      try { await api('DELETE', '/sales/item-tag-captures/' + item.capture.id) }
-      catch (e) {
-        setEntries(current => current.map(x => x.key === item.key
-          ? { ...x, error: e instanceof Error ? e.message : 'Photo could not be removed.' } : x))
-        return
-      }
-      onRemove(item.capture.id, [item.serial || item.imei1 || item.imei2].map(x => x.trim().toUpperCase()).filter(Boolean))
-      loadedIds.current.delete(item.capture.id)
-    }
+  function removePhoto(item: ScanDraft) {
     if (item.preview) {
       URL.revokeObjectURL(item.preview)
       urls.current.delete(item.preview)
@@ -349,54 +201,44 @@ export function ItemTagCapture({
     setEntries(current => current.filter(x => x.key !== item.key))
   }
 
-  async function createProduct(item: CaptureDraft) {
-    if (!item.name.trim()) throw new Error('Enter the product name first.')
-    const mrp = item.mrp.trim() ? Number(item.mrp) : null
-    if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) throw new Error('Enter a valid MRP.')
-    const created = await api<{ id: string }>('POST', '/products', {
-      name: item.name.trim(), categoryName: item.capture?.extraction?.category?.trim() || 'Uncategorised',
-      isGeneric: !item.brand.trim() && !item.model.trim(), baseUnit: 'pcs',
-      brand: item.brand.trim() || null, model: item.model.trim() || null,
-      barcode: item.barcode.trim() || null, mrp, hsnCode: item.hsn.trim() || null
-    })
-    return created.id
-  }
-
-  async function addToBill(item: CaptureDraft) {
-    if (!item.capture || item.capture.status === 'ReadingTag' || item.busy || item.saving || item.added) return
-    if (!item.name.trim()) { patch(item.key, { error: 'Enter the product name from the tag.' }); return }
-    patch(item.key, { saving: true, error: '' })
-    try {
-      const productId = item.productId || await createProduct(item)
-      if (!item.productId) patch(item.key, { productId })
-      const reviewResult = await api<{ warnings?: string[] }>('PUT', '/sales/item-tag-captures/' + item.capture.id + '/review', {
-        productId, productName: item.name.trim(), brand: item.brand.trim() || null,
-        model: item.model.trim() || null, barcode: item.barcode.trim() || null,
-        barcodeSymbology: item.barcodeSymbology.trim() || null,
-        serial: item.serial.trim() || null, imei1: item.imei1.trim() || null,
-        imei2: item.imei2.trim() || null,
-        mrp: item.mrp.trim() ? Number(item.mrp) : null, hsnCode: item.hsn.trim() || null
-      })
-      const primaryIdentifier = (item.serial || item.imei1 || item.imei2).trim().toUpperCase()
-      const accepted = onAdd({
-        captureId: item.capture.id, productId, name: item.name.trim(),
-        serials: primaryIdentifier ? [primaryIdentifier] : []
-      })
-      if (!accepted) throw new Error('Finish adding the item already being entered before selecting another tag photo.')
-      patch(item.key, { saving: false, added: true, productId, warning: reviewResult?.warnings?.join(' ') ?? '' })
-    } catch (e) {
-      const message = e instanceof ApiError && e.status === 403
-        ? 'Your role cannot create a product. Choose an existing product or ask an owner to add it.'
-        : e instanceof Error ? e.message : 'The item could not be added. Review it and retry.'
-      patch(item.key, { saving: false, error: message })
+  function addToInvoice(item: ScanDraft) {
+    if (item.busy) return
+    if (!item.name.trim()) {
+      patch(item.key, { error: 'Enter the product name from the tag.' })
+      return
     }
+    const mrp = item.mrp.trim() ? Number(item.mrp) : null
+    if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) {
+      patch(item.key, { error: 'Enter a valid MRP.' })
+      return
+    }
+    const serial = item.serial.trim()
+    const accepted = onAdd({
+      productId: item.productId,
+      name: item.name.trim(),
+      brand: item.brand.trim(),
+      model: item.model.trim(),
+      category: item.category.trim(),
+      barcode: item.barcode.trim(),
+      barcodeSymbology: item.barcodeSymbology.trim(),
+      serials: serial ? [serial] : [],
+      imei1: item.imei1.trim(),
+      imei2: item.imei2.trim(),
+      mrp,
+      hsn: item.hsn.trim()
+    })
+    if (!accepted) {
+      patch(item.key, { error: 'Finish the current invoice product row before adding another scanned item.' })
+      return
+    }
+    removePhoto(item)
   }
 
   const available = !disabled
   return (
     <div className="billing-card item-tag-card">
-      <h3>Photograph item tag</h3>
-      <p className="billing-hint">Take one clear photo for each physical item. RBOS reads the tag into a draft; check every field before adding it to the bill.</p>
+      <h3>Scan product tag</h3>
+      <p className="billing-hint">Take a picture of the label on the product box. RBOS reads the barcode, model and serial number and fills an invoice row. Verify the details before adding it.</p>
       <div className="billing-row">
         <button type="button" disabled={!available} onClick={() => cameraRef.current?.click()}>Take photo</button>
         <button type="button" className="secondary" disabled={!available} onClick={() => galleryRef.current?.click()}>Choose photo(s)</button>
@@ -405,40 +247,37 @@ export function ItemTagCapture({
         <input ref={galleryRef} hidden type="file" accept="image/jpeg,image/png,image/webp" multiple
           onChange={e => { addFiles(e.currentTarget.files); e.currentTarget.value = '' }} />
       </div>
-      {!available && <p className="billing-hint" role="status">Photo upload needs an internet connection. Existing reviewed photos can be kept with a held bill and submitted when online.</p>}
+      {!available && <p className="billing-hint" role="status">Tag scanning needs an internet connection. You can enter the invoice row manually while offline.</p>}
       {entries.map(item => (
-        <section className="item-tag-review" key={item.key} aria-label="Review photographed item">
+        <section className="item-tag-review" key={item.key} aria-label="Review scanned product tag">
           {item.preview && <img src={item.preview} alt="Captured product tag preview" className="item-tag-preview" />}
           <div className="item-tag-status" role="status">
-            {item.busy ? 'Uploading photo and reading tag…'
-              : item.added ? 'Added to bill — photo evidence is linked to this item'
-              : item.capture?.status === 'ReadingTag' ? 'Photo saved. Reading tag in the background…'
-              : item.capture?.status === 'NeedsAttention' ? 'Photo saved. Automatic reading was unavailable; enter the details manually.'
-              : item.capture ? 'Photo ready — review the extracted details'
-              : item.error ? 'Needs attention'
+            {item.busy ? 'Reading product tag…'
+              : item.error && !item.scan ? 'Could not read tag'
+              : item.scan?.status === 'NeedsAttention' ? 'Tag read partially — verify or complete the fields'
+              : item.scan ? 'Tag read — verify the fields before adding the invoice row'
               : 'Preparing photo'}
           </div>
           {item.error && <p className="billing-err" role="alert">{item.error}</p>}
           {item.warning && <p className="billing-hint" role="status">{item.warning}</p>}
-          {!item.capture && !item.busy && item.error && item.preview && item.file &&
-            <button type="button" className="secondary" disabled={!available} onClick={() => void sendPhoto(item)}>Retry upload</button>}
-          {!item.capture && item.error &&
-            <button type="button" className="secondary" onClick={() => void removePhoto(item)}>Remove photo</button>}
-          {item.capture?.status === 'ReadingTag' && <>
-            <button type="button" className="secondary" onClick={() => void checkStatus(item)}>Check status</button>
-            <button type="button" className="secondary" disabled={item.saving} onClick={() => void removePhoto(item)}>Remove photo</button>
-          </>}
-          {item.capture && item.capture.status !== 'ReadingTag' && !item.added && <>
-            {item.capture.suggestedProduct && <p className="billing-hint">Possible match: {item.capture.suggestedProduct.name} ({item.capture.suggestedProduct.reason}). Confirm it below.</p>}
+          {!item.scan && !item.busy && item.error && item.preview &&
+            <button type="button" className="secondary" disabled={!available} onClick={() => void sendPhoto(item)}>Retry scan</button>}
+          {item.scan && <>
+            {item.scan.suggestedProduct && <p className="billing-hint">
+              Barcode match: <strong>{item.scan.suggestedProduct.name}</strong>
+              {item.scan.suggestedProduct.reason ? ' (' + item.scan.suggestedProduct.reason + ')' : ''}
+            </p>}
             <div className="billing-grid">
               <div className="billing-field billing-col-12">
-                <label>Product in catalogue</label>
+                <label>Match to catalogue product</label>
                 <select value={item.productId} onChange={e => patch(item.key, { productId: e.target.value })}>
-                  <option value="">Create a new product from these details</option>
+                  <option value="">Create product from tag details when invoice is confirmed</option>
+                  {item.scan.suggestedProduct && !products.some(product => product.id === item.scan?.suggestedProduct?.id) &&
+                    <option value={item.scan.suggestedProduct.id}>{item.scan.suggestedProduct.name}</option>}
                   {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
                 </select>
               </div>
-              <div className="billing-field billing-col-6"><label>Product name</label><input value={item.name} onChange={e => patch(item.key, { name: e.target.value })} /></div>
+              <div className="billing-field billing-col-12"><label>Product name</label><input value={item.name} onChange={e => patch(item.key, { name: e.target.value })} /></div>
               <div className="billing-field billing-col-6"><label>Brand</label><input value={item.brand} onChange={e => patch(item.key, { brand: e.target.value })} /></div>
               <div className="billing-field billing-col-6"><label>Model</label><input value={item.model} onChange={e => patch(item.key, { model: e.target.value })} /></div>
               <div className="billing-field billing-col-6"><label>Barcode</label><input value={item.barcode} onChange={e => patch(item.key, { barcode: e.target.value })} /></div>
@@ -448,20 +287,17 @@ export function ItemTagCapture({
               <div className="billing-field billing-col-6"><label>MRP (reference only)</label><input inputMode="decimal" value={item.mrp} onChange={e => patch(item.key, { mrp: e.target.value })} /></div>
               <div className="billing-field billing-col-6"><label>HSN</label><input value={item.hsn} onChange={e => patch(item.key, { hsn: e.target.value })} /></div>
             </div>
-            {(item.capture.extraction?.warranty || item.capture.extraction?.specifications || item.capture.extraction?.otherText) && <details className="item-tag-details">
+            {(item.scan.extraction?.warranty || item.scan.extraction?.specifications || item.scan.extraction?.otherText) && <details className="item-tag-details">
               <summary>More information read from the tag</summary>
-              {item.capture.extraction.warranty && <p><strong>Warranty:</strong> {item.capture.extraction.warranty}</p>}
-              {item.capture.extraction.specifications && <p><strong>Specifications:</strong> {item.capture.extraction.specifications}</p>}
-              {item.capture.extraction.otherText && <p><strong>Other printed text:</strong> {item.capture.extraction.otherText}</p>}
+              {item.scan.extraction.warranty && <p><strong>Warranty:</strong> {item.scan.extraction.warranty}</p>}
+              {item.scan.extraction.specifications && <p><strong>Specifications:</strong> {item.scan.extraction.specifications}</p>}
+              {item.scan.extraction.otherText && <p><strong>Other printed text:</strong> {item.scan.extraction.otherText}</p>}
             </details>}
             <div className="billing-row">
-              <button type="button" disabled={item.saving || disabled} onClick={() => void addToBill(item)}>
-                {item.saving ? 'Saving review…' : 'Confirm details & add item'}
-              </button>
-              <button type="button" className="secondary" disabled={item.saving} onClick={() => void removePhoto(item)}>Remove / retake</button>
+              <button type="button" disabled={item.busy || disabled} onClick={() => addToInvoice(item)}>Use details in invoice</button>
+              <button type="button" className="secondary" onClick={() => removePhoto(item)}>Discard / retake</button>
             </div>
           </>}
-          {item.added && <button type="button" className="secondary" onClick={() => void removePhoto(item)}>Remove from bill</button>}
         </section>
       ))}
     </div>

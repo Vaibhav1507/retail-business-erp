@@ -17,11 +17,13 @@ public sealed record ItemTagReviewCommand(
     decimal? Mrp, string? HsnCode);
 
 /// <summary>
-/// Stores one private image per physical item, obtains structured tag extraction through
-/// direct Gemini/Groq provider calls, and keeps review/attachment state under tenant RLS.
+/// Provides transient, synchronous product-tag extraction for invoice entry. New scans
+/// are never persisted; the legacy capture routines remain only for rows created by
+/// earlier deployed versions and are not used by the invoice scan endpoint.
 /// </summary>
 public sealed class ItemTagCaptureService(
-    TenantDb db, HttpClient http, GroqVisionClient groq, IConfiguration configuration, ILogger<ItemTagCaptureService> log)
+    TenantDb db, HttpClient http, GroqVisionClient groq, LocalOcr localOcr, CatalogueService catalogue,
+    IConfiguration configuration, ILogger<ItemTagCaptureService> log)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp"];
@@ -45,106 +47,224 @@ public sealed class ItemTagCaptureService(
         }
     }
 
-    public async Task<ServiceResult<object>> UploadAsync(
-        Guid uid, string? idempotencyKey, string? contentType, string? detectedBarcode,
-        string? detectedSymbology, byte[] bytes, CancellationToken ct)
+    /// <summary>
+    /// Processes a tag photo in memory. No image, queue row or capture record is created.
+    /// </summary>
+    public async Task<ServiceResult<object>> ScanAsync(
+        Guid uid, string? contentType, string? detectedBarcode, string? detectedSymbology,
+        byte[] bytes, CancellationToken ct)
     {
         var requestTimer = Stopwatch.StartNew();
         try
         {
-            if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length is < 8 or > 100)
-                return ServiceResult<object>.Fail("A valid Idempotency-Key header (8-100 characters) is required.");
             if (contentType is null || !Allowed.Contains(contentType, StringComparer.OrdinalIgnoreCase))
-                return ServiceResult<object>.Fail("Choose a JPEG, PNG or WebP photo.");
+                return ServiceResult<object>.Fail("Choose a JPEG, PNG or WebP photo.", 415);
             if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, contentType))
                 return ServiceResult<object>.Fail("The photo is empty, larger than 8 MB, corrupt or not the type it claims to be.");
 
             var tenantId = await db.FindTenantAsync(uid, ct);
             if (tenantId is null)
-                return ServiceResult<object>.Fail("Set up a business before uploading an item tag.", 409);
+                return ServiceResult<object>.Fail("Set up a business before scanning a product tag.", 409);
 
-            var hash = Convert.ToHexString(SHA256.HashData(bytes));
-            var id = Guid.NewGuid();
-
-            // Expiry cleanup must never turn queued work into a terminal state merely
-            // because a worker is temporarily unavailable. Expired detached captures
-            // are deleted; the queue row cascades with the capture.
-            if (TryBeginRetentionCleanup(tenantId.Value))
+            var barcodeResult = BarcodeRules.Normalize(detectedBarcode);
+            var localBarcode = barcodeResult.Error is null ? barcodeResult.Code : null;
+            // A barcode decoded from the pixels is authoritative input. If its check
+            // digit/format is invalid, do not let a vision model silently replace it
+            // with a different guessed code.
+            var invalidLocalBarcode = !string.IsNullOrWhiteSpace(detectedBarcode) && barcodeResult.Error is not null;
+            var localSymbology = BarcodeRules.CleanSymbology(detectedSymbology);
+            var extracted = new JsonObject();
+            if (localBarcode is not null)
             {
-                try
-                {
-                    await using var cleanup = await db.BeginAsync(uid, tenantId, ct);
-                    await SqlHelpers.Exec(cleanup, ct,
-                        "delete from sales.item_tag_capture where sale_id is null and expires_at <= now()");
-                    await cleanup.CommitAsync(ct);
-                }
-                catch (Exception e) when (e is not OperationCanceledException)
-                {
-                    log.LogWarning("Item-tag retention cleanup deferred ({ErrorType}).", e.GetType().Name);
-                }
+                extracted["barcode"] = localBarcode;
+                extracted["barcodeSymbology"] = localSymbology;
+            }
+            else if (invalidLocalBarcode)
+            {
+                extracted["barcode"] = null;
+                extracted["barcodeSymbology"] = null;
             }
 
-            await using (var session = await db.BeginAsync(uid, tenantId, ct))
+            byte[] aiBytes = bytes;
+            var aiMime = contentType;
+            string? ocrText = null;
+            try
             {
-                await using var insert = session.Command(@"
-                    insert into sales.item_tag_capture
-                      (tenant_id,id,idempotency_key,content_type,size_bytes,content_sha256,content,status,extraction,created_by)
-                    values (@t,@i,@k,@m,@z,@h,@b,'ReadingTag',@e::jsonb,@u)
-                    on conflict (tenant_id,idempotency_key) do nothing");
-                var barcodeHint = BarcodeRules.Normalize(detectedBarcode);
-                var confirmedLocalBarcode = barcodeHint.Error is null ? barcodeHint.Code : null;
-                var localSymbology = BarcodeRules.CleanSymbology(detectedSymbology);
-                var initialExtraction = new JsonObject();
-                if (confirmedLocalBarcode is not null)
+                var prepTimer = Stopwatch.StartNew();
+                aiBytes = PrepareVisionImage(bytes, contentType, out aiMime);
+                prepTimer.Stop();
+                log.LogInformation(
+                    "Item-tag image prepared in memory. Original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms",
+                    bytes.Length, aiBytes.Length, prepTimer.ElapsedMilliseconds);
+
+                if (localOcr.Available)
                 {
-                    initialExtraction["barcode"] = confirmedLocalBarcode;
-                    initialExtraction["barcodeSymbology"] = localSymbology;
+                    using var ocrBudget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    ocrBudget.CancelAfter(TimeSpan.FromMilliseconds(900));
+                    try
+                    {
+                        var rows = await localOcr.ReadImageAsync(aiBytes, ocrBudget.Token);
+                        if (rows is not null)
+                            ocrText = string.Join('\n', rows.Take(35).Select(row => string.Join(" | ", row))).Trim();
+                        if (ocrText?.Length > 5000) ocrText = ocrText[..5000];
+                    }
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                    {
+                        log.LogDebug("Optional item-tag OCR exceeded its 900ms fast-path budget; vision extraction continues.");
+                    }
                 }
 
-                insert.Parameters.AddWithValue("t", tenantId.Value);
-                insert.Parameters.AddWithValue("i", id);
-                insert.Parameters.AddWithValue("k", idempotencyKey);
-                insert.Parameters.AddWithValue("m", contentType);
-                insert.Parameters.AddWithValue("z", bytes.Length);
-                insert.Parameters.AddWithValue("h", hash);
-                insert.Parameters.AddWithValue("b", bytes);
-                insert.Parameters.AddWithValue("e", initialExtraction.ToJsonString());
-                insert.Parameters.AddWithValue("u", uid);
-                var inserted = await insert.ExecuteNonQueryAsync(ct);
-
-                if (inserted == 0)
+                var attempts = new List<VisionProviderAttempt>();
+                var geminiKey = configuration["Gemini:ApiKey"];
+                var geminiModels = VisionProviderFallback.ItemTagGeminiModels(configuration);
+                var attemptTimeout = Math.Clamp(configuration.GetValue("AiPerformance:ItemTagAttemptTimeoutSeconds", 7), 5, 15);
+                var geminiEnabled = !string.IsNullOrWhiteSpace(geminiKey);
+                if (geminiEnabled)
                 {
-                    await using var existing = session.Command(
-                        "select id,content_sha256 from sales.item_tag_capture where idempotency_key=@k");
-                    existing.Parameters.AddWithValue("k", idempotencyKey);
-                    await using var reader = await existing.ExecuteReaderAsync(ct);
-                    if (!await reader.ReadAsync(ct))
-                        return ServiceResult<object>.Fail("The photo could not be saved. Retry the upload.", 409);
-                    var existingId = reader.GetGuid(0);
-                    var existingHash = reader.GetString(1).Trim();
-                    await reader.CloseAsync();
-                    if (!string.Equals(existingHash, hash, StringComparison.OrdinalIgnoreCase))
-                        return ServiceResult<object>.Fail("This upload key was already used for a different photo.", 409);
-                    await session.CommitAsync(ct);
-                    return await GetAsync(uid, existingId, ct);
+                    var primaryModel = geminiModels[0];
+                    attempts.Add(new VisionProviderAttempt("Gemini", primaryModel, attemptTimeout,
+                        token => ExtractWithGeminiAsync(geminiKey!, primaryModel, aiMime, aiBytes, token, ocrText)));
                 }
 
-                // The image and its processing job commit atomically. The API never
-                // returns a successful acknowledgement for an unqueued capture.
-                await using var enqueue = session.Command(
-                    "select integrations.enqueue_item_tag_capture(@t,@i,@u)");
-                enqueue.Parameters.AddWithValue("t", tenantId.Value);
-                enqueue.Parameters.AddWithValue("i", id);
-                enqueue.Parameters.AddWithValue("u", uid);
-                await enqueue.ExecuteNonQueryAsync(ct);
-                await session.CommitAsync(ct);
+                if (groq.Available && configuration.GetValue("Groq:ItemTagFallbackEnabled", false))
+                {
+                    attempts.Add(new VisionProviderAttempt("Groq", groq.Model, attemptTimeout,
+                        token => groq.ExtractImageAsync(aiMime, Convert.ToBase64String(aiBytes), BuildPrompt(ocrText), token)));
+                }
+
+                if (geminiEnabled)
+                {
+                    foreach (var model in geminiModels.Skip(1))
+                    {
+                        var fallbackModel = model;
+                        attempts.Add(new VisionProviderAttempt("Gemini", fallbackModel, attemptTimeout,
+                            token => ExtractWithGeminiAsync(geminiKey!, fallbackModel, aiMime, aiBytes, token, ocrText)));
+                    }
+                }
+
+                var providerBudget = Math.Clamp(
+                    configuration.GetValue("AiPerformance:ItemTagTotalProviderBudgetSeconds", 10), 5, 30);
+                var response = await VisionProviderFallback.ExecuteAsync(
+                    "ItemTagScan", attempts, HasUsableItemTagExtraction, log, ct,
+                    TimeSpan.FromSeconds(providerBudget));
+
+                if (response is JsonObject json)
+                    extracted = CleanExtraction(json);
+
+                if (localBarcode is not null)
+                {
+                    extracted["barcode"] = localBarcode;
+                    extracted["barcodeSymbology"] = localSymbology;
+                }
+
+                var warnings = new List<string>();
+                if (invalidLocalBarcode)
+                    warnings.Add("The barcode decoded from the photo failed validation. It was not replaced with an AI guess; scan it again or enter it manually.");
+                var serial = ReadString(extracted["serial"]);
+                if (!string.IsNullOrWhiteSpace(serial) &&
+                    (serial.Trim().Length is < 4 or > 40 || serial.Any(char.IsWhiteSpace)))
+                {
+                    extracted["serial"] = null;
+                    warnings.Add("The serial number could not pass format validation. Check the printed value before adding it to the invoice.");
+                }
+
+                foreach (var imeiField in new[] { "imei1", "imei2" })
+                {
+                    var imei = ReadString(extracted[imeiField]);
+                    if (!string.IsNullOrWhiteSpace(imei) && !IsValidImei(imei))
+                    {
+                        extracted[imeiField] = null;
+                        warnings.Add($"{imeiField.ToUpperInvariant()} could not pass its 15-digit check. Verify it on the tag before adding it.");
+                    }
+                }
+
+                var hsn = ReadString(extracted["hsn"]);
+                if (!string.IsNullOrWhiteSpace(hsn) && !GstCalculator.IsValidHsn(hsn.Trim()))
+                {
+                    extracted["hsn"] = null;
+                    warnings.Add("The HSN value could not pass validation. Verify it before adding it to the invoice.");
+                }
+
+                var modelBarcode = ReadString(extracted["barcode"]);
+                if (invalidLocalBarcode)
+                {
+                    extracted["barcode"] = null;
+                    extracted["barcodeSymbology"] = null;
+                }
+                else if (localBarcode is null && !string.IsNullOrWhiteSpace(modelBarcode))
+                {
+                    var normalized = BarcodeRules.Normalize(modelBarcode);
+                    if (normalized.Error is not null)
+                    {
+                        extracted["barcode"] = null;
+                        extracted["barcodeSymbology"] = null;
+                        warnings.Add("The barcode text could not pass validation. Scan it again or enter it manually.");
+                    }
+                    else
+                    {
+                        extracted["barcode"] = normalized.Code;
+                        extracted["barcodeSymbology"] = BarcodeRules.CleanSymbology(ReadString(extracted["barcodeSymbology"]));
+                    }
+                }
+
+                if (ReadString(extracted["otherText"]) is null && !string.IsNullOrWhiteSpace(ocrText))
+                    extracted["otherText"] = ocrText[..Math.Min(ocrText.Length, 1000)];
+
+                var barcode = ReadString(extracted["barcode"]);
+                var matchTimer = Stopwatch.StartNew();
+                var match = await MatchProductAsync(uid, tenantId.Value, extracted, ct);
+                if (!string.IsNullOrWhiteSpace(barcode))
+                {
+                    // A barcode verified by another business in this retail vertical
+                    // outranks a fuzzy brand/model guess. If our tenant's product match
+                    // disagrees, surface the conflict rather than choosing silently.
+                    var shared = await MatchOrImportSharedBarcodeAsync(uid, tenantId.Value, barcode!, ct);
+                    if (shared.Name is not null && shared.ProductId is null)
+                    {
+                        warnings.Add($"This barcode matches the shared RBOS product '{shared.Name}', but a catalogue manager must add it to this shop before it can be selected.");
+                        match = (null, null, null);
+                    }
+                    else if (shared.ProductId is not null)
+                    {
+                        if (match.ProductId is not null && match.ProductId != shared.ProductId)
+                        {
+                            warnings.Add("The barcode conflicts with the product identified by the model/name on this tag. Select the correct product manually; no mapping will be overwritten.");
+                            match = (null, null, null);
+                        }
+                        else
+                        {
+                            match = shared;
+                        }
+                    }
+                }
+                matchTimer.Stop();
+
+                var status = HasUsableItemTagExtraction(extracted) ? "ReadyForReview" : "NeedsAttention";
+                requestTimer.Stop();
+                log.LogInformation(
+                    "Item-tag scan completed. Status {Status}, barcode decoded locally {LocalBarcode}, catalogue match {Matched}, OCR used {OcrUsed}, bytes {UploadedBytes}, match latency {MatchMs}ms, total latency {TotalMs}ms, trace {TraceId}",
+                    status, localBarcode is not null, match.ProductId is not null, !string.IsNullOrWhiteSpace(ocrText),
+                    bytes.Length, matchTimer.ElapsedMilliseconds, requestTimer.ElapsedMilliseconds,
+                    Activity.Current?.TraceId.ToString());
+
+                return ServiceResult<object>.Ok(new
+                {
+                    status,
+                    extraction = extracted,
+                    suggestedProduct = match.ProductId is null ? null : new
+                    {
+                        id = match.ProductId.Value,
+                        name = match.Name ?? "",
+                        reason = match.Reason
+                    },
+                    warnings
+                });
             }
-
-            requestTimer.Stop();
-            log.LogInformation(
-                "Item-tag capture saved and queued. Capture {CaptureId}, content type {ContentType}, uploaded bytes {UploadedBytes}, enqueue latency {TotalMs}ms, trace {TraceId}",
-                id, contentType, bytes.Length, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
-            return await GetAsync(uid, id, ct);
+            finally
+            {
+                if (!ReferenceEquals(aiBytes, bytes))
+                    CryptographicOperations.ZeroMemory(aiBytes);
+            }
         }
         finally
         {
@@ -152,7 +272,64 @@ public sealed class ItemTagCaptureService(
         }
     }
 
-    /// <summary>Processes a persisted capture from the durable queue.</summary>
+    async Task<(Guid? ProductId, string? Name, string? Reason)> MatchOrImportSharedBarcodeAsync(
+        Guid uid, Guid tenantId, string barcode, CancellationToken ct)
+    {
+        Guid? masterProductId = null;
+        Guid? localProductId = null;
+        string? localName = null;
+        string? masterName = null;
+        await using (var session = await db.BeginAsync(uid, tenantId, ct))
+        await using (var query = session.Command(@"
+            select mb.master_product_id, p.id, p.name, mp.name
+            from core.business_profile bp
+            join catalog.master_product_barcode mb
+              on mb.business_category=bp.business_category and mb.code=@code
+            join catalog.master_product mp on mp.id=mb.master_product_id
+            left join catalog.product p
+              on p.tenant_id=bp.tenant_id and p.master_product_id=mp.id and p.is_active
+            where bp.tenant_id=@tenant"))
+        {
+            query.Parameters.AddWithValue("code", barcode);
+            query.Parameters.AddWithValue("tenant", tenantId);
+            await using var reader = await query.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
+            {
+                masterProductId = reader.GetGuid(0);
+                localProductId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
+                localName = reader.IsDBNull(2) ? null : reader.GetString(2);
+                masterName = reader.GetString(3);
+            }
+        }
+
+        if (masterProductId is null) return (null, null, null);
+        if (localProductId is null)
+        {
+            var role = await db.FindRoleAsync(uid, ct);
+            if (!Permissions.Has(role, Permissions.CatalogueManage))
+                return (null, masterName, "Shared catalogue match requires catalogue-manager access.");
+
+            _ = await catalogue.AddFromMasterAsync(uid, masterProductId.Value, ct);
+            await using var session = await db.BeginAsync(uid, tenantId, ct);
+            await using var query = session.Command(@"
+                select id,name from catalog.product
+                where tenant_id=@tenant and master_product_id=@master and is_active
+                limit 1");
+            query.Parameters.AddWithValue("tenant", tenantId);
+            query.Parameters.AddWithValue("master", masterProductId.Value);
+            await using var reader = await query.ExecuteReaderAsync(ct);
+            if (await reader.ReadAsync(ct))
+            {
+                localProductId = reader.GetGuid(0);
+                localName = reader.GetString(1);
+            }
+        }
+
+        return localProductId is null ? (null, masterName, "Verified shared barcode mapping")
+            : (localProductId, localName ?? masterName, "Verified shared barcode mapping");
+    }
+
+    /// <summary>Extracts a previously saved item-tag photo within the upload request.</summary>
     public async Task ProcessAsync(Guid uid, Guid tenantId, Guid id, CancellationToken ct)
     {
         var requestTimer = Stopwatch.StartNew();
@@ -248,8 +425,9 @@ public sealed class ItemTagCaptureService(
             var matchTimer = Stopwatch.StartNew();
             try
             {
-                (suggestedProductId, matchReason) =
-                    await MatchProductAsync(uid, tenantId, extracted, ct);
+                var match = await MatchProductAsync(uid, tenantId, extracted, ct);
+                suggestedProductId = match.ProductId;
+                matchReason = match.Reason;
             }
             catch (Exception e) when (e is NpgsqlException or InvalidOperationException)
             {
@@ -282,7 +460,7 @@ public sealed class ItemTagCaptureService(
 
         requestTimer.Stop();
         log.LogInformation(
-            "Item-tag background processing completed. Capture {CaptureId}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
+            "Item-tag extraction completed. Capture {CaptureId}, final status {Status}, total latency {TotalMs}ms, trace {TraceId}",
             id, status, requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
     }
 
@@ -461,12 +639,12 @@ public sealed class ItemTagCaptureService(
         return ServiceResult<object>.Ok(new { id, deleted = true });
     }
 
-    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string model, string mime, byte[] bytes, CancellationToken ct)
+    async Task<JsonNode?> ExtractWithGeminiAsync(string apiKey, string model, string mime, byte[] bytes, CancellationToken ct, string? ocrText = null)
     {
         var parts = new JsonArray
         {
             new JsonObject { ["inline_data"] = new JsonObject { ["mime_type"] = mime, ["data"] = Convert.ToBase64String(bytes) } },
-            new JsonObject { ["text"] = Prompt }
+            new JsonObject { ["text"] = BuildPrompt(ocrText) }
         };
         var body = new JsonObject
         {
@@ -494,7 +672,7 @@ public sealed class ItemTagCaptureService(
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
 
-    async Task<(Guid? ProductId, string? Reason)> MatchProductAsync(
+    async Task<(Guid? ProductId, string? Name, string? Reason)> MatchProductAsync(
         Guid uid, Guid tenantId, JsonObject extraction, CancellationToken ct)
     {
         var barcodeHint = BarcodeRules.Normalize(ReadString(extraction["barcode"]));
@@ -539,14 +717,14 @@ public sealed class ItemTagCaptureService(
 
         await using var reader = await query.ExecuteReaderAsync(ct);
         return await reader.ReadAsync(ct)
-            ? (reader.GetGuid(0), reader.GetString(2))
-            : (null, null);
+            ? (reader.GetGuid(0), reader.GetString(1), reader.GetString(2))
+            : (null, null, null);
     }
 
     static bool HasUsableItemTagExtraction(JsonNode? value)
     {
         if (value is not JsonObject obj) return false;
-        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn", "warranty", "specifications", "otherText" })
+        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn" })
             if (!string.IsNullOrWhiteSpace(ReadString(obj[key]))) return true;
         try { return obj["mrp"]?.GetValue<decimal?>() is >= 0; }
         catch (Exception e) when (e is InvalidOperationException or FormatException) { return false; }
@@ -560,10 +738,17 @@ public sealed class ItemTagCaptureService(
             using var source = SKBitmap.Decode(original);
             if (source is null) return original;
             var maxDimension = Math.Max(source.Width, source.Height);
-            const int maxAiDimension = 2200;
-            if (maxDimension <= maxAiDimension) return original;
+            const int maxAiDimension = 3000;
+            const int reencodeAboveBytes = 1_500_000;
+            var resizeRequired = maxDimension > maxAiDimension;
+            var reencodeRequired = resizeRequired || !string.Equals(mime, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                || original.Length > reencodeAboveBytes;
+            if (!reencodeRequired) return original;
 
-            var scale = (double)maxAiDimension / maxDimension;
+            // Preserve the full pixel dimensions for ordinary label photos, but normalize
+            // PNG/WebP/large JPEG inputs into a high-quality JPEG to reduce request size.
+            // Only downscale very large images; never shrink small serial-number text.
+            var scale = resizeRequired ? (double)maxAiDimension / maxDimension : 1d;
             var width = Math.Max(1, (int)Math.Round(source.Width * scale));
             var height = Math.Max(1, (int)Math.Round(source.Height * scale));
             using var resized = new SKBitmap(new SKImageInfo(width, height, source.ColorType, source.AlphaType));
@@ -573,7 +758,7 @@ public sealed class ItemTagCaptureService(
                 canvas.DrawBitmap(source, new SKRect(0, 0, width, height));
                 canvas.Flush();
             }
-            using var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, 88);
+            using var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, 92);
             if (encoded is null) return original;
             using var stream = new MemoryStream();
             encoded.SaveTo(stream);
@@ -624,6 +809,11 @@ public sealed class ItemTagCaptureService(
         };
     }
 
+    static string BuildPrompt(string? ocrText) =>
+        string.IsNullOrWhiteSpace(ocrText)
+            ? Prompt
+            : Prompt + "\n\nOptional local OCR transcription from this same tag (may contain recognition errors). Use it only to cross-check visible characters; the image remains the source of truth. Never copy an OCR value that conflicts with the image:\n" + ocrText;
+
     const string Prompt =
         "Read the product identification tag for exactly one physical retail item. Extract only values visible on the tag. " +
         "Return null for unreadable or absent fields; never guess. Keep product-level fields (brand, model, description, barcode, specifications, MRP, HSN) " +
@@ -637,6 +827,25 @@ public sealed class ItemTagCaptureService(
         "image/webp" => b.Length > 12 && b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 && b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50,
         _ => false
     };
+
+    static bool IsValidImei(string value)
+    {
+        if (value.Length != 15 || !value.All(char.IsAsciiDigit)) return false;
+        var sum = value[^1] - '0'; // IMEI's final digit is the Luhn check digit.
+        var doubleDigit = true;
+        for (var i = value.Length - 2; i >= 0; i--)
+        {
+            var digit = value[i] - '0';
+            if (doubleDigit)
+            {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+            doubleDigit = !doubleDigit;
+        }
+        return sum % 10 == 0;
+    }
 
     static string? ReadString(JsonNode? node)
     {

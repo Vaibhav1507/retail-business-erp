@@ -133,6 +133,7 @@ public sealed class SalesService(TenantDb db)
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
         await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
+            l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, p.model, p.brand, p.hsn_code,
             coalesce((select array_agg(tc.id) from sales.item_tag_capture tc
                       where tc.tenant_id=l.tenant_id and tc.sale_id=l.sale_id and tc.sale_product_id=l.product_id), array[]::uuid[])
             from sales.sale_line l join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
@@ -141,7 +142,19 @@ public sealed class SalesService(TenantDb db)
             c.Parameters.AddWithValue("i", id);
             await using var r = await c.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
-                lines.Add(new { product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2), unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5), serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6), captureIds = r.GetFieldValue<Guid[]>(7) });
+                lines.Add(new
+                {
+                    product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2),
+                    unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5),
+                    serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6),
+                    imei1s = r.GetFieldValue<string[]>(7), imei2s = r.GetFieldValue<string[]>(8),
+                    barcode = r.IsDBNull(9) ? null : r.GetString(9),
+                    barcodeSymbology = r.IsDBNull(10) ? null : r.GetString(10),
+                    model = r.IsDBNull(11) ? null : r.GetString(11),
+                    brand = r.IsDBNull(12) ? null : r.GetString(12),
+                    hsnCode = r.IsDBNull(13) ? null : r.GetString(13),
+                    captureIds = r.GetFieldValue<Guid[]>(14)
+                });
         }
         return ServiceResult<object>.Ok(new { sale = head, lines });
     }
@@ -220,6 +233,26 @@ public sealed class SalesService(TenantDb db)
     {
         key ??= "";
         if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
+        if (m.Lines is not null)
+        {
+            var normalizedLines = new List<SaleLineInput>(m.Lines.Count);
+            foreach (var line in m.Lines)
+            {
+                if (string.IsNullOrWhiteSpace(line.Barcode))
+                {
+                    normalizedLines.Add(line with { Barcode = null, BarcodeSymbology = null });
+                    continue;
+                }
+                var (normalizedBarcode, barcodeError) = BarcodeRules.Normalize(line.Barcode);
+                if (barcodeError is not null) return ServiceResult<object>.Fail(barcodeError);
+                normalizedLines.Add(line with
+                {
+                    Barcode = normalizedBarcode,
+                    BarcodeSymbology = BarcodeRules.CleanSymbology(line.BarcodeSymbology)
+                });
+            }
+            m = m with { Lines = normalizedLines };
+        }
         var amountPaid = m.AmountPaid; var payMethod = m.PayMethod;
         var split = new List<(string Method, decimal Amount)>();
         if (m.Payments is { Count: > 0 })
@@ -236,7 +269,7 @@ public sealed class SalesService(TenantDb db)
         if (allCaptureIds.Distinct().Count() != allCaptureIds.Length)
             return ServiceResult<object>.Fail("An item-tag photo can be attached to only one sale line.");
         var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{string.Join(',', l.CaptureIds ?? [])}"))) + splitKey);
+            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{string.Join(',', l.CaptureIds ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -258,6 +291,16 @@ public sealed class SalesService(TenantDb db)
             {
                 q.Parameters.AddWithValue("i", ids);
                 if ((long)(await q.ExecuteScalarAsync(ct))! != ids.Length) return ServiceResult<object>.Fail("Unknown or inactive product.");
+            }
+
+            // Barcode learning is part of this transaction, not the scan request.
+            // A failed sale cannot leave either a tenant-private or shared mapping behind.
+            foreach (var line in lines.Where(x => !string.IsNullOrWhiteSpace(x.Barcode)))
+            {
+                if (!await BarcodeService.LearnFromCompletedSaleAsync(
+                    s, tenantId, line.ProductId, line.Barcode!, line.BarcodeSymbology, ct))
+                    return ServiceResult<object>.Fail(
+                        "This barcode is already associated with a different product in this business or shared catalogue.", 409);
             }
 
             // Lock and validate every reviewed photo before any ledger or stock mutation.
@@ -314,8 +357,8 @@ public sealed class SalesService(TenantDb db)
 
             foreach (var (l, unitCost, cost, next) in costed)
             {
-                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr)",
-                    ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials));
+                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr,@i1,@i2,@bc,@bs)",
+                    ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
                 if (l.CaptureIds is { Length: > 0 })
                 {
                     var attached = await SqlHelpers.ExecCount(s, ct, @"
@@ -357,6 +400,9 @@ public sealed class SalesService(TenantDb db)
                         'name', p.name, 'sku', p.internal_sku, 'quantity', sl.quantity,
                         'unitPrice', sl.unit_price, 'discount', sl.discount,
                         'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials),
+                        'imei1s', to_jsonb(sl.imei1s), 'imei2s', to_jsonb(sl.imei2s),
+                        'barcode', sl.barcode, 'barcodeSymbology', sl.barcode_symbology,
+                        'model', p.model, 'brand', p.brand, 'hsnCode', p.hsn_code,
                         'itemTagCaptureIds', coalesce((
                           select to_jsonb(array_agg(tc.id)) from sales.item_tag_capture tc
                           where tc.tenant_id=sl.tenant_id and tc.sale_id=sl.sale_id and tc.sale_product_id=sl.product_id
@@ -406,12 +452,19 @@ public sealed class SalesService(TenantDb db)
                 await enqueue.ExecuteNonQueryAsync(ct);
             }
 
-            var allSerials = lines.Where(l => l.Serials is not null).SelectMany(l => l.Serials!).ToArray();
+            var allIdentifiers = lines
+                .SelectMany(l => (l.Serials ?? [])
+                    .Concat(l.Imei1s ?? []).Concat(l.Imei2s ?? []))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var soldBefore = new List<string>();
-            if (allSerials.Length > 0)
+            if (allIdentifiers.Length > 0)
             {
-                await using var q = s.Command("select distinct u from sales.sale_line l, unnest(l.serials) u where u = any(@s)");
-                q.Parameters.AddWithValue("s", allSerials);
+                await using var q = s.Command(@"
+                    select distinct identifier
+                    from sales.sale_line l,
+                         unnest(coalesce(l.serials, array[]::text[]) || l.imei1s || l.imei2s) identifier
+                    where identifier = any(@ids)");
+                q.Parameters.AddWithValue("ids", allIdentifiers);
                 await using var r = await q.ExecuteReaderAsync(ct);
                 while (await r.ReadAsync(ct)) soldBefore.Add(r.GetString(0));
             }
