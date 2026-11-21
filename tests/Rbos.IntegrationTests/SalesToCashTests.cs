@@ -73,6 +73,24 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(8m, (await Stock(c)).GetProperty("quantity").GetDecimal());
         Assert.Single((await c.GetJson("/sales")).EnumerateArray());
     }
+    [Fact] public async Task Sale_search_matches_serial_case_insensitively_and_preserves_original_value()
+    {
+        var (c, loc, p) = await Stocked(f);
+        const string serial = "abC-01oI";
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = loc, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new { productId = p, quantity = 1m, unitPrice = 80m, discount = 0m, serials = new[] { serial } } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + saleId);
+        Assert.Equal(serial, detail.GetProperty("lines")[0].GetProperty("serials")[0].GetString());
+        Assert.Single((await c.GetJson("/sales?q=ABC-01OI")).EnumerateArray());
+        Assert.Single((await c.GetJson("/sales?q=abC-01oI")).EnumerateArray());
+    }
+
     [Fact] public async Task Sale_detail_and_search_work()
     {
         var (c, loc, p) = await Stocked(f); var cust = await Customer(c, "Meera Stores", "12 Market Road | Bhagalpur | Bihar | 812001");
@@ -195,4 +213,133 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         await transaction.RollbackAsync(); // Keep the shared CI queue unchanged for other tests.
     }
 
+
+    [Fact] public async Task Scanned_barcode_is_learned_only_after_successful_invoice_and_cannot_be_reassigned()
+    {
+        var (client, location, product) = await Stocked(f, qty: 5);
+        const string code = "4006381333931";
+        var failed = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = product, quantity = 6m, unitPrice = 100m, discount = 0m,
+                serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.BadRequest, failed.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.Raw("/products/by-barcode?code=" + code)).StatusCode);
+
+        var posted = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = product, quantity = 1m, unitPrice = 100m, discount = 0m,
+                serials = new[] { "SERIAL12345" }, barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, posted.StatusCode);
+
+        var lookup = await client.GetJson("/products/by-barcode?code=" + code);
+        Assert.Equal(product, lookup.GetProperty("productId").GetGuid());
+
+        var otherProduct = await client.AddProduct("Different product cannot claim barcode");
+        var conflict = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = otherProduct, quantity = 1m, unitPrice = 100m, discount = 0m,
+                serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal(product, (await client.GetJson("/products/by-barcode?code=" + code))
+            .GetProperty("productId").GetGuid());
+    }
+
+    [Fact] public async Task Verified_barcode_mapping_is_reused_by_another_business_in_the_same_vertical()
+    {
+        static async Task SelectElectronicsVertical(Client client, string name)
+        {
+            var response = await client.Send(HttpMethod.Put, "/business-profile", new
+            {
+                businessName = name, businessCategory = "electronics_mobile",
+                ownerName = "Shop Owner", mobile = (string?)null,
+                address = "1 Market Road", city = "Bengaluru", state = "Karnataka",
+                pinCode = "560001", gstStatus = "NotRegistered", gstin = (string?)null,
+                financialYearStartMonth = 4, language = "en"
+            });
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        var first = new Client(f);
+        await first.SignUpAndBootstrap();
+        await SelectElectronicsVertical(first, "Electronics Shop A");
+        var firstProduct = await first.AddProduct("Shared Electronics Television Model X");
+        var location = await first.Location();
+        var supplierResponse = await first.Send(HttpMethod.Post, "/suppliers", new { name = "Shared Supplier A" });
+        Assert.Equal(HttpStatusCode.OK, supplierResponse.StatusCode);
+        var supplier = (await supplierResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var receipt = await first.Send(HttpMethod.Post, "/purchases", new
+        {
+            supplierId = supplier, locationId = location, receiptDate = Today,
+            lines = new[] { new { productId = firstProduct, quantity = 3m, unitCost = 1000m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, receipt.StatusCode);
+
+        const string code = "4006381333931";
+        var sale = await first.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = firstProduct, quantity = 1m, unitPrice = 1500m, discount = 0m,
+                serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, sale.StatusCode);
+
+        var second = new Client(f);
+        await second.SignUpAndBootstrap();
+        await SelectElectronicsVertical(second, "Electronics Shop B");
+        var sharedLookup = await second.GetJson("/products/by-barcode?code=" + code);
+        Assert.Equal("Shared Electronics Television Model X", sharedLookup.GetProperty("name").GetString());
+        Assert.Equal(code, sharedLookup.GetProperty("code").GetString());
+
+        // A second lookup now uses the tenant's own materialized map, not AI or an external provider.
+        var secondLookup = await second.GetJson("/products/by-barcode?code=" + code);
+        Assert.Equal(sharedLookup.GetProperty("productId").GetGuid(), secondLookup.GetProperty("productId").GetGuid());
+    }
+
+    [Fact] public async Task Dual_sim_phone_keeps_two_imeis_separate_from_one_physical_serial()
+    {
+        var (client, location, product) = await Stocked(f, qty: 2);
+        const string serial = "SERIAL12345";
+        const string imei1 = "490154203237518";
+        const string imei2 = "490154203237526";
+        var response = await client.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            amountPaid = (decimal?)null, payMethod = (string?)null,
+            lines = new[] { new
+            {
+                productId = product, quantity = 1m, unitPrice = 1000m, discount = 0m,
+                serials = new[] { serial }, imei1s = new[] { imei1 }, imei2s = new[] { imei2 }
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await client.GetJson("/sales/" + saleId);
+        var line = detail.GetProperty("lines")[0];
+        Assert.Equal(new[] { serial }, line.GetProperty("serials").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(new[] { imei1 }, line.GetProperty("imei1s").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(new[] { imei2 }, line.GetProperty("imei2s").EnumerateArray().Select(x => x.GetString()).ToArray());
+    }
 }

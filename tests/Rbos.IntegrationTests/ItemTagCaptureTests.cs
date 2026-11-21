@@ -1,357 +1,114 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Npgsql;
-using Rbos.Api.Application;
 
 namespace Rbos.IntegrationTests;
 
 public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    static string Today => DateTime.UtcNow.ToString("yyyy-MM-dd");
     static string Key() => Guid.NewGuid().ToString("N");
     static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xD9];
 
-    static async Task<Guid> Upload(
-        Client client, byte[]? bytes = null, string? key = null, string? barcode = null, bool process = false)
+    [Fact]
+    public async Task Scan_returns_invoice_fields_immediately_without_creating_a_capture_or_storing_the_photo()
     {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        var productId = await client.AddProduct("RBOS Tag Scan Television");
+        const string code = "4006381333931";
+
+        var link = await client.Send(HttpMethod.Post, "/products/" + productId + "/barcodes",
+            new { code, symbology = "EAN_13", packQuantity = 1 });
+        Assert.Equal(HttpStatusCode.OK, link.StatusCode);
+
         var response = await client.SendBytes(
-            "/sales/item-tag-captures", bytes ?? Jpeg, "image/jpeg", key ?? Key(),
-            barcode, barcode is null ? null : "EAN_13");
-        Assert.True(response.StatusCode == HttpStatusCode.OK,
-            $"Upload returned {(int)response.StatusCode} {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
-        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        if (process) await DrainItemTagQueueForTests();
-        return id;
-    }
+            "/sales/item-tag-scan", Jpeg, "image/jpeg", Key(), code, "EAN_13");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-    // Use the real queue claim/finish functions but remove provider credentials from
-    // this deterministic test worker, so no external AI request or cost is possible.
-    static async Task DrainItemTagQueueForTests()
-    {
-        var cfg = new ConfigurationBuilder()
-            .AddUserSecrets<Program>()
-            .AddEnvironmentVariables()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Rbos:Database"] = "test",
-                ["Gemini:ApiKey"] = "",
-                ["Groq:ApiKey"] = "",
-                ["Groq:ItemTagFallbackEnabled"] = "false",
-                ["AiPerformance:TotalProviderBudgetSeconds"] = "1"
-            })
-            .Build();
-        await using var app = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestApp"]
-            ?? throw new InvalidOperationException("RbosTestApp connection is not configured."));
-        await using var worker = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestWhatsAppWorker"]
-            ?? throw new InvalidOperationException("RbosTestWhatsAppWorker connection is not configured."));
-        using var loggerFactory = LoggerFactory.Create(logging => logging.SetMinimumLevel(LogLevel.Warning));
-        await ItemTagCaptureWorker.RunAsync(app, worker, cfg, loggerFactory, CancellationToken.None);
-    }
-
-    static async Task<HttpResponseMessage> Review(
-        Client client, Guid id, Guid productId, string? barcode = null)
-        => await client.Send(HttpMethod.Put, "/sales/item-tag-captures/" + id + "/review",
-            new
-            {
-                productId, productName = "RBOS Test Cable", brand = (string?)null, model = (string?)null,
-                barcode, barcodeSymbology = barcode is null ? null : "EAN_13",
-                serial = (string?)null, imei1 = (string?)null, imei2 = (string?)null,
-                mrp = (decimal?)null, hsnCode = (string?)null
-            });
-
-    static async Task<(Client Client, Guid LocationId, Guid ProductId)> Stocked(ApiFactory factory)
-    {
-        var client = new Client(factory);
-        await client.SignUpAndBootstrap();
-        var location = await client.Location();
-        var product = await client.AddProduct("RBOS Test Cable");
-        var supplierResponse = await client.Send(HttpMethod.Post, "/suppliers", new { name = "Capture Test Supplier" });
-        Assert.Equal(HttpStatusCode.OK, supplierResponse.StatusCode);
-        var supplier = (await supplierResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        var purchase = await client.Send(HttpMethod.Post, "/purchases", new
-        {
-            supplierId = supplier, locationId = location, receiptDate = Today,
-            lines = new[] { new { productId = product, quantity = 5m, unitCost = 20m } }
-        }, Key());
-        Assert.Equal(HttpStatusCode.OK, purchase.StatusCode);
-        return (client, location, product);
-    }
-
-    [Fact]
-    public async Task Upload_is_idempotent_and_image_access_is_private_and_deletable()
-    {
-        var client = new Client(factory);
-        await client.SignUpAndBootstrap();
-        var key = Key();
-
-        var first = await client.SendBytes("/sales/item-tag-captures", Jpeg, "image/jpeg", key);
-        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
-        var id = firstBody.GetProperty("id").GetGuid();
-        Assert.Equal("ReadingTag", firstBody.GetProperty("status").GetString());
-
-        var replay = await client.SendBytes("/sales/item-tag-captures", Jpeg, "image/jpeg", key);
-        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
-        Assert.Equal(id, (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid());
-
-        var conflict = await client.SendBytes("/sales/item-tag-captures", [0xFF, 0xD8, 0xFF, 0xE0], "image/jpeg", key);
-        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
-
-        var image = await client.Raw("/sales/item-tag-captures/" + id + "/image");
-        Assert.Equal(HttpStatusCode.OK, image.StatusCode);
-        Assert.Equal(Jpeg, await image.Content.ReadAsByteArrayAsync());
-        Assert.Contains("private", image.Headers.CacheControl?.ToString());
-        Assert.Contains("no-store", image.Headers.CacheControl?.ToString());
-
-        var removed = await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id);
-        Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.Raw("/sales/item-tag-captures/" + id)).StatusCode);
-    }
-
-    [Fact]
-    public async Task Local_EAN13_barcode_hint_is_preserved_and_matched_without_AI()
-    {
-        var client = new Client(factory);
-        await client.SignUpAndBootstrap();
-        const string code = "4006381333931";
-        var productResponse = await client.Send(HttpMethod.Post, "/products", new
-        {
-            name = "Barcode Test Product", categoryName = "Accessories", isGeneric = true,
-            baseUnit = "pcs", barcode = code
-        });
-        Assert.Equal(HttpStatusCode.OK, productResponse.StatusCode);
-        var productId = (await productResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-
-        var upload = await client.SendBytes(
-            "/sales/item-tag-captures", Jpeg, "image/jpeg", Key(), code, "EAN_13");
-        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
-        var body = await upload.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("ReadingTag", body.GetProperty("status").GetString());
+        Assert.Equal("ReadyForReview", body.GetProperty("status").GetString());
         Assert.Equal(code, body.GetProperty("extraction").GetProperty("barcode").GetString());
-        Assert.Equal(JsonValueKind.Null, body.GetProperty("suggestedProduct").ValueKind);
+        Assert.Equal(productId, body.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
+        Assert.False(body.TryGetProperty("id", out _));
+        Assert.False(body.TryGetProperty("captureId", out _));
 
-        await DrainItemTagQueueForTests();
-        var processed = await client.GetJson("/sales/item-tag-captures/" + body.GetProperty("id").GetGuid());
-        Assert.Equal("ReadyForReview", processed.GetProperty("status").GetString());
-        Assert.Equal(productId, processed.GetProperty("suggestedProduct").GetProperty("id").GetGuid());
+        // The old evidence-upload API is deliberately no longer exposed. A tag image
+        // exists only in the scan request and the browser's temporary preview.
+        var oldUpload = await client.Send(HttpMethod.Post, "/sales/item-tag-captures", new { });
+        Assert.Equal(HttpStatusCode.NotFound, oldUpload.StatusCode);
     }
 
     [Fact]
-    public async Task Confirmed_barcode_is_learned_for_existing_product_and_reused_on_future_scans()
+    public async Task Scan_does_not_replace_an_invalid_locally_decoded_barcode_with_an_ai_guess()
     {
         var client = new Client(factory);
         await client.SignUpAndBootstrap();
-        var productId = await client.AddProduct("Existing LG Television");
-        const string code = "4006381333931";
+        const string invalidEan13 = "4006381333932";
 
-        var captureId = await Upload(client, barcode: code, process: true);
-        var review = await Review(client, captureId, productId, code);
-        Assert.Equal(HttpStatusCode.OK, review.StatusCode);
+        var response = await client.SendBytes(
+            "/sales/item-tag-scan", Jpeg, "image/jpeg", Key(), invalidEan13, "EAN_13");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-        var lookup = await client.GetJson("/products/by-barcode?code=" + code);
-        Assert.Equal(productId, lookup.GetProperty("productId").GetGuid());
-
-        var repeated = await Review(client, captureId, productId, code);
-        Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
-        var list = await client.GetJson("/products/" + productId + "/barcodes");
-        Assert.Single(list.GetProperty("barcodes").EnumerateArray());
+        Assert.True(body.GetProperty("extraction").GetProperty("barcode").ValueKind == JsonValueKind.Null);
+        Assert.Contains(body.GetProperty("warnings").EnumerateArray(),
+            warning => warning.GetString()!.Contains("not replaced with an AI guess", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Confirmed_barcode_cannot_be_reassigned_from_another_product()
-    {
-        var client = new Client(factory);
-        await client.SignUpAndBootstrap();
-        const string code = "4006381333931";
-        var original = await client.Send(HttpMethod.Post, "/products", new
-        {
-            name = "Original barcode owner", categoryName = "Accessories", isGeneric = true,
-            baseUnit = "pcs", barcode = code
-        });
-        Assert.Equal(HttpStatusCode.OK, original.StatusCode);
-        var originalId = (await original.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        var otherProduct = await client.AddProduct("Different product");
-
-        var captureId = await Upload(client, barcode: code, process: true);
-        var conflict = await Review(client, captureId, otherProduct, code);
-        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
-
-        var lookup = await client.GetJson("/products/by-barcode?code=" + code);
-        Assert.Equal(originalId, lookup.GetProperty("productId").GetGuid());
-    }
-
-    [Fact]
-    public async Task Expired_item_tag_lease_is_exclusive_and_recovery_does_not_repeat_provider_calls()
-    {
-        var client = new Client(factory);
-        await client.SignUpAndBootstrap();
-        // Keep the assertion isolated from any stale test-fixture queue rows.
-        await DrainItemTagQueueForTests();
-        var id = await Upload(client);
-
-        var cfg = new ConfigurationBuilder()
-            .AddUserSecrets<Program>()
-            .AddEnvironmentVariables()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Rbos:Database"] = "test",
-                ["Gemini:ApiKey"] = "",
-                ["Groq:ApiKey"] = "",
-                ["Groq:ItemTagFallbackEnabled"] = "false"
-            })
-            .Build();
-        await using var worker = NpgsqlDataSource.Create(cfg["ConnectionStrings:RbosTestWhatsAppWorker"]
-            ?? throw new InvalidOperationException("RbosTestWhatsAppWorker connection is not configured."));
-
-        Guid firstLease;
-        await using (var connection = await worker.OpenConnectionAsync())
-        await using (var claim = new NpgsqlCommand(
-            "select capture_id,lease_token,attempt_count from integrations.claim_item_tag_captures(1,300)", connection))
-        await using (var reader = await claim.ExecuteReaderAsync())
-        {
-            Assert.True(await reader.ReadAsync());
-            Assert.Equal(id, reader.GetGuid(0));
-            firstLease = reader.GetGuid(1);
-            Assert.Equal(1, reader.GetInt32(2));
-        }
-
-        // A user must not be able to delete evidence while an active worker may
-        // already be making a paid provider call.
-        var activeDelete = await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id);
-        Assert.Equal(HttpStatusCode.Conflict, activeDelete.StatusCode);
-
-        // A second scheduled invocation must not claim a job with a live lease.
-        await using (var connection = await worker.OpenConnectionAsync())
-        await using (var claim = new NpgsqlCommand(
-            "select count(*) from integrations.claim_item_tag_captures(1,300)", connection))
-            Assert.Equal(0L, (long)(await claim.ExecuteScalarAsync())!);
-
-        await using (var connection = await worker.OpenConnectionAsync())
-        await using (var finish = new NpgsqlCommand(
-            "select integrations.finish_item_tag_capture(@id,@lease,null)", connection))
-        {
-            finish.Parameters.AddWithValue("id", id);
-            finish.Parameters.AddWithValue("lease", Guid.NewGuid());
-            Assert.False((bool)(await finish.ExecuteScalarAsync())!);
-        }
-
-        // Simulate process death after a possibly-paid provider attempt. Expire only
-        // this test row using the test migrator; the recovery worker must not call AI.
-        await using (var migrator = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]))
-        {
-            await migrator.OpenAsync();
-            await using var expire = new NpgsqlCommand(@"
-                update integrations.item_tag_capture_queue
-                   set lease_until = now() - interval '1 second'
-                 where capture_id = @id", migrator);
-            expire.Parameters.AddWithValue("id", id);
-            Assert.Equal(1, await expire.ExecuteNonQueryAsync());
-        }
-
-        await DrainItemTagQueueForTests();
-        var recovered = await client.GetJson("/sales/item-tag-captures/" + id);
-        Assert.Equal("NeedsAttention", recovered.GetProperty("status").GetString());
-        Assert.NotEqual(Guid.Empty, firstLease);
-        Assert.Equal(HttpStatusCode.OK, (await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id)).StatusCode);
-    }
-
-    [Fact]
-    public async Task Upload_rejects_unsupported_type_bad_signature_and_oversized_photo()
+    public async Task Scan_without_barcode_or_provider_returns_a_manual_review_result_not_a_queued_job()
     {
         var client = new Client(factory);
         await client.SignUpAndBootstrap();
 
-        var unsupported = await client.SendBytes("/sales/item-tag-captures", Jpeg, "application/octet-stream", Key());
+        var response = await client.SendBytes(
+            "/sales/item-tag-scan", Jpeg, "image/jpeg", Key());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("NeedsAttention", body.GetProperty("status").GetString());
+        Assert.True(body.GetProperty("extraction").ValueKind == JsonValueKind.Object);
+        Assert.False(body.TryGetProperty("id", out _));
+    }
+
+    [Fact]
+    public async Task Scan_rejects_unsupported_type_bad_signature_and_oversized_photo()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+
+        var unsupported = await client.SendBytes(
+            "/sales/item-tag-scan", Jpeg, "application/octet-stream", Key());
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, unsupported.StatusCode);
 
-        var wrongSignature = await client.SendBytes("/sales/item-tag-captures", [0, 1, 2, 3], "image/jpeg", Key());
+        var wrongSignature = await client.SendBytes(
+            "/sales/item-tag-scan", [0, 1, 2, 3], "image/jpeg", Key());
         Assert.Equal(HttpStatusCode.BadRequest, wrongSignature.StatusCode);
 
         var oversized = new byte[8 * 1024 * 1024 + 1];
         oversized[0] = 0xFF; oversized[1] = 0xD8; oversized[2] = 0xFF; oversized[3] = 0xD9;
-        var tooLarge = await client.SendBytes("/sales/item-tag-captures", oversized, "image/jpeg", Key());
+        var tooLarge = await client.SendBytes(
+            "/sales/item-tag-scan", oversized, "image/jpeg", Key());
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, tooLarge.StatusCode);
     }
 
     [Fact]
-    public async Task Another_tenant_cannot_read_review_or_delete_a_capture()
-    {
-        var tenantA = new Client(factory);
-        await tenantA.SignUpAndBootstrap();
-        var productA = await tenantA.AddProduct("Tenant A Cable");
-        var id = await Upload(tenantA, barcode: "4006381333931", process: true);
-        await Review(tenantA, id, productA);
-
-        var tenantB = new Client(factory);
-        await tenantB.SignUpAndBootstrap();
-        Assert.Equal(HttpStatusCode.NotFound, (await tenantB.Raw("/sales/item-tag-captures/" + id)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await tenantB.Raw("/sales/item-tag-captures/" + id + "/image")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await tenantB.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + id)).StatusCode);
-        var crossTenantReview = await tenantB.Send(HttpMethod.Put, "/sales/item-tag-captures/" + id + "/review",
-            new { productId = await tenantB.AddProduct("Tenant B Cable"), productName = "Tenant B Cable" });
-        Assert.Equal(HttpStatusCode.NotFound, crossTenantReview.StatusCode);
-    }
-
-    [Fact]
-    public async Task Reviewed_photo_is_attached_atomically_to_sale_line_and_remains_retrievable()
-    {
-        var (client, location, product) = await Stocked(factory);
-        var captureId = await Upload(client, barcode: "4006381333931", process: true);
-        await Review(client, captureId, product);
-
-        var sale = await client.Send(HttpMethod.Post, "/sales", new
-        {
-            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
-            amountPaid = (decimal?)null, payMethod = (string?)null,
-            lines = new[]
-            {
-                new { productId = product, quantity = 1m, unitPrice = 100m, discount = 0m,
-                    serials = Array.Empty<string>(), captureIds = new[] { captureId } }
-            }
-        }, Key());
-        Assert.Equal(HttpStatusCode.OK, sale.StatusCode);
-        var saleId = (await sale.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-
-        var detail = await client.GetJson("/sales/" + saleId);
-        var line = Assert.Single(detail.GetProperty("lines").EnumerateArray());
-        Assert.Equal(captureId, Assert.Single(line.GetProperty("captureIds").EnumerateArray()).GetGuid());
-
-        var capture = await client.GetJson("/sales/item-tag-captures/" + captureId);
-        Assert.Equal("Attached", capture.GetProperty("status").GetString());
-        Assert.Equal(HttpStatusCode.OK, (await client.Raw("/sales/item-tag-captures/" + captureId + "/image")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.Send(HttpMethod.Delete, "/sales/item-tag-captures/" + captureId)).StatusCode);
-    }
-
-    [Fact]
-    public async Task Unreviewed_photo_cannot_be_attached_to_a_sale()
-    {
-        var (client, location, product) = await Stocked(factory);
-        var captureId = await Upload(client);
-        var sale = await client.Send(HttpMethod.Post, "/sales", new
-        {
-            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
-            amountPaid = (decimal?)null, payMethod = (string?)null,
-            lines = new[]
-            {
-                new { productId = product, quantity = 1m, unitPrice = 100m, discount = 0m,
-                    serials = Array.Empty<string>(), captureIds = new[] { captureId } }
-            }
-        }, Key());
-        Assert.Equal(HttpStatusCode.Conflict, sale.StatusCode);
-        Assert.Equal(5m, (await client.GetJson("/stock")).EnumerateArray().Single().GetProperty("quantity").GetDecimal());
-    }
-
-    [Fact]
-    public async Task Capture_routes_require_authentication()
+    public async Task Android_asset_links_endpoint_is_public_and_returns_json_array()
     {
         var client = new Client(factory);
-        var response = await client.Raw("/sales/item-tag-captures/" + Guid.NewGuid());
-        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized,
-            $"Expected 401, got {(int)response.StatusCode} {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
-        var upload = await client.SendBytes("/sales/item-tag-captures", Jpeg, "image/jpeg", Key());
-        Assert.Equal(HttpStatusCode.Unauthorized, upload.StatusCode);
+        var response = await client.Raw("/.well-known/assetlinks.json");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("application/json", response.Content.Headers.ContentType?.MediaType);
+        using var body = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        Assert.Equal(JsonValueKind.Array, body.RootElement.ValueKind);
+    }
+
+    [Fact]
+    public async Task Scan_route_requires_authentication()
+    {
+        var client = new Client(factory);
+        var response = await client.SendBytes(
+            "/sales/item-tag-scan", Jpeg, "image/jpeg", Key());
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

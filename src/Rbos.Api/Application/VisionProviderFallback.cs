@@ -76,9 +76,10 @@ public static class VisionProviderFallback
 
             var remainingBudget = budget - chainTimer.Elapsed;
             if (remainingBudget <= TimeSpan.Zero) break;
+            var configuredAttemptBudget = TimeSpan.FromSeconds(Math.Clamp(attempt.TimeoutSeconds, 5, 60));
+            var totalBudgetLimitsThisAttempt = remainingBudget <= configuredAttemptBudget;
             var attemptBudget = TimeSpan.FromMilliseconds(
-                Math.Min(TimeSpan.FromSeconds(Math.Clamp(attempt.TimeoutSeconds, 5, 60)).TotalMilliseconds,
-                    remainingBudget.TotalMilliseconds));
+                Math.Min(configuredAttemptBudget.TotalMilliseconds, remainingBudget.TotalMilliseconds));
             var timer = Stopwatch.StartNew();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(attemptBudget);
@@ -113,6 +114,10 @@ public static class VisionProviderFallback
                 logger.LogWarning(
                     "Vision provider attempt timed out. Feature {Feature}, provider {Provider}, model {Model}, timeout {TimeoutMs}ms, latency {LatencyMs}ms",
                     feature, attempt.Provider, attempt.Model, attemptBudget.TotalMilliseconds, timer.ElapsedMilliseconds);
+                // When the request budget was shorter than the provider timeout, this
+                // cancellation consumed the remaining chain budget. Do not start another
+                // provider with a few milliseconds left (or invoke a non-cooperative task).
+                if (totalBudgetLimitsThisAttempt) break;
             }
             catch (HttpRequestException e)
             {

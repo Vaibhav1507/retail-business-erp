@@ -38,7 +38,7 @@ public static class BarcodeRules
     public static string? CleanSymbology(string? s) => s is not null && Symbologies.Contains(s.Trim().ToUpperInvariant()) ? s.Trim().ToUpperInvariant() : null;
 }
 
-public sealed class BarcodeService(TenantDb db)
+public sealed class BarcodeService(TenantDb db, CatalogueService catalogue)
 {
     public async Task<ServiceResult<object>> LookupAsync(Guid uid, string? code, CancellationToken ct)
     {
@@ -46,19 +46,75 @@ public sealed class BarcodeService(TenantDb db)
         if (err is not null) return ServiceResult<object>.Fail(err);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
-        await using var s = await db.BeginAsync(uid, tid.Value, ct);
-        await using var c = s.Command(@"select p.id,p.name,p.internal_sku,p.brand,p.model,p.base_unit,p.is_active,p.track_serials,b.pack_quantity,b.code,cat.name
-            from catalog.product_barcode b join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
-            join catalog.category cat on cat.tenant_id=p.tenant_id and cat.id=p.category_id where b.code=@c");
-        c.Parameters.AddWithValue("c", norm!);
-        await using var r = await c.ExecuteReaderAsync(ct);
-        if (!await r.ReadAsync(ct)) return ServiceResult<object>.Fail("No product has this barcode.", 404);
-        string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
-        return ServiceResult<object>.Ok(new
+
+        // Prefer the tenant's own verified mapping.
+        await using (var s = await db.BeginAsync(uid, tid.Value, ct))
+        await using (var c = s.Command(@"select p.id,p.name,p.internal_sku,p.brand,p.model,p.base_unit,p.is_active,p.track_serials,
+                b.pack_quantity,b.code,cat.name,p.master_product_id,mb.master_product_id
+            from catalog.product_barcode b
+            join catalog.product p on p.tenant_id=b.tenant_id and p.id=b.product_id
+            join catalog.category cat on cat.tenant_id=p.tenant_id and cat.id=p.category_id
+            left join core.business_profile bp on bp.tenant_id=p.tenant_id
+            left join catalog.master_product_barcode mb on mb.business_category=bp.business_category and mb.code=b.code
+            where b.code=@c"))
         {
-            productId = r.GetGuid(0), name = r.GetString(1), sku = r.GetString(2), brand = S(3), model = S(4), unit = r.GetString(5),
-            isActive = r.GetBoolean(6), trackSerials = r.GetBoolean(7), packQuantity = r.GetInt32(8), code = r.GetString(9), category = r.GetString(10),
-        });
+            c.Parameters.AddWithValue("c", norm!);
+            await using var r = await c.ExecuteReaderAsync(ct);
+            if (await r.ReadAsync(ct))
+            {
+                string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+                var localMasterId = r.IsDBNull(11) ? (Guid?)null : r.GetGuid(11);
+                var sharedOwnerMasterId = r.IsDBNull(12) ? (Guid?)null : r.GetGuid(12);
+                var product = new
+                {
+                    productId = r.GetGuid(0), name = r.GetString(1), sku = r.GetString(2), brand = S(3), model = S(4), unit = r.GetString(5),
+                    isActive = r.GetBoolean(6), trackSerials = r.GetBoolean(7), packQuantity = r.GetInt32(8), code = r.GetString(9), category = r.GetString(10),
+                };
+                if (sharedOwnerMasterId is not null && sharedOwnerMasterId != localMasterId)
+                    return ServiceResult<object>.Fail("This tenant barcode mapping conflicts with the verified shared product mapping. Review it before scanning this item.", 409);
+                return ServiceResult<object>.Ok(product);
+            }
+        }
+
+        // No tenant mapping yet: consult only the shared map for this business vertical.
+        Guid? sharedMasterId;
+        await using (var s = await db.BeginAsync(uid, tid.Value, ct))
+        await using (var q = s.Command(@"
+            select mb.master_product_id
+            from core.business_profile bp
+            join catalog.master_product_barcode mb
+              on mb.business_category=bp.business_category and mb.code=@code
+            where bp.tenant_id=@tenant"))
+        {
+            q.Parameters.AddWithValue("code", norm!);
+            q.Parameters.AddWithValue("tenant", tid.Value);
+            sharedMasterId = await q.ExecuteScalarAsync(ct) as Guid?;
+        }
+        if (sharedMasterId is null)
+            return ServiceResult<object>.Fail("No product has this barcode.", 404);
+
+        var role = await db.FindRoleAsync(uid, ct);
+        if (!Permissions.Has(role, Permissions.CatalogueManage))
+            return ServiceResult<object>.Fail(
+                "This barcode matches the shared RBOS catalogue. Ask a catalogue manager to add the product to this shop before using it.", 403);
+
+        // Materialize a tenant-owned catalogue product from the verified shared master.
+        // Stock, SKU, price and unit serial tracking remain business-specific.
+        _ = await catalogue.AddFromMasterAsync(uid, sharedMasterId.Value, ct);
+        await using (var s = await db.BeginAsync(uid, tid.Value, ct))
+        {
+            var productId = await SqlHelpers.Scalar<Guid?>(s,
+                "select id from catalog.product where master_product_id=@master and is_active",
+                ct, ("master", sharedMasterId.Value));
+            if (productId is null)
+                return ServiceResult<object>.Fail("The shared barcode product could not be added to this catalogue.", 409);
+            if (!await LinkOrConfirmAsync(s, tid.Value, productId.Value, norm!, null, ct))
+                return ServiceResult<object>.Fail("This barcode conflicts with an existing product mapping in this business.", 409);
+            await s.CommitAsync(ct);
+        }
+
+        // Read through the same tenant mapping path after it has been materialized.
+        return await LookupAsync(uid, norm, ct);
     }
 
     public async Task<ServiceResult<object>> ListAsync(Guid uid, Guid productId, CancellationToken ct)
@@ -144,6 +200,73 @@ public sealed class BarcodeService(TenantDb db)
         verify.Parameters.AddWithValue("t", tid);
         verify.Parameters.AddWithValue("c", norm!);
         return await verify.ExecuteScalarAsync(ct) is Guid finalOwner && finalOwner == productId;
+    }
+
+
+    /// <summary>
+    /// Learns a barcode only inside the transaction that posts the invoice. A local
+    /// catalogue mapping and a shared vertical mapping therefore roll back together
+    /// whenever stock, accounting or invoice posting fails.
+    /// </summary>
+    public static async Task<bool> LearnFromCompletedSaleAsync(
+        TenantSession s, Guid tenantId, Guid productId, string code, string? symbology, CancellationToken ct)
+    {
+        var (norm, error) = BarcodeRules.Normalize(code);
+        if (error is not null) return false;
+        if (!await LinkOrConfirmAsync(s, tenantId, productId, norm!, symbology, ct))
+            return false;
+
+        Guid? masterProductId;
+        string? businessCategory;
+        await using (var q = s.Command(@"
+            select p.master_product_id, bp.business_category
+            from catalog.product p
+            join core.business_profile bp on bp.tenant_id=p.tenant_id
+            where p.tenant_id=@tenant and p.id=@product"))
+        {
+            q.Parameters.AddWithValue("tenant", tenantId);
+            q.Parameters.AddWithValue("product", productId);
+            await using var r = await q.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return false;
+            masterProductId = r.IsDBNull(0) ? null : r.GetGuid(0);
+            businessCategory = r.IsDBNull(1) ? null : r.GetString(1);
+        }
+
+        // Businesses that have not selected a retail vertical retain a private mapping.
+        if (masterProductId is null || string.IsNullOrWhiteSpace(businessCategory))
+            return true;
+
+        await using (var insert = s.Command(@"
+            insert into catalog.master_product_barcode
+                (business_category,code,master_product_id,symbology)
+            values (@category,@code,@master,@symbology)
+            on conflict (business_category,code) do nothing"))
+        {
+            insert.Parameters.AddWithValue("category", businessCategory);
+            insert.Parameters.AddWithValue("code", norm!);
+            insert.Parameters.AddWithValue("master", masterProductId.Value);
+            insert.Parameters.AddWithValue("symbology", (object?)BarcodeRules.CleanSymbology(symbology) ?? DBNull.Value);
+            await insert.ExecuteNonQueryAsync(ct);
+        }
+
+        var owner = await SqlHelpers.Scalar<Guid?>(s,
+            "select master_product_id from catalog.master_product_barcode where business_category=@category and code=@code",
+            ct, ("category", businessCategory), ("code", norm!));
+        if (owner != masterProductId) return false;
+
+        var contributorInserted = await SqlHelpers.ExecCount(s, ct, @"
+            insert into catalog.master_product_barcode_confirmation
+                (business_category,code,tenant_id)
+            values (@category,@code,@tenant)
+            on conflict (business_category,code,tenant_id) do nothing",
+            ("category", businessCategory), ("code", norm!), ("tenant", tenantId));
+        if (contributorInserted > 0)
+            await SqlHelpers.Exec(s, ct, @"
+                update catalog.master_product_barcode
+                set confirmed_business_count=confirmed_business_count+1,last_verified_at=now()
+                where business_category=@category and code=@code",
+                ("category", businessCategory), ("code", norm!));
+        return true;
     }
 
 	/// <summary>Links a barcode to a product inside an existing session; skips codes already mapped (never re-points a mapping).</summary>

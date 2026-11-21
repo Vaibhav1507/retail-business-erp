@@ -2,12 +2,10 @@ using Rbos.Domain;
 
 namespace Rbos.UnitTests;
 
-public sealed class SaleLineCaptureRulesTests
+public sealed class SaleLineRulesTests
 {
     static readonly DateOnly Today = new(2026, 11, 18);
     static readonly Guid Product = Guid.NewGuid();
-    static readonly Guid CaptureA = Guid.NewGuid();
-    static readonly Guid CaptureB = Guid.NewGuid();
 
     static bool Validate(SaleLineInput line, out IReadOnlyList<SaleLine> lines, out string? error) =>
         SalesRules.TryValidateSale(
@@ -15,30 +13,31 @@ public sealed class SaleLineCaptureRulesTests
             out lines, out _, out _, out _, out error);
 
     [Fact]
-    public void Reviewed_capture_references_are_preserved_in_normalised_sale_line()
+    public void Serial_number_characters_are_preserved_exactly()
     {
-        Assert.True(Validate(new SaleLineInput(Product, 2m, 100m, 0m, null, [CaptureA, CaptureB]), out var lines, out var error), error);
-        Assert.Equal(new[] { CaptureA, CaptureB }, Assert.Single(lines).CaptureIds);
+        const string serial = "abC-01oI";
+        Assert.True(Validate(new SaleLineInput(Product, 1m, 100m, 0m, [serial]), out var lines, out var error), error);
+        Assert.Equal(serial, Assert.Single(Assert.Single(lines).Serials!));
     }
 
     [Fact]
-    public void Duplicate_or_empty_capture_ids_are_rejected()
+    public void Dual_imei_identifiers_are_validated_and_kept_separate_from_serial()
     {
-        Assert.False(Validate(new SaleLineInput(Product, 2m, 100m, 0m, null, [CaptureA, CaptureA]), out _, out _));
-        Assert.False(Validate(new SaleLineInput(Product, 1m, 100m, 0m, null, [Guid.Empty]), out _, out _));
+        const string serial = "SERIAL12345";
+        const string imei1 = "490154203237518";
+        const string imei2 = "490154203237526";
+        Assert.True(Validate(new SaleLineInput(Product, 1m, 100m, 0m, [serial], null, null, [imei1], [imei2]),
+            out var lines, out var error), error);
+        var line = Assert.Single(lines);
+        Assert.Equal(serial, Assert.Single(line.Serials!));
+        Assert.Equal(imei1, Assert.Single(line.Imei1s!));
+        Assert.Equal(imei2, Assert.Single(line.Imei2s!));
     }
 
     [Fact]
-    public void Photo_count_cannot_exceed_whole_unit_quantity()
+    public void Invalid_imei_check_digit_is_rejected()
     {
-        Assert.False(Validate(new SaleLineInput(Product, 1m, 100m, 0m, null, [CaptureA, CaptureB]), out _, out _));
-        Assert.False(Validate(new SaleLineInput(Product, 1.5m, 100m, 0m, null, [CaptureA]), out _, out _));
-    }
-
-    [Fact]
-    public void Existing_sale_lines_remain_valid_when_capture_ids_are_omitted()
-    {
-        Assert.True(Validate(new SaleLineInput(Product, 1m, 100m, 0m), out var lines, out var error), error);
-        Assert.Null(Assert.Single(lines).CaptureIds);
+        Assert.False(Validate(new SaleLineInput(Product, 1m, 100m, 0m, null, null, null, ["490154203237519"]),
+            out _, out _));
     }
 }
