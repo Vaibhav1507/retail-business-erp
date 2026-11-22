@@ -9,7 +9,7 @@ type Receipt = { id: string; date: string; supplier: string; total: number }
 type Payment = { id: string; number: number; date: string; customer: string; amount: number; method: string; reference: string | null }
 type Entry = { type: string; number: number; date: string; debit: number; credit: number; balance: number; id: string }
 type Statement = { customer: string; outstanding: number; entries: Entry[] }
-type Returnable = { productId: string; product: string; sold: number; returned: number; remaining: number }
+type Returnable = { saleLineId: string; productId: string | null; product: string; sold: number; returned: number; remaining: number }
 type PurchaseDetail = { receipt: { number: number }; lines: { productId: string; product: string; quantity: number; returned: number; remaining: number }[] }
 type SaleReturn = { id: string; number: number; date: string; saleNumber: number; customer: string; total: number; balanceCredit: number; cashRefund: number; reason: string | null }
 type PurchaseReturn = { id: string; number: number; date: string; supplier: string; receiptNumber: number; total: number; reason: string | null }
@@ -96,9 +96,9 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
     setCancelKey(newKey()); setRetSale(''); setRetLines([]); setRetReason('')
     return 'Sale cancelled. Stock restored and the books reversed.'
   })
-  const toLines = (q: Record<string, string>) => Object.entries(q).map(([productId, v]) => ({ productId, quantity: Number(v) })).filter(x => x.quantity > 0)
+  const toLines = (q: Record<string, string>) => Object.entries(q).map(([productId, v]) => ({ productId, quantity: Number(v) })).filter(x => x.quantity > 0)\n  const toSaleLines = (q: Record<string, string>) => Object.entries(q).map(([saleLineId, v]) => ({ saleLineId, productId: retLines.find(line => line.saleLineId === saleLineId)?.productId ?? null, quantity: Number(v) })).filter(x => x.quantity > 0)
   const returnSale = () => run(async () => {
-    const r = await api<{ total: number; balanceCredit: number; cashRefund: number }>('POST', '/sale-returns', { saleId: retSale, returnDate: today(), reason: retReason || null, refundMethod: retMethod, lines: toLines(retQty) }, retKey)
+    const r = await api<{ total: number; balanceCredit: number; cashRefund: number }>('POST', '/sale-returns', { saleId: retSale, returnDate: today(), reason: retReason || null, refundMethod: retMethod, lines: toSaleLines(retQty) }, retKey)
     setRetKey(newKey()); setRetQty({}); setRetReason(''); await pickSale(retSale)
     return 'Return posted: ' + r.total.toFixed(2) + ' INR. For an exchange, bill the replacement items from Sell > New bill and settle the difference there (balance reduced ' + r.balanceCredit.toFixed(2) + ', cash refund ' + r.cashRefund.toFixed(2) + '). Stock increased.'
   })
@@ -153,9 +153,9 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
       {v('sreturn') && <>
       <h3>Customer return</h3>
       <label>Return against sale <select value={retSale} onChange={e => pickSale(e.target.value)}><option value="">Select</option>{sales.filter(s => !s.cancelled).map(s => <option key={s.id} value={s.id}>#{s.number} {s.customer} {s.total.toFixed(2)}</option>)}</select></label>
-      {retLines.map(l => <label key={l.productId}>Return qty: {l.product} (remaining {l.remaining})
-        <input inputMode="decimal" value={retQty[l.productId] ?? ''} onChange={e => setRetQty({ ...retQty, [l.productId]: e.target.value })} /></label>)}
-      {retLines.length > 0 && <button type="button" onClick={() => setRetQty(Object.fromEntries(retLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>Return everything remaining</button>}
+      {retLines.map(l => <label key={l.saleLineId}>Return qty: {l.product} (remaining {l.remaining})
+        <input inputMode="decimal" value={retQty[l.saleLineId] ?? ''} onChange={e => setRetQty({ ...retQty, [l.saleLineId]: e.target.value })} /></label>)}
+      {retLines.length > 0 && <button type="button" onClick={() => setRetQty(Object.fromEntries(retLines.filter(l => l.remaining > 0).map(l => [l.saleLineId, String(l.remaining)])))}>Return everything remaining</button>}
       <label>Customer return reason <input value={retReason} onChange={e => setRetReason(e.target.value)} /></label>
       <label>Refund method <select value={retMethod} onChange={e => setRetMethod(e.target.value)}><option>Cash</option><option>Bank</option><option>UPI</option></select></label>
       <button type="button" onClick={returnSale} disabled={!retSale || toLines(retQty).length === 0}>Post customer return</button>
