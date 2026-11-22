@@ -347,7 +347,7 @@ public sealed class SalesService(TenantDb db)
                 if (provisionalQuantity > 0 && provisionalUnitCost <= 0)
                 {
                     provisionalUnitCost = await Scalar<decimal?>(s,
-                        "select unit_cost from inventory.stock_movement where product_id=@p and quantity_delta>0 and value_delta>0 and unit_cost>0 order by effective_date desc, occurred_at desc, id desc limit 1",
+                        "select unit_cost from inventory.stock_movement where product_id=@p and quantity_delta>0 and unit_cost>0 order by effective_date desc, occurred_at desc, id desc limit 1",
                         ct, ("p", productId)) ?? 0m;
                 }
                 if (provisionalQuantity > 0 && provisionalUnitCost <= 0)
