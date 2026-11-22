@@ -343,7 +343,7 @@ public sealed class AfterSalesService(TenantDb db)
                     ("ic", x.InventoryCost.Amount), ("pc", x.ProvisionalCost.Amount));
                 if (x.InventoryProductId is not Guid returnProductId) continue;
                 var movementUnitCost = x.InventoryQuantity > 0
-                    ? WeightedAverageCostCalculator.RoundWac(x.InventoryCost.Amount / x.InventoryQuantity) : 0m;
+                    ? WeightedAverageCostCalculator.RoundWac(x.InventoryCost.Amount / x.InventoryQuantity) : x.UnitCost;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleReturn',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", returnProductId), ("l", locationId),
                     ("q", x.Quantity), ("c", movementUnitCost), ("v", x.InventoryCost.Amount), ("e", m.ReturnDate), ("d", id));
@@ -637,11 +637,12 @@ public sealed class AfterSalesService(TenantDb db)
             var journal = SalesRules.SaleCancellationJournal(Money.Of(total), Money.Of(paid),
                 Money.Of(inventoryCostTotal), Money.Of(provisionalCostTotal));
 
-            var historicalLines = new List<(Guid ProductId, decimal Quantity, decimal ValuedQuantity, decimal InventoryCost)>();
+            var historicalLines = new List<(Guid ProductId, decimal Quantity, decimal ValuedQuantity, decimal InventoryCost, decimal UnitCost)>();
             await using (var q = s.Command(@"select l.product_id,
                     sum(l.quantity),
                     sum(l.quantity - l.provisional_quantity + coalesce(c.settled_quantity,0)),
-                    sum(l.inventory_cost_amount)
+                    sum(l.inventory_cost_amount),
+                    max(l.unit_cost)
                 from sales.sale_line l
                 left join inventory.negative_stock_commitment c
                   on c.tenant_id=l.tenant_id and c.sale_line_id=l.line_id
@@ -652,13 +653,13 @@ public sealed class AfterSalesService(TenantDb db)
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
                 while (await r.ReadAsync(ct))
-                    historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2), r.GetDecimal(3)));
+                    historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2), r.GetDecimal(3), r.GetDecimal(4)));
             }
 
-            var lines = new List<(Guid InventoryProductId, decimal Quantity, decimal ValuedQuantity, decimal InventoryCost)>();
+            var lines = new List<(Guid InventoryProductId, decimal Quantity, decimal ValuedQuantity, decimal InventoryCost, decimal UnitCost)>();
             foreach (var line in historicalLines)
                 lines.Add((await CanonicalProductIdAsync(s, tenantId, line.ProductId, ct),
-                    line.Quantity, line.ValuedQuantity, line.InventoryCost));
+                    line.Quantity, line.ValuedQuantity, line.InventoryCost, line.UnitCost));
 
             var id = Guid.NewGuid();
             var entry = Guid.NewGuid();
@@ -672,7 +673,7 @@ public sealed class AfterSalesService(TenantDb db)
 
             foreach (var line in lines)
             {
-                var unitCost = line.ValuedQuantity <= 0 ? 0m
+                var unitCost = line.ValuedQuantity <= 0 ? line.UnitCost
                     : WeightedAverageCostCalculator.RoundWac(line.InventoryCost / line.ValuedQuantity);
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleCancellation',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", line.InventoryProductId), ("l", locationId),
