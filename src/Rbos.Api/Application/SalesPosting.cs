@@ -316,24 +316,39 @@ public sealed class SalesService(TenantDb db)
             }
 
             var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next)>();
-            foreach (var l in lines.OrderBy(x => x.ProductId))
+            foreach (var line in lines.Where(x => x.ProductId is null))
+                costed.Add((line, 0m, 0m, CostState.Empty));
+
+            foreach (var productLines in lines.Where(x => x.ProductId.HasValue)
+                .GroupBy(x => x.ProductId!.Value).OrderBy(x => x.Key))
             {
-                if (l.ProductId is null)
-                {
-                    costed.Add((l, 0m, 0m, CostState.Empty));
-                    continue;
-                }
-                var productId = l.ProductId.Value;
-                var onHand = await Scalar<decimal?>(s, "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update", ct, ("p", productId), ("l", m.LocationId)) ?? 0m;
-                if (onHand < l.Quantity.Value)
+                var productId = productLines.Key;
+                var totalQuantity = productLines.Sum(x => x.Quantity.Value);
+                var onHand = await Scalar<decimal?>(s,
+                    "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update",
+                    ct, ("p", productId), ("l", m.LocationId)) ?? 0m;
+                if (onHand < totalQuantity)
                 {
                     var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", productId));
                     return ServiceResult<object>.Fail($"Not enough stock for {name}: {onHand:0.###} available.");
                 }
-                var cur = await ReadCostAsync(s, productId, ct);
-                var remaining = cur.TotalQuantity - l.Quantity.Value;
-                var cost = remaining <= 0 ? cur.InventoryValue : Math.Min(cur.InventoryValue, Money.Of(l.Quantity.Value * cur.Wac).Amount);
-                costed.Add((l, cur.Wac, cost, new CostState(remaining, cur.InventoryValue - cost, cur.Wac)));
+                var currentCost = await ReadCostAsync(s, productId, ct);
+                var remainingQuantity = currentCost.TotalQuantity - totalQuantity;
+                var groupCost = remainingQuantity <= 0
+                    ? currentCost.InventoryValue
+                    : Math.Min(currentCost.InventoryValue, Money.Of(totalQuantity * currentCost.Wac).Amount);
+                var next = new CostState(remainingQuantity, currentCost.InventoryValue - groupCost, currentCost.Wac);
+                var productRows = productLines.ToList();
+                var allocated = 0m;
+                for (var index = 0; index < productRows.Count; index++)
+                {
+                    var line = productRows[index];
+                    var lineCost = index == productRows.Count - 1
+                        ? groupCost - allocated
+                        : Money.Of(groupCost * line.Quantity.Value / totalQuantity).Amount;
+                    allocated += lineCost;
+                    costed.Add((line, currentCost.Wac, lineCost, next));
+                }
             }
 
             var costTotal = Money.Of(costed.Sum(x => x.Cost));
@@ -357,16 +372,21 @@ public sealed class SalesService(TenantDb db)
             foreach (var (l, unitCost, cost, next) in costed)
             {
                 var lineId = Guid.NewGuid();
-                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,line_id,product_id,description,brand,model,hsn_code,is_stock_tracked,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@li,@p,@desc,@brand,@model,@hsn,@tracked,@q,@u,@d,@v,@c,@sr,@i1,@i2,@bc,@bs)",
+                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,line_id,product_id,description,brand,model,hsn_code,is_stock_tracked,quantity,unit_price,discount,line_total,unit_cost,inventory_cost_amount,provisional_cost_amount,provisional_quantity,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@li,@p,@desc,@brand,@model,@hsn,@tracked,@q,@u,@d,@v,@c,@ic,0,0,@sr,@i1,@i2,@bc,@bs)",
                     ("t", tenantId), ("s", id), ("li", lineId), ("p", (object?)l.ProductId ?? DBNull.Value), ("desc", l.Description ?? l.Model ?? "Unlisted item"),
                     ("brand", (object?)l.Brand ?? DBNull.Value), ("model", (object?)l.Model ?? DBNull.Value), ("hsn", (object?)l.HsnCode ?? DBNull.Value),
-                    ("tracked", l.IsStockTracked), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost),
+                    ("tracked", l.IsStockTracked), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("ic", cost),
                     ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
                 if (l.ProductId is not Guid stockProductId) continue;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'Sale',@d)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("p", stockProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
                 await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", stockProductId), ("l", m.LocationId));
-                await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac), ("p", stockProductId));
+            }
+            foreach (var productCost in costed.Where(x => x.Line.ProductId.HasValue).GroupBy(x => x.Line.ProductId!.Value))
+            {
+                var next = productCost.First().Next;
+                await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p",
+                    ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac), ("p", productCost.Key));
             }
             // Freeze the invoice from committed business data and enqueue only with explicit customer consent.
             // Both writes share the sale transaction, so a failed sale cannot leave a deliverable invoice.
