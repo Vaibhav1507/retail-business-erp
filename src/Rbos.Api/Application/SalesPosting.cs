@@ -330,7 +330,7 @@ public sealed class SalesService(TenantDb db)
                 .GroupBy(x => x.Line.ProductId!.Value).OrderBy(x => x.Key))
             {
                 var productId = productLines.Key;
-                var totalQuantity = productLines.Sum(x => x.Quantity.Value);
+                var totalQuantity = productLines.Sum(x => x.Line.Quantity.Value);
                 await Exec(s, ct,
                     "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,0) on conflict (tenant_id,product_id,location_id) do nothing",
                     ("t", tenantId), ("p", productId), ("l", m.LocationId));
