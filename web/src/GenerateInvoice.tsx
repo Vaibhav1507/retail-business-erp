@@ -208,7 +208,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function addItem() {
-    const serials = serialText.split(/[\\s,;]+/).map(x => x.trim()).filter(Boolean)
+    const serials = serialText.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)
     const quantity = Number(qty), unitPrice = Number(price), discount = Number(disc || 0)
     const mrp = mrpText.trim() ? Number(mrpText) : null
     if (!typed || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product, quantity and price.'); return }
