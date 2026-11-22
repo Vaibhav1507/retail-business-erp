@@ -48,8 +48,8 @@ describe('ItemTagCapture', () => {
     expect(screen.queryByRole('button', { name: 'Take a photo' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
     expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Take a photo' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Choose from device' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Take a photo/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Choose from device/ })).toBeInTheDocument()
 
     const inputs = container.querySelectorAll('input[type="file"]')
     expect(inputs).toHaveLength(2)
