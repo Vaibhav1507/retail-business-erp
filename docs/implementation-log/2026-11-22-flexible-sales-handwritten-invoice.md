@@ -72,3 +72,12 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - CI findings: run #869 exposed a migration ordering issue (drop the product-key primary key before dropping NOT NULL) and stale tests expecting stock rejection. Migration order was corrected in commit `a2ff0a9fcc548511c90d1bbffcef0d65ff292689`; tests were updated in commits `338d78c13cf112dce444932136ccce0eb8c084ae` and `348170365fcb4b6f4c1b4e89e48df2614e6dded5`. Run #872 backend and frontend jobs passed; PostgreSQL integration was still running at the time of this log update. Exact-head CI after the latest test changes is required.
 - No production migration, deployment, secret change, provider-flag change or live provider call was made.
 - Known gap: uploaded sales invoice photo is processed in memory and not retained. Decide whether the shop needs tenant-scoped source-photo retention before production release.
+
+
+## Follow-up validation and source-invoice metadata — 2026-11-22
+
+- Added migration 057 to persist the source invoice reference and source invoice date separately from RBOS legal invoice numbering. These fields are included in sale creation/idempotency, invoice snapshots, sales search and sale detail. Generate Invoice carries them through posting and held/offline drafts.
+- Exact-head run #900 failed backend and PostgreSQL integration due to one compile error in repeated-product grouping: the indexed tuple exposes quantity through its Line member. Fixed in commit d11afbb384ea067739c329d37610ba2629cb3cf5.
+- Hardened ad-hoc model-only entry by normalizing whitespace-only description/brand/model/HSN values to null before persistence. Added an integration test for model-number-only billing with no catalogue creation (commit 7870e389b7eb4daa02a2d79f480f80ed1252cb2f).
+- Exact-head run #903 for 7870e38: frontend passed; backend and PostgreSQL integration were in progress at the time of this log update. Do not infer completion from older green runs.
+- PR #64 body was updated to reflect the actual implementation and validation state. It remains draft/open; no merge or production operation was performed.
