@@ -32,3 +32,6 @@ Implementation note: code now exists beyond Slice 4 (returns, period lock, repor
 | 024 | English/Hindi localisation foundation | adr-019-024-capabilities.md | Yes | No |
 
 Grouping into four files is deliberate for readability; each ADR keeps its own number and can be split out later without renumbering.
+
+| 025 | Physical negative stock with provisional cost and later reconciliation | adr-025-026-flexible-sales-and-handwritten-capture.md | Pending | **Yes** |
+| 026 | Handwritten sales invoice capture as an unposted draft | adr-025-026-flexible-sales-and-handwritten-capture.md | Pending | Tax/accounting rules: Yes |
