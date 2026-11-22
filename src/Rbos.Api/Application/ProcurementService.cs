@@ -263,7 +263,7 @@ public sealed class ProcurementService(TenantDb db)
 
     static async Task<Guid> AccountAsync(TenantSession s, Guid tenantId, string code, CancellationToken ct)
     {
-        var (name, type) = code switch { "2000" => ("Accounts Payable", "Liability"), "1000" => ("Cash and Bank", "Asset"), "1400" => ("Inventory", "Asset"), "1500" => ("GST Input", "Asset"), _ => (code, "Asset") };
+        var (name, type) = code switch { "2000" => ("Accounts Payable", "Liability"), "1000" => ("Cash and Bank", "Asset"), "1400" => ("Inventory", "Asset"), "1410" => ("Negative Stock Clearing", "Liability"), "5000" => ("Cost of Goods Sold", "Expense"), "1500" => ("GST Input", "Asset"), _ => (code, "Asset") };
         await Exec(s, ct, "insert into accounting.account(tenant_id,id,code,name,type) values (@t,@i,@c,@n,@y) on conflict (tenant_id,code) do nothing",
             ("t", tenantId), ("i", Guid.NewGuid()), ("c", code), ("n", name), ("y", type));
         return (await Scalar<Guid?>(s, "select id from accounting.account where code=@c", ct, ("c", code)))!.Value;
