@@ -38,6 +38,9 @@ public static class AfterSalesRules
             return Fail("Every returned line must identify the original sale line.", out error);
         if (input.Select(x => x.SaleLineId).Where(x => x.HasValue).Distinct().Count() != input.Count(x => x.SaleLineId.HasValue))
             return Fail("Each sale line can appear only once per return.", out error);
+        if (input.Where(x => x.SaleLineId is null && x.ProductId.HasValue)
+            .GroupBy(x => x.ProductId).Any(group => group.Count() > 1))
+            return Fail("Select the exact sale line when a product appears more than once.", out error);
         var list = new List<(Guid?, Guid?, Quantity)>();
         foreach (var line in input)
         {
