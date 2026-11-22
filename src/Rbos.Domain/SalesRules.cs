@@ -67,7 +67,10 @@ public static class SalesRules
                 imei1s.Intersect(imei2s, StringComparer.Ordinal).Any())
                 return Fail("The same IMEI cannot appear twice on a sale line.", out error);
             list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount,
-                l.Description?.Trim(), l.Brand?.Trim(), l.Model?.Trim(), l.HsnCode?.Trim(),
+                string.IsNullOrWhiteSpace(l.Description) ? null : l.Description.Trim(),
+                string.IsNullOrWhiteSpace(l.Brand) ? null : l.Brand.Trim(),
+                string.IsNullOrWhiteSpace(l.Model) ? null : l.Model.Trim(),
+                string.IsNullOrWhiteSpace(l.HsnCode) ? null : l.HsnCode.Trim(),
                 serials.Length == 0 ? null : serials,
                 l.Barcode, l.BarcodeSymbology, imei1s.Length == 0 ? null : imei1s, imei2s.Length == 0 ? null : imei2s));
         }
