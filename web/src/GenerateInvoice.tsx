@@ -462,6 +462,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <div className="billing-field billing-col-2"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" inputMode="decimal" value={disc} onChange={e => setDisc(e.target.value)} /></div>
           <div className="billing-field billing-col-5"><label htmlFor="billing-serial">Serial / IMEI (optional)</label><input id="billing-serial" autoComplete="off" value={serialText} onChange={e => setSerialText(e.target.value)} /></div>
         </div>
+        <details className="invoice-product-more-details">
+          <summary>More tag details</summary>
+          <div className="billing-grid">
+            <div className="billing-field billing-col-4"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
+            <div className="billing-field billing-col-4"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
+            <div className="billing-field billing-col-4"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" inputMode="decimal" value={mrpText} onChange={e => setMrpText(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-hsn">HSN</label><input id="billing-hsn" value={hsnText} onChange={e => setHsnText(e.target.value)} /></div>
+          </div>
+        </details>
         <div className="billing-row invoice-product-actions">
           <button type="button" onClick={addItem}>{tr('bill.add')}</button>
           <ItemTagCapture disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
@@ -469,7 +479,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </div>
         {items.length > 0 && <table className="billing-table">
           <thead><tr><th>{tr('bill.item')}</th><th>{tr('bill.qty')}</th><th>{tr('bill.price')}</th><th>{tr('bill.disc')}</th><th>{tr('bill.amount')}</th><th /></tr></thead>
-          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
+          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.brand && <small> Brand: {i.brand}</small>}{i.model && <small> Model: {i.model}</small>}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
         </table>}
       </div>
 
