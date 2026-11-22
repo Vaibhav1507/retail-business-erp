@@ -47,3 +47,12 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - CI run #805 exposed a compile error in the new endpoint: the endpoint file was missing the `Rbos.Api.Persistence` namespace import for `TenantDb`. Added the missing using in commit `e023771c18d2c864fa17ae5e893c62fe60febd6f`.
 - The same run also reported an unread constructor parameter in an earlier service commit; that parameter was removed in commit `0b50a80447b08bdb980b82b55c0750ef70f38f86`.
 - Runs #808–#810 were triggered on commits before the endpoint namespace correction, so they cannot validate the corrected head. A new exact-head CI result is required before proceeding to the next feature slice.
+
+
+## Generate Invoice UI integration — 2026-11-22
+
+- Added `web/src/SalesInvoiceCapture.tsx`, using the existing `apiBinary` image-upload helper and the same 8 MB JPEG/PNG/WebP limits as item-tag capture.
+- Wired the upload/camera action into `GenerateInvoice`. Extraction appears in a separate editable review table; description, brand, model, HSN, quantity, unit price and discount can be corrected before the operator adds lines to the existing bill editor. The source invoice reference is shown as a source reference, not RBOS's official invoice number. Extracted customer name/phone and date are prefilled for review.
+- Manual product entry now accepts a model number or brand/barcode as the display label when the full product name is unavailable. At confirmation, the existing online product-creation flow still creates a catalogue product for an unlisted row; a true non-catalogue sale-line schema/posting path remains outstanding.
+- Added frontend tests for editable handwritten extraction and model-number-only manual entry. Frontend checks passed in CI run #816 on commit `3a7b47f81f9869c3e20a4dbac4518b68942a1b6f`.
+- PostgreSQL integration run #812 revealed that the security middleware allowed raw image bodies only on the item-tag route, and the explicit API route inventory lacked the new route. Added bounded raw-image support to `SecurityMiddleware` and classified `/api/sales/invoice-image-extract` under `Permissions.SalesCreate` in `ApiRouteAccess` (commits `565d3a8be4320caae340d34fb732313ef9798df8` and `83add80a5627d737fda4753029b172cad2f79ade`). Re-run exact-head integration CI after these fixes.
