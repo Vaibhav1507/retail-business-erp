@@ -401,18 +401,27 @@ public sealed class SalesService(TenantDb db)
             foreach (var (payMethodName, payAmount) in split)
                 await Exec(s, ct, "insert into sales.sale_payment(tenant_id,sale_id,method,amount) values (@t,@s,@m,@a)", ("t", tenantId), ("s", id), ("m", payMethodName), ("a", payAmount));
 
-            foreach (var (l, unitCost, cost, next) in costed)
+            foreach (var (l, unitCost, cost, next, inventoryCost, provisionalCost, provisionalQty, provisionalUnitCost) in costed)
             {
                 var lineId = Guid.NewGuid();
-                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,line_id,product_id,description,brand,model,hsn_code,is_stock_tracked,quantity,unit_price,discount,line_total,unit_cost,inventory_cost_amount,provisional_cost_amount,provisional_quantity,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@li,@p,@desc,@brand,@model,@hsn,@tracked,@q,@u,@d,@v,@c,@ic,0,0,@sr,@i1,@i2,@bc,@bs)",
+                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,line_id,product_id,description,brand,model,hsn_code,is_stock_tracked,quantity,unit_price,discount,line_total,unit_cost,inventory_cost_amount,provisional_cost_amount,provisional_quantity,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@li,@p,@desc,@brand,@model,@hsn,@tracked,@q,@u,@d,@v,@c,@ic,@pc,@pq,@sr,@i1,@i2,@bc,@bs)",
                     ("t", tenantId), ("s", id), ("li", lineId), ("p", (object?)l.ProductId ?? DBNull.Value), ("desc", l.Description ?? l.Model ?? "Unlisted item"),
                     ("brand", (object?)l.Brand ?? DBNull.Value), ("model", (object?)l.Model ?? DBNull.Value), ("hsn", (object?)l.HsnCode ?? DBNull.Value),
-                    ("tracked", l.IsStockTracked), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("ic", cost),
+                    ("tracked", l.IsStockTracked), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost),
+                    ("ic", inventoryCost), ("pc", provisionalCost), ("pq", provisionalQty),
                     ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
                 if (l.ProductId is not Guid stockProductId) continue;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'Sale',@d)",
-                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", stockProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
-                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", stockProductId), ("l", m.LocationId));
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", stockProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -inventoryCost), ("e", m.SaleDate), ("d", id));
+                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l",
+                    ("q", l.Quantity.Value), ("p", stockProductId), ("l", m.LocationId));
+                if (provisionalQty > 0)
+                    await Exec(s, ct, @"insert into inventory.negative_stock_commitment
+                        (tenant_id,id,sale_id,sale_line_id,product_id,location_id,original_quantity,remaining_quantity,
+                         provisional_unit_cost,remaining_provisional_cost_amount,settled_quantity,settled_cost_amount,status)
+                        values (@t,@id,@sale,@line,@p,@loc,@qty,@qty,@unit,@cost,0,0,'Open')",
+                        ("t", tenantId), ("id", Guid.NewGuid()), ("sale", id), ("line", lineId), ("p", stockProductId),
+                        ("loc", m.LocationId), ("qty", provisionalQty), ("unit", provisionalUnitCost), ("cost", provisionalCost));
             }
             foreach (var productCost in costed.Where(x => x.Line.ProductId.HasValue).GroupBy(x => x.Line.ProductId!.Value))
             {
