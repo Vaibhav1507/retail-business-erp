@@ -94,12 +94,12 @@ public sealed class SalesService(TenantDb db)
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         await using var s = await db.BeginAsync(uid, tid, ct);
         await using var c = s.Command(@"select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, c.name, x.number,
-            exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no,
+            exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no, x.source_invoice_ref, x.source_invoice_date,
             (select d.status from sales.invoice_delivery d where d.tenant_id=x.tenant_id and d.sale_id=x.id and d.channel='WhatsApp')
             from sales.sale x left join sales.customer c on c.id=x.customer_id
             where (@c::uuid is null or x.customer_id=@c)
               and (@q::text is null or lower(coalesce(c.name,'walk-in')) like '%' || lower(@q) || '%'
-              or x.number::text = @q or lower(x.sale_type)=lower(@q) or coalesce(c.phone,'') like '%' || @q || '%'
+              or x.number::text = @q or lower(coalesce(x.source_invoice_ref,'')) like '%' || lower(@q) || '%' or lower(x.sale_type)=lower(@q) or coalesce(c.phone,'') like '%' || @q || '%'
               or exists (select 1 from sales.sale_line sl where sl.sale_id=x.id and exists (select 1 from unnest(coalesce(sl.serials, array[]::text[])) serial_value where upper(btrim(serial_value)) = upper(btrim(@q)))))
             order by x.sale_date desc, x.created_at desc limit 100");
         c.Parameters.AddWithValue("c", (object?)customerId ?? DBNull.Value);
@@ -108,7 +108,9 @@ public sealed class SalesService(TenantDb db)
         await using var r = await c.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
             list.Add(new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), customer = r.IsDBNull(5) ? "Walk-in" : r.GetString(5),
-                number = r.GetInt64(6), cancelled = r.GetBoolean(7), invoiceNo = r.IsDBNull(8) ? null : r.GetString(8), whatsappStatus = r.IsDBNull(9) ? "NotAvailable" : r.GetString(9) });
+                number = r.GetInt64(6), cancelled = r.GetBoolean(7), invoiceNo = r.IsDBNull(8) ? null : r.GetString(8), sourceInvoiceRef = r.IsDBNull(9) ? null : r.GetString(9),
+                sourceInvoiceDate = r.IsDBNull(10) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(10),
+                whatsappStatus = r.IsDBNull(11) ? "NotAvailable" : r.GetString(11) });
         return ServiceResult<object>.Ok(list);
     }
 
@@ -119,7 +121,7 @@ public sealed class SalesService(TenantDb db)
         await using var s = await db.BeginAsync(uid, tid, ct);
         object? head = null;
         await using (var c = s.Command(@"select x.id, x.sale_date, x.sale_type, x.total, x.amount_paid, x.pay_method, c.name, l.name, x.number, c.phone,
-            c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no,
+            c.notes, x.gst_rate, exists (select 1 from sales.sale_cancellation k where k.sale_id=x.id), x.invoice_no, x.source_invoice_ref, x.source_invoice_date,
             (select d.status from sales.invoice_delivery d where d.tenant_id=x.tenant_id and d.sale_id=x.id and d.channel='WhatsApp')
             from sales.sale x left join sales.customer c on c.id=x.customer_id join core.stock_location l on l.id=x.location_id where x.id=@i"))
         {
@@ -128,7 +130,10 @@ public sealed class SalesService(TenantDb db)
             if (await r.ReadAsync(ct))
                 head = new { id = r.GetGuid(0), date = r.GetFieldValue<DateOnly>(1), saleType = r.GetString(2), total = r.GetDecimal(3), amountPaid = r.GetDecimal(4), balance = r.GetDecimal(3) - r.GetDecimal(4), payMethod = r.IsDBNull(5) ? null : r.GetString(5), customer = r.IsDBNull(6) ? "Walk-in" : r.GetString(6), location = r.GetString(7), number = r.GetInt64(8), customerPhone = r.IsDBNull(9) ? null : r.GetString(9),
                 customerNotes = r.IsDBNull(10) ? null : r.GetString(10), gstRate = r.IsDBNull(11) ? (decimal?)null : r.GetDecimal(11),
-                cancelled = r.GetBoolean(12), invoiceNo = r.IsDBNull(13) ? null : r.GetString(13), whatsappStatus = r.IsDBNull(14) ? "NotAvailable" : r.GetString(14) };
+                cancelled = r.GetBoolean(12), invoiceNo = r.IsDBNull(13) ? null : r.GetString(13),
+                sourceInvoiceRef = r.IsDBNull(14) ? null : r.GetString(14),
+                sourceInvoiceDate = r.IsDBNull(15) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(15),
+                whatsappStatus = r.IsDBNull(16) ? "NotAvailable" : r.GetString(16) };
                         }
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
