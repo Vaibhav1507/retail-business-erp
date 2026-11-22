@@ -352,7 +352,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
             locationId = loc,
             saleDate = Today,
             saleType = "Cash",
-            lines = new[]
+            lines = new object[]
             {
                 new { productId = p, description = "catalogue row one", quantity = 1m, unitPrice = 100m, discount = 0m },
                 new { productId = p, description = "catalogue row two", quantity = 1m, unitPrice = 95m, discount = 5m },
