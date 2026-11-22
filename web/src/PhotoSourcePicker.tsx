@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 
 type PhotoSourcePickerProps = {
@@ -79,7 +79,7 @@ export function PhotoSourcePicker({
     if (file) onFileSelected(file)
   }
 
-  function chooseSource(input: React.RefObject<HTMLInputElement | null>) {
+  function chooseSource(input: RefObject<HTMLInputElement | null>) {
     setOpen(false)
     input.current?.click()
   }
