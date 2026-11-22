@@ -529,58 +529,92 @@ public sealed class AfterSalesService(TenantDb db)
             var prior = await Prior(s, "sales.sale_cancellation", key, hash, ct);
             if (prior is not null) return prior;
 
-            Guid locationId = Guid.Empty; DateOnly saleDate = default; decimal total = 0, paid = 0, costTotal = 0; var found = false;
-            await using (var q = s.Command("select location_id, sale_date, total, amount_paid, cost_total from sales.sale where id=@i"))
+            Guid locationId = Guid.Empty;
+            DateOnly saleDate = default;
+            decimal total = 0, paid = 0, inventoryCostTotal = 0, provisionalCostTotal = 0;
+            var found = false;
+            await using (var q = s.Command(@"select location_id, sale_date, total, amount_paid,
+                    inventory_cost_total, provisional_cost_total
+                from sales.sale where id=@i"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
-                if (await r.ReadAsync(ct)) { found = true; locationId = r.GetGuid(0); saleDate = r.GetFieldValue<DateOnly>(1); total = r.GetDecimal(2); paid = r.GetDecimal(3); inventoryCostTotal = r.GetDecimal(4); provisionalCostTotal = r.GetDecimal(5); }
+                if (await r.ReadAsync(ct))
+                {
+                    found = true;
+                    locationId = r.GetGuid(0);
+                    saleDate = r.GetFieldValue<DateOnly>(1);
+                    total = r.GetDecimal(2);
+                    paid = r.GetDecimal(3);
+                    inventoryCostTotal = r.GetDecimal(4);
+                    provisionalCostTotal = r.GetDecimal(5);
+                }
             }
             if (!found) return ServiceResult<object>.Fail("Sale not found.", 404);
-            if (await Scalar<Guid?>(s, "select id from sales.sale_cancellation where sale_id=@i", ct, ("i", saleId)) is not null) return ServiceResult<object>.Fail("This sale is already cancelled.", 409);
-            if (await Scalar<Guid?>(s, "select id from sales.sale_return where sale_id=@i limit 1", ct, ("i", saleId)) is not null) return ServiceResult<object>.Fail("This sale has returns against it and cannot be cancelled.", 409);
+            if (await Scalar<Guid?>(s, "select id from sales.sale_cancellation where sale_id=@i", ct, ("i", saleId)) is not null)
+                return ServiceResult<object>.Fail("This sale is already cancelled.", 409);
+            if (await Scalar<Guid?>(s, "select id from sales.sale_return where sale_id=@i limit 1", ct, ("i", saleId)) is not null)
+                return ServiceResult<object>.Fail("This sale has returns against it and cannot be cancelled.", 409);
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var cancelDate = today < saleDate ? saleDate : today;
-            var journal = SalesRules.SaleJournal(Money.Of(total), Money.Of(paid), Money.Of(costTotal))
-                .Select(j => new JournalLineDraft(j.AccountCode, j.Credit, j.Debit)).ToList();
+            var journal = SalesRules.SaleCancellationJournal(Money.Of(total), Money.Of(paid),
+                Money.Of(inventoryCostTotal), Money.Of(provisionalCostTotal));
 
-            var historicalLines = new List<(Guid ProductId, decimal Qty, decimal Cost)>();
-            await using (var q = s.Command(@"select l.product_id, sum(l.quantity),
-                  coalesce((select -sum(m.value_delta) from inventory.stock_movement m
-                    where m.source_type='Sale' and m.source_id=l.sale_id and m.product_id=l.product_id),0)
-                from sales.sale_line l where l.sale_id=@i and l.product_id is not null
-                group by l.sale_id,l.product_id order by l.product_id"))
+            var historicalLines = new List<(Guid ProductId, decimal Quantity, decimal ValuedQuantity, decimal InventoryCost)>();
+            await using (var q = s.Command(@"select l.product_id,
+                    sum(l.quantity),
+                    sum(l.quantity - l.provisional_quantity + coalesce(c.settled_quantity,0)),
+                    sum(l.inventory_cost_amount)
+                from sales.sale_line l
+                left join inventory.negative_stock_commitment c
+                  on c.tenant_id=l.tenant_id and c.sale_line_id=l.line_id
+                where l.sale_id=@i and l.product_id is not null
+                group by l.sale_id,l.product_id
+                order by l.product_id"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
-                while (await r.ReadAsync(ct)) historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2), r.GetDecimal(3)));
+                while (await r.ReadAsync(ct))
+                    historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2), r.GetDecimal(3)));
             }
 
-            var lines = new List<(Guid ProductId, Guid InventoryProductId, decimal Qty, decimal ValuedQty, decimal Cost)>();
+            var lines = new List<(Guid InventoryProductId, decimal Quantity, decimal ValuedQuantity, decimal InventoryCost)>();
             foreach (var line in historicalLines)
-                lines.Add((line.ProductId, await CanonicalProductIdAsync(s, tenantId, line.ProductId, ct),
-                    line.Qty, line.ValuedQty, line.Cost));
+                lines.Add((await CanonicalProductIdAsync(s, tenantId, line.ProductId, ct),
+                    line.Quantity, line.ValuedQuantity, line.InventoryCost));
 
-            var id = Guid.NewGuid(); var entry = Guid.NewGuid();
+            var id = Guid.NewGuid();
+            var entry = Guid.NewGuid();
             await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'SaleCancelled','Sale',@d,@s,@c)",
-                ("t", tenantId), ("a", Guid.NewGuid()), ("u", uid), ("d", saleId), ("s", string.Create(CultureInfo.InvariantCulture, $"Sale cancelled, value {total:0.00} INR")), ("c", correlationId));
+                ("t", tenantId), ("a", Guid.NewGuid()), ("u", uid), ("d", saleId),
+                ("s", string.Create(CultureInfo.InvariantCulture, $"Sale cancelled, value {total:0.00} INR")), ("c", correlationId));
             await PostJournal(s, tenantId, entry, cancelDate, "SaleCancellation", id, journal, ct);
             await Exec(s, ct, "insert into sales.sale_cancellation(tenant_id,id,sale_id,cancel_date,reason,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@d,@r,@k,@h,@j,@u)",
-                ("t", tenantId), ("i", id), ("s", saleId), ("d", cancelDate), ("r", Blank(reason)), ("k", key), ("h", hash), ("j", entry), ("u", uid));
-            foreach (var x in lines)
+                ("t", tenantId), ("i", id), ("s", saleId), ("d", cancelDate), ("r", Blank(reason)),
+                ("k", key), ("h", hash), ("j", entry), ("u", uid));
+
+            foreach (var line in lines)
             {
-                var unitCost = x.Qty == 0 ? 0m : WeightedAverageCostCalculator.RoundWac(x.Cost / x.Qty);
-                if (x.Cost > 0)
-                    await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleCancellation',@d)",
-                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", unitCost), ("v", x.Cost), ("e", cancelDate), ("d", id));
+                var unitCost = line.ValuedQuantity <= 0 ? 0m
+                    : WeightedAverageCostCalculator.RoundWac(line.InventoryCost / line.ValuedQuantity);
+                await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleCancellation',@d)",
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", line.InventoryProductId), ("l", locationId),
+                    ("q", line.Quantity), ("c", unitCost), ("v", line.InventoryCost), ("e", cancelDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
-                    ("t", tenantId), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty));
-                var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
-                var tq = cur.TotalQuantity + x.Qty; var tv = cur.InventoryValue + x.Cost;
+                    ("t", tenantId), ("p", line.InventoryProductId), ("l", locationId), ("q", line.Quantity));
+                var current = await ReadCostAsync(s, line.InventoryProductId, ct);
+                var nextQuantity = current.TotalQuantity + line.ValuedQuantity;
+                var nextValue = current.InventoryValue + line.InventoryCost;
                 await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
-                    ("t", tenantId), ("p", x.InventoryProductId), ("q", tq), ("v", tv), ("w", WeightedAverageCostCalculator.RoundWac(tv / tq)));
+                    ("t", tenantId), ("p", line.InventoryProductId), ("q", nextQuantity), ("v", nextValue),
+                    ("w", nextQuantity > 0 ? WeightedAverageCostCalculator.RoundWac(nextValue / nextQuantity) : current.Wac));
             }
+
+            await Exec(s, ct, @"update inventory.negative_stock_commitment
+                set remaining_quantity=0, remaining_provisional_cost_amount=0, status='Cancelled', updated_at=now()
+                where tenant_id=@t and sale_id=@s and status <> 'Cancelled'",
+                ("t", tenantId), ("s", saleId));
             await s.CommitAsync(ct);
             return ServiceResult<object>.Ok(new { id, saleId, cancelled = true });
         }
@@ -589,7 +623,10 @@ public sealed class AfterSalesService(TenantDb db)
             await using var s2 = await db.BeginAsync(uid, tenantId, ct);
             return await Prior(s2, "sales.sale_cancellation", key, hash, ct) ?? ServiceResult<object>.Fail("This sale is already cancelled.", 409);
         }
-        catch (PostgresException e) when (e.SqlState == "RB001") { return ServiceResult<object>.Fail(e.MessageText, 409); }
+        catch (PostgresException e) when (e.SqlState == "RB001")
+        {
+            return ServiceResult<object>.Fail(e.MessageText, 409);
+        }
     }
 
     // ---------- helpers ----------
