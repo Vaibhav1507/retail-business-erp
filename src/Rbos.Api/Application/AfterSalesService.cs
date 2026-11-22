@@ -198,7 +198,7 @@ public sealed class AfterSalesService(TenantDb db)
             if (m.ReturnDate < saleDate) return ServiceResult<object>.Fail("Return date cannot be before the sale date.");
 
             var costed = new List<(Guid SaleLineId, Guid? ProductId, Guid? InventoryProductId,
-                decimal Quantity, decimal InventoryQuantity, decimal ProvisionalQuantity, Money Amount,
+                decimal Quantity, decimal InventoryQuantity, decimal ProvisionalQuantity, decimal UntrackedQuantity, Money Amount,
                 decimal UnitCost, Money InventoryCost, Money ProvisionalCost)>();
             foreach (var line in lines.OrderBy(x => x.SaleLineId))
             {
@@ -270,9 +270,10 @@ public sealed class AfterSalesService(TenantDb db)
                         settledQty = cr.GetDecimal(3);
                     }
                 }
-                var provisionalReturnQty = Math.Min(line.Quantity.Value, remainingProvisionalQty);
-                var inventoryReturnQty = line.Quantity.Value - provisionalReturnQty;
-                var availableInventoryQty = sold - originalProvisionalQty + settledQty;
+                var untrackedReturnQty = productId is null ? line.Quantity.Value : 0m;
+                var provisionalReturnQty = productId is null ? 0m : Math.Min(line.Quantity.Value, remainingProvisionalQty);
+                var inventoryReturnQty = productId is null ? 0m : line.Quantity.Value - provisionalReturnQty;
+                var availableInventoryQty = productId is null ? 0m : sold - originalProvisionalQty + settledQty;
                 if (inventoryReturnQty > availableInventoryQty - retInventoryQty)
                     return ServiceResult<object>.Fail("The requested quantity exceeds the remaining valued and provisional quantity on this sale line.");
 
@@ -301,7 +302,7 @@ public sealed class AfterSalesService(TenantDb db)
                         ("c", provisionalReturnCost.Amount), ("t", tenantId), ("s", m.SaleId), ("line", saleLineId));
                 }
                 costed.Add((saleLineId, productId, inventoryProductId, line.Quantity.Value,
-                    inventoryReturnQty, provisionalReturnQty, amount, unitCost, inventoryReturnCost, provisionalReturnCost));
+                    inventoryReturnQty, provisionalReturnQty, untrackedReturnQty, amount, unitCost, inventoryReturnCost, provisionalReturnCost));
             }
 
             var total = Money.Of(costed.Sum(x => x.Amount.Amount));
@@ -333,12 +334,12 @@ public sealed class AfterSalesService(TenantDb db)
                 var totalCost = x.InventoryCost.Amount + x.ProvisionalCost.Amount;
                 await Exec(s, ct, @"insert into sales.sale_return_line
                     (tenant_id,return_id,sale_id,sale_line_id,product_id,quantity,amount,unit_cost,cost_amount,
-                     inventory_quantity,provisional_quantity,inventory_cost_amount,provisional_cost_amount)
-                    values (@t,@r,@s,@li,@p,@q,@a,@c,@ca,@iq,@pq,@ic,@pc)",
+                     inventory_quantity,provisional_quantity,untracked_quantity,inventory_cost_amount,provisional_cost_amount)
+                    values (@t,@r,@s,@li,@p,@q,@a,@c,@ca,@iq,@pq,@uq,@ic,@pc)",
                     ("t", tenantId), ("r", id), ("s", m.SaleId), ("li", x.SaleLineId),
                     ("p", (object?)x.ProductId ?? DBNull.Value), ("q", x.Quantity), ("a", x.Amount.Amount),
                     ("c", x.UnitCost), ("ca", totalCost), ("iq", x.InventoryQuantity), ("pq", x.ProvisionalQuantity),
-                    ("ic", x.InventoryCost.Amount), ("pc", x.ProvisionalCost.Amount));
+                    ("uq", x.UntrackedQuantity), ("ic", x.InventoryCost.Amount), ("pc", x.ProvisionalCost.Amount));
                 if (x.InventoryProductId is not Guid returnProductId) continue;
                 var movementUnitCost = x.InventoryQuantity > 0
                     ? WeightedAverageCostCalculator.RoundWac(x.InventoryCost.Amount / x.InventoryQuantity) : x.UnitCost;
