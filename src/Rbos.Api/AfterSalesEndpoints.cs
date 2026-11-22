@@ -7,7 +7,7 @@ using static Rbos.Api.ApiResults;
 namespace Rbos.Api;
 
 public sealed record CollectionRequest(Guid CustomerId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference, List<BillAllocation>? Allocations = null);
-public sealed record SaleReturnRequest(Guid SaleId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines, string? RefundMethod = null);
+public sealed record SaleReturnRequest(Guid SaleId, DateOnly ReturnDate, string? Reason, List<SaleReturnLineInput>? Lines, string? RefundMethod = null);
 public sealed record CancelSaleRequest(string? Reason);
 public sealed record PurchaseReturnRequest(Guid ReceiptId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines);
 
