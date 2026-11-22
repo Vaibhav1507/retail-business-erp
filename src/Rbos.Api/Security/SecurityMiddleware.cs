@@ -29,11 +29,12 @@ public sealed class SecurityMiddleware(RequestDelegate next)
             if (!HttpMethods.IsGet(ctx.Request.Method) && !HttpMethods.IsHead(ctx.Request.Method))
             {
                 var isItemTagPhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/item-tag-scan");
+                var isSalesInvoicePhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/invoice-image-extract");
                 var isInvoiceExtraction = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/purchases/extract");
                 var contentType = ctx.Request.ContentType?.Split(';')[0].Trim();
                 var isMultipartInvoiceUpload = isInvoiceExtraction
                     && string.Equals(contentType, "multipart/form-data", StringComparison.OrdinalIgnoreCase);
-                var limit = isItemTagPhotoUpload ? MaxItemTagPhotoBodyBytes
+                var limit = isItemTagPhotoUpload || isSalesInvoicePhotoUpload ? MaxItemTagPhotoBodyBytes
                     : isMultipartInvoiceUpload ? MaxInvoiceMultipartBodyBytes
                     : isInvoiceExtraction ? MaxInvoiceBodyBytes
                     : ctx.Request.Path.Equals("/api/products/import/read") ? MaxCatalogueImportBodyBytes
@@ -48,7 +49,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                 if (feature is { IsReadOnly: false }) feature.MaxRequestBodySize = limit;
 
                 var hasBody = ctx.Request.ContentLength is > 0 || ctx.Request.Headers.ContainsKey("Transfer-Encoding");
-                if (hasBody && isItemTagPhotoUpload)
+                if (hasBody && (isItemTagPhotoUpload || isSalesInvoicePhotoUpload))
                 {
                     var imageContentType = ctx.Request.ContentType?.Split(';')[0].Trim();
                     if (!string.Equals(imageContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
