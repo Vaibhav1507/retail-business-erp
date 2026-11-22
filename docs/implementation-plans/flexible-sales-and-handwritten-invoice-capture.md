@@ -151,4 +151,8 @@ Never auto-post. Present source evidence next to extracted fields, visually mark
 
 ## 9. Current implementation checkpoint
 
-At branch creation, no feature code or schema migration has been changed yet. Main CI run #45011704085 passed for `ee50405`; this is baseline evidence only, not feature validation. The open PR list on main included #61, #50 and #3; do not assume those branches are merged. Re-check the branch and PR state before each write.
+- PR #64 is the single draft implementation PR. The direct-provider handwritten sales-invoice extraction backend slice now exists: authenticated `POST /api/sales/invoice-image-extract`, JPEG/PNG/WebP signature and size validation, a 900 ms optional local OCR fast path, bounded direct Gemini model attempts, optional Groq using the existing `Groq:InvoiceFallbackEnabled` flag, `VisionProviderFallback`, structured JSON cleanup, line validation, confidence fields and warnings. It is draft-only, has no database writes and does not create a sale, stock movement, journal, customer balance or legal invoice number.
+- The extraction path does not call `AiGateway`, its credential pool or usage ledger. No new provider, API key, secret or feature flag was added. The same server-side direct image-provider rule is recorded in ADR-026.
+- The backend extraction route is not yet wired into Generate Invoice UI. Flexible sale-line schema/domain/posting, negative-stock costing and receipt reconciliation are not implemented. Do not treat this partial slice as usable end-to-end.
+- Added integration tests for provider-disabled draft response, no sale posting, invalid MIME/signature and authentication. Exact-head CI has been triggered; record its final result after it completes.
+- Main CI run #45011704085 passed for `ee50405`; this is baseline evidence only. No production migration or deployment was performed.
