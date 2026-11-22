@@ -108,3 +108,5 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - Commits: test response shape `436e4179`; PDF backend `480727ea`; PDF UI `dad3d174`; PDF integration tests `12389cf3`; ADR/plan policy updates `14177f21` and `ed7fcd19`.
 - Latest exact-head CI is run #920 on `ed7fcd19388fe518cdcb1a8262305f9a8ed94ffc`; frontend, backend and PostgreSQL integration jobs were running at log update time. Do not mark release-ready until all jobs pass and the final diff is reviewed.
 - No production migration, deployment, provider configuration/secret change, or merge was performed.
+
+- Follow-up review caught the request security middleware still allowing only image MIME types on the raw sales-invoice endpoint. Updated it to permit `application/pdf` only on `/api/sales/invoice-image-extract`; the item-tag photo endpoint remains image-only. This was necessary for PDF to reach endpoint-level signature validation. Commit `00739a84`.
