@@ -315,13 +315,14 @@ public sealed class SalesService(TenantDb db)
                         "This barcode is already associated with a different product in this business or shared catalogue.", 409);
             }
 
-            var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next,
+            var costed = new List<(int LineIndex, SaleLine Line, decimal UnitCost, decimal Cost, CostState Next,
                 decimal InventoryCost, decimal ProvisionalCost, decimal ProvisionalQuantity, decimal ProvisionalUnitCost)>();
-            foreach (var line in lines.Where(x => x.ProductId is null))
-                costed.Add((line, 0m, 0m, CostState.Empty, 0m, 0m, 0m, 0m));
+            foreach (var row in lines.Select((line, index) => (Line: line, Index: index)).Where(x => x.Line.ProductId is null))
+                costed.Add((row.Index, row.Line, 0m, 0m, CostState.Empty, 0m, 0m, 0m, 0m));
 
-            foreach (var productLines in lines.Where(x => x.ProductId.HasValue)
-                .GroupBy(x => x.ProductId!.Value).OrderBy(x => x.Key))
+            foreach (var productLines in lines.Select((line, index) => (Line: line, Index: index))
+                .Where(x => x.Line.ProductId.HasValue)
+                .GroupBy(x => x.Line.ProductId!.Value).OrderBy(x => x.Key))
             {
                 var productId = productLines.Key;
                 var totalQuantity = productLines.Sum(x => x.Quantity.Value);
@@ -363,7 +364,8 @@ public sealed class SalesService(TenantDb db)
                 var remainingInventoryCost = inventoryCost;
                 for (var index = 0; index < productRows.Count; index++)
                 {
-                    var line = productRows[index];
+                    var row = productRows[index];
+                    var line = row.Line;
                     var lineInventoryQty = Math.Min(line.Quantity.Value, remainingInventoryQty);
                     var lineProvisionalQty = line.Quantity.Value - lineInventoryQty;
                     var lineInventoryCost = lineInventoryQty <= 0 ? 0m
@@ -376,7 +378,7 @@ public sealed class SalesService(TenantDb db)
                     var lineCost = lineInventoryCost + lineProvisionalCost;
                     var unitCost = line.Quantity.Value > 0
                         ? WeightedAverageCostCalculator.RoundWac(lineCost / line.Quantity.Value) : 0m;
-                    costed.Add((line, unitCost, lineCost, next, lineInventoryCost, lineProvisionalCost,
+                    costed.Add((row.Index, line, unitCost, lineCost, next, lineInventoryCost, lineProvisionalCost,
                         lineProvisionalQty, lineProvisionalQty > 0 ? provisionalUnitCost : 0m));
                 }
             }
@@ -401,8 +403,15 @@ public sealed class SalesService(TenantDb db)
             foreach (var (payMethodName, payAmount) in split)
                 await Exec(s, ct, "insert into sales.sale_payment(tenant_id,sale_id,method,amount) values (@t,@s,@m,@a)", ("t", tenantId), ("s", id), ("m", payMethodName), ("a", payAmount));
 
-            foreach (var (l, unitCost, cost, next, inventoryCost, provisionalCost, provisionalQty, provisionalUnitCost) in costed)
+            foreach (var item in costed.OrderBy(x => x.LineIndex))
             {
+                var l = item.Line;
+                var unitCost = item.UnitCost;
+                var cost = item.Cost;
+                var inventoryCost = item.InventoryCost;
+                var provisionalCost = item.ProvisionalCost;
+                var provisionalQty = item.ProvisionalQuantity;
+                var provisionalUnitCost = item.ProvisionalUnitCost;
                 var lineId = Guid.NewGuid();
                 await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,line_id,product_id,description,brand,model,hsn_code,is_stock_tracked,quantity,unit_price,discount,line_total,unit_cost,inventory_cost_amount,provisional_cost_amount,provisional_quantity,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@li,@p,@desc,@brand,@model,@hsn,@tracked,@q,@u,@d,@v,@c,@ic,@pc,@pq,@sr,@i1,@i2,@bc,@bs)",
                     ("t", tenantId), ("s", id), ("li", lineId), ("p", (object?)l.ProductId ?? DBNull.Value), ("desc", l.Description ?? l.Model ?? "Unlisted item"),
