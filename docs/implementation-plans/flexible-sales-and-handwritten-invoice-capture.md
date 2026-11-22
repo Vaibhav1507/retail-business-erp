@@ -143,7 +143,7 @@ Never auto-post. Present source evidence next to extracted fields, visually mark
 >
 > First reconcile this plan with the exact current branch code. Implement the feature as one coherent vertical slice: flexible sale lines (catalogue-linked or ad-hoc), multiple rows for the same product, sales despite zero/insufficient stock using an explicit positive provisional-cost policy, and handwritten sales-invoice upload that produces an editable draft. All entry paths must converge on the existing sales posting engine. AI must never post or authoritatively calculate totals, tax, inventory, cost, journals or balances.
 >
-> Do not merely remove the stock guard or let current WAC become negative. Preserve non-negative valued inventory, track negative physical quantity and provisional sale-line cost, then reconcile later receipts with linked balanced COGS adjustments. Preserve immutable source history, tenant RLS, idempotency, period locks, GST, payment allocations, invoice numbering, serial/IMEI, offline draft semantics and auditability. If the approved cost policy or required schema cannot be made correct, stop that sub-slice and document the precise blocker rather than ship an unsafe approximation.
+> Do not merely remove the stock guard or let current WAC become negative. Preserve non-negative valued inventory, track negative physical quantity and provisional sale-line cost, then reconcile later receipts with linked balanced COGS adjustments. Preserve immutable source history, tenant RLS, idempotency, period locks, GST, payment allocations, invoice numbering, serial/IMEI, offline draft semantics and auditability. Use the selected policy recorded in ADR-025: current positive WAC, else latest positive incoming-movement unit cost; reject when no positive history exists. Allocate receipts FIFO at the same location and reconcile through account 1410. If a migration, lock order or journal cannot be made correct, stop that sub-slice and document the precise blocker rather than ship an unsafe approximation.
 >
 > Before coding, inspect every dependent query, FK, unique constraint, return/cancellation/report/export/print path and migration. Add additive migrations and tests. Never implicitly create a catalogue product from an invoice line. Preserve original customer invoice evidence and source number separately from RBOS's official invoice number. Extraction output is an unposted draft, is treated as untrusted, uses provider budget/fallback controls, has confidence/warnings and requires human confirmation.
 >
@@ -151,8 +151,28 @@ Never auto-post. Present source evidence next to extracted fields, visually mark
 
 ## 9. Current implementation checkpoint
 
-- PR #64 is the single draft implementation PR. The direct-provider handwritten sales-invoice extraction backend slice now exists: authenticated `POST /api/sales/invoice-image-extract`, JPEG/PNG/WebP signature and size validation, a 900 ms optional local OCR fast path, bounded direct Gemini model attempts, optional Groq using the existing `Groq:ItemTagFallbackEnabled` flag, `VisionProviderFallback`, structured JSON cleanup, line validation, confidence fields and warnings. It is draft-only, has no database writes and does not create a sale, stock movement, journal, customer balance or legal invoice number.
-- The extraction path does not call `AiGateway`, its credential pool or usage ledger. No new provider, API key, secret or feature flag was added. The same server-side direct image-provider rule is recorded in ADR-026.
-- Generate Invoice is now wired to the extraction route. The operator reviews and edits extracted lines before adding them to the bill. Flexible sale-line schema/domain/posting, true non-catalogue lines, negative-stock costing and receipt reconciliation are not implemented. Do not treat this partial slice as complete end-to-end billing.
-- Added integration tests for provider-disabled draft response, no sale posting, invalid MIME/signature and authentication. Exact-head CI has been triggered; record its final result after it completes.
-- Main CI run #45011704085 passed for `ee50405`; this is baseline evidence only. No production migration or deployment was performed.
+### Implemented on this feature branch (not merged/deployed)
+
+- **Handwritten invoice capture:** authenticated `POST /api/sales/invoice-image-extract`; JPEG/PNG/WebP signature and 8 MB limits; SkiaSharp preparation; 900 ms local OCR fast path; direct Gemini via `ItemTagGeminiModels`; optional Groq only behind existing `Groq:ItemTagFallbackEnabled`; shared `VisionProviderFallback` and existing item-tag budgets. No AI Gateway. Generate Invoice upload/camera UI presents an editable draft and requires explicit operator confirmation. Uploaded image is processed in memory and not retained.
+- **Ad-hoc sale lines:** `sales.sale_line.product_id` is nullable; description/model snapshot is required; brand/model/HSN are snapshotted; unlisted lines do not create catalogue products and are explicitly non-stock-tracked. Manual model-number-only entry is supported.
+- **Stable line identity:** sale lines have `line_id` and line number; repeated rows for the same catalogue product are allowed. Returns identify the exact sale line; sale detail and customer insights include ad-hoc descriptions. Cancellation aggregates repeated product rows correctly.
+- **Zero/insufficient-stock sales:** physical location balance may become negative. Product-wide valued `item_cost` quantity/value never goes negative. Existing positive WAC is the provisional fallback; otherwise latest positive incoming movement unit cost. If no positive cost history exists, posting fails closed. Each provisional quantity is linked to the exact sale line in `inventory.negative_stock_commitment`.
+- **Receipt reconciliation:** receipts at the same location allocate to open deficits FIFO by commitment creation time and ID. Only unconsumed receipt quantity/value enters WAC. A balanced linked journal debits 1410 Negative Stock Clearing, credits Inventory at actual landed cost, and posts the actual-vs-provisional difference to COGS. Sale and line cost projections are updated atomically.
+- **Returns/cancellation:** returns split valued and provisional quantities/costs; provisional returns reduce open commitments and clear provisional COGS. Cancellation restores full physical quantity, only valued inventory quantity/value, reverses the current clearing balance and closes open commitments.
+- **Migrations:** 055 flexible sale-line identity and nullable catalogue link; 056 negative-stock commitments, sale/return cost split fields, relaxed physical stock and zero-value movement support, RLS and least-privilege grants.
+- **Tests added:** ad-hoc + duplicate product lines, ad-hoc and exact-line returns, zero/insufficient stock, positive-cost fail-closed behaviour, receipt settlement, post-settlement return and cancellation of open provisional stock. Existing sales/returns/cancellation suites remain part of CI.
+
+### Validation checkpoint
+
+- Frontend and backend builds have passed in earlier exact-branch runs.
+- PostgreSQL integration run #869 is validating migration 055/056 after a migration-order correction (drop product primary keys before making product_id nullable). The latest test changes are on later commits; record a new exact-head green run before calling this slice complete.
+- No production migration, production deployment, provider secret/flag change or provider calls from tests.
+- This branch remains draft PR #64. Do not merge or pilot until exact-head CI, database migration tests, regression/browser tests and review of the provisional-cost accounting policy pass.
+
+### Remaining work
+
+1. Verify the current CI failure/success and fix every exact-head failure.
+2. Run focused backend/frontend/DB tests, including existing returns, cancellation, reporting, serial/IMEI, GST, offline queue, invoice print and tenant-isolation suites.
+3. Add/verify browser-level end-to-end coverage for handwritten upload → review/correct → add lines → post sale, and zero-stock sale.
+4. Review source evidence retention: the current capture endpoint intentionally does not retain the uploaded photo; if the shop requires source-photo retention for audit, add tenant-scoped evidence storage and explicit lifecycle/retention before production.
+5. Update all docs and PR body with exact final CI links and commit SHAs. No production migration/deployment without explicit approval.
