@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { apiBinary } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
@@ -137,7 +137,7 @@ export function ItemTagCapture({
     }
   }
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     void readFile(file)
