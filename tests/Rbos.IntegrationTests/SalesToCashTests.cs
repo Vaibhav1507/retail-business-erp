@@ -251,7 +251,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
             amountPaid = (decimal?)null, payMethod = (string?)null,
             lines = new[] { new
             {
-                productId = product, quantity = 1m, unitPrice = 0m, discount = 0m,
+                productId = product, quantity = 0m, unitPrice = 100m, discount = 0m,
                 serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
             } }
         }, K());
