@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GenerateInvoice } from './GenerateInvoice'
@@ -92,7 +92,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
     const photoInputs = container.querySelectorAll('input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
-    await userEvent.upload(photoInputs[1], file)
+    fireEvent.change(photoInputs[1], { target: { files: [file] } })
 
     expect(await screen.findByDisplayValue('LG')).toBeInTheDocument()
     expect(screen.getByDisplayValue('PX900H7SD4Z')).toBeInTheDocument()
