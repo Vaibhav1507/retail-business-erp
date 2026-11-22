@@ -52,12 +52,17 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                 if (hasBody && (isItemTagPhotoUpload || isSalesInvoicePhotoUpload))
                 {
                     var imageContentType = ctx.Request.ContentType?.Split(';')[0].Trim();
-                    if (!string.Equals(imageContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                    var allowedSalesInvoiceType = isSalesInvoicePhotoUpload &&
+                        string.Equals(imageContentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
+                    if (!allowedSalesInvoiceType &&
+                        !string.Equals(imageContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
                         && !string.Equals(imageContentType, "image/png", StringComparison.OrdinalIgnoreCase)
                         && !string.Equals(imageContentType, "image/webp", StringComparison.OrdinalIgnoreCase))
                     {
                         ctx.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
-                        await ctx.Response.WriteAsJsonAsync(new { error = "Choose a JPEG, PNG or WebP photo." });
+                        await ctx.Response.WriteAsJsonAsync(new { error = isSalesInvoicePhotoUpload
+                            ? "Choose a JPEG, PNG, WebP photo or PDF invoice."
+                            : "Choose a JPEG, PNG or WebP photo." });
                         return;
                     }
                 }
