@@ -267,15 +267,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     if (!manualLabel || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product description or model number, quantity and price.'); return }
     if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) { setError('Enter a valid MRP.'); return }
     const productId = selectedProductId || match?.id || ''
-    const existing = productId ? items.find(item => item.productId === productId) : undefined
-    if (existing && (existing.unitPrice !== unitPrice || existing.discount !== discount)) {
-      setError('This product is already on the bill with a different price or discount. Keep one price per product line.')
-      return
-    }
-    if (existing && barcodeText.trim() && existing.barcode && existing.barcode !== barcodeText.trim()) {
-      setError('This product already has a different barcode on this bill. Verify the product or add a separate catalogue product.')
-      return
-    }
     const newItem: Item = {
       productId, name: match?.name ?? manualLabel, quantity, unitPrice, discount, serials,
       imei1s: imei1Text.trim() ? [imei1Text.trim()] : [],
@@ -289,17 +280,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       hsn: hsnText.trim() || undefined
     }
     setError('')
-    if (existing) {
-      setItems(current => current.map(item => item.productId === productId
-        ? { ...item, quantity: item.quantity + quantity, serials: [...item.serials, ...serials],
-            imei1s: [...item.imei1s, ...newItem.imei1s], imei2s: [...item.imei2s, ...newItem.imei2s],
-            barcode: item.barcode ?? newItem.barcode, barcodeSymbology: item.barcodeSymbology ?? newItem.barcodeSymbology,
-            brand: item.brand ?? newItem.brand, model: item.model ?? newItem.model,
-            category: item.category ?? newItem.category, mrp: item.mrp ?? newItem.mrp, hsn: item.hsn ?? newItem.hsn }
-        : item))
-    } else {
-      setItems(current => [...current, newItem])
-    }
+    setItems(current => [...current, newItem])
     setPname(''); setSelectedProductId('')
     setBrandText(''); setModelText(''); setCategoryText(''); setBarcodeText(''); setBarcodeSymbology('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText('')
@@ -320,7 +301,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     try {
       if (offlineMode || !navigator.onLine) {
         if (!ownerKey) throw new Error('This device has no provisioned offline workspace. Connect and sign in before creating offline bills.')
-        if (effItems.some(item => !item.productId)) throw new Error('Offline bills can use only products already in your saved catalogue. Add new products when you are online.')
         if (!customerId && (name.trim() || phone.trim() || address.trim() || city.trim() || state.trim() || pin.trim())) {
           throw new Error('Offline bills can use an existing selected customer or walk-in only. New customer creation requires a connection.')
         }
@@ -337,22 +317,21 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         }
       }
 
-      const lines = []
-      for (const item of effItems) {
-        let productId = item.productId
-        if (!productId) {
-          if (offlineMode || !navigator.onLine) throw new Error('New products can be added to a bill only while online.')
-          const product = await api<{ id: string }>('POST', '/products', {
-            name: item.name, categoryName: item.category || 'Uncategorised',
-            isGeneric: !item.brand && !item.model, baseUnit: 'pcs',
-            brand: item.brand || null, model: item.model || null, mrp: item.mrp ?? null, hsnCode: item.hsn || null
-          })
-          productId = product.id
-        }
-        lines.push({ productId, quantity: item.quantity, unitPrice: item.unitPrice, discount: item.discount,
-          serials: item.serials, imei1s: item.imei1s, imei2s: item.imei2s,
-          barcode: item.barcode ?? null, barcodeSymbology: item.barcodeSymbology ?? null })
-      }
+      const lines = effItems.map(item => ({
+        productId: item.productId || null,
+        description: item.name,
+        brand: item.brand ?? null,
+        model: item.model ?? null,
+        hsnCode: item.hsn ?? null,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        serials: item.serials,
+        imei1s: item.imei1s,
+        imei2s: item.imei2s,
+        barcode: item.barcode ?? null,
+        barcodeSymbology: item.barcodeSymbology ?? null
+      }))
       const credit = mode === 'Credit'
       const part = Number(paid || 0)
       const part2 = Number(paid2 || 0)
