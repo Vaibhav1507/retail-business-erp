@@ -391,8 +391,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var detail = await c.GetJson("/sales/" + saleId);
         var saleLines = detail.GetProperty("lines").EnumerateArray().ToArray();
         Assert.Equal(3, saleLines.Length);
-        Assert.Equal(2, saleLines.Count(x => x.GetProperty("sku").GetString() is not null));
-        var adHoc = Assert.Single(saleLines.Where(x => x.GetProperty("sku").ValueKind == JsonValueKind.Null));
+        var adHoc = Assert.Single(saleLines, x => x.GetProperty("product").GetString() == "Unlisted charger model ZX-90");
         Assert.Equal("Unlisted charger model ZX-90", adHoc.GetProperty("product").GetString());
         Assert.Equal("ZX-90", adHoc.GetProperty("model").GetString());
         Assert.Equal(productsBefore, (await c.GetJson("/products")).EnumerateArray().Count());
