@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 
 type PhotoSourcePickerProps = {
@@ -55,6 +55,7 @@ export function PhotoSourcePicker({
       if (controls.length === 0) return
       const first = controls[0]
       const last = controls[controls.length - 1]
+      if (!first || !last) return
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault()
         last.focus()
@@ -79,7 +80,7 @@ export function PhotoSourcePicker({
     if (file) onFileSelected(file)
   }
 
-  function chooseSource(input: RefObject<HTMLInputElement | null>) {
+  function chooseSource(input: { current: HTMLInputElement | null }) {
     setOpen(false)
     input.current?.click()
   }
