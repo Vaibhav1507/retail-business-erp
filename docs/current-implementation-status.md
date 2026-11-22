@@ -223,3 +223,8 @@ Multipart invoice transport and durable asynchronous item-tag extraction remain 
 - Integration tests now exercise the queue worker with Gemini/Groq credentials explicitly disabled, so they do not make real provider calls. Queue permission tests cover the app/worker privilege boundary. These PostgreSQL integration tests are still disabled in the current PR CI workflow.
 - Migration 050 is not applied to any database. The Cloud Run worker Job command and secret mapping have not been changed. After merge approval, migration 050 and the existing Job configuration must be applied/updated in the intended environment before enabling the asynchronous user flow.
 - No provider credentials, API keys, paid services, billing settings, production database, Cloud Run deployment or provider flags were modified.
+
+
+## Flexible sales and handwritten invoice capture — 2026-11-22
+
+A dedicated implementation branch `feat/flexible-sales-handwritten-invoice` was created from main `ee50405e5fe5ee29ba9f4b5cbbda163aa5a40fe5`. The scope and dependency analysis are recorded in [the implementation plan](implementation-plans/flexible-sales-and-handwritten-invoice-capture.md), with proposed ADR-025/026 and a dated handover log. At this checkpoint, documentation/design has been committed on the feature branch; feature migrations, backend/UI code and feature tests are not yet implemented. Main CI run [#45011704085](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45011704085) passed on the baseline only. No production migration or deployment was performed. Do not mark these capabilities as implemented or pilot-ready.
