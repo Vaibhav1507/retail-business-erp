@@ -46,7 +46,11 @@ create index sale_line_product_ix on sales.sale_line (tenant_id, product_id, sal
 -- Return rows point to the exact sold line, allowing duplicate catalogue products
 -- and ad-hoc lines to be returned independently.
 alter table sales.sale_return_line
-  add column sale_line_id uuid;
+  add column sale_line_id uuid,
+  add column cost_amount numeric(18,2) not null default 0 check (cost_amount >= 0);
+
+update sales.sale_return_line
+set cost_amount = round(quantity * unit_cost, 2);
 
 update sales.sale_return_line rl
 set sale_line_id = sl.line_id
