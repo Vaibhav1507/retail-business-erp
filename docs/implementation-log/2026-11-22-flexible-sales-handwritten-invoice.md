@@ -96,3 +96,15 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - Corrected the Generate Invoice helper text for unmatched manual products: it now accurately says the line is billed ad-hoc and does not create a catalogue product (commit 0ce29e3).
 
 - The source-invoice metadata test initially failed to compile because the shared Today test helper is already an ISO date string. Corrected the assertion to compare against Today directly in commit d5a6d035a0d359fee656972a8d4ba0c66e1edaa7. Exact-head run #913 is validating the corrected test and current frontend.
+
+
+## Completion follow-up — PDF support and CI regression fix
+
+- Run #914 exposed one failing integration assertion in the model-number-only/source-invoice test. The API returns source invoice reference/date inside the `sale` object of the sale-detail response; corrected the test to assert the documented response shape. The preceding run had 177/178 integration tests pass; backend and frontend were green.
+- Added PDF support to the handwritten sales invoice capture flow. The UI accepts JPEG, PNG, WebP and PDF up to 8 MB; the API validates the PDF signature and sends PDF bytes as `application/pdf` to the existing direct Gemini `generateContent` call. The image-only Groq fallback and local image OCR are skipped for PDF input. PDF extraction remains a draft-only flow and does not post sales or accounting.
+- Added integration coverage for PDF MIME/signature acceptance and invalid PDF signatures. No live AI provider was invoked by tests.
+- Verified against Google's Gemini documentation that PDF is a supported inline multimodal input; native PDF input retains document page context and supports scanned pages. See the implementation plan's research references and the official [Gemini document understanding](https://ai.google.dev/gemini-api/docs/document-processing) and [file input methods](https://ai.google.dev/gemini-api/docs/file-input-methods).
+- Source-evidence policy clarified: original invoice photos/PDFs are not retained by this feature. This is an intentional privacy-minimizing choice until the business explicitly defines tenant-level access, retention and deletion requirements. The operator-confirmed source invoice reference/date are retained with the sale.
+- Commits: test response shape `436e4179`; PDF backend `480727ea`; PDF UI `dad3d174`; PDF integration tests `12389cf3`; ADR/plan policy updates `14177f21` and `ed7fcd19`.
+- Latest exact-head CI is run #920 on `ed7fcd19388fe518cdcb1a8262305f9a8ed94ffc`; frontend, backend and PostgreSQL integration jobs were running at log update time. Do not mark release-ready until all jobs pass and the final diff is reviewed.
+- No production migration, deployment, provider configuration/secret change, or merge was performed.
