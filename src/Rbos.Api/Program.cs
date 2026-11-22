@@ -232,7 +232,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/api/health").AllowAnonymous();
 Rbos.Api.Endpoints.Map(app);
 Rbos.Api.WhatsAppWebhookEndpoints.Map(app);
-app.MapGet("/.well-known/assetlinks.json", (IConfiguration configuration) =>
+Func<IConfiguration, IResult> assetLinksHandler = configuration =>
 {
     var configured = configuration["Android:AssetLinksJson"];
     if (string.IsNullOrWhiteSpace(configured))
@@ -248,7 +248,12 @@ app.MapGet("/.well-known/assetlinks.json", (IConfiguration configuration) =>
     {
         return Results.Problem("Android asset links configuration is not valid JSON.", statusCode: 500);
     }
-}).AllowAnonymous();
+};
+
+// Android App Links requires the root well-known URL. Keep the API-prefixed alias
+// as well because the integration-test API client resolves Raw() paths under /api.
+app.MapGet("/.well-known/assetlinks.json", assetLinksHandler).AllowAnonymous();
+app.MapGet("/api/.well-known/assetlinks.json", assetLinksHandler).AllowAnonymous();
 app.MapFallback("/api/{**path}", () => Results.NotFound()).AllowAnonymous();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 app.Run();
