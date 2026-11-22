@@ -116,7 +116,13 @@ export function ItemTagCapture({
         extraction.imei2?.trim() ||
         scan.suggestedProduct?.id
       )
-      const hasBarcode = Boolean(extraction.barcode?.trim() || decodedBarcode?.code)
+      // A null barcode returned by the server is an explicit validation rejection;
+      // do not reintroduce that rejected local decode into the invoice form.
+      const barcode = extraction.barcode === null ? '' : extraction.barcode?.trim() || decodedBarcode?.code || ''
+      const barcodeSymbology = extraction.barcodeSymbology === null
+        ? ''
+        : extraction.barcodeSymbology || decodedBarcode?.symbology || ''
+      const hasBarcode = Boolean(barcode)
 
       onExtract({
         productId: scan.suggestedProduct?.id ?? '',
@@ -127,8 +133,8 @@ export function ItemTagCapture({
         model: extraction.model ?? '',
         category: extraction.category ?? '',
         // Prefer the server-returned value because it has passed server validation.
-        barcode: extraction.barcode ?? decodedBarcode?.code ?? '',
-        barcodeSymbology: extraction.barcodeSymbology ?? decodedBarcode?.symbology ?? '',
+        barcode,
+        barcodeSymbology,
         serials: extraction.serial ? [extraction.serial] : [],
         imei1: extraction.imei1 ?? '',
         imei2: extraction.imei2 ?? '',
