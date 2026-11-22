@@ -1,6 +1,7 @@
 namespace Rbos.Domain;
 
-public sealed record ReturnLineInput(Guid ProductId, decimal Quantity);\npublic sealed record SaleReturnLineInput(Guid? ProductId, Guid? SaleLineId, decimal Quantity);
+public sealed record ReturnLineInput(Guid ProductId, decimal Quantity);
+public sealed record SaleReturnLineInput(Guid? ProductId, Guid? SaleLineId, decimal Quantity);
 
 /// <summary>Pure rules for customer collections and customer/supplier returns (Slice 5).</summary>
 public static class AfterSalesRules
