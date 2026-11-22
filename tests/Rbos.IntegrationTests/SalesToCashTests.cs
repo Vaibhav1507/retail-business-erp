@@ -491,7 +491,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("product").GetString());
         Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("model").GetString());
         Assert.Equal("SRC-2026-1122", detail.GetProperty("sourceInvoiceRef").GetString());
-        Assert.Equal(Today.ToString("yyyy-MM-dd"), detail.GetProperty("sourceInvoiceDate").GetString());
+        Assert.Equal(Today, detail.GetProperty("sourceInvoiceDate").GetString());
         Assert.Equal(before, (await c.GetJson("/products")).EnumerateArray().Count());
     }
 
