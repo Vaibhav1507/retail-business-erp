@@ -182,6 +182,24 @@ public sealed class ProcurementService(TenantDb db)
             await Exec(s, ct, "insert into procurement.purchase_receipt(tenant_id,id,supplier_id,location_id,receipt_date,supplier_ref,total,gst_total,gst_claimed,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@l,@d,@r,@v,@g,@gc,@k,@h,@j,@u)",
                 ("t", tenantId), ("i", id), ("s", m.SupplierId), ("l", m.LocationId), ("d", m.ReceiptDate), ("r", Blank(m.SupplierRef)), ("v", total.Amount), ("g", gstTotal.Amount), ("gc", gstClaimed), ("k", key), ("h", hash), ("j", entry), ("u", uid));
 
+            // Lock affected sales first, in a stable global order, before locking
+            // their commitments. Returns and cancellations use the same lock order.
+            var affectedSales = new List<Guid>();
+            await using (var q = s.Command(@"select distinct sale_id
+                from inventory.negative_stock_commitment
+                where tenant_id=@t and location_id=@l and product_id=any(@p)
+                  and status='Open' and remaining_quantity>0
+                order by sale_id"))
+            {
+                q.Parameters.AddWithValue("t", tenantId);
+                q.Parameters.AddWithValue("l", m.LocationId);
+                q.Parameters.AddWithValue("p", lines.Select(x => x.ProductId).Distinct().ToArray());
+                await using var r = await q.ExecuteReaderAsync(ct);
+                while (await r.ReadAsync(ct)) affectedSales.Add(r.GetGuid(0));
+            }
+            foreach (var affectedSaleId in affectedSales)
+                _ = await Scalar<Guid?>(s, "select id from sales.sale where id=@s for update", ct, ("s", affectedSaleId));
+
             var settledProvisionalTotal = 0m;
             var settledActualTotal = 0m;
             foreach (var l in lines)
