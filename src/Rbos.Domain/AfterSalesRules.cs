@@ -82,16 +82,24 @@ public static class AfterSalesRules
         return j;
     }
 
-    /// <summary>Dr Sales revenue; Cr Receivable (up to what the customer owes) and Cr Cash for any refund; Dr Inventory, Cr COGS at original cost.</summary>
+    /// <summary>Reverses the sale revenue and both valued and provisional cost portions.</summary>
     public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(Money revenue, Money receivableCredit, Money cashRefund, Money cost)
+        => CustomerReturnJournal(revenue, receivableCredit, cashRefund, cost, Money.Zero);
+
+    public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(
+        Money revenue, Money receivableCredit, Money cashRefund, Money inventoryCost, Money provisionalCost)
     {
-        if (revenue.Amount <= 0 || receivableCredit.Amount + cashRefund.Amount != revenue.Amount) throw new ArgumentException("Return amounts do not add up.");
-        var j = new List<JournalLineDraft> { new(RevenueAccount, revenue.Amount, 0m) };
-        if (receivableCredit.Amount > 0) j.Add(new(ReceivableAccount, 0m, receivableCredit.Amount));
-        if (cashRefund.Amount > 0) j.Add(new(CashAccount, 0m, cashRefund.Amount));
-        if (cost.Amount > 0) { j.Add(new(InventoryAccount, cost.Amount, 0m)); j.Add(new(CogsAccount, 0m, cost.Amount)); }
-        BalancedJournalPolicy.AssertBalanced(j);
-        return j;
+        if (revenue.Amount <= 0 || receivableCredit.Amount + cashRefund.Amount != revenue.Amount)
+            throw new ArgumentException("Return amounts do not add up.");
+        var journal = new List<JournalLineDraft> { new(RevenueAccount, revenue.Amount, 0m) };
+        if (receivableCredit.Amount > 0) journal.Add(new(ReceivableAccount, 0m, receivableCredit.Amount));
+        if (cashRefund.Amount > 0) journal.Add(new(CashAccount, 0m, cashRefund.Amount));
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, inventoryCost.Amount, 0m));
+        if (provisionalCost.Amount > 0) journal.Add(new(SalesRules.NegativeStockClearingAccount, provisionalCost.Amount, 0m));
+        var totalCost = inventoryCost.Amount + provisionalCost.Amount;
+        if (totalCost > 0) journal.Add(new(CogsAccount, 0m, totalCost));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
     }
 
     /// <summary>Dr Accounts Payable at the purchase cost; Cr Inventory at the cost removed; any difference goes to COGS.</summary>
