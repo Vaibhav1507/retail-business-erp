@@ -132,9 +132,9 @@ public sealed class SalesService(TenantDb db)
                         }
         if (head is null) return ServiceResult<object>.Fail("Sale not found.", 404);
         var lines = new List<object>();
-        await using (var c = s.Command(@"select p.name, p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
-            l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, p.model, p.brand, p.hsn_code
-            from sales.sale_line l join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
+        await using (var c = s.Command(@"select coalesce(l.description,p.name), p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
+            l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, coalesce(l.model,p.model), coalesce(l.brand,p.brand), coalesce(l.hsn_code,p.hsn_code)
+            from sales.sale_line l left join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
             where l.sale_id=@i order by p.name"))
         {
             c.Parameters.AddWithValue("i", id);
@@ -263,7 +263,7 @@ public sealed class SalesService(TenantDb db)
         var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
         if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
         var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
+            string.Join(';', lines.Select(l => $"{l.ProductId?.ToString() ?? "adhoc"}:{l.Description}:{l.Brand}:{l.Model}:{l.HsnCode}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -280,19 +280,37 @@ public sealed class SalesService(TenantDb db)
             }
             if (m.CustomerId is not null && await Scalar<Guid?>(s, "select id from sales.customer where id=@i and is_active", ct, ("i", m.CustomerId)) is null) return ServiceResult<object>.Fail("Unknown or inactive customer.");
             if (await Scalar<Guid?>(s, "select id from core.stock_location where id=@i", ct, ("i", m.LocationId)) is null) return ServiceResult<object>.Fail("Unknown location.");
-            var ids = lines.Select(l => l.ProductId).ToArray();
+            var ids = lines.Where(l => l.ProductId.HasValue).Select(l => l.ProductId!.Value).Distinct().ToArray();
             await using (var q = s.Command("select count(*) from catalog.product where id = any(@i) and is_active"))
             {
                 q.Parameters.AddWithValue("i", ids);
                 if ((long)(await q.ExecuteScalarAsync(ct))! != ids.Length) return ServiceResult<object>.Fail("Unknown or inactive product.");
             }
+            // Catalogue data is authoritative for linked rows; ad-hoc rows retain the
+            // operator-entered snapshot and never create a catalogue record implicitly.
+            foreach (var index in Enumerable.Range(0, lines.Count))
+            {
+                if (lines[index].ProductId is not Guid productId) continue;
+                await using var product = s.Command("select name, brand, model, hsn_code from catalog.product where id=@p and is_active");
+                product.Parameters.AddWithValue("p", productId);
+                await using var reader = await product.ExecuteReaderAsync(ct);
+                if (!await reader.ReadAsync(ct)) return ServiceResult<object>.Fail("Unknown or inactive product.");
+                lines = lines.ToArray();
+                ((SaleLine[])lines)[index] = lines[index] with
+                {
+                    Description = reader.GetString(0),
+                    Brand = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    Model = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    HsnCode = reader.IsDBNull(3) ? null : reader.GetString(3)
+                };
+            }
 
             // Barcode learning is part of this transaction, not the scan request.
             // A failed sale cannot leave either a tenant-private or shared mapping behind.
-            foreach (var line in lines.Where(x => !string.IsNullOrWhiteSpace(x.Barcode)))
+            foreach (var line in lines.Where(x => x.ProductId.HasValue && !string.IsNullOrWhiteSpace(x.Barcode)))
             {
                 if (!await BarcodeService.LearnFromCompletedSaleAsync(
-                    s, tenantId, line.ProductId, line.Barcode!, line.BarcodeSymbology, ct))
+                    s, tenantId, line.ProductId!.Value, line.Barcode!, line.BarcodeSymbology, ct))
                     return ServiceResult<object>.Fail(
                         "This barcode is already associated with a different product in this business or shared catalogue.", 409);
             }
@@ -300,10 +318,16 @@ public sealed class SalesService(TenantDb db)
             var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next)>();
             foreach (var l in lines.OrderBy(x => x.ProductId))
             {
-                var onHand = await Scalar<decimal?>(s, "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update", ct, ("p", l.ProductId), ("l", m.LocationId)) ?? 0m;
+                if (l.ProductId is null)
+                {
+                    costed.Add((l, 0m, 0m, CostState.Empty));
+                    continue;
+                }
+                var productId = l.ProductId.Value;
+                var onHand = await Scalar<decimal?>(s, "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update", ct, ("p", productId), ("l", m.LocationId)) ?? 0m;
                 if (onHand < l.Quantity.Value)
                 {
-                    var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", l.ProductId));
+                    var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", productId));
                     return ServiceResult<object>.Fail($"Not enough stock for {name}: {onHand:0.###} available.");
                 }
                 var cur = await ReadCostAsync(s, l.ProductId, ct);
@@ -332,12 +356,17 @@ public sealed class SalesService(TenantDb db)
 
             foreach (var (l, unitCost, cost, next) in costed)
             {
-                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,product_id,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@p,@q,@u,@d,@v,@c,@sr,@i1,@i2,@bc,@bs)",
-                    ("t", tenantId), ("s", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost), ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
+                var lineId = Guid.NewGuid();
+                await Exec(s, ct, "insert into sales.sale_line(tenant_id,sale_id,line_id,product_id,description,brand,model,hsn_code,is_stock_tracked,quantity,unit_price,discount,line_total,unit_cost,serials,imei1s,imei2s,barcode,barcode_symbology) values (@t,@s,@li,@p,@desc,@brand,@model,@hsn,@tracked,@q,@u,@d,@v,@c,@sr,@i1,@i2,@bc,@bs)",
+                    ("t", tenantId), ("s", id), ("li", lineId), ("p", (object?)l.ProductId ?? DBNull.Value), ("desc", l.Description ?? l.Model ?? "Unlisted item"),
+                    ("brand", (object?)l.Brand ?? DBNull.Value), ("model", (object?)l.Model ?? DBNull.Value), ("hsn", (object?)l.HsnCode ?? DBNull.Value),
+                    ("tracked", l.IsStockTracked), ("q", l.Quantity.Value), ("u", l.UnitPrice), ("d", l.Discount), ("v", l.LineTotal), ("c", unitCost),
+                    ("sr", l.Serials), ("i1", l.Imei1s ?? []), ("i2", l.Imei2s ?? []), ("bc", (object?)l.Barcode ?? DBNull.Value), ("bs", (object?)l.BarcodeSymbology ?? DBNull.Value));
+                if (l.ProductId is not Guid stockProductId) continue;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'Sale',@d)",
-                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
-                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", l.ProductId), ("l", m.LocationId));
-                await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac), ("p", l.ProductId));
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", stockProductId), ("l", m.LocationId), ("q", -l.Quantity.Value), ("c", unitCost), ("v", -cost), ("e", m.SaleDate), ("d", id));
+                await Exec(s, ct, "update inventory.stock_balance set quantity = quantity - @q where product_id=@p and location_id=@l", ("q", l.Quantity.Value), ("p", stockProductId), ("l", m.LocationId));
+                await Exec(s, ct, "update inventory.item_cost set total_quantity=@q, inventory_value=@v, wac=@w where product_id=@p", ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac), ("p", stockProductId));
             }
             // Freeze the invoice from committed business data and enqueue only with explicit customer consent.
             // Both writes share the sale transaction, so a failed sale cannot leave a deliverable invoice.
@@ -361,15 +390,15 @@ public sealed class SalesService(TenantDb db)
                     'location', l.name,
                     'lines', coalesce((
                       select jsonb_agg(jsonb_build_object(
-                        'name', p.name, 'sku', p.internal_sku, 'quantity', sl.quantity,
+                        'name', coalesce(sl.description,p.name), 'sku', p.internal_sku, 'quantity', sl.quantity,
                         'unitPrice', sl.unit_price, 'discount', sl.discount,
                         'lineTotal', sl.line_total, 'serials', to_jsonb(sl.serials),
                         'imei1s', to_jsonb(sl.imei1s), 'imei2s', to_jsonb(sl.imei2s),
                         'barcode', sl.barcode, 'barcodeSymbology', sl.barcode_symbology,
-                        'model', p.model, 'brand', p.brand, 'hsnCode', p.hsn_code
+                        'model', coalesce(sl.model,p.model), 'brand', coalesce(sl.brand,p.brand), 'hsnCode', coalesce(sl.hsn_code,p.hsn_code)
                       ) order by p.name)
                       from sales.sale_line sl
-                      join catalog.product p on p.tenant_id=sl.tenant_id and p.id=sl.product_id
+                      left join catalog.product p on p.tenant_id=sl.tenant_id and p.id=sl.product_id
                       where sl.tenant_id=x.tenant_id and sl.sale_id=x.id
                     ), '[]'::jsonb),
                     'payments', coalesce((
