@@ -22,6 +22,7 @@ public static class SalesRules
     public const string RevenueAccount = "4000";
     public const string CogsAccount = "5000";
     public const string InventoryAccount = "1400";
+    public const string NegativeStockClearingAccount = "1410";
     public static readonly string[] SaleTypes = ["Cash", "UPI", "Credit"];
     public static readonly string[] PayMethods = ["Cash", "Bank", "UPI"];
 
@@ -98,14 +99,58 @@ public static class SalesRules
     }
 
     public static IReadOnlyList<JournalLineDraft> SaleJournal(Money total, Money paid, Money cost)
+        => SaleJournal(total, paid, cost, Money.Zero);
+
+    /// <summary>
+    /// Posts COGS at the selected provisional cost while crediting only inventory that
+    /// actually had a positive valuation. The unreceived portion is credited to the
+    /// negative-stock clearing liability until a later receipt settles it.
+    /// </summary>
+    public static IReadOnlyList<JournalLineDraft> SaleJournal(Money total, Money paid, Money inventoryCost, Money provisionalCost)
     {
-        var j = new List<JournalLineDraft>();
-        if (paid.Amount > 0) j.Add(new(CashAccount, paid.Amount, 0m));
-        if (total.Amount - paid.Amount > 0) j.Add(new(ReceivableAccount, total.Amount - paid.Amount, 0m));
-        j.Add(new(RevenueAccount, 0m, total.Amount));
-        if (cost.Amount > 0) { j.Add(new(CogsAccount, cost.Amount, 0m)); j.Add(new(InventoryAccount, 0m, cost.Amount)); }
-        BalancedJournalPolicy.AssertBalanced(j);
-        return j;
+        var journal = new List<JournalLineDraft>();
+        if (paid.Amount > 0) journal.Add(new(CashAccount, paid.Amount, 0m));
+        if (total.Amount - paid.Amount > 0) journal.Add(new(ReceivableAccount, total.Amount - paid.Amount, 0m));
+        journal.Add(new(RevenueAccount, 0m, total.Amount));
+        var cogs = inventoryCost.Amount + provisionalCost.Amount;
+        if (cogs > 0) journal.Add(new(CogsAccount, cogs, 0m));
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, 0m, inventoryCost.Amount));
+        if (provisionalCost.Amount > 0) journal.Add(new(NegativeStockClearingAccount, 0m, provisionalCost.Amount));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
+    }
+
+    /// <summary>Reverses a sale after accounting for any provisional cost already settled by receipts.</summary>
+    public static IReadOnlyList<JournalLineDraft> SaleCancellationJournal(Money total, Money paid, Money inventoryCost, Money provisionalCost)
+    {
+        var journal = new List<JournalLineDraft>();
+        journal.Add(new(RevenueAccount, total.Amount, 0m));
+        if (paid.Amount > 0) journal.Add(new(CashAccount, 0m, paid.Amount));
+        if (total.Amount - paid.Amount > 0) journal.Add(new(ReceivableAccount, 0m, total.Amount - paid.Amount));
+        var cogs = inventoryCost.Amount + provisionalCost.Amount;
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, inventoryCost.Amount, 0m));
+        if (provisionalCost.Amount > 0) journal.Add(new(NegativeStockClearingAccount, provisionalCost.Amount, 0m));
+        if (cogs > 0) journal.Add(new(CogsAccount, 0m, cogs));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
+    }
+
+    public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(Money revenue, Money receivableCredit, Money cashRefund, Money cost)
+        => CustomerReturnJournal(revenue, receivableCredit, cashRefund, cost, Money.Zero);
+
+    public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(Money revenue, Money receivableCredit, Money cashRefund, Money inventoryCost, Money provisionalCost)
+    {
+        if (revenue.Amount <= 0 || receivableCredit.Amount + cashRefund.Amount != revenue.Amount)
+            throw new ArgumentException("Return amounts do not add up.");
+        var journal = new List<JournalLineDraft> { new(RevenueAccount, revenue.Amount, 0m) };
+        if (receivableCredit.Amount > 0) journal.Add(new(ReceivableAccount, 0m, receivableCredit.Amount));
+        if (cashRefund.Amount > 0) journal.Add(new(CashAccount, 0m, cashRefund.Amount));
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, inventoryCost.Amount, 0m));
+        if (provisionalCost.Amount > 0) journal.Add(new(NegativeStockClearingAccount, provisionalCost.Amount, 0m));
+        var totalCost = inventoryCost.Amount + provisionalCost.Amount;
+        if (totalCost > 0) journal.Add(new(CogsAccount, 0m, totalCost));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
     }
 
     public static bool TryValidateCustomer(string? name, string? phone, string? notes, out string? error)
