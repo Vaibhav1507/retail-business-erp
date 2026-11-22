@@ -4,6 +4,7 @@ import './invoice.css'
 import './billing-forms.css'
 import { InvoiceDocument } from './InvoiceDocument'
 import { ItemTagCapture, type CapturedInvoiceItem } from './ItemTagCapture'
+import { SalesInvoiceCapture, type ExtractedSalesInvoice } from './SalesInvoiceCapture'
 import { t as tr } from './i18n'
 import { whatsappStatusLabel } from './whatsappStatus'
 import { discardOfflineSale, listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
@@ -59,6 +60,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [pname, setPname] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [tagCaptureKey, setTagCaptureKey] = useState(0)
+  const [salesInvoiceDraft, setSalesInvoiceDraft] = useState<ExtractedSalesInvoice | null>(null)
+  const [salesInvoiceWarnings, setSalesInvoiceWarnings] = useState<string[]>([])
   const [brandText, setBrandText] = useState('')
   const [modelText, setModelText] = useState('')
   const [categoryText, setCategoryText] = useState('')
@@ -208,11 +211,60 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems(current => current.filter((_, i) => i !== index))
   }
 
+  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[]) {
+    setSalesInvoiceDraft(draft)
+    setSalesInvoiceWarnings(warnings)
+    if (draft.customerName) setName(draft.customerName)
+    if (draft.customerPhone) setPhone(draft.customerPhone)
+    if (draft.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(draft.date)) setDate(draft.date)
+  }
+
+  function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
+    setSalesInvoiceDraft(current => current ? ({
+      ...current,
+      lines: current.lines.map((line, lineIndex) => lineIndex !== index ? line : {
+        ...line,
+        [field]: ['quantity', 'unitPrice', 'discount'].includes(field)
+          ? (value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null)
+          : value
+      })
+    }) : current)
+  }
+
+  function addCapturedLines() {
+    if (!salesInvoiceDraft?.lines.length) { setError('No invoice lines were extracted. Add the products manually.'); return }
+    const invalid = salesInvoiceDraft.lines.findIndex(line =>
+      !(line.description?.trim() || line.model?.trim()) ||
+      !(line.quantity != null && line.quantity > 0) ||
+      !(line.unitPrice != null && line.unitPrice > 0) ||
+      (line.discount != null && line.discount < 0))
+    if (invalid >= 0) {
+      setError('Complete a description or model number, quantity and unit price for every extracted line before adding them to the bill.')
+      return
+    }
+    const next: Item[] = salesInvoiceDraft.lines.map(line => ({
+      productId: '',
+      name: line.description?.trim() || line.model!.trim(),
+      quantity: line.quantity!,
+      unitPrice: line.unitPrice!,
+      discount: line.discount ?? 0,
+      serials: [], imei1s: [], imei2s: [],
+      brand: line.brand?.trim() || undefined,
+      model: line.model?.trim() || undefined,
+      hsn: line.hsn?.trim() || undefined
+    }))
+    setItems(current => [...current, ...next])
+    setSalesInvoiceDraft(null)
+    setSalesInvoiceWarnings([])
+    setError('')
+  }
+
   function addItem() {
     const serials = serialText.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)
     const quantity = Number(qty), unitPrice = Number(price), discount = Number(disc || 0)
     const mrp = mrpText.trim() ? Number(mrpText) : null
-    if (!typed || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product, quantity and price.'); return }
+    const manualLabel = pname.trim() || modelText.trim() || brandText.trim() || barcodeText.trim()
+    if (!manualLabel || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product description or model number, quantity and price.'); return }
     if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) { setError('Enter a valid MRP.'); return }
     const productId = selectedProductId || match?.id || ''
     const existing = productId ? items.find(item => item.productId === productId) : undefined
@@ -225,7 +277,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       return
     }
     const newItem: Item = {
-      productId, name: match?.name ?? pname.trim(), quantity, unitPrice, discount, serials,
+      productId, name: match?.name ?? manualLabel, quantity, unitPrice, discount, serials,
       imei1s: imei1Text.trim() ? [imei1Text.trim()] : [],
       imei2s: imei2Text.trim() ? [imei2Text.trim()] : [],
       barcode: barcodeText.trim() || undefined,
@@ -347,6 +399,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
     setTagCaptureKey(value => value + 1)
+    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([])
     setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
@@ -482,8 +535,31 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <div className="billing-row invoice-product-actions">
           <button type="button" onClick={addItem}>{tr('bill.add')}</button>
           <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
+          <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
           {pname.trim() && !match && <span className="billing-hint">This product will be added to your catalogue when you confirm the invoice.</span>}
         </div>
+        {salesInvoiceDraft && <div className="billing-card" role="region" aria-label="Review extracted sales invoice">
+          <h4>Review extracted invoice before adding it to the bill</h4>
+          {salesInvoiceDraft.invoiceNumber && <p>Source invoice reference: <strong>{salesInvoiceDraft.invoiceNumber}</strong> (not the RBOS invoice number)</p>}
+          {salesInvoiceDraft.total != null && <p>Handwritten total detected: {money(salesInvoiceDraft.total)} INR — verify it against the line values.</p>}
+          {salesInvoiceWarnings.length > 0 && <ul className="billing-hint">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
+          {salesInvoiceDraft.lines.length === 0 && <p>No usable lines were detected. You can still enter the bill manually.</p>}
+          {salesInvoiceDraft.lines.length > 0 && <div className="billing-table-wrap"><table className="billing-table">
+            <thead><tr><th>Description / model</th><th>Brand</th><th>Model</th><th>Qty</th><th>Unit price</th><th>Discount</th></tr></thead>
+            <tbody>{salesInvoiceDraft.lines.map((line, index) => <tr key={index}>
+              <td><input aria-label={`Extracted line ${index + 1} description`} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} brand`} value={line.brand ?? ''} onChange={e => updateCapturedLine(index, 'brand', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} model`} value={line.model ?? ''} onChange={e => updateCapturedLine(index, 'model', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} quantity`} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} unit price`} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} discount`} inputMode="decimal" value={line.discount ?? ''} onChange={e => updateCapturedLine(index, 'discount', e.target.value)} /></td>
+            </tr>)}</tbody>
+          </table></div>}
+          <div className="billing-row">
+            <button type="button" onClick={addCapturedLines} disabled={salesInvoiceDraft.lines.length === 0}>Add reviewed lines to bill</button>
+            <button type="button" className="secondary" onClick={() => { setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]) }}>Discard extraction</button>
+          </div>
+        </div>}
         {items.length > 0 && <table className="billing-table">
           <thead><tr><th>{tr('bill.item')}</th><th>{tr('bill.qty')}</th><th>{tr('bill.price')}</th><th>{tr('bill.disc')}</th><th>{tr('bill.amount')}</th><th /></tr></thead>
           <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.brand && <small> Brand: {i.brand}</small>}{i.model && <small> Model: {i.model}</small>}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
