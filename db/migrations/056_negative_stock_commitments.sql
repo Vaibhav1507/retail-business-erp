@@ -71,3 +71,7 @@ create policy tenant_isolation on inventory.negative_stock_commitment
   with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id));
 
 grant select, insert, update on inventory.negative_stock_commitment to rbos_app;
+
+-- Cost projections are updated only by the atomic receipt settlement and return workflows.
+grant update (cost_total, inventory_cost_total, provisional_cost_total) on sales.sale to rbos_app;
+grant update (inventory_cost_amount, provisional_cost_amount, unit_cost) on sales.sale_line to rbos_app;
