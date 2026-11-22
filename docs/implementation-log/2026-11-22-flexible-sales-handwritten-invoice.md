@@ -30,8 +30,8 @@ See [flexible sales and handwritten invoice capture plan](../implementation-plan
 - Added `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs` and `src/Rbos.Api/SalesInvoiceCaptureEndpoints.cs`.
 - Registered the service in `src/Rbos.Api/Program.cs` and mapped the authenticated route from `src/Rbos.Api/Endpoints.cs`.
 - Added `tests/Rbos.IntegrationTests/SalesInvoiceCaptureTests.cs` covering provider-disabled draft-only response/no sale side effects, invalid MIME/signature and authentication.
-- Extraction follows the existing direct Gemini → optional Groq → Gemini fallback chain via `VisionProviderFallback`; Groq remains gated by existing `Groq:InvoiceFallbackEnabled`. Optional local OCR is bounded to 900 ms. The feature does not call `AiGateway`, does not write provider usage ledger records, and does not persist the uploaded image.
-- The endpoint is currently backend-only. Generate Invoice UI integration, flexible sale-line support, negative-stock costing and receipt reconciliation remain pending. This is not end-to-end functionality.
+- Extraction follows the existing direct Gemini → optional Groq → Gemini fallback chain via `VisionProviderFallback`; Groq remains gated by existing `Groq:ItemTagFallbackEnabled`. Optional local OCR is bounded to 900 ms. The feature does not call `AiGateway`, does not write provider usage ledger records, and does not persist the uploaded image.
+- The backend extraction endpoint is wired into Generate Invoice with a separate editable extraction review table. True non-catalogue sale-line support, negative-stock costing and receipt reconciliation remain pending. This is not end-to-end functionality.
 - Commits: service `9f55153c061f04c1070406c8e9649e8b6a135f96`; endpoint `4bff322e76967539f3aada242e610ef0efe195f0`; DI/route wiring `d9f130018dbc977559698d9b1e6a88b8197e71a7`; parser hardening `11d3b4e28084ec400c0f7553f01b9978439d2258`; tests `c44a9106c91515c3608fc70ba397f0b43b383d08`.
 
 ## Tests
