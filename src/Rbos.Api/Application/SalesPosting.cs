@@ -10,7 +10,7 @@ namespace Rbos.Api.Application;
 
 public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string? WhatsappConsentStatus = null);
 public sealed record SalePaymentInput(string Method, decimal Amount);
-public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null);
+public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null);
 
 /// <summary>Customers and sales (stock deduction at WAC, balanced journal, customer receivable). All amounts are recomputed server-side.</summary>
 public sealed class SalesService(TenantDb db)
@@ -397,8 +397,9 @@ public sealed class SalesService(TenantDb db)
             for (var i = 0; i < journal.Count; i++)
                 await Exec(s, ct, "insert into accounting.journal_line(tenant_id,id,entry_id,account_id,debit,credit) values (@t,@i,@e,@a,@d,@c)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("e", entry), ("a", accounts[i]), ("d", journal[i].Debit), ("c", journal[i].Credit));
-            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,inventory_cost_total,provisional_cost_total,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate,invoice_no,place_of_supply,is_inter_state) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@ict,@pct,@k,@h,@j,@u,@g,@iv,@pos,(@pos::text is not null and exists (select 1 from core.business_profile b where b.state is not null and lower(btrim(b.state)) <> lower(btrim(@pos::text)))))",
-                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("ict", inventoryCostTotal.Amount), ("pct", provisionalCostTotal.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value), ("iv", await NextInvoiceNoAsync(s, tenantId, m.SaleDate, ct)), ("pos", string.IsNullOrWhiteSpace(m.PlaceOfSupply) ? DBNull.Value : m.PlaceOfSupply.Trim()));
+            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,inventory_cost_total,provisional_cost_total,source_invoice_ref,source_invoice_date,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate,invoice_no,place_of_supply,is_inter_state) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@ict,@pct,@sir,@sid,@k,@h,@j,@u,@g,@iv,@pos,(@pos::text is not null and exists (select 1 from core.business_profile b where b.state is not null and lower(btrim(b.state)) <> lower(btrim(@pos::text)))))",
+                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("ict", inventoryCostTotal.Amount), ("pct", provisionalCostTotal.Amount),
+                ("sir", (object?)Blank(m.SourceInvoiceRef) ?? DBNull.Value), ("sid", (object?)m.SourceInvoiceDate ?? DBNull.Value), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value), ("iv", await NextInvoiceNoAsync(s, tenantId, m.SaleDate, ct)), ("pos", string.IsNullOrWhiteSpace(m.PlaceOfSupply) ? DBNull.Value : m.PlaceOfSupply.Trim()));
 
             foreach (var (payMethodName, payAmount) in split)
                 await Exec(s, ct, "insert into sales.sale_payment(tenant_id,sale_id,method,amount) values (@t,@s,@m,@a)", ("t", tenantId), ("s", id), ("m", payMethodName), ("a", payAmount));
@@ -446,7 +447,8 @@ public sealed class SalesService(TenantDb db)
                 select @t, x.id, x.invoice_no,
                   jsonb_build_object(
                     'sale', jsonb_build_object(
-                      'id', x.id, 'invoiceNo', x.invoice_no, 'date', x.sale_date,
+                      'id', x.id, 'invoiceNo', x.invoice_no, 'sourceInvoiceRef', x.source_invoice_ref,
+                      'sourceInvoiceDate', x.source_invoice_date, 'date', x.sale_date,
                       'saleType', x.sale_type, 'total', x.total, 'amountPaid', x.amount_paid,
                       'payMethod', x.pay_method, 'gstRate', x.gst_rate
                     ),
