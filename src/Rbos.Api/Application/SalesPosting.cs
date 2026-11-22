@@ -315,44 +315,76 @@ public sealed class SalesService(TenantDb db)
                         "This barcode is already associated with a different product in this business or shared catalogue.", 409);
             }
 
-            var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next)>();
+            var costed = new List<(SaleLine Line, decimal UnitCost, decimal Cost, CostState Next,
+                decimal InventoryCost, decimal ProvisionalCost, decimal ProvisionalQuantity, decimal ProvisionalUnitCost)>();
             foreach (var line in lines.Where(x => x.ProductId is null))
-                costed.Add((line, 0m, 0m, CostState.Empty));
+                costed.Add((line, 0m, 0m, CostState.Empty, 0m, 0m, 0m, 0m));
 
             foreach (var productLines in lines.Where(x => x.ProductId.HasValue)
                 .GroupBy(x => x.ProductId!.Value).OrderBy(x => x.Key))
             {
                 var productId = productLines.Key;
                 var totalQuantity = productLines.Sum(x => x.Quantity.Value);
-                var onHand = await Scalar<decimal?>(s,
+                await Exec(s, ct,
+                    "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,0) on conflict (tenant_id,product_id,location_id) do nothing",
+                    ("t", tenantId), ("p", productId), ("l", m.LocationId));
+                _ = await Scalar<decimal?>(s,
                     "select quantity from inventory.stock_balance where product_id=@p and location_id=@l for update",
-                    ct, ("p", productId), ("l", m.LocationId)) ?? 0m;
-                if (onHand < totalQuantity)
+                    ct, ("p", productId), ("l", m.LocationId));
+
+                var currentCost = await ReadCostAsync(s, productId, ct);
+                if (currentCost.TotalQuantity < 0 || currentCost.InventoryValue < 0)
+                    return ServiceResult<object>.Fail("Inventory valuation is inconsistent. Reconcile stock before billing this product.", 409);
+
+                var inventoryQuantity = Math.Min(currentCost.TotalQuantity, totalQuantity);
+                var provisionalQuantity = totalQuantity - inventoryQuantity;
+                var inventoryCost = inventoryQuantity <= 0 ? 0m
+                    : inventoryQuantity >= currentCost.TotalQuantity ? currentCost.InventoryValue
+                    : Math.Min(currentCost.InventoryValue, Money.Of(inventoryQuantity * currentCost.Wac).Amount);
+                var provisionalUnitCost = currentCost.Wac;
+                if (provisionalQuantity > 0 && provisionalUnitCost <= 0)
+                {
+                    provisionalUnitCost = await Scalar<decimal?>(s,
+                        "select unit_cost from inventory.stock_movement where product_id=@p and quantity_delta>0 and value_delta>0 and unit_cost>0 order by effective_date desc, occurred_at desc, id desc limit 1",
+                        ct, ("p", productId)) ?? 0m;
+                }
+                if (provisionalQuantity > 0 && provisionalUnitCost <= 0)
                 {
                     var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", productId));
-                    return ServiceResult<object>.Fail($"Not enough stock for {name}: {onHand:0.###} available.");
+                    return ServiceResult<object>.Fail($"Cannot bill {name} without stock: no positive historical cost exists. Enter an opening cost or receive stock first.", 409);
                 }
-                var currentCost = await ReadCostAsync(s, productId, ct);
-                var remainingQuantity = currentCost.TotalQuantity - totalQuantity;
-                var groupCost = remainingQuantity <= 0
-                    ? currentCost.InventoryValue
-                    : Math.Min(currentCost.InventoryValue, Money.Of(totalQuantity * currentCost.Wac).Amount);
-                var next = new CostState(remainingQuantity, currentCost.InventoryValue - groupCost, currentCost.Wac);
+
+                var provisionalCost = provisionalQuantity > 0
+                    ? Money.Of(provisionalQuantity * provisionalUnitCost).Amount : 0m;
+                var remainingQuantity = currentCost.TotalQuantity - inventoryQuantity;
+                var next = new CostState(remainingQuantity, currentCost.InventoryValue - inventoryCost, currentCost.Wac);
                 var productRows = productLines.ToList();
-                var allocated = 0m;
+                var remainingInventoryQty = inventoryQuantity;
+                var remainingInventoryCost = inventoryCost;
                 for (var index = 0; index < productRows.Count; index++)
                 {
                     var line = productRows[index];
-                    var lineCost = index == productRows.Count - 1
-                        ? groupCost - allocated
-                        : Money.Of(groupCost * line.Quantity.Value / totalQuantity).Amount;
-                    allocated += lineCost;
-                    costed.Add((line, currentCost.Wac, lineCost, next));
+                    var lineInventoryQty = Math.Min(line.Quantity.Value, remainingInventoryQty);
+                    var lineProvisionalQty = line.Quantity.Value - lineInventoryQty;
+                    var lineInventoryCost = lineInventoryQty <= 0 ? 0m
+                        : lineInventoryQty >= remainingInventoryQty ? remainingInventoryCost
+                        : Math.Min(remainingInventoryCost, Money.Of(lineInventoryQty * currentCost.Wac).Amount);
+                    var lineProvisionalCost = lineProvisionalQty > 0
+                        ? Money.Of(lineProvisionalQty * provisionalUnitCost).Amount : 0m;
+                    remainingInventoryQty -= lineInventoryQty;
+                    remainingInventoryCost -= lineInventoryCost;
+                    var lineCost = lineInventoryCost + lineProvisionalCost;
+                    var unitCost = line.Quantity.Value > 0
+                        ? WeightedAverageCostCalculator.RoundWac(lineCost / line.Quantity.Value) : 0m;
+                    costed.Add((line, unitCost, lineCost, next, lineInventoryCost, lineProvisionalCost,
+                        lineProvisionalQty, lineProvisionalQty > 0 ? provisionalUnitCost : 0m));
                 }
             }
 
-            var costTotal = Money.Of(costed.Sum(x => x.Cost));
-            var journal = SalesRules.SaleJournal(total, paid, costTotal);
+            var inventoryCostTotal = Money.Of(costed.Sum(x => x.InventoryCost));
+            var provisionalCostTotal = Money.Of(costed.Sum(x => x.ProvisionalCost));
+            var costTotal = Money.Of(inventoryCostTotal.Amount + provisionalCostTotal.Amount);
+            var journal = SalesRules.SaleJournal(total, paid, inventoryCostTotal, provisionalCostTotal);
             var accounts = new List<Guid>();
             foreach (var j in journal) accounts.Add(await AccountAsync(s, tenantId, j.AccountCode, ct));
 
@@ -363,8 +395,8 @@ public sealed class SalesService(TenantDb db)
             for (var i = 0; i < journal.Count; i++)
                 await Exec(s, ct, "insert into accounting.journal_line(tenant_id,id,entry_id,account_id,debit,credit) values (@t,@i,@e,@a,@d,@c)",
                     ("t", tenantId), ("i", Guid.NewGuid()), ("e", entry), ("a", accounts[i]), ("d", journal[i].Debit), ("c", journal[i].Credit));
-            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate,invoice_no,place_of_supply,is_inter_state) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@k,@h,@j,@u,@g,@iv,@pos,(@pos::text is not null and exists (select 1 from core.business_profile b where b.state is not null and lower(btrim(b.state)) <> lower(btrim(@pos::text)))))",
-                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value), ("iv", await NextInvoiceNoAsync(s, tenantId, m.SaleDate, ct)), ("pos", string.IsNullOrWhiteSpace(m.PlaceOfSupply) ? DBNull.Value : m.PlaceOfSupply.Trim()));
+            await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,inventory_cost_total,provisional_cost_total,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate,invoice_no,place_of_supply,is_inter_state) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@ict,@pct,@k,@h,@j,@u,@g,@iv,@pos,(@pos::text is not null and exists (select 1 from core.business_profile b where b.state is not null and lower(btrim(b.state)) <> lower(btrim(@pos::text)))))",
+                ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("ict", inventoryCostTotal.Amount), ("pct", provisionalCostTotal.Amount), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value), ("iv", await NextInvoiceNoAsync(s, tenantId, m.SaleDate, ct)), ("pos", string.IsNullOrWhiteSpace(m.PlaceOfSupply) ? DBNull.Value : m.PlaceOfSupply.Trim()));
 
             foreach (var (payMethodName, payAmount) in split)
                 await Exec(s, ct, "insert into sales.sale_payment(tenant_id,sale_id,method,amount) values (@t,@s,@m,@a)", ("t", tenantId), ("s", id), ("m", payMethodName), ("a", payAmount));
