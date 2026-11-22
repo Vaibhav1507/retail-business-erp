@@ -40,3 +40,10 @@ See [flexible sales and handwritten invoice capture plan](../implementation-plan
 
 ## Next action
 Wire this extraction draft into the Generate Invoice editor only after the sale-line contract supports ad-hoc lines. Then implement and test the line-identity/schema/posting refactor across returns, cancellation, reports, print, serial/IMEI, offline sales and stock projections. Negative-stock financial posting remains blocked on explicit owner/CA policy.
+
+
+## CI correction — 2026-11-22
+
+- CI run #805 exposed a compile error in the new endpoint: the endpoint file was missing the `Rbos.Api.Persistence` namespace import for `TenantDb`. Added the missing using in commit `e023771c18d2c864fa17ae5e893c62fe60febd6f`.
+- The same run also reported an unread constructor parameter in an earlier service commit; that parameter was removed in commit `0b50a80447b08bdb980b82b55c0750ef70f38f86`.
+- Runs #808–#810 were triggered on commits before the endpoint namespace correction, so they cannot validate the corrected head. A new exact-head CI result is required before proceeding to the next feature slice.
