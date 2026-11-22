@@ -34,6 +34,14 @@ public static class SalesRules
         var list = new List<SaleLine>();
         foreach (var l in input)
         {
+            if (l.ProductId is null && string.IsNullOrWhiteSpace(l.Description) && string.IsNullOrWhiteSpace(l.Model))
+                return Fail("An unlisted sale line needs a description or model number.", out error);
+            if ((l.Description?.Trim().Length ?? 0) > 240 || (l.Brand?.Trim().Length ?? 0) > 80 ||
+                (l.Model?.Trim().Length ?? 0) > 100 || (l.HsnCode?.Trim().Length ?? 0) > 12)
+                return Fail("Sale line description, brand, model or HSN is too long.", out error);
+            if (l.ProductId is null && ((l.Serials?.Count ?? 0) > 0 || (l.Imei1s?.Count ?? 0) > 0 ||
+                (l.Imei2s?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(l.Barcode)))
+                return Fail("Serial, IMEI and barcode tracking requires a catalogue product. Add the product to the catalogue first.", out error);
             if (!Quantity.TryCreate(l.Quantity, out var q, out var qe)) return Fail(qe!, out error);
             if (l.UnitPrice <= 0 || decimal.Round(l.UnitPrice, 2) != l.UnitPrice) return Fail("Unit price must be positive with at most 2 decimal places.", out error);
             var discount = l.Discount ?? 0m;
@@ -55,6 +63,7 @@ public static class SalesRules
                 imei1s.Intersect(imei2s, StringComparer.Ordinal).Any())
                 return Fail("The same IMEI cannot appear twice on a sale line.", out error);
             list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount,
+                l.Description?.Trim(), l.Brand?.Trim(), l.Model?.Trim(), l.HsnCode?.Trim(),
                 serials.Length == 0 ? null : serials,
                 l.Barcode, l.BarcodeSymbology, imei1s.Length == 0 ? null : imei1s, imei2s.Length == 0 ? null : imei2s));
         }
