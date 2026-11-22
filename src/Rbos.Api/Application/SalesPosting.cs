@@ -333,7 +333,9 @@ public sealed class SalesService(TenantDb db)
                     ct, ("p", productId), ("l", m.LocationId));
 
                 var currentCost = await ReadCostAsync(s, productId, ct);
-                if (currentCost.TotalQuantity < 0 || currentCost.InventoryValue < 0)
+                if (currentCost.TotalQuantity < 0 || currentCost.InventoryValue < 0 ||
+                    (currentCost.TotalQuantity > 0 && (currentCost.Wac <= 0 || currentCost.InventoryValue <= 0)) ||
+                    (currentCost.TotalQuantity == 0 && currentCost.InventoryValue > 0))
                     return ServiceResult<object>.Fail("Inventory valuation is inconsistent. Reconcile stock before billing this product.", 409);
 
                 var inventoryQuantity = Math.Min(currentCost.TotalQuantity, totalQuantity);
