@@ -214,11 +214,12 @@ public sealed class AfterSalesService(TenantDb db)
                 else return ServiceResult<object>.Fail("Choose the sale line to return.");
 
                 Guid? productId = null;
-                decimal sold = 0, lineTotal = 0, unitCost = 0, retQty = 0, retAmt = 0;
+                decimal sold = 0, lineTotal = 0, inventoryCostAmount = 0, unitCost = 0, retQty = 0, retAmt = 0, retCostAmount = 0;
                 var has = false;
-                await using (var q = s.Command(@"select l.product_id, l.quantity, l.line_total, l.unit_cost,
+                await using (var q = s.Command(@"select l.product_id, l.quantity, l.line_total, l.inventory_cost_amount, l.unit_cost,
                       coalesce((select sum(quantity) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0),
-                      coalesce((select sum(amount) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0)
+                      coalesce((select sum(amount) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0),
+                      coalesce((select sum(cost_amount) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0)
                     from sales.sale_line l where l.sale_id=@s and l.line_id=@li"))
                 {
                     q.Parameters.AddWithValue("s", m.SaleId);
@@ -230,9 +231,11 @@ public sealed class AfterSalesService(TenantDb db)
                         productId = r.IsDBNull(0) ? null : r.GetGuid(0);
                         sold = r.GetDecimal(1);
                         lineTotal = r.GetDecimal(2);
-                        unitCost = r.GetDecimal(3);
-                        retQty = r.GetDecimal(4);
-                        retAmt = r.GetDecimal(5);
+                        inventoryCostAmount = r.GetDecimal(3);
+                        unitCost = r.GetDecimal(4);
+                        retQty = r.GetDecimal(5);
+                        retAmt = r.GetDecimal(6);
+                        retCostAmount = r.GetDecimal(7);
                     }
                 }
                 if (!has) return ServiceResult<object>.Fail("A returned line was not on this sale.");
@@ -242,8 +245,9 @@ public sealed class AfterSalesService(TenantDb db)
                     return ServiceResult<object>.Fail($"Cannot return {line.Quantity.Value:0.###}: only {sold - retQty:0.###} left to return for this line.");
                 var amount = AfterSalesRules.ReturnedValue(lineTotal, sold, retQty, retAmt, line.Quantity.Value);
                 Guid? inventoryProductId = productId is Guid pId ? await CanonicalProductIdAsync(s, tenantId, pId, ct) : null;
-                costed.Add((saleLineId, productId, inventoryProductId, line.Quantity.Value, amount, unitCost,
-                    productId is null ? Money.Zero : Money.Of(line.Quantity.Value * unitCost)));
+                var returnedCost = productId is null ? Money.Zero
+                    : AfterSalesRules.ReturnedValue(inventoryCostAmount, sold, retQty, retCostAmount, line.Quantity.Value);
+                costed.Add((saleLineId, productId, inventoryProductId, line.Quantity.Value, amount, unitCost, returnedCost));
             }
 
             var total = Money.Of(costed.Sum(x => x.Amount.Amount));
@@ -270,9 +274,9 @@ public sealed class AfterSalesService(TenantDb db)
 
             foreach (var x in costed)
             {
-                await Exec(s, ct, "insert into sales.sale_return_line(tenant_id,return_id,sale_id,sale_line_id,product_id,quantity,amount,unit_cost) values (@t,@r,@s,@li,@p,@q,@a,@c)",
+                await Exec(s, ct, "insert into sales.sale_return_line(tenant_id,return_id,sale_id,sale_line_id,product_id,quantity,amount,unit_cost,cost_amount) values (@t,@r,@s,@li,@p,@q,@a,@c,@ca)",
                     ("t", tenantId), ("r", id), ("s", m.SaleId), ("li", x.SaleLineId),
-                    ("p", (object?)x.ProductId ?? DBNull.Value), ("q", x.Qty), ("a", x.Amount.Amount), ("c", x.UnitCost));
+                    ("p", (object?)x.ProductId ?? DBNull.Value), ("q", x.Qty), ("a", x.Amount.Amount), ("c", x.UnitCost), ("ca", x.Cost.Amount));
                 if (x.Cost.Amount > 0 && x.InventoryProductId is Guid returnProductId)
                 {
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleReturn',@d)",
