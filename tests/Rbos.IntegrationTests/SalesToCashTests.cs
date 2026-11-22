@@ -418,4 +418,48 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
 
+    [Fact] public async Task New_product_without_any_historical_cost_fails_closed_when_stock_is_zero()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var product = await c.AddProduct("Never stocked product");
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new { productId = product, quantity = 1m, unitPrice = 100m, discount = 0m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Empty((await c.GetJson("/sales")).EnumerateArray());
+    }
+
+    [Fact] public async Task Cancelling_sale_with_open_negative_stock_restores_only_valued_inventory_and_closes_commitment()
+    {
+        var (c, loc, p) = await Stocked(f, qty: 5, cost: 20m);
+        var response = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "Cash"), K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal(-1m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+
+        var cancelled = await c.Send(HttpMethod.Post, "/sales/" + saleId + "/cancel",
+            new { reason = "Mistaken invoice" }, K());
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        var restored = await Stock(c);
+        Assert.Equal(5m, restored.GetProperty("quantity").GetDecimal());
+        Assert.Equal(100m, restored.GetProperty("value").GetDecimal());
+
+        var supplierResponse = await c.Send(HttpMethod.Post, "/suppliers", new { name = "After cancellation supplier" });
+        var supplierId = (await supplierResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var receipt = await c.Send(HttpMethod.Post, "/purchases", new
+        {
+            supplierId, locationId = loc, receiptDate = Today,
+            lines = new[] { new { productId = p, quantity = 1m, unitCost = 30m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, receipt.StatusCode);
+        var afterReceipt = await Stock(c);
+        Assert.Equal(6m, afterReceipt.GetProperty("quantity").GetDecimal());
+        Assert.Equal(130m, afterReceipt.GetProperty("value").GetDecimal());
+    }
+
+
 }
