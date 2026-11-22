@@ -34,9 +34,7 @@ public static class SalesRules
         if (date > today) return Fail("Sale date cannot be in the future.", out error);
         if (date < today.AddYears(-5)) return Fail("Sale date is too far in the past.", out error);
         if (input is null || input.Count == 0) return Fail("At least one sale line is required.", out error);
-        if (input.Count > MaxLines) return Fail($"A sale can have at most {MaxLines} lines.", out error);
-        if (input.Select(l => l.ProductId).Distinct().Count() != input.Count) return Fail("Each product can appear only once per sale.", out error);
-
+        if (input.Count > MaxLines) return Fail($"A sale can have at most {MaxLines} lines.", out error);
         var list = new List<SaleLine>();
         foreach (var l in input)
         {
