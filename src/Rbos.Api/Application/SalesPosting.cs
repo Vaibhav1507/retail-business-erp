@@ -135,7 +135,7 @@ public sealed class SalesService(TenantDb db)
         await using (var c = s.Command(@"select coalesce(l.description,p.name), p.internal_sku, l.quantity, l.unit_price, l.discount, l.line_total, l.serials,
             l.imei1s, l.imei2s, l.barcode, l.barcode_symbology, coalesce(l.model,p.model), coalesce(l.brand,p.brand), coalesce(l.hsn_code,p.hsn_code)
             from sales.sale_line l left join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id
-            where l.sale_id=@i order by p.name"))
+            where l.sale_id=@i order by l.line_number"))
         {
             c.Parameters.AddWithValue("i", id);
             await using var r = await c.ExecuteReaderAsync(ct);
@@ -457,7 +457,7 @@ public sealed class SalesService(TenantDb db)
                         'imei1s', to_jsonb(sl.imei1s), 'imei2s', to_jsonb(sl.imei2s),
                         'barcode', sl.barcode, 'barcodeSymbology', sl.barcode_symbology,
                         'model', coalesce(sl.model,p.model), 'brand', coalesce(sl.brand,p.brand), 'hsnCode', coalesce(sl.hsn_code,p.hsn_code)
-                      ) order by p.name)
+                       ) order by sl.line_number)
                       from sales.sale_line sl
                       left join catalog.product p on p.tenant_id=sl.tenant_id and p.id=sl.product_id
                       where sl.tenant_id=x.tenant_id and sl.sale_id=x.id
