@@ -9,7 +9,7 @@ using Rbos.Domain;
 namespace Rbos.Api.Application;
 
 public sealed record CollectionCommand(Guid CustomerId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference, IReadOnlyList<BillAllocation>? Allocations = null);
-public sealed record SaleReturnLineInput(Guid? ProductId, Guid? SaleLineId, decimal Quantity);\npublic sealed record SaleReturnCommand(Guid SaleId, DateOnly ReturnDate, string? Reason, List<SaleReturnLineInput>? Lines, string? RefundMethod = null);
+public sealed record SaleReturnCommand(Guid SaleId, DateOnly ReturnDate, string? Reason, List<SaleReturnLineInput>? Lines, string? RefundMethod = null);
 public sealed record PurchaseReturnCommand(Guid ReceiptId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines);
 
 /// <summary>Slice 5: customer collections, customer returns, supplier returns and print data. All amounts are recomputed server-side.</summary>
