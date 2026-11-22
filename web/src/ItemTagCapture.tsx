@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { apiBinary } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
@@ -51,7 +51,6 @@ export function ItemTagCapture({
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
-  const uploadKey = useRef(0)
 
   async function readFile(file: File) {
     setError('')
@@ -98,7 +97,6 @@ export function ItemTagCapture({
         // Vision extraction remains available for difficult or damaged barcodes.
       }
 
-      uploadKey.current += 1
       const scan = await apiBinary<ScanResponse>(
         '/sales/item-tag-scan', file, undefined, crypto.randomUUID(),
         decodedBarcode ? {
