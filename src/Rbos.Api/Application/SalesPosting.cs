@@ -356,8 +356,6 @@ public sealed class SalesService(TenantDb db)
                     return ServiceResult<object>.Fail($"Cannot bill {name} without stock: no positive historical cost exists. Enter an opening cost or receive stock first.", 409);
                 }
 
-                var provisionalCost = provisionalQuantity > 0
-                    ? Money.Of(provisionalQuantity * provisionalUnitCost).Amount : 0m;
                 var remainingQuantity = currentCost.TotalQuantity - inventoryQuantity;
                 var next = new CostState(remainingQuantity, currentCost.InventoryValue - inventoryCost, currentCost.Wac);
                 var productRows = productLines.ToList();
