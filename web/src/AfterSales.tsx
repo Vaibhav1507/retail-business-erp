@@ -96,7 +96,8 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
     setCancelKey(newKey()); setRetSale(''); setRetLines([]); setRetReason('')
     return 'Sale cancelled. Stock restored and the books reversed.'
   })
-  const toLines = (q: Record<string, string>) => Object.entries(q).map(([productId, v]) => ({ productId, quantity: Number(v) })).filter(x => x.quantity > 0)\n  const toSaleLines = (q: Record<string, string>) => Object.entries(q).map(([saleLineId, v]) => ({ saleLineId, productId: retLines.find(line => line.saleLineId === saleLineId)?.productId ?? null, quantity: Number(v) })).filter(x => x.quantity > 0)
+  const toLines = (q: Record<string, string>) => Object.entries(q).map(([productId, v]) => ({ productId, quantity: Number(v) })).filter(x => x.quantity > 0)
+  const toSaleLines = (q: Record<string, string>) => Object.entries(q).map(([saleLineId, v]) => ({ saleLineId, productId: retLines.find(line => line.saleLineId === saleLineId)?.productId ?? null, quantity: Number(v) })).filter(x => x.quantity > 0)
   const returnSale = () => run(async () => {
     const r = await api<{ total: number; balanceCredit: number; cashRefund: number }>('POST', '/sale-returns', { saleId: retSale, returnDate: today(), reason: retReason || null, refundMethod: retMethod, lines: toSaleLines(retQty) }, retKey)
     setRetKey(newKey()); setRetQty({}); setRetReason(''); await pickSale(retSale)
