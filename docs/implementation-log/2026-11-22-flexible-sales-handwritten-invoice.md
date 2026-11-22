@@ -94,3 +94,5 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - Added an integration assertion that a model-only ad-hoc sale can persist and return the source invoice reference/date independently of the RBOS invoice number (commit 7abdc438). A fresh exact-head CI run is required for this additional test.
 
 - Corrected the Generate Invoice helper text for unmatched manual products: it now accurately says the line is billed ad-hoc and does not create a catalogue product (commit 0ce29e3).
+
+- The source-invoice metadata test initially failed to compile because the shared Today test helper is already an ISO date string. Corrected the assertion to compare against Today directly in commit d5a6d035a0d359fee656972a8d4ba0c66e1edaa7. Exact-head run #913 is validating the corrected test and current frontend.
