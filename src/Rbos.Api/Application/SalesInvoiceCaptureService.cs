@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using Rbos.Api.Persistence;
 
 namespace Rbos.Api.Application;
 
@@ -13,7 +12,6 @@ namespace Rbos.Api.Application;
 /// </summary>
 public sealed class SalesInvoiceCaptureService(
     HttpClient http,
-    TenantDb db,
     GroqVisionClient groq,
     LocalOcr localOcr,
     IConfiguration cfg,
@@ -52,9 +50,6 @@ public sealed class SalesInvoiceCaptureService(
             if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, mime))
                 return ServiceResult<object>.Fail("The photo is empty, larger than 8 MB, corrupt or not the type it claims to be.");
 
-            var uid = Guid.Empty;
-            // Authentication is enforced by the route; tenant membership is checked there
-            // through the active authenticated user before any provider request.
             string? ocrText = null;
             if (localOcr.Available)
             {
