@@ -110,3 +110,5 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - No production migration, deployment, provider configuration/secret change, or merge was performed.
 
 - Follow-up review caught the request security middleware still allowing only image MIME types on the raw sales-invoice endpoint. Updated it to permit `application/pdf` only on `/api/sales/invoice-image-extract`; the item-tag photo endpoint remains image-only. This was necessary for PDF to reach endpoint-level signature validation. Commit `00739a84`.
+
+- PostgreSQL integration run #923 caught a real endpoint contract omission: `SalesRequest` had not been extended with `SourceInvoiceRef`/`SourceInvoiceDate`, so the values were dropped before `SalesService.SellAsync` despite the service and DB columns being ready. Added both request fields and passed them into `SaleCommand`; expanded the integration test to verify both sale detail and search. Commit `70c48717`; test `b955f92d`. Re-run latest-head CI before accepting this feature.
