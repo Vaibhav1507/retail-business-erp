@@ -217,14 +217,13 @@ public sealed class AfterSalesService(TenantDb db)
 
                 Guid? productId = null;
                 decimal sold = 0, lineTotal = 0, inventoryCostAmount = 0, unitCost = 0, originalProvisionalQty = 0;
-                decimal retQty = 0, retAmt = 0, retInventoryQty = 0, retProvisionalQty = 0, retInventoryCost = 0;
+                decimal retQty = 0, retAmt = 0, retInventoryQty = 0, retInventoryCost = 0;
                 var has = false;
                 await using (var q = s.Command(@"select l.product_id, l.quantity, l.line_total, l.inventory_cost_amount, l.unit_cost,
                       l.provisional_quantity,
                       coalesce((select sum(quantity) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0),
                       coalesce((select sum(amount) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0),
                       coalesce((select sum(inventory_quantity) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0),
-                      coalesce((select sum(provisional_quantity) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0),
                       coalesce((select sum(inventory_cost_amount) from sales.sale_return_line x where x.sale_id=l.sale_id and x.sale_line_id=l.line_id),0)
                     from sales.sale_line l where l.sale_id=@s and l.line_id=@li"))
                 {
@@ -243,8 +242,7 @@ public sealed class AfterSalesService(TenantDb db)
                         retQty = r.GetDecimal(6);
                         retAmt = r.GetDecimal(7);
                         retInventoryQty = r.GetDecimal(8);
-                        retProvisionalQty = r.GetDecimal(9);
-                        retInventoryCost = r.GetDecimal(10);
+                        retInventoryCost = r.GetDecimal(9);
                     }
                 }
                 if (!has) return ServiceResult<object>.Fail("A returned line was not on this sale.");
@@ -254,7 +252,7 @@ public sealed class AfterSalesService(TenantDb db)
                     return ServiceResult<object>.Fail($"Cannot return {line.Quantity.Value:0.###}: only {sold - retQty:0.###} left to return for this line.");
 
                 decimal remainingProvisionalQty = 0, remainingProvisionalCost = 0, provisionalUnitCost = 0, settledQty = 0;
-                if (productId is Guid trackedProductId)
+                if (productId is not null)
                 {
                     await using var commitment = s.Command(@"select remaining_quantity, remaining_provisional_cost_amount,
                             provisional_unit_cost, settled_quantity
