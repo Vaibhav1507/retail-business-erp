@@ -30,3 +30,15 @@ Live schema (migration 003, updated by migration 008): `tenant_id`, `id`, `produ
 ## Ordering
 
 Current implementation replay order = (`effective_date`, `occurred_at`, `id`). The live schema has no `posted_seq`; `occurred_at` plus movement UUID provides a deterministic tie-break after effective date. This is an implementation fallback, not a claim that a per-tenant posting sequence exists.
+
+
+## Proposed negative-stock extension (ADR-025; not yet implemented)
+
+| # | Invariant | Enforcement | Test |
+|---|---|---|---|
+| I-15 | Physical location quantity may be negative only through a posted sale; valued inventory quantity/value never becomes negative | Sale-line provisional-cost ledger; product-wide valued-cost projection bounded at zero | Zero/partial stock sale keeps valued projection non-negative |
+| I-16 | Every negative quantity has a positive provisional unit cost and source sale-line reference | Posting validation + FK + unique allocation constraints | Missing/zero fallback cost rejected atomically |
+| I-17 | Later receipts clear outstanding negative-stock exposure in deterministic order and reconcile actual cost to provisional COGS | Receipt allocation + linked cost-adjustment document/journal | Negative sale → receipt → cost adjustment reconciles movement, subledger and GL |
+| I-18 | Ad-hoc sale lines preserve transaction description and tax/price snapshots without inventing catalogue identity | Nullable product FK plus required description and line identity | Ad-hoc and mixed invoice post, return and report correctly |
+
+These are proposed requirements, not claims about the live schema. I-7 remains the current production-code behaviour until the ADR-025 migration and implementation are complete. Owner approval of fallback-cost and allocation policy and CA approval of journal treatment are release gates.
