@@ -81,3 +81,11 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - Hardened ad-hoc model-only entry by normalizing whitespace-only description/brand/model/HSN values to null before persistence. Added an integration test for model-number-only billing with no catalogue creation (commit 7870e389b7eb4daa02a2d79f480f80ed1252cb2f).
 - Exact-head run #903 for 7870e38: frontend passed; backend and PostgreSQL integration were in progress at the time of this log update. Do not infer completion from older green runs.
 - PR #64 body was updated to reflect the actual implementation and validation state. It remains draft/open; no merge or production operation was performed.
+
+
+## CI completion — 2026-11-22
+
+- Exact feature-code commit 7870e389b7eb4daa02a2d79f480f80ed1252cb2f passed all three CI jobs in run #903: backend, frontend and PostgreSQL integration.
+- This run includes the indexed tuple compile fix, whitespace-only description normalization, and the model-number-only ad-hoc sale integration test.
+- Subsequent commits 26a116b2, f6f5867b and 7ce8d595 update only implementation documentation; no application code or migrations changed after the green feature-code commit.
+- Documentation-only follow-up runs #904–#906 were still running at the time of this note. PR #64 remains draft/open; production remains untouched.
