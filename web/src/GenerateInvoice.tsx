@@ -214,7 +214,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[]) {
     setSalesInvoiceDraft(draft)
     setSalesInvoiceWarnings(warnings)
-    if (draft.customerName) setName(draft.customerName)
+    if (draft.customerName) { setCustomerId(''); setName(draft.customerName) }
     if (draft.customerPhone) setPhone(draft.customerPhone)
     if (draft.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(draft.date)) setDate(draft.date)
   }
@@ -545,11 +545,12 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {salesInvoiceWarnings.length > 0 && <ul className="billing-hint">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
           {salesInvoiceDraft.lines.length === 0 && <p>No usable lines were detected. You can still enter the bill manually.</p>}
           {salesInvoiceDraft.lines.length > 0 && <div className="billing-table-wrap"><table className="billing-table">
-            <thead><tr><th>Description / model</th><th>Brand</th><th>Model</th><th>Qty</th><th>Unit price</th><th>Discount</th></tr></thead>
+            <thead><tr><th>Description / model</th><th>Brand</th><th>Model</th><th>HSN</th><th>Qty</th><th>Unit price</th><th>Discount</th></tr></thead>
             <tbody>{salesInvoiceDraft.lines.map((line, index) => <tr key={index}>
-              <td><input aria-label={`Extracted line ${index + 1} description`} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} description`} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} />{line.confidence != null && <small>Extraction confidence: {Math.round(line.confidence * 100)}%</small>}</td>
               <td><input aria-label={`Extracted line ${index + 1} brand`} value={line.brand ?? ''} onChange={e => updateCapturedLine(index, 'brand', e.target.value)} /></td>
               <td><input aria-label={`Extracted line ${index + 1} model`} value={line.model ?? ''} onChange={e => updateCapturedLine(index, 'model', e.target.value)} /></td>
+              <td><input aria-label={`Extracted line ${index + 1} HSN`} value={line.hsn ?? ''} onChange={e => updateCapturedLine(index, 'hsn', e.target.value)} /></td>
               <td><input aria-label={`Extracted line ${index + 1} quantity`} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></td>
               <td><input aria-label={`Extracted line ${index + 1} unit price`} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></td>
               <td><input aria-label={`Extracted line ${index + 1} discount`} inputMode="decimal" value={line.discount ?? ''} onChange={e => updateCapturedLine(index, 'discount', e.target.value)} /></td>
