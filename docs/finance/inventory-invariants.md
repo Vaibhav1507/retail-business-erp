@@ -1,6 +1,6 @@
 # Inventory invariants
 
-Status: **Proposed.**
+Status: **Implemented on PR #64 branch; not merged or deployed.**
 
 | # | Invariant | Enforcement | Test |
 |---|---|---|---|
@@ -10,13 +10,13 @@ Status: **Proposed.**
 | I-4 | A transfer does not change total tenant stock (1B) | Paired out/in movements in one TX | Σ tenant qty unchanged |
 | I-5 | A return links to its source where possible; returned qty ≤ returnable qty | Validation | Over-return rejected |
 | I-6 | Corrections never rewrite history | Append-only movements (app + trigger) | Update attempt fails |
-| I-7 | **Negative stock is blocked in Phase 1A** | Validation under row lock + CHECK on projection | Concurrent oversell → one succeeds, one rejected |
+| I-7 | Physical stock may go negative only through a posted sale; valued inventory quantity/value must remain non-negative | Location row lock; positive provisional unit cost; bounded product-wide `item_cost`; RLS commitment ledger | Zero/partial stock sale; concurrent receipt/sale; valued projection never negative |
 | I-8 | Unit conversions are explicit and validated | Conversion required for non-base units; factor > 0; stored on movement | Conversion tests |
 | I-9 | Tracking requirements enforced before posting | tracking_mode = none in 1A; future validation | Later |
 | I-10 | Stock valuation reconciles to Inventory control | Same calculation produces movement value and journal amount | Reconciliation test |
 | I-11 | Money uses decimal arithmetic | decimal / numeric only; no floating point | Static analysis + tests |
 | I-12 | Quantity uses configured precision | Per-unit precision; piece = 0 decimals | Validation tests |
-| I-13 | Unknown cost never becomes zero | Pilot posting requires an explicit positive owner-entered actual or estimated unit cost; no inferred/zero cost | Posting without cost rejected |
+| I-13 | Unknown cost never becomes zero | Current positive WAC, else latest positive incoming-movement unit cost; if neither exists, reject | New never-stocked product with no cost history rejected |
 | I-14 | Every movement records required context | NOT NULL constraints | Schema test |
 
 ## Movement record (required fields)
@@ -32,13 +32,13 @@ Live schema (migration 003, updated by migration 008): `tenant_id`, `id`, `produ
 Current implementation replay order = (`effective_date`, `occurred_at`, `id`). The live schema has no `posted_seq`; `occurred_at` plus movement UUID provides a deterministic tie-break after effective date. This is an implementation fallback, not a claim that a per-tenant posting sequence exists.
 
 
-## Proposed negative-stock extension (ADR-025; not yet implemented)
+## Negative-stock and flexible-sale invariants (ADR-025; implemented on PR #64 branch)
 
 | # | Invariant | Enforcement | Test |
 |---|---|---|---|
 | I-15 | Physical location quantity may be negative only through a posted sale; valued inventory quantity/value never becomes negative | Sale-line provisional-cost ledger; product-wide valued-cost projection bounded at zero | Zero/partial stock sale keeps valued projection non-negative |
 | I-16 | Every negative quantity has a positive provisional unit cost and source sale-line reference | Posting validation + FK + unique allocation constraints | Missing/zero fallback cost rejected atomically |
-| I-17 | Later receipts clear outstanding negative-stock exposure in deterministic order and reconcile actual cost to provisional COGS | Receipt allocation + linked cost-adjustment document/journal | Negative sale → receipt → cost adjustment reconciles movement, subledger and GL |
+| I-17 | Later receipts clear same-location deficits FIFO and reconcile actual cost to provisional COGS | `negative_stock_commitment` allocation ordered by creation time/ID; balanced clearing/inventory/COGS adjustment journal | Negative sale → receipt → cost adjustment; clearing balance equals open provisional exposure |
 | I-18 | Ad-hoc sale lines preserve transaction description and tax/price snapshots without inventing catalogue identity | Nullable product FK plus required description and line identity | Ad-hoc and mixed invoice post, return and report correctly |
 
-These are proposed requirements, not claims about the live schema. I-7 remains the current production-code behaviour until the ADR-025 migration and implementation are complete. Owner approval of fallback-cost and allocation policy and CA approval of journal treatment are release gates.
+These invariants are implemented on PR #64's feature branch through migrations 055–056 and the sales/receipt/return/cancellation services. They are not live in `main` and no production migration has been applied. Production release still requires owner and CA review of the selected fallback and journal treatment.
