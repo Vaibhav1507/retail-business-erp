@@ -400,7 +400,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(160m, stock.GetProperty("value").GetDecimal());
 
         var returnable = (await c.GetJson("/sales/" + saleId + "/returnable")).EnumerateArray().ToArray();
-        var adHocReturn = Assert.Single(returnable.Where(x => x.GetProperty("productId").ValueKind == JsonValueKind.Null));
+        var adHocReturn = Assert.Single(returnable, x => x.GetProperty("productId").ValueKind == JsonValueKind.Null);
         var returnResponse = await c.Send(HttpMethod.Post, "/sale-returns", new
         {
             saleId,
