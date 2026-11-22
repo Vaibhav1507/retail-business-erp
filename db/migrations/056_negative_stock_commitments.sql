@@ -31,15 +31,15 @@ alter table sales.sale_return_line
   add column untracked_quantity numeric(18,3) not null default 0 check (untracked_quantity >= 0);
 
 update sales.sale_return_line
+set inventory_quantity = quantity,
+    inventory_cost_amount = cost_amount;
+
+update sales.sale_return_line
 set untracked_quantity = greatest(0, quantity - inventory_quantity - provisional_quantity);
 
 alter table sales.sale_return_line
   add constraint sale_return_line_quantity_split_ck
   check (inventory_quantity + provisional_quantity + untracked_quantity = quantity);
-
-update sales.sale_return_line
-set inventory_quantity = quantity,
-    inventory_cost_amount = cost_amount;
 
 create table inventory.negative_stock_commitment (
   tenant_id uuid not null,
