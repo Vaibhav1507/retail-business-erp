@@ -89,3 +89,6 @@ Wire this extraction draft into the Generate Invoice editor only after the sale-
 - This run includes the indexed tuple compile fix, whitespace-only description normalization, and the model-number-only ad-hoc sale integration test.
 - Subsequent commits 26a116b2, f6f5867b and 7ce8d595 update only implementation documentation; no application code or migrations changed after the green feature-code commit.
 - Documentation-only follow-up runs #904–#906 were still running at the time of this note. PR #64 remains draft/open; production remains untouched.
+
+
+- Added an integration assertion that a model-only ad-hoc sale can persist and return the source invoice reference/date independently of the RBOS invoice number (commit 7abdc438). A fresh exact-head CI run is required for this additional test.
