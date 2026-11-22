@@ -221,3 +221,11 @@ For each approved item, record:
 - The historical phase summaries and many pre-existing improvement rows remain unverified item by item. Do not mass-change their statuses based only on feature presence.
 
 | 2026-11-14 | Reconciled H2 after PR #24 merge; recorded #22 closed without merge and #25/#26 duplicate UI fix status. |
+
+## Newly approved scope — flexible sales and handwritten invoice capture (2026-11-22)
+
+| ID | Improvement | Category | Priority | Cost | Evidence | Classification | Decision | Status | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| FS-01 | Allow billing when physical stock is zero/insufficient with explicit provisional costing and later receipt reconciliation | Finance / Inventory | Critical | L | Seen | Missing capability | Approved | In progress | ADR-025; do not merely remove stock validation. Owner fallback-cost/allocation policy and CA journal review required. |
+| FS-02 | Support ad-hoc sale lines without implicit catalogue creation; allow repeated product lines | Sales / Catalogue | High | L | Seen | Missing capability | Approved | In progress | Preserve description and transaction snapshots; refactor returns/cancellation/reports to line identity. |
+| FS-03 | Upload/capture handwritten sales invoices and extract editable draft data | AI / Sales UX | High | L | Seen | Missing capability | Approved | In progress | ADR-026; extraction only, human review required, shared sales posting engine. |
