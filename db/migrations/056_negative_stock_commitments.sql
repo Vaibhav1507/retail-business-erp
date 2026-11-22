@@ -27,7 +27,15 @@ alter table sales.sale_return_line
   add column inventory_quantity numeric(18,3) not null default 0 check (inventory_quantity >= 0),
   add column provisional_quantity numeric(18,3) not null default 0 check (provisional_quantity >= 0),
   add column inventory_cost_amount numeric(18,2) not null default 0 check (inventory_cost_amount >= 0),
-  add column provisional_cost_amount numeric(18,2) not null default 0 check (provisional_cost_amount >= 0);
+  add column provisional_cost_amount numeric(18,2) not null default 0 check (provisional_cost_amount >= 0),
+  add column untracked_quantity numeric(18,3) not null default 0 check (untracked_quantity >= 0);
+
+update sales.sale_return_line
+set untracked_quantity = greatest(0, quantity - inventory_quantity - provisional_quantity);
+
+alter table sales.sale_return_line
+  add constraint sale_return_line_quantity_split_ck
+  check (inventory_quantity + provisional_quantity + untracked_quantity = quantity);
 
 update sales.sale_return_line
 set inventory_quantity = quantity,
