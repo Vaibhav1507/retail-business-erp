@@ -21,7 +21,7 @@
 - Sale lines currently require an active `catalog.product` FK; the schema has a unique key on `(tenant_id, sale_id, product_id)`. This prevents multiple invoice rows for the same product, including different rates/discounts, and cannot represent an unlisted free-text line.
 - Product creation from `GenerateInvoice` is currently attempted before posting when a line has no product ID. This mutates the catalogue as a side effect of billing and forces the line through catalogue validation.
 - `InvoiceExtractionService` is a supplier-purchase extractor. Its prompt explicitly says to ignore handwriting. It returns a draft and does not post. Reuse its safe provider/fallback concepts, not its supplier schema or purchase workflow.
-- Existing image extraction is implemented with direct server-side Gemini calls, the shared `VisionProviderFallback` runner, optional Groq Vision behind workflow-specific flags, bounded local OCR and sanitized provider telemetry. The AI Gateway has had reliability issues and is explicitly out of scope for this feature. Do not call `AiGateway`, add a direct browser API key, add a new provider, or create a Lovable project.
+- Existing image extraction is implemented with the exact `ItemTagCaptureService` pattern: `ItemTagGeminiModels`, direct Gemini calls, optional Groq behind the existing `Groq:ItemTagFallbackEnabled` flag, `VisionProviderFallback`, SkiaSharp image preparation, 900 ms local OCR, item-tag attempt/total provider budgets and sanitized telemetry. The AI Gateway has had reliability issues and is explicitly out of scope for this feature. Do not call `AiGateway`, add a direct browser API key, add a new provider, or create a Lovable project.
 - The current integration suite includes sales-to-cash, returns, cancellation, finance and reconciliation coverage. Existing assumptions explicitly reject negative stock and must be revised without weakening tenant isolation, idempotency, period locks or ledger controls.
 
 ## 3. Recommended architecture
@@ -61,7 +61,7 @@ This needs a dedicated migration and transaction design. The exact fallback-cost
 
 ### 3.4 Handwritten invoice extraction
 
-Create a separate sales-invoice extraction contract/service, following the same direct-provider architecture as `ItemTagCaptureService` and `InvoiceExtractionService`: direct server-side Gemini calls, `VisionProviderFallback`, optional Groq via the existing Groq client and a sales-specific flag, bounded local OCR, feature-level validation and safe latency/error logs. Never call `AiGateway` or its credential pool/usage ledger. The prompt must distinguish the seller/shop from the buyer/customer and extract only evidence visible on the document:
+Create a separate sales-invoice extraction contract/service, following the same direct-provider architecture as `ItemTagCaptureService` and `InvoiceExtractionService`: direct server-side Gemini calls, `VisionProviderFallback`, optional Groq via the existing `GroqVisionClient` and the existing `Groq:ItemTagFallbackEnabled` flag, bounded local OCR, feature-level validation and safe latency/error logs. Never call `AiGateway` or its credential pool/usage ledger. The prompt must distinguish the seller/shop from the buyer/customer and extract only evidence visible on the document:
 - customer name/contact/address when present;
 - source invoice number/date (kept as external reference, never RBOS's official invoice number);
 - line description/model/brand, quantity, unit, unit price, discount and line amount;
