@@ -53,14 +53,41 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 50m, "Credit", 60m), K())).StatusCode);
         Assert.Equal(10m, (await Stock(c)).GetProperty("quantity").GetDecimal());
     }
-    [Fact] public async Task Sale_cannot_make_stock_negative()
+    [Fact] public async Task Insufficient_stock_sale_uses_provisional_cost_and_receipt_reconciles_it()
     {
-        var (c, loc, p) = await Stocked(f, 5);
-        var r = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "UPI"), K());
-        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
-        Assert.Equal(5m, (await Stock(c)).GetProperty("quantity").GetDecimal());
-        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 5, 50m, "UPI"), K())).StatusCode);
-        var s = await Stock(c); Assert.Equal(0m, s.GetProperty("quantity").GetDecimal()); Assert.Equal(0m, s.GetProperty("value").GetDecimal());
+        var (c, loc, p) = await Stocked(f, 5, 20m);
+        var saleResponse = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "UPI"), K());
+        Assert.Equal(HttpStatusCode.OK, saleResponse.StatusCode);
+        var saleId = (await saleResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var afterSale = await Stock(c);
+        Assert.Equal(-1m, afterSale.GetProperty("quantity").GetDecimal());
+        Assert.Equal(0m, afterSale.GetProperty("value").GetDecimal());
+
+        var supplierResponse = await c.Send(HttpMethod.Post, "/suppliers", new { name = "Settlement supplier" });
+        var supplierId = (await supplierResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var receipt = await c.Send(HttpMethod.Post, "/purchases", new
+        {
+            supplierId, locationId = loc, receiptDate = Today,
+            lines = new[] { new { productId = p, quantity = 1m, unitCost = 30m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, receipt.StatusCode);
+        var settled = await Stock(c);
+        Assert.Equal(0m, settled.GetProperty("quantity").GetDecimal());
+        Assert.Equal(0m, settled.GetProperty("value").GetDecimal());
+
+        var saleDetail = await c.GetJson("/sales/" + saleId);
+        Assert.Equal(6m, saleDetail.GetProperty("lines")[0].GetProperty("quantity").GetDecimal());
+        var returnable = (await c.GetJson("/sales/" + saleId + "/returnable")).EnumerateArray().Single();
+        var returnResponse = await c.Send(HttpMethod.Post, "/sale-returns", new
+        {
+            saleId, returnDate = Today, reason = "Return after settlement",
+            lines = new[] { new { saleLineId = returnable.GetProperty("saleLineId").GetGuid(), productId = p, quantity = 1m } },
+            refundMethod = "Cash"
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, returnResponse.StatusCode);
+        var afterReturn = await Stock(c);
+        Assert.Equal(1m, afterReturn.GetProperty("quantity").GetDecimal());
+        Assert.True(afterReturn.GetProperty("value").GetDecimal() > 0m);
     }
     [Fact] public async Task Duplicate_submission_is_safe_and_key_reuse_conflicts()
     {
