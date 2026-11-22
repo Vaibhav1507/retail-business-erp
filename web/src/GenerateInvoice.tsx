@@ -522,7 +522,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <button type="button" onClick={addItem}>{tr('bill.add')}</button>
           <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
           <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
-          {pname.trim() && !match && <span className="billing-hint">This product will be added to your catalogue when you confirm the invoice.</span>}
+          {pname.trim() && !match && <span className="billing-hint">This will be billed as an ad-hoc line and will not create a catalogue product.</span>}
         </div>
         {salesInvoiceDraft && <div className="billing-card" role="region" aria-label="Review extracted sales invoice">
           <h4>Review extracted invoice before adding it to the bill</h4>
