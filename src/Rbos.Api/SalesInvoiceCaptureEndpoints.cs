@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Rbos.Api.Application;
+using Rbos.Api.Persistence;
 using static Rbos.Api.ApiResults;
 
 namespace Rbos.Api;
