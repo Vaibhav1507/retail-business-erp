@@ -142,7 +142,7 @@ public sealed class SalesService(TenantDb db)
             while (await r.ReadAsync(ct))
                 lines.Add(new
                 {
-                    product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2),
+                    product = r.GetString(0), sku = r.IsDBNull(1) ? null : r.GetString(1), quantity = r.GetDecimal(2),
                     unitPrice = r.GetDecimal(3), discount = r.GetDecimal(4), lineTotal = r.GetDecimal(5),
                     serials = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6),
                     imei1s = r.GetFieldValue<string[]>(7), imei2s = r.GetFieldValue<string[]>(8),
@@ -330,7 +330,7 @@ public sealed class SalesService(TenantDb db)
                     var name = await Scalar<string>(s, "select name from catalog.product where id=@p", ct, ("p", productId));
                     return ServiceResult<object>.Fail($"Not enough stock for {name}: {onHand:0.###} available.");
                 }
-                var cur = await ReadCostAsync(s, l.ProductId, ct);
+                var cur = await ReadCostAsync(s, productId, ct);
                 var remaining = cur.TotalQuantity - l.Quantity.Value;
                 var cost = remaining <= 0 ? cur.InventoryValue : Math.Min(cur.InventoryValue, Money.Of(l.Quantity.Value * cur.Wac).Amount);
                 costed.Add((l, cur.Wac, cost, new CostState(remaining, cur.InventoryValue - cost, cur.Wac)));
