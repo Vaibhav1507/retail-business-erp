@@ -25,13 +25,18 @@ See [flexible sales and handwritten invoice capture plan](../implementation-plan
 - **Provider rule (owner clarification, 2026-11-22):** Do not use the AI Gateway. Follow the existing image-upload extraction pattern: direct Gemini + shared bounded `VisionProviderFallback`, optional Groq only behind its existing workflow flag, bounded local OCR, server-only credentials and sanitized logs. No new provider/config/secret.
 - No production deployment or production migration.
 
-## Files changed
-- Added `docs/implementation-plans/flexible-sales-and-handwritten-invoice-capture.md`.
-- Added `docs/adr/adr-025-026-flexible-sales-and-handwritten-capture.md`.
-- At the initial documentation checkpoint, feature code and migrations had not yet been changed. Subsequent implementation commits must be recorded below.
+## Implementation progress — direct-provider sales invoice extraction
+
+- Added `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs` and `src/Rbos.Api/SalesInvoiceCaptureEndpoints.cs`.
+- Registered the service in `src/Rbos.Api/Program.cs` and mapped the authenticated route from `src/Rbos.Api/Endpoints.cs`.
+- Added `tests/Rbos.IntegrationTests/SalesInvoiceCaptureTests.cs` covering provider-disabled draft-only response/no sale side effects, invalid MIME/signature and authentication.
+- Extraction follows the existing direct Gemini → optional Groq → Gemini fallback chain via `VisionProviderFallback`; Groq remains gated by existing `Groq:InvoiceFallbackEnabled`. Optional local OCR is bounded to 900 ms. The feature does not call `AiGateway`, does not write provider usage ledger records, and does not persist the uploaded image.
+- The endpoint is currently backend-only. Generate Invoice UI integration, flexible sale-line support, negative-stock costing and receipt reconciliation remain pending. This is not end-to-end functionality.
+- Commits: service `9f55153c061f04c1070406c8e9649e8b6a135f96`; endpoint `4bff322e76967539f3aada242e610ef0efe195f0`; DI/route wiring `d9f130018dbc977559698d9b1e6a88b8197e71a7`; parser hardening `11d3b4e28084ec400c0f7553f01b9978439d2258`; tests `c44a9106c91515c3608fc70ba397f0b43b383d08`.
 
 ## Tests
-- No feature tests run yet. Baseline CI result above is not feature evidence.
+- Exact-head CI is still pending. The previous run on `11d3b4e` started before the integration-test file commit; do not treat it as validation of `c44a910`.
+- No provider calls were made from tests. No production migration or deployment was performed.
 
 ## Next action
-Implement schema/domain/API slice after validating every dependency in sale returns, cancellation, reports, print, serial/IMEI, stock projections and purchase receipt costing. Keep this log updated in the same PR.
+Wire this extraction draft into the Generate Invoice editor only after the sale-line contract supports ad-hoc lines. Then implement and test the line-identity/schema/posting refactor across returns, cancellation, reports, print, serial/IMEI, offline sales and stock projections. Negative-stock financial posting remains blocked on explicit owner/CA policy.
