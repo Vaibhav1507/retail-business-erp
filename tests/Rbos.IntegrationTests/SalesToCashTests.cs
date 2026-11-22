@@ -473,4 +473,24 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
 
+    [Fact] public async Task Model_number_only_ad_hoc_sale_line_is_accepted_without_catalogue_creation()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var before = (await c.GetJson("/products")).EnumerateArray().Count();
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new { productId = (Guid?)null, description = "", model = "ZX-9000", quantity = 1m, unitPrice = 125m, discount = 0m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + id);
+        Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("product").GetString());
+        Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("model").GetString());
+        Assert.Equal(before, (await c.GetJson("/products")).EnumerateArray().Count());
+    }
+
+
 }
