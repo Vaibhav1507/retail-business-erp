@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GenerateInvoice } from './GenerateInvoice'
 import { resetCsrf } from './api'
 
+vi.mock('@zxing/browser', () => ({
+  BrowserMultiFormatReader: class {
+    async decodeFromImageUrl() { throw new Error('No barcode in test image') }
+  }
+}))
+
 const calls: { url: string; method: string }[] = []
 const products = [{ id: 'p1', name: 'Test Cable' }]
 const locations = [{ id: 'l1', name: 'Main Store' }]
@@ -47,4 +53,59 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(calls.some(x => x.url.includes('/whatsapp'))).toBe(false)
     expect(reload).toHaveBeenCalled()
   })
+
+  it('uses one shared product editor for tag capture and adds the populated row directly', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:invoice-tag-test'),
+      revokeObjectURL: vi.fn()
+    })
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      calls.push({ url, method })
+      if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
+      if (url === '/api/business-profile') return new Response(JSON.stringify({
+        businessName: 'Pilot Shop', address: '', city: '', state: '',
+        pinCode: '', mobile: '', gstin: null
+      }))
+      if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/sales/item-tag-scan' && method === 'POST') return new Response(JSON.stringify({
+        status: 'ReadyForReview',
+        extraction: {
+          productName: 'Semi Automatic Washing Machine',
+          brand: 'LG',
+          model: 'PX900H7SD4Z',
+          serial: '610NWHS203785',
+          barcode: '4006381333931'
+        },
+        suggestedProduct: null,
+        warnings: []
+      }))
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    }))
+
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Scan product' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Brand')).toBeInTheDocument()
+    expect(screen.getByLabelText('Model')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    const photoInputs = container.querySelectorAll('input[type="file"]')
+    const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(photoInputs[1], file)
+
+    expect(await screen.findByDisplayValue('LG')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('PX900H7SD4Z')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('610NWHS203785')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Add product' })).toHaveLength(1)
+    expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('Price (INR)'), '15000')
+    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
+
+    expect(screen.getByText('Semi Automatic Washing Machine')).toBeInTheDocument()
+    expect(screen.getByText(/Serial: 610NWHS203785/)).toBeInTheDocument()
+    expect(screen.getByText(/Barcode: 4006381333931/)).toBeInTheDocument()
+  })
+
 })
