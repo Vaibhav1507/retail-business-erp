@@ -542,8 +542,11 @@ public sealed class AfterSalesService(TenantDb db)
                 .Select(j => new JournalLineDraft(j.AccountCode, j.Credit, j.Debit)).ToList();
 
             var historicalLines = new List<(Guid ProductId, decimal Qty, decimal Cost)>();
-            await using (var q = s.Command(@"select l.product_id, l.quantity, coalesce((select -sum(m.value_delta) from inventory.stock_movement m where m.source_type='Sale' and m.source_id=l.sale_id and m.product_id=l.product_id),0)
-                from sales.sale_line l where l.sale_id=@i and l.product_id is not null order by l.product_id"))
+            await using (var q = s.Command(@"select l.product_id, sum(l.quantity),
+                  coalesce((select -sum(m.value_delta) from inventory.stock_movement m
+                    where m.source_type='Sale' and m.source_id=l.sale_id and m.product_id=l.product_id),0)
+                from sales.sale_line l where l.sale_id=@i and l.product_id is not null
+                group by l.sale_id,l.product_id order by l.product_id"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
