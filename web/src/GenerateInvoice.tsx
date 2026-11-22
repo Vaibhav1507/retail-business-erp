@@ -58,6 +58,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [items, setItems] = useState<Item[]>([])
   const [pname, setPname] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
+  const [tagCaptureKey, setTagCaptureKey] = useState(0)
   const [brandText, setBrandText] = useState('')
   const [modelText, setModelText] = useState('')
   const [categoryText, setCategoryText] = useState('')
@@ -251,6 +252,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setBrandText(''); setModelText(''); setCategoryText(''); setBarcodeText(''); setBarcodeSymbology('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText('')
     setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
+    setTagCaptureKey(value => value + 1)
   }
 
   function review() {
@@ -340,7 +342,12 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function clearForm() {
-    setItems([]); setSelectedProductId(''); setTagDetails(null); setPname(''); setPrice(''); setSerialText(''); setBillDisc(''); setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
+    setItems([]); setSelectedProductId(''); setPname('')
+    setBrandText(''); setModelText(''); setCategoryText(''); setBarcodeText(''); setBarcodeSymbology('')
+    setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
+    setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
+    setTagCaptureKey(value => value + 1)
+    setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
   async function hold() {
@@ -474,7 +481,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </details>
         <div className="billing-row invoice-product-actions">
           <button type="button" onClick={addItem}>{tr('bill.add')}</button>
-          <ItemTagCapture disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
+          <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
           {pname.trim() && !match && <span className="billing-hint">This product will be added to your catalogue when you confirm the invoice.</span>}
         </div>
         {items.length > 0 && <table className="billing-table">
