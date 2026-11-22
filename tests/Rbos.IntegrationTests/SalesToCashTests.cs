@@ -414,6 +414,18 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var postedReturn = (await returnResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
         var returnDetail = await c.GetJson("/sale-returns/" + postedReturn);
         Assert.Equal("Unlisted charger model ZX-90", returnDetail.GetProperty("lines")[0].GetProperty("product").GetString());
+
+        var catalogueLine = Assert.Single(returnable, x => x.GetProperty("productId").ValueKind != JsonValueKind.Null);
+        var catalogueReturn = await c.Send(HttpMethod.Post, "/sale-returns", new
+        {
+            saleId, returnDate = Today, reason = "Return one repeated catalogue line",
+            lines = new[] { new { saleLineId = catalogueLine.GetProperty("saleLineId").GetGuid(), productId = p, quantity = 1m } },
+            refundMethod = "Cash"
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, catalogueReturn.StatusCode);
+        var afterCatalogueReturn = await Stock(c);
+        Assert.Equal(9m, afterCatalogueReturn.GetProperty("quantity").GetDecimal());
+        Assert.Equal(180m, afterCatalogueReturn.GetProperty("value").GetDecimal());
     }
 
 
