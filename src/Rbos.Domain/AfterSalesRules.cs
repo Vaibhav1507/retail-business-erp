@@ -1,6 +1,6 @@
 namespace Rbos.Domain;
 
-public sealed record ReturnLineInput(Guid ProductId, decimal Quantity);
+public sealed record ReturnLineInput(Guid ProductId, decimal Quantity);\npublic sealed record SaleReturnLineInput(Guid? ProductId, Guid? SaleLineId, decimal Quantity);
 
 /// <summary>Pure rules for customer collections and customer/supplier returns (Slice 5).</summary>
 public static class AfterSalesRules
@@ -24,6 +24,29 @@ public static class AfterSalesRules
         if (owed <= 0) return Fail("This customer has nothing outstanding.", out error);
         if (amount > owed) return Fail($"Amount exceeds the outstanding balance of {owed:0.00} INR.", out error);
         money = Money.Of(amount); error = null; return true;
+    }
+
+    public static bool TryValidateSaleReturnLines(IReadOnlyList<SaleReturnLineInput>? input, string? reason,
+        out IReadOnlyList<(Guid? ProductId, Guid? SaleLineId, Quantity Quantity)> lines, out string? error)
+    {
+        lines = [];
+        if ((reason?.Trim().Length ?? 0) > 200) return Fail("Reason is too long (max 200 characters).", out error);
+        if (input is null || input.Count == 0) return Fail("Choose at least one line to return.", out error);
+        if (input.Count > MaxLines) return Fail($"At most {MaxLines} lines per return.", out error);
+        if (input.Any(x => x.ProductId is null && x.SaleLineId is null))
+            return Fail("Every returned line must identify the original sale line.", out error);
+        if (input.Select(x => x.SaleLineId).Where(x => x.HasValue).Distinct().Count() != input.Count(x => x.SaleLineId.HasValue))
+            return Fail("Each sale line can appear only once per return.", out error);
+        var list = new List<(Guid?, Guid?, Quantity)>();
+        foreach (var line in input)
+        {
+            if (!Quantity.TryCreate(line.Quantity, out var quantity, out var quantityError))
+                return Fail(quantityError!, out error);
+            list.Add((line.ProductId, line.SaleLineId, quantity));
+        }
+        lines = list;
+        error = null;
+        return true;
     }
 
     public static bool TryValidateReturnLines(IReadOnlyList<ReturnLineInput>? input, string? reason, out IReadOnlyList<(Guid ProductId, Quantity Quantity)> lines, out string? error)
