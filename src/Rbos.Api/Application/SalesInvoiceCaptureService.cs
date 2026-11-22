@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using SkiaSharp;
 
 namespace Rbos.Api.Application;
 
@@ -43,12 +44,18 @@ public sealed class SalesInvoiceCaptureService(
     public async Task<ServiceResult<object>> ExtractAsync(string? mime, byte[] bytes, CancellationToken ct)
     {
         var timer = Stopwatch.StartNew();
+        byte[]? aiBytes = null;
         try
         {
             if (mime is null || !Allowed.Contains(mime, StringComparer.OrdinalIgnoreCase))
                 return ServiceResult<object>.Fail("Choose a JPEG, PNG or WebP invoice photo.", 415);
             if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, mime))
                 return ServiceResult<object>.Fail("The photo is empty, larger than 8 MB, corrupt or not the type it claims to be.");
+
+            var preparationTimer = Stopwatch.StartNew();
+            aiBytes = PrepareVisionImage(bytes, mime, out var aiMime);
+            preparationTimer.Stop();
+            log.LogInformation("Sales invoice image prepared in memory. Original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms", bytes.Length, aiBytes.Length, preparationTimer.ElapsedMilliseconds);
 
             string? ocrText = null;
             if (localOcr.Available)
@@ -57,10 +64,10 @@ public sealed class SalesInvoiceCaptureService(
                 budget.CancelAfter(TimeSpan.FromMilliseconds(900));
                 try
                 {
-                    var rows = await localOcr.ReadImageAsync(bytes, budget.Token);
+                    var rows = await localOcr.ReadImageAsync(aiBytes, budget.Token);
                     if (rows is not null)
-                        ocrText = string.Join('\n', rows.Take(50).Select(row => string.Join(" | ", row))).Trim();
-                    if (ocrText?.Length > 6000) ocrText = ocrText[..6000];
+                        ocrText = string.Join('\n', rows.Take(35).Select(row => string.Join(" | ", row))).Trim();
+                    if (ocrText?.Length > 5000) ocrText = ocrText[..5000];
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
@@ -70,21 +77,22 @@ public sealed class SalesInvoiceCaptureService(
 
             var attempts = new List<VisionProviderAttempt>();
             var apiKey = cfg["Gemini:ApiKey"];
-            var models = VisionProviderFallback.InvoiceGeminiModels(cfg);
+            var models = VisionProviderFallback.ItemTagGeminiModels(cfg);
+            var attemptTimeout = Math.Clamp(cfg.GetValue("AiPerformance:ItemTagAttemptTimeoutSeconds", 7), 5, 15);
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
                 var primary = models[0];
                 attempts.Add(new VisionProviderAttempt("Gemini", primary,
-                    VisionProviderFallback.GeminiTimeoutSeconds(cfg),
-                    token => ExtractWithGeminiAsync(apiKey!, primary, mime, bytes, ocrText, token)));
+                    attemptTimeout,
+                    token => ExtractWithGeminiAsync(apiKey!, primary, aiMime, aiBytes, ocrText, token)));
             }
 
-            if (groq.Available && cfg.GetValue("Groq:InvoiceFallbackEnabled", false))
+            if (groq.Available && cfg.GetValue("Groq:ItemTagFallbackEnabled", false))
             {
                 var prompt = ocrText is null ? Prompt : Prompt + "\nOptional local OCR hints (may contain errors; image is authoritative):\n" + ocrText;
                 attempts.Add(new VisionProviderAttempt("Groq", groq.Model,
-                    VisionProviderFallback.GroqTimeoutSeconds(cfg),
-                    token => groq.ExtractImageAsync(mime, Convert.ToBase64String(bytes), prompt, token)));
+                    attemptTimeout,
+                    token => groq.ExtractImageAsync(aiMime, Convert.ToBase64String(aiBytes), prompt, token)));
             }
 
             if (!string.IsNullOrWhiteSpace(apiKey))
@@ -93,14 +101,14 @@ public sealed class SalesInvoiceCaptureService(
                 {
                     var fallback = model;
                     attempts.Add(new VisionProviderAttempt("Gemini", fallback,
-                        VisionProviderFallback.GeminiTimeoutSeconds(cfg),
-                        token => ExtractWithGeminiAsync(apiKey!, fallback, mime, bytes, ocrText, token)));
+                        attemptTimeout,
+                        token => ExtractWithGeminiAsync(apiKey!, fallback, aiMime, aiBytes, ocrText, token)));
                 }
             }
 
             var parsed = await VisionProviderFallback.ExecuteAsync(
                 "SalesInvoiceCapture", attempts, HasUsableLines, log, ct,
-                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
+                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:ItemTagTotalProviderBudgetSeconds", 10), 5, 30)));
 
             var warnings = new List<string>();
             var extraction = Clean(parsed);
@@ -137,7 +145,47 @@ public sealed class SalesInvoiceCaptureService(
         }
         finally
         {
+            if (aiBytes is not null && !ReferenceEquals(aiBytes, bytes))
+                CryptographicOperations.ZeroMemory(aiBytes);
             CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
+    static byte[] PrepareVisionImage(byte[] original, string mime, out string outputMime)
+    {
+        outputMime = mime;
+        try
+        {
+            using var source = SKBitmap.Decode(original);
+            if (source is null) return original;
+            var maxDimension = Math.Max(source.Width, source.Height);
+            const int maxAiDimension = 3000;
+            const int reencodeAboveBytes = 1_500_000;
+            var resizeRequired = maxDimension > maxAiDimension;
+            var reencodeRequired = resizeRequired || !string.Equals(mime, "image/jpeg", StringComparison.OrdinalIgnoreCase)
+                || original.Length > reencodeAboveBytes;
+            if (!reencodeRequired) return original;
+
+            var scale = resizeRequired ? (double)maxAiDimension / maxDimension : 1d;
+            var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+            var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+            using var resized = new SKBitmap(new SKImageInfo(width, height, source.ColorType, source.AlphaType));
+            using (var canvas = new SKCanvas(resized))
+            {
+                canvas.Clear(SKColors.White);
+                canvas.DrawBitmap(source, new SKRect(0, 0, width, height));
+                canvas.Flush();
+            }
+            using var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, 92);
+            if (encoded is null) return original;
+            using var stream = new MemoryStream();
+            encoded.SaveTo(stream);
+            outputMime = "image/jpeg";
+            return stream.ToArray();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            return original;
         }
     }
 
