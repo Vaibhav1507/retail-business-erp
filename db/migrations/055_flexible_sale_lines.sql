@@ -31,10 +31,12 @@ set inventory_cost_amount = coalesce((
 where sl.product_id is not null;
 
 alter table sales.sale_line
+  drop constraint if exists sale_line_pkey,
+  drop constraint if exists sale_line_tenant_id_product_id_fkey;
+
+alter table sales.sale_line
   alter column description set not null,
   alter column product_id drop not null,
-  drop constraint if exists sale_line_pkey,
-  drop constraint if exists sale_line_tenant_id_product_id_fkey,
   add constraint sale_line_pkey primary key (tenant_id, sale_id, line_id),
   add constraint sale_line_product_fk foreign key (tenant_id, product_id) references catalog.product(tenant_id, id),
   add constraint sale_line_description_ck check (length(btrim(description)) between 1 and 240),
@@ -60,10 +62,12 @@ where sl.tenant_id = rl.tenant_id
   and sl.product_id = rl.product_id;
 
 alter table sales.sale_return_line
+  drop constraint if exists sale_return_line_pkey,
+  drop constraint if exists sale_return_line_tenant_id_product_id_fkey;
+
+alter table sales.sale_return_line
   alter column sale_line_id set not null,
   alter column product_id drop not null,
-  drop constraint if exists sale_return_line_pkey,
-  drop constraint if exists sale_return_line_tenant_id_product_id_fkey,
   add constraint sale_return_line_pkey primary key (tenant_id, return_id, sale_line_id),
   add constraint sale_return_line_sale_line_fk foreign key (tenant_id, sale_id, sale_line_id)
     references sales.sale_line(tenant_id, sale_id, line_id),
