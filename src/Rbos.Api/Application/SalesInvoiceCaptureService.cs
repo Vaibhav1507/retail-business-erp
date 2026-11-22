@@ -180,7 +180,7 @@ public sealed class SalesInvoiceCaptureService(
     static bool HasUsableLines(JsonNode? value) =>
         value is JsonObject obj && obj["lines"] is JsonArray lines &&
         lines.OfType<JsonObject>().Any(line =>
-            ReadString(line["description"]) is not null &&
+            (ReadString(line["description"]) is not null || ReadString(line["model"]) is not null) &&
             (ReadDecimal(line["quantity"]) is > 0 || ReadDecimal(line["amount"]) is > 0));
 
     static JsonObject Clean(JsonNode? source)
@@ -227,14 +227,14 @@ public sealed class SalesInvoiceCaptureService(
                 decimal.TryParse(raw, System.Globalization.NumberStyles.Number,
                     System.Globalization.CultureInfo.InvariantCulture, out number)) return number;
         }
-        catch (InvalidOperationException) { }
+        catch (Exception e) when (e is InvalidOperationException or FormatException) { }
         return null;
     }
 
     static string? ReadString(JsonNode? node)
     {
         try { return node?.GetValue<string>()?.Trim() is { Length: > 0 } value ? value : null; }
-        catch (InvalidOperationException) { return null; }
+        catch (Exception e) when (e is InvalidOperationException or FormatException) { return null; }
     }
 
     static string? Clip(string? value, int max) =>
