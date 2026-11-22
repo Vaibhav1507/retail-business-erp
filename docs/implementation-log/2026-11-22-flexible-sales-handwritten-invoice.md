@@ -22,7 +22,7 @@ See [flexible sales and handwritten invoice capture plan](../implementation-plan
 - Use positive provisional cost and a later linked cost adjustment; fallback hierarchy and allocation policy require owner approval and CA review.
 - Ad-hoc lines do not implicitly create catalogue products.
 - Handwritten extraction is a draft only; posting stays in existing sales flow.
-- **Provider rule (owner clarification, 2026-11-22):** Do not use the AI Gateway. Follow the existing image-upload extraction pattern: direct Gemini + shared bounded `VisionProviderFallback`, optional Groq only behind its existing workflow flag, bounded local OCR, server-only credentials and sanitized logs. No new provider/config/secret.
+- **Provider rule (owner clarification, 2026-11-22):** Do not use the AI Gateway. Follow the existing image-upload extraction pattern: the exact item-tag extraction pattern: direct Gemini + `ItemTagGeminiModels`, shared bounded `VisionProviderFallback`, optional Groq only behind existing `Groq:ItemTagFallbackEnabled`, SkiaSharp image preparation, bounded 900 ms local OCR, server-only credentials and sanitized logs. No new provider/config/secret.
 - No production deployment or production migration.
 
 ## Implementation progress — direct-provider sales invoice extraction
