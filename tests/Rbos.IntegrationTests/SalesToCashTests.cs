@@ -342,4 +342,53 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(new[] { imei1 }, line.GetProperty("imei1s").EnumerateArray().Select(x => x.GetString()).ToArray());
         Assert.Equal(new[] { imei2 }, line.GetProperty("imei2s").EnumerateArray().Select(x => x.GetString()).ToArray());
     }
+    [Fact] public async Task Ad_hoc_and_repeated_product_lines_post_without_catalogue_creation_and_return_by_line_id()
+    {
+        var (c, loc, p) = await Stocked(f, qty: 10, cost: 20m);
+        var productsBefore = (await c.GetJson("/products")).EnumerateArray().Count();
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null,
+            locationId = loc,
+            saleDate = Today,
+            saleType = "Cash",
+            lines = new[]
+            {
+                new { productId = p, description = "catalogue row one", quantity = 1m, unitPrice = 100m, discount = 0m },
+                new { productId = p, description = "catalogue row two", quantity = 1m, unitPrice = 95m, discount = 5m },
+                new { productId = (Guid?)null, description = "Unlisted charger model ZX-90", model = "ZX-90", brand = "Local", hsnCode = "850440", quantity = 1m, unitPrice = 250m, discount = 0m }
+            }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + saleId);
+        var saleLines = detail.GetProperty("lines").EnumerateArray().ToArray();
+        Assert.Equal(3, saleLines.Length);
+        Assert.Equal(2, saleLines.Count(x => x.GetProperty("sku").GetString() is not null));
+        var adHoc = Assert.Single(saleLines.Where(x => x.GetProperty("sku").ValueKind == JsonValueKind.Null));
+        Assert.Equal("Unlisted charger model ZX-90", adHoc.GetProperty("product").GetString());
+        Assert.Equal("ZX-90", adHoc.GetProperty("model").GetString());
+        Assert.Equal(productsBefore, (await c.GetJson("/products")).EnumerateArray().Count());
+        var stock = await Stock(c);
+        Assert.Equal(8m, stock.GetProperty("quantity").GetDecimal());
+        Assert.Equal(160m, stock.GetProperty("value").GetDecimal());
+
+        var returnable = (await c.GetJson("/sales/" + saleId + "/returnable")).EnumerateArray().ToArray();
+        var adHocReturn = Assert.Single(returnable.Where(x => x.GetProperty("productId").ValueKind == JsonValueKind.Null));
+        var returnResponse = await c.Send(HttpMethod.Post, "/sale-returns", new
+        {
+            saleId,
+            returnDate = Today,
+            reason = "Customer returned unlisted item",
+            lines = new[] { new { saleLineId = adHocReturn.GetProperty("saleLineId").GetGuid(), productId = (Guid?)null, quantity = 1m } },
+            refundMethod = "Cash"
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, returnResponse.StatusCode);
+        Assert.Equal(8m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+        var postedReturn = (await returnResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var returnDetail = await c.GetJson("/sale-returns/" + postedReturn);
+        Assert.Equal("Unlisted charger model ZX-90", returnDetail.GetProperty("lines")[0].GetProperty("product").GetString());
+    }
+
+
 }
