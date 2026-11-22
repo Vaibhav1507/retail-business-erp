@@ -182,21 +182,119 @@ public sealed class ProcurementService(TenantDb db)
             await Exec(s, ct, "insert into procurement.purchase_receipt(tenant_id,id,supplier_id,location_id,receipt_date,supplier_ref,total,gst_total,gst_claimed,idempotency_key,request_hash,journal_entry_id,created_by) values (@t,@i,@s,@l,@d,@r,@v,@g,@gc,@k,@h,@j,@u)",
                 ("t", tenantId), ("i", id), ("s", m.SupplierId), ("l", m.LocationId), ("d", m.ReceiptDate), ("r", Blank(m.SupplierRef)), ("v", total.Amount), ("g", gstTotal.Amount), ("gc", gstClaimed), ("k", key), ("h", hash), ("j", entry), ("u", uid));
 
-                            foreach (var l in lines)
-                            {
-                                var landed = l.LandedUnitCost(gstClaimed);
-                                var landedCost = UnitCost.TryCreate(landed, out var lc, out _) ? lc : l.UnitCost;
-                                await Exec(s, ct, "insert into procurement.purchase_receipt_line(tenant_id,receipt_id,product_id,quantity,unit_cost,gst_amount,landed_unit_cost) values (@t,@r,@p,@q,@c,@g,@lc)",
-                                    ("t", tenantId), ("r", id), ("p", l.ProductId), ("q", l.Quantity.Value), ("c", l.UnitCost.Value), ("g", l.Gst.Amount), ("lc", landedCost.Value));
+            var settledProvisionalTotal = 0m;
+            var settledActualTotal = 0m;
+            foreach (var l in lines)
+            {
+                var landed = l.LandedUnitCost(gstClaimed);
+                var landedCost = UnitCost.TryCreate(landed, out var lc, out _) ? lc : l.UnitCost;
+                await Exec(s, ct, "insert into procurement.purchase_receipt_line(tenant_id,receipt_id,product_id,quantity,unit_cost,gst_amount,landed_unit_cost) values (@t,@r,@p,@q,@c,@g,@lc)",
+                    ("t", tenantId), ("r", id), ("p", l.ProductId), ("q", l.Quantity.Value),
+                    ("c", l.UnitCost.Value), ("g", l.Gst.Amount), ("lc", landedCost.Value));
+
+                var commitments = new List<(Guid Id, Guid SaleId, Guid SaleLineId, decimal RemainingQuantity, decimal ProvisionalUnitCost, decimal RemainingCost)>();
+                await using (var q = s.Command(@"select id, sale_id, sale_line_id, remaining_quantity,
+                        provisional_unit_cost, remaining_provisional_cost_amount
+                    from inventory.negative_stock_commitment
+                    where tenant_id=@t and product_id=@p and location_id=@l
+                      and status='Open' and remaining_quantity>0
+                    order by created_at, id
+                    for update"))
+                {
+                    q.Parameters.AddWithValue("t", tenantId);
+                    q.Parameters.AddWithValue("p", l.ProductId);
+                    q.Parameters.AddWithValue("l", m.LocationId);
+                    await using var r = await q.ExecuteReaderAsync(ct);
+                    while (await r.ReadAsync(ct))
+                        commitments.Add((r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5)));
+                }
+
+                var receiptRemaining = l.Quantity.Value;
+                var lineProvisionalSettled = 0m;
+                var lineActualSettled = 0m;
+                foreach (var commitment in commitments)
+                {
+                    if (receiptRemaining <= 0) break;
+                    var allocatedQuantity = Math.Min(receiptRemaining, commitment.RemainingQuantity);
+                    var provisionalCost = allocatedQuantity >= commitment.RemainingQuantity
+                        ? commitment.RemainingCost
+                        : Money.Of(allocatedQuantity * commitment.ProvisionalUnitCost).Amount;
+                    var actualCost = Money.Of(allocatedQuantity * landedCost.Value).Amount;
+                    var newRemainingQuantity = commitment.RemainingQuantity - allocatedQuantity;
+                    var newRemainingCost = Math.Max(0m, commitment.RemainingCost - provisionalCost);
+                    await Exec(s, ct, @"update inventory.negative_stock_commitment
+                        set remaining_quantity=@rq, remaining_provisional_cost_amount=@rc,
+                            settled_quantity=settled_quantity+@sq, settled_cost_amount=settled_cost_amount+@sc,
+                            status=case when @rq=0 then 'Settled' else 'Open' end, updated_at=now()
+                        where tenant_id=@t and id=@i",
+                        ("rq", newRemainingQuantity), ("rc", newRemainingCost), ("sq", allocatedQuantity),
+                        ("sc", actualCost), ("t", tenantId), ("i", commitment.Id));
+                    await Exec(s, ct, @"update sales.sale_line
+                        set inventory_cost_amount=inventory_cost_amount+@actual,
+                            provisional_cost_amount=greatest(0,provisional_cost_amount-@provisional),
+                            unit_cost=round((inventory_cost_amount+@actual+greatest(0,provisional_cost_amount-@provisional))/quantity,4)
+                        where tenant_id=@t and sale_id=@s and line_id=@line",
+                        ("actual", actualCost), ("provisional", provisionalCost), ("t", tenantId),
+                        ("s", commitment.SaleId), ("line", commitment.SaleLineId));
+                    await Exec(s, ct, @"update sales.sale
+                        set inventory_cost_total=inventory_cost_total+@actual,
+                            provisional_cost_total=greatest(0,provisional_cost_total-@provisional),
+                            cost_total=greatest(0,cost_total+@actual-@provisional)
+                        where tenant_id=@t and id=@s",
+                        ("actual", actualCost), ("provisional", provisionalCost), ("t", tenantId), ("s", commitment.SaleId));
+                    receiptRemaining -= allocatedQuantity;
+                    lineProvisionalSettled += provisionalCost;
+                    lineActualSettled += actualCost;
+                }
+
+                var stockValue = l.StockValue(gstClaimed).Amount;
+                var remainingStockValue = Math.Max(0m, stockValue - lineActualSettled);
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'PurchaseReceipt',@d)",
-                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId), ("q", l.Quantity.Value), ("c", landedCost.Value), ("v", l.StockValue(gstClaimed).Amount), ("e", m.ReceiptDate), ("d", id));
+                    ("t", tenantId), ("i", Guid.NewGuid()), ("p", l.ProductId), ("l", m.LocationId),
+                    ("q", l.Quantity.Value), ("c", landedCost.Value), ("v", remainingStockValue), ("e", m.ReceiptDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
                     ("t", tenantId), ("p", l.ProductId), ("l", m.LocationId), ("q", l.Quantity.Value));
-                var current = await ReadCostAsync(s, l.ProductId, ct);
-                var next = WeightedAverageCostCalculator.ApplyReceipt(current, l.Quantity, landedCost);
-                await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
-                    ("t", tenantId), ("p", l.ProductId), ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac));
+
+                if (receiptRemaining > 0 && Quantity.TryCreate(receiptRemaining, out var remainingQty, out _))
+                {
+                    var current = await ReadCostAsync(s, l.ProductId, ct);
+                    var next = WeightedAverageCostCalculator.ApplyReceipt(current, remainingQty, landedCost);
+                    await Exec(s, ct, "insert into inventory.item_cost(tenant_id,product_id,total_quantity,inventory_value,wac) values (@t,@p,@q,@v,@w) on conflict (tenant_id,product_id) do update set total_quantity=excluded.total_quantity, inventory_value=excluded.inventory_value, wac=excluded.wac",
+                        ("t", tenantId), ("p", l.ProductId), ("q", next.TotalQuantity), ("v", next.InventoryValue), ("w", next.Wac));
+                }
+                settledProvisionalTotal += lineProvisionalSettled;
+                settledActualTotal += lineActualSettled;
             }
+
+            if (settledProvisionalTotal > 0)
+            {
+                var adjustment = new List<JournalLineDraft>
+                {
+                    new(SalesRules.NegativeStockClearingAccount, settledProvisionalTotal, 0m)
+                };
+                if (settledActualTotal > 0)
+                    adjustment.Add(new(SalesRules.InventoryAccount, 0m, settledActualTotal));
+                var variance = settledActualTotal - settledProvisionalTotal;
+                if (variance > 0) adjustment.Add(new(SalesRules.CogsAccount, variance, 0m));
+                else if (variance < 0) adjustment.Add(new(SalesRules.CogsAccount, 0m, -variance));
+                BalancedJournalPolicy.AssertBalanced(adjustment);
+                var adjustmentEntry = Guid.NewGuid();
+                await Exec(s, ct, "insert into accounting.journal_entry(tenant_id,id,effective_date,source_type,source_id) values (@t,@e,@d,'NegativeStockReceiptAdjustment',@s)",
+                    ("t", tenantId), ("e", adjustmentEntry), ("d", m.ReceiptDate), ("s", id));
+                foreach (var line in adjustment)
+                {
+                    var account = await AccountAsync(s, tenantId, line.AccountCode, ct);
+                    await Exec(s, ct, "insert into accounting.journal_line(tenant_id,id,entry_id,account_id,debit,credit) values (@t,@i,@e,@a,@d,@c)",
+                        ("t", tenantId), ("i", Guid.NewGuid()), ("e", adjustmentEntry), ("a", account),
+                        ("d", line.Debit), ("c", line.Credit));
+                }
+                await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'NegativeStockSettled','PurchaseReceipt',@d,@s,@c)",
+                    ("t", tenantId), ("a", Guid.NewGuid()), ("u", uid), ("d", id),
+                    ("s", string.Create(CultureInfo.InvariantCulture,
+                        $"Settled negative stock provisional cost {settledProvisionalTotal:0.00} INR against actual receipt cost {settledActualTotal:0.00} INR")),
+                    ("c", correlationId));
+            }
+
             if (m.InvoiceFileId is { } fid)
             {
                 await using var att = s.Command("update procurement.invoice_file set receipt_id=@r where id=@f and receipt_id is null");
