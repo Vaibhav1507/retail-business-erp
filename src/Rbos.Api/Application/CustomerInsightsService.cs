@@ -42,7 +42,7 @@ public sealed class CustomerInsightsService(TenantDb db)
             c.Parameters.AddWithValue("c", customerId);
             await using var r = await c.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
-                top.Add(new { productId = r.GetGuid(0), product = r.GetString(1), quantity = r.GetDecimal(2), amount = r.GetDecimal(3), lastSold = r.GetFieldValue<DateOnly>(4) });
+                top.Add(new { productId = r.IsDBNull(0) ? (Guid?)null : r.GetGuid(0), product = r.GetString(1), quantity = r.GetDecimal(2), amount = r.GetDecimal(3), lastSold = r.GetFieldValue<DateOnly>(4) });
         }
         return ServiceResult<object>.Ok(new { customer = name, sales, topProducts = top });
     }
