@@ -51,23 +51,49 @@ The backend currently considers `barcode` one of the fields that can make `HasUs
 - Introduce one reusable accessible mobile bottom sheet for Camera / Choose from device, used by both tag-photo and handwritten-invoice actions. The chooser no longer inserts a second row of buttons into the invoice form.
 - Add regression coverage for barcode-only results and a catalogue-match name with barcode-only model extraction.
 
-## Runtime evidence still required
+## Runtime evidence from the 22 November 2026 incident
 
-Source inspection proves the frontend mapping and layout issues. It does not prove why the AI returned no brand/model/productName for the user's exact upload.
+A read-only Cloud Run diagnostic report was supplied for the request at 2026-11-22 13:26:28 UTC (18:56:28 IST), trace `4183666ec79bc2b67b5b44e884525f46`, served by revision `rbos-pilot-00108-tsr` (commit `04a8a989e428d3f69b0edd735d082394f08218fe`, PR #64).
 
-For the exact failed scan, obtain Cloud Run application logs around the upload timestamp and correlate the request trace ID. Redact tokens, API keys, image bytes, tenant/user identifiers and customer data. We need these safe fields:
+Reported request outcome:
+- Locally decoded barcode: true.
+- Catalogue match: false.
+- Product name, brand and model from vision: null.
+- OCR used: false.
+- API response: HTTP 200 with `status: ReadyForReview`, barcode only.
+- Reported provider attempts: Gemini `gemini-4-hydrogen` timed out at 7,070 ms; Groq returned HTTP 400 after 184 ms; Gemini `gemini-3.8-flash` timed out at 7,002 ms; Gemini `gemini-3.5-flash-lite` returned HTTP 503 after 2,104 ms.
+- Reported total provider chain latency: 16,363 ms; total scan latency: 17,704 ms; configured chain budget: 20 seconds.
 
-- Item-tag scan completion: status, locally decoded barcode flag, catalogue match flag, OCR-used flag, image byte counts, match latency, total latency, trace ID.
-- Vision fallback attempts: feature, provider, model, success / empty structured output / timeout / HTTP status / invalid response, latency and total provider budget.
-- Any request-level exception or cancellation around the same trace ID.
+This confirms that no AI provider returned usable product identity for this request. It also proves the backend's barcode-only readiness defect: the local barcode was preserved and the final status helper considered a barcode by itself sufficient for `ReadyForReview`.
 
-Do not log or export the uploaded image, full OCR text, prompt, provider response body, access token, API key, customer details or tenant identifiers.
+### Important correction to the diagnostic report
+
+The report characterises `qwen/qwen3.8-27b` as a text/code-only model. That conclusion is not supported by Groq's published documentation: Groq lists Qwen 3.8 27B as multimodal/vision-capable and documents image URL/data-URL inputs and JSON mode for its Qwen vision models. Therefore the 400 is confirmed, but the asserted reason ("non-vision model") is not confirmed. The sanitized report did not include the exact error `code` and `param` metadata that the application logs, so those fields are still required before changing the Groq model or request payload.
+
+Also, `Groq:Model` is a shared setting used by supplier-invoice, item-tag and handwritten-sales-invoice vision calls. A global model change would affect those workflows. Do not replace it globally based on the current report.
+
+The report says OCR was not used and attributes this to the 900 ms timeout. Unless the correlated logs include the OCR timeout event or a process failure, "OCR exceeded 900 ms" is an explanation hypothesis, not a proven runtime fact. The configured Tesseract path alone does not establish the process launched successfully for this request.
+
+### Backend readiness correction added to this branch
+
+- Provider fallback now requires a descriptive product identity (`productName` or `model`) before accepting a provider response as usable.
+- The final response is `ReadyForReview` only when descriptive identity exists or a validated local/shared catalogue match exists.
+- A barcode-only scan with no catalogue match returns `NeedsAttention` and an actionable warning, while retaining the valid barcode for manual review.
+- The existing integration test for a valid barcode with a product match continues to assert `ReadyForReview`.
+- A new integration test covers a valid but unmapped barcode and asserts `NeedsAttention`.
+
+No provider model, timeout, OCR, image-preparation or production configuration change is included.
 
 ## Validation
 
-Frontend regression tests are added for:
+Frontend regression tests cover:
 - Product-name fallback from the verified catalogue suggestion.
 - Barcode-only extraction being displayed as partial rather than complete.
-- Camera/gallery source selection being presented in a modal dialog rather than inline buttons.
+- Camera/gallery selection in the shared modal bottom sheet.
 
-GitHub Actions must pass on the exact PR head before this follow-up is considered CI-validated. Cloud Run logs are required before attributing the missing AI fields to provider timeout, model response, OCR or deployment configuration.
+Backend integration tests cover:
+- A valid, matched barcode returns `ReadyForReview`.
+- A valid but unmatched barcode with no model identity returns `NeedsAttention`.
+- Invalid local barcode is never replaced with an AI guess.
+
+The follow-up is CI-validated only when all jobs pass on the exact current PR head. Runtime model/request diagnosis remains limited to the Groq HTTP 400 until the exact sanitized provider error code and parameter are extracted from the correlated log entry.
