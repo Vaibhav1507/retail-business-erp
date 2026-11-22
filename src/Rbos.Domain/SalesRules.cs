@@ -1,12 +1,17 @@
 namespace Rbos.Domain;
 
-public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount,
+public sealed record SaleLineInput(Guid? ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount,
     List<string>? Serials = null, string? Barcode = null,
-    string? BarcodeSymbology = null, List<string>? Imei1s = null, List<string>? Imei2s = null);
+    string? BarcodeSymbology = null, List<string>? Imei1s = null, List<string>? Imei2s = null,
+    string? Description = null, string? Brand = null, string? Model = null, string? HsnCode = null);
 
-public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal,
+public sealed record SaleLine(Guid? ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal,
+    string? Description = null, string? Brand = null, string? Model = null, string? HsnCode = null,
     string[]? Serials = null, string? Barcode = null,
-    string? BarcodeSymbology = null, string[]? Imei1s = null, string[]? Imei2s = null);
+    string? BarcodeSymbology = null, string[]? Imei1s = null, string[]? Imei2s = null)
+{
+    public bool IsStockTracked => ProductId.HasValue;
+}
 
 /// <summary>Pure rules for customer sales (Slice 4): validation, totals and the balanced journal.</summary>
 public static class SalesRules
