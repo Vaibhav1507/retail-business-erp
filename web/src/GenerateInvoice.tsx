@@ -389,7 +389,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
   async function hold() {
     if (!items.length || !ownerKey) return
-    const data = { customerId, phone, name, address, city, state, pin, date, mode, paid, payMethod, paid2, payMethod2, gst, rate, items, billDisc }
+    const data = { customerId, phone, name, address, city, state, pin, date, mode, paid, payMethod, paid2, payMethod2, gst, rate, items, billDisc, sourceInvoiceRef, sourceInvoiceDate }
     const label = (name.trim() || phone.trim() || 'Walk-in') + ' - ' + items.length + ' item(s)'
     const next = [{ id: crypto.randomUUID(), label, data }, ...held].slice(0, 20)
     await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next); clearForm()
@@ -404,6 +404,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems((d.items ?? []).map((item: Item) => ({
       ...item, imei1s: item.imei1s ?? [], imei2s: item.imei2s ?? []
     })));
+    setSourceInvoiceRef(d.sourceInvoiceRef ?? ''); setSourceInvoiceDate(d.sourceInvoiceDate ?? '');
     setBillDisc(d.billDisc ?? '')
     const next = held.filter(x => x.id !== h.id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
@@ -435,6 +436,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}
+        {sourceInvoiceRef && <p className="billing-hint">Source invoice reference: {sourceInvoiceRef}{sourceInvoiceDate ? ` · ${sourceInvoiceDate}` : ''}</p>}
         <InvoiceDocument biz={biz} showGst={showGst} rate={rate} invoiceNo={invNo || 'Pending'} date={date} payment={mode} location={locations.length > 1 ? locName : undefined} customerName={name} customerPhone={phone} customerAddress={[address, city, state, pin].filter(Boolean).join(', ')} items={effItems} paid={mode === 'Credit' ? Number(paid || 0) + Number(paid2 || 0) : total} credit={mode === 'Credit'} />
       </section>
     )
