@@ -33,5 +33,5 @@ Implementation note: code now exists beyond Slice 4 (returns, period lock, repor
 
 Grouping into four files is deliberate for readability; each ADR keeps its own number and can be split out later without renumbering.
 
-| 025 | Physical negative stock with provisional cost and later reconciliation | adr-025-026-flexible-sales-and-handwritten-capture.md | Pending | **Yes** |
-| 026 | Handwritten sales invoice capture as an unposted draft | adr-025-026-flexible-sales-and-handwritten-capture.md | Pending | Tax/accounting rules: Yes |
+| 025 | Physical negative stock with provisional cost and later reconciliation | adr-025-026-flexible-sales-and-handwritten-capture.md | Owner review before production | **Yes before production** |
+| 026 | Handwritten sales invoice capture as an unposted draft | adr-025-026-flexible-sales-and-handwritten-capture.md | Review source-evidence retention | Tax/accounting rules: Yes |
