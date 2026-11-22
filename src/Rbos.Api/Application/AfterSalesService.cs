@@ -9,7 +9,7 @@ using Rbos.Domain;
 namespace Rbos.Api.Application;
 
 public sealed record CollectionCommand(Guid CustomerId, DateOnly PaymentDate, decimal Amount, string? Method, string? Reference, IReadOnlyList<BillAllocation>? Allocations = null);
-public sealed record SaleReturnCommand(Guid SaleId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines, string? RefundMethod = null);
+public sealed record SaleReturnLineInput(Guid? ProductId, Guid? SaleLineId, decimal Quantity);\npublic sealed record SaleReturnCommand(Guid SaleId, DateOnly ReturnDate, string? Reason, List<SaleReturnLineInput>? Lines, string? RefundMethod = null);
 public sealed record PurchaseReturnCommand(Guid ReceiptId, DateOnly ReturnDate, string? Reason, List<ReturnLineInput>? Lines);
 
 /// <summary>Slice 5: customer collections, customer returns, supplier returns and print data. All amounts are recomputed server-side.</summary>
@@ -147,7 +147,7 @@ public sealed class AfterSalesService(TenantDb db)
         c.Parameters.AddWithValue("s", saleId);
         await using var r = await c.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
-            list.Add(new { productId = r.GetGuid(0), product = r.GetString(1), sold = r.GetDecimal(2), lineTotal = r.GetDecimal(3), returned = r.GetDecimal(4), remaining = r.GetDecimal(2) - r.GetDecimal(4) });
+            list.Add(new { saleLineId = r.GetGuid(0), productId = r.IsDBNull(1) ? (Guid?)null : r.GetGuid(1), product = r.GetString(2), sold = r.GetDecimal(3), lineTotal = r.GetDecimal(4), returned = r.GetDecimal(5), remaining = r.GetDecimal(3) - r.GetDecimal(5) });
         return ServiceResult<object>.Ok(list);
     }
 
@@ -155,7 +155,7 @@ public sealed class AfterSalesService(TenantDb db)
     {
         key ??= "";
         if (key.Length is < 8 or > 100) return ServiceResult<object>.Fail("Idempotency-Key header (8-100 chars) required.");
-        if (!AfterSalesRules.TryValidateReturnLines(m.Lines, m.Reason, out var lines, out var err)) return ServiceResult<object>.Fail(err!);
+        if (!AfterSalesRules.TryValidateSaleReturnLines(m.Lines, m.Reason, out var lines, out var err)) return ServiceResult<object>.Fail(err!);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (m.ReturnDate > today) return ServiceResult<object>.Fail("Return date cannot be in the future.");
         if (m.ReturnDate < today.AddYears(-5)) return ServiceResult<object>.Fail("Return date is too old.");
@@ -223,7 +223,7 @@ public sealed class AfterSalesService(TenantDb db)
                     ("t", tenantId), ("r", id), ("s", m.SaleId), ("p", x.ProductId), ("q", x.Qty), ("a", x.Amount.Amount), ("c", x.UnitCost));
                 if (x.Cost.Amount > 0)
                     await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleReturn',@d)",
-                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty), ("c", x.UnitCost), ("v", x.Cost.Amount), ("e", m.ReturnDate), ("d", id));
+                        ("t", tenantId), ("i", Guid.NewGuid()), ("p", inventoryProductId), ("l", locationId), ("q", x.Qty), ("c", x.UnitCost), ("v", x.Cost.Amount), ("e", m.ReturnDate), ("d", id));
                 await Exec(s, ct, "insert into inventory.stock_balance(tenant_id,product_id,location_id,quantity) values (@t,@p,@l,@q) on conflict (tenant_id,product_id,location_id) do update set quantity = inventory.stock_balance.quantity + excluded.quantity",
                     ("t", tenantId), ("p", x.InventoryProductId), ("l", locationId), ("q", x.Qty));
                 var cur = await ReadCostAsync(s, x.InventoryProductId, ct);
@@ -274,11 +274,11 @@ public sealed class AfterSalesService(TenantDb db)
         }
         if (head is null) return ServiceResult<object>.Fail("Return not found.", 404);
         var lines = new List<object>();
-        await using (var c = s.Command("select p.name, p.internal_sku, l.quantity, l.amount from sales.sale_return_line l join catalog.product p on p.id=l.product_id where l.return_id=@i order by p.name"))
+        await using (var c = s.Command("select coalesce(sl.description,p.name), p.internal_sku, l.quantity, l.amount from sales.sale_return_line l join sales.sale_line sl on sl.tenant_id=l.tenant_id and sl.sale_id=l.sale_id and sl.line_id=l.sale_line_id left join catalog.product p on p.tenant_id=l.tenant_id and p.id=l.product_id where l.return_id=@i order by sl.line_number"))
         {
             c.Parameters.AddWithValue("i", id);
             await using var r = await c.ExecuteReaderAsync(ct);
-            while (await r.ReadAsync(ct)) lines.Add(new { product = r.GetString(0), sku = r.GetString(1), quantity = r.GetDecimal(2), amount = r.GetDecimal(3) });
+            while (await r.ReadAsync(ct)) lines.Add(new { product = r.GetString(0), sku = r.IsDBNull(1) ? null : r.GetString(1), quantity = r.GetDecimal(2), amount = r.GetDecimal(3) });
         }
         return ServiceResult<object>.Ok(new { @return = head, lines });
     }
@@ -486,7 +486,7 @@ public sealed class AfterSalesService(TenantDb db)
 
             var historicalLines = new List<(Guid ProductId, decimal Qty, decimal Cost)>();
             await using (var q = s.Command(@"select l.product_id, l.quantity, coalesce((select -sum(m.value_delta) from inventory.stock_movement m where m.source_type='Sale' and m.source_id=l.sale_id and m.product_id=l.product_id),0)
-                from sales.sale_line l where l.sale_id=@i order by l.product_id"))
+                from sales.sale_line l where l.sale_id=@i and l.product_id is not null order by l.product_id"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
