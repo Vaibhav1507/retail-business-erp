@@ -220,7 +220,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setSourceInvoiceDate(draft.date && /^\d{4}-\d{2}-\d{2}$/.test(draft.date) ? draft.date : '')
     if (draft.customerName) { setCustomerId(''); setName(draft.customerName) }
     if (draft.customerPhone) setPhone(draft.customerPhone)
-    if (draft.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(draft.date)) setDate(draft.date)
+    if (draft.date && /^\d{4}-\d{2}-\d{2}$/.test(draft.date)) setDate(draft.date)
   }
 
   function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
