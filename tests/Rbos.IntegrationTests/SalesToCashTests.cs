@@ -482,6 +482,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var response = await c.Send(HttpMethod.Post, "/sales", new
         {
             customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            sourceInvoiceRef = "SRC-2026-1122", sourceInvoiceDate = Today,
             lines = new[] { new { productId = (Guid?)null, description = "", model = "ZX-9000", quantity = 1m, unitPrice = 125m, discount = 0m } }
         }, K());
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -489,6 +490,8 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         var detail = await c.GetJson("/sales/" + id);
         Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("product").GetString());
         Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("model").GetString());
+        Assert.Equal("SRC-2026-1122", detail.GetProperty("sourceInvoiceRef").GetString());
+        Assert.Equal(Today.ToString("yyyy-MM-dd"), detail.GetProperty("sourceInvoiceDate").GetString());
         Assert.Equal(before, (await c.GetJson("/products")).EnumerateArray().Count());
     }
 
