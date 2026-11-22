@@ -92,3 +92,17 @@
   .item-tag-uploader { align-items: stretch; }
   .item-tag-source-options { width: 100%; }
 }
+
+.invoice-product-more-details {
+  margin-top: 12px;
+  border-top: 1px solid var(--line, #e3e7e5);
+  padding-top: 10px;
+}
+.invoice-product-more-details summary {
+  cursor: pointer;
+  color: var(--muted, #5b6770);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.invoice-product-more-details[open] summary { margin-bottom: 12px; }
