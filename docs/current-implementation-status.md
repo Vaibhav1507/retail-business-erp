@@ -1,6 +1,6 @@
 # Current implementation and repository status
 
-**Reviewed:** 2026-11-18 (PR #47 documentation refresh)  
+**Reviewed:** 2026-11-22 (PR #64 flexible sales and handwritten invoice follow-up)  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
@@ -18,6 +18,29 @@
 | P0.5 One-shop financial E2E | Existing synthetic integration/E2E suites cover opening stock, sales, collections, returns/cancellation, stock verification, tenant isolation, idempotency and negative-stock rejection across focused tests. | Not yet a single repeatable 25-step end-to-end scenario. GST profile setup, both invoice print modes and complete P&L/balance-sheet assertions need explicit consolidated acceptance. Do not mark pilot-accepted. |
 
 No application schema migration was added by this P0 remediation. CI migration validation targets a disposable synthetic PostgreSQL database only. No production database, secret, deployment or AI provider was accessed. Manual acceptance and CA review remain separate from CI. The one-shop consolidated financial journey is still an acceptance gap; do not infer pilot readiness from merging this PR.
+
+
+## Flexible sales and handwritten sales invoice capture — PR #64 (open, draft, unmerged)
+
+**Branch:** `feat/flexible-sales-handwritten-invoice`  
+**Latest implementation/documentation head at this update:** `bcd13c26a16997e2c69ddd6bcf98578724ac00cc`.
+
+| Scope | Implementation state | Remaining gate |
+|---|---|---|
+| Zero/insufficient-stock sales | Implemented through normal sales posting; physical location quantity may be negative while product-wide valued inventory stays non-negative | Full regression and CA/business-owner review of provisional-cost policy |
+| Negative-stock costing | Positive WAC/latest positive incoming movement fallback; fail closed without cost history; same-location FIFO receipt settlement and account 1410 clearing | Review journal/period-lock/partial receipt/return/cancellation edge cases before production |
+| Ad-hoc invoice rows | Implemented with nullable product FK, stable line identity and description/model snapshots; no implicit catalogue creation | Browser workflow and downstream regression acceptance |
+| Duplicate product rows | Implemented as distinct lines; returns/cancellations use exact line identity | Final review of reports/printing/serial/IMEI and offline sync paths |
+| Handwritten invoice capture | Photo capture/upload, editable extraction review and normal sales posting; extraction has no posting authority | Accuracy validation against a representative real-world handwritten corpus |
+| PDF invoice capture | JPEG/PNG/WebP/PDF accepted up to 8 MB; PDF sent natively to Gemini; image-only Groq and local image OCR are skipped for PDF | Exact-head CI and live-provider acceptance with consented sample PDFs |
+| Source invoice metadata | Confirmed source reference/date stored separately from RBOS legal invoice numbering | Regression verification included in latest CI |
+| Source document retention | Original photo/PDF is deliberately not retained; source reference/date are retained after operator confirmation | Revisit only if owner defines tenant-level evidence access, retention and deletion policy |
+| Repository documentation | Plan, ADR-025/026, inventory invariants, transaction model, implementation log and this status index updated | Keep log/status synchronized with final CI and review outcome |
+
+**CI:** Earlier feature-code run #903 passed backend, frontend and PostgreSQL integration. Run #914 found one test assertion reading sale metadata at the wrong response level; corrected. The latest exact-head run #923 is running against `bcd13c26`; frontend was still running at last check and backend/PostgreSQL integration were in progress. [Run #923](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45021362904).
+
+**Release boundary:** PR #64 remains draft/open and is not in `main`. No production migration, deployment, merge, secret change or provider configuration change has been made. Do not infer production readiness from branch implementation or earlier green CI. Accounting owner/CA review and real-world document accuracy acceptance remain separate release gates.
+
 
 ## Product and pilot status
 
