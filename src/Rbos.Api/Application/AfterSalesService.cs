@@ -297,6 +297,10 @@ public sealed class AfterSalesService(TenantDb db)
                             status=case when @q=0 then 'Settled' else 'Open' end, updated_at=now()
                         where tenant_id=@t and sale_line_id=@line",
                         ("q", newRemainingQty), ("c", newRemainingCost), ("t", tenantId), ("line", saleLineId));
+                    await Exec(s, ct, @"update sales.sale_line
+                        set provisional_cost_amount=greatest(0,provisional_cost_amount-@c)
+                        where tenant_id=@t and sale_id=@s and line_id=@line",
+                        ("c", provisionalReturnCost.Amount), ("t", tenantId), ("s", m.SaleId), ("line", saleLineId));
                 }
                 costed.Add((saleLineId, productId, inventoryProductId, line.Quantity.Value,
                     inventoryReturnQty, provisionalReturnQty, amount, unitCost, inventoryReturnCost, provisionalReturnCost));
@@ -337,7 +341,7 @@ public sealed class AfterSalesService(TenantDb db)
                     ("p", (object?)x.ProductId ?? DBNull.Value), ("q", x.Quantity), ("a", x.Amount.Amount),
                     ("c", x.UnitCost), ("ca", totalCost), ("iq", x.InventoryQuantity), ("pq", x.ProvisionalQuantity),
                     ("ic", x.InventoryCost.Amount), ("pc", x.ProvisionalCost.Amount));
-                if (x.ProductId is not Guid productId || x.InventoryProductId is not Guid returnProductId) continue;
+                if (x.InventoryProductId is not Guid returnProductId) continue;
                 var movementUnitCost = x.InventoryQuantity > 0
                     ? WeightedAverageCostCalculator.RoundWac(x.InventoryCost.Amount / x.InventoryQuantity) : 0m;
                 await Exec(s, ct, "insert into inventory.stock_movement(tenant_id,id,product_id,location_id,quantity_delta,unit_cost,value_delta,effective_date,source_type,source_id) values (@t,@i,@p,@l,@q,@c,@v,@e,'SaleReturn',@d)",
