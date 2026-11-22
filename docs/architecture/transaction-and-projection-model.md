@@ -73,3 +73,12 @@ No projection is ever an independent source of truth. No UI edits a projection.
 ## 6. Outbox
 
 Not used in Phase 1A. Introduced only when a side effect must leave the database transaction (e.g. email notification). Documented in ADR-015.
+
+
+## Proposed extension: flexible sales and negative-stock reconciliation (ADR-025)
+
+The current sequence rejects insufficient physical stock and the current WAC projection is product-wide while stock balance is location-scoped. Do not remove the guard without replacing the valuation model. The proposed posting transaction must persist (a) the actual location quantity movement, (b) the valued inventory quantity/value consumed, (c) positive provisional cost for the unvalued deficit tied to each sale line, and (d) a balanced sale journal. A later receipt allocates to outstanding deficits deterministically and posts a linked cost-of-sales adjustment; only unconsumed receipt quantity/value enters WAC. All source records, projections and journals commit atomically. Detailed policy gates are in ADR-025 and the implementation plan. This section is design-only until migration and tests are merged.
+
+## Proposed extension: handwritten sales invoice capture (ADR-026)
+
+Document extraction is an unposted draft operation. It stores tenant-scoped evidence and returns editable suggestions; it does not create sale lines, stock movements, journals, customer balances or legal invoice numbers. Human-confirmed data enters the existing sales posting transaction. AI output is untrusted and cannot own tax, totals, costing or posting decisions.
