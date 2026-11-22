@@ -214,7 +214,16 @@ public sealed class ItemTagCaptureService(
                 }
                 matchTimer.Stop();
 
-                var status = HasUsableItemTagExtraction(extracted) ? "ReadyForReview" : "NeedsAttention";
+                // A barcode is an identifier, not sufficient product identity by itself.
+                // Only mark the scan ready when the vision result contains a product name
+                // or model, or a validated catalogue lookup resolved the barcode.
+                var hasProductIdentity = HasUsableItemTagExtraction(extracted);
+                var hasCatalogueMatch = match.ProductId is not null;
+                if (!hasProductIdentity && !hasCatalogueMatch && !string.IsNullOrWhiteSpace(barcode))
+                {
+                    warnings.Add("Barcode detected, but product name/model could not be read and no catalogue match was found. Complete the product details manually before adding this invoice row.");
+                }
+                var status = hasProductIdentity || hasCatalogueMatch ? "ReadyForReview" : "NeedsAttention";
                 requestTimer.Stop();
                 log.LogInformation(
                     "Item-tag scan completed. Status {Status}, barcode decoded locally {LocalBarcode}, catalogue match {Matched}, OCR used {OcrUsed}, bytes {UploadedBytes}, match latency {MatchMs}ms, total latency {TotalMs}ms, trace {TraceId}",
@@ -389,10 +398,12 @@ public sealed class ItemTagCaptureService(
     static bool HasUsableItemTagExtraction(JsonNode? value)
     {
         if (value is not JsonObject obj) return false;
-        foreach (var key in new[] { "productName", "brand", "model", "barcode", "serial", "imei1", "imei2", "hsn" })
-            if (!string.IsNullOrWhiteSpace(ReadString(obj[key]))) return true;
-        try { return obj["mrp"]?.GetValue<decimal?>() is >= 0; }
-        catch (Exception e) when (e is InvalidOperationException or FormatException) { return false; }
+
+        // Provider fallback should continue until it returns a descriptive product
+        // identity. Barcode/serial/IMEI/HSN/MRP values alone are not enough to identify
+        // the catalogue item and must not turn an incomplete vision attempt into success.
+        return !string.IsNullOrWhiteSpace(ReadString(obj["productName"])) ||
+               !string.IsNullOrWhiteSpace(ReadString(obj["model"]));
     }
 
     static byte[] PrepareVisionImage(byte[] original, string mime, out string outputMime)
