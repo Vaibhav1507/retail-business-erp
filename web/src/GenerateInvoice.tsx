@@ -62,6 +62,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [tagCaptureKey, setTagCaptureKey] = useState(0)
   const [salesInvoiceDraft, setSalesInvoiceDraft] = useState<ExtractedSalesInvoice | null>(null)
   const [salesInvoiceWarnings, setSalesInvoiceWarnings] = useState<string[]>([])
+  const [sourceInvoiceRef, setSourceInvoiceRef] = useState('')
+  const [sourceInvoiceDate, setSourceInvoiceDate] = useState('')
   const [brandText, setBrandText] = useState('')
   const [modelText, setModelText] = useState('')
   const [categoryText, setCategoryText] = useState('')
@@ -214,6 +216,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[]) {
     setSalesInvoiceDraft(draft)
     setSalesInvoiceWarnings(warnings)
+    setSourceInvoiceRef(draft.invoiceNumber?.trim() ?? '')
+    setSourceInvoiceDate(draft.date && /^\d{4}-\d{2}-\d{2}$/.test(draft.date) ? draft.date : '')
     if (draft.customerName) { setCustomerId(''); setName(draft.customerName) }
     if (draft.customerPhone) setPhone(draft.customerPhone)
     if (draft.date && /^\\d{4}-\\d{2}-\\d{2}$/.test(draft.date)) setDate(draft.date)
@@ -336,7 +340,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       const part = Number(paid || 0)
       const part2 = Number(paid2 || 0)
       const payments = credit && part2 > 0 ? [{ method: payMethod, amount: part }, { method: payMethod2, amount: part2 }].filter(x => x.amount > 0) : undefined
-      saleBody = { customerId: cid || null, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null }
+      saleBody = { customerId: cid || null, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null,
+        sourceInvoiceRef: sourceInvoiceRef.trim() || null, sourceInvoiceDate: sourceInvoiceDate || null }
 
       if (offlineMode || !navigator.onLine) {
         await queueOfflineSale(ownerKey, saleBody, key)
@@ -378,7 +383,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
     setTagCaptureKey(value => value + 1)
-    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([])
+    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate('')
     setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
@@ -537,7 +542,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </table></div>}
           <div className="billing-row">
             <button type="button" onClick={addCapturedLines} disabled={salesInvoiceDraft.lines.length === 0}>Add reviewed lines to bill</button>
-            <button type="button" className="secondary" onClick={() => { setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]) }}>Discard extraction</button>
+            <button type="button" className="secondary" onClick={() => { setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate('') }}>Discard extraction</button>
           </div>
         </div>}
         {items.length > 0 && <table className="billing-table">
