@@ -8,7 +8,10 @@ alter table sales.sale_line
   add column brand text,
   add column model text,
   add column hsn_code text,
-  add column is_stock_tracked boolean not null default true;
+  add column is_stock_tracked boolean not null default true,
+  add column inventory_cost_amount numeric(18,2) not null default 0 check (inventory_cost_amount >= 0),
+  add column provisional_cost_amount numeric(18,2) not null default 0 check (provisional_cost_amount >= 0),
+  add column provisional_quantity numeric(18,3) not null default 0 check (provisional_quantity >= 0);
 
 update sales.sale_line sl
 set description = p.name,
@@ -17,6 +20,15 @@ set description = p.name,
     hsn_code = p.hsn_code
 from catalog.product p
 where p.tenant_id = sl.tenant_id and p.id = sl.product_id;
+
+update sales.sale_line sl
+set inventory_cost_amount = coalesce((
+  select -sum(m.value_delta)
+  from inventory.stock_movement m
+  where m.tenant_id=sl.tenant_id and m.source_type='Sale'
+    and m.source_id=sl.sale_id and m.product_id=sl.product_id
+), round(sl.quantity * sl.unit_cost, 2))
+where sl.product_id is not null;
 
 alter table sales.sale_line
   alter column description set not null,
