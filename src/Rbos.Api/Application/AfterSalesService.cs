@@ -180,7 +180,7 @@ public sealed class AfterSalesService(TenantDb db)
             Guid locationId = Guid.Empty;
             DateOnly saleDate = default;
             var found = false;
-            await using (var q = s.Command("select customer_id, location_id, sale_date from sales.sale where id=@i"))
+            await using (var q = s.Command("select customer_id, location_id, sale_date from sales.sale where id=@i for update"))
             {
                 q.Parameters.AddWithValue("i", m.SaleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
@@ -611,7 +611,7 @@ public sealed class AfterSalesService(TenantDb db)
             var found = false;
             await using (var q = s.Command(@"select location_id, sale_date, total, amount_paid,
                     inventory_cost_total, provisional_cost_total
-                from sales.sale where id=@i"))
+                from sales.sale where id=@i for update"))
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
