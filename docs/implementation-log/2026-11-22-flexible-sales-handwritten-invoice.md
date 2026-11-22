@@ -3,7 +3,7 @@
 - **Repository:** `Vaibhav1507/retail-business-erp`
 - **Baseline:** `main` at `ee50405e5fe5ee29ba9f4b5cbbda163aa5a40fe5`
 - **Branch:** `feat/flexible-sales-handwritten-invoice`
-- **PR:** Not created yet.
+- **PR:** [#64](https://github.com/Vaibhav1507/retail-business-erp/pull/64), draft; continue implementation on this branch/PR.
 - **Production deployment/migration:** Explicitly not performed.
 
 ## Scope
@@ -22,12 +22,13 @@ See [flexible sales and handwritten invoice capture plan](../implementation-plan
 - Use positive provisional cost and a later linked cost adjustment; fallback hierarchy and allocation policy require owner approval and CA review.
 - Ad-hoc lines do not implicitly create catalogue products.
 - Handwritten extraction is a draft only; posting stays in existing sales flow.
+- **Provider rule (owner clarification, 2026-11-22):** Do not use the AI Gateway. Follow the existing image-upload extraction pattern: direct Gemini + shared bounded `VisionProviderFallback`, optional Groq only behind its existing workflow flag, bounded local OCR, server-only credentials and sanitized logs. No new provider/config/secret.
 - No production deployment or production migration.
 
 ## Files changed
 - Added `docs/implementation-plans/flexible-sales-and-handwritten-invoice-capture.md`.
 - Added `docs/adr/adr-025-026-flexible-sales-and-handwritten-capture.md`.
-- Feature code and migrations have not yet been changed at this checkpoint.
+- At the initial documentation checkpoint, feature code and migrations had not yet been changed. Subsequent implementation commits must be recorded below.
 
 ## Tests
 - No feature tests run yet. Baseline CI result above is not feature evidence.
