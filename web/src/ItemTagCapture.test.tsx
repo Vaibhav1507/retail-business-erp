@@ -40,26 +40,26 @@ beforeEach(() => {
 })
 
 describe('ItemTagCapture', () => {
-  it('reads a tag transiently and returns verified invoice row fields without a capture record', async () => {
-    const onAdd = vi.fn(() => true)
-    const { container } = render(
-      <ItemTagCapture products={[{ id: 'p1', name: 'Test Cable' }]} disabled={false} onAdd={onAdd} />
-    )
+  it('offers one compact photo action and fills the shared invoice editor without a preview or second form', async () => {
+    const onExtract = vi.fn()
+    const { container } = render(<ItemTagCapture disabled={false} onExtract={onExtract} />)
+
+    expect(screen.getByRole('button', { name: 'Add tag photo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take photo' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+
     const inputs = container.querySelectorAll('input[type="file"]')
     expect(inputs).toHaveLength(2)
     expect(inputs[0]).toHaveAttribute('capture', 'environment')
-    expect(inputs[1]).toHaveAttribute('multiple')
+    expect(inputs[1]).not.toHaveAttribute('multiple')
 
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'tag.jpg', { type: 'image/jpeg' })
     fireEvent.change(inputs[1], { target: { files: [file] } })
 
-    expect(await screen.findByText(/Tag read — verify/)).toBeInTheDocument()
-    expect(await screen.findByAltText('Captured product tag preview')).toBeInTheDocument()
-    expect(screen.getAllByDisplayValue('Test Cable')).toHaveLength(2)
-    expect(screen.getByDisplayValue('abC-01oI')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Use details in invoice' }))
-
-    await waitFor(() => expect(onAdd).toHaveBeenCalledWith({
+    expect(await screen.findByText(/Tag details filled in/)).toBeInTheDocument()
+    expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Product name')).not.toBeInTheDocument()
+    await waitFor(() => expect(onExtract).toHaveBeenCalledWith({
       productId: 'p1', name: 'Test Cable', brand: 'RBOS', model: 'CB-1',
       category: '', barcode: '4006381333931', barcodeSymbology: 'EAN_13',
       serials: ['abC-01oI'], imei1: '490154203237518', imei2: '490154203237526', mrp: null, hsn: ''
@@ -75,9 +75,8 @@ describe('ItemTagCapture', () => {
   })
 
   it('shows a helpful error for unsupported images without uploading', async () => {
-    const { container } = render(
-      <ItemTagCapture products={[]} disabled={false} onAdd={() => true} />
-    )
+    const { container } = render(<ItemTagCapture disabled={false} onExtract={() => undefined} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
     const input = container.querySelectorAll('input[type="file"]')[1]
     const file = new File(['not an image'], 'tag.txt', { type: 'text/plain' })
     fireEvent.change(input, { target: { files: [file] } })
@@ -85,10 +84,8 @@ describe('ItemTagCapture', () => {
     expect(fetchMock).not.toHaveBeenCalledWith('/api/sales/item-tag-scan', expect.anything())
   })
 
-  it('disables capture while offline', () => {
-    render(<ItemTagCapture products={[]} disabled onAdd={() => true} />)
-    const buttons = screen.getAllByRole('button')
-    expect(buttons.find(button => button.textContent === 'Take photo')).toBeDisabled()
-    expect(buttons.find(button => button.textContent === 'Choose photo(s)')).toBeDisabled()
+  it('disables tag upload while offline', () => {
+    render(<ItemTagCapture disabled onExtract={() => undefined} />)
+    expect(screen.getByRole('button', { name: 'Add tag photo' })).toBeDisabled()
   })
 })

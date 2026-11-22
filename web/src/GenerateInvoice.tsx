@@ -3,7 +3,6 @@ import { api, ApiError } from './api'
 import './invoice.css'
 import './billing-forms.css'
 import { InvoiceDocument } from './InvoiceDocument'
-import { BarcodeScanner, type ScanResult } from './BarcodeScanner'
 import { ItemTagCapture, type CapturedInvoiceItem } from './ItemTagCapture'
 import { t as tr } from './i18n'
 import { whatsappStatusLabel } from './whatsappStatus'
@@ -59,7 +58,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [items, setItems] = useState<Item[]>([])
   const [pname, setPname] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [tagDetails, setTagDetails] = useState<CapturedInvoiceItem | null>(null)
+  const [tagCaptureKey, setTagCaptureKey] = useState(0)
+  const [brandText, setBrandText] = useState('')
+  const [modelText, setModelText] = useState('')
+  const [categoryText, setCategoryText] = useState('')
+  const [barcodeText, setBarcodeText] = useState('')
+  const [barcodeSymbology, setBarcodeSymbology] = useState('')
+  const [imei1Text, setImei1Text] = useState('')
+  const [imei2Text, setImei2Text] = useState('')
+  const [mrpText, setMrpText] = useState('')
+  const [hsnText, setHsnText] = useState('')
   const [showProducts, setShowProducts] = useState(false)
   const [qty, setQty] = useState('1')
   const [price, setPrice] = useState('')
@@ -70,7 +78,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [invNo, setInvNo] = useState('')
   const [whatsappStatus, setWhatsappStatus] = useState('NotAvailable')
   const [serialText, setSerialText] = useState('')
-  const [scanning, setScanning] = useState(false)
   const [warn, setWarn] = useState('')
     const [billDisc, setBillDisc] = useState('')
     const [held, setHeld] = useState<Held[]>([])
@@ -176,23 +183,25 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const match = products.find(p => p.name.toLowerCase() === typed)
   const suggestions = useMemo(() => (typed ? products.filter(p => p.name.toLowerCase().includes(typed)) : products).slice(0, 8), [products, typed])
 
-  async function onScan(r: ScanResult) {
-	setScanning(false); setError('')
-	try {
-	  const p = await api<{ productId: string; name: string }>('GET', '/products/by-barcode?code=' + encodeURIComponent(r.code))
-	  setPname(p.name); setSelectedProductId(p.productId); setQty('1'); setShowProducts(false)
-	} catch (e) { setError(e instanceof ApiError && e.status === 404 ? 'No product has code ' + r.code + '. Type the product name instead.' : msg(e)) }
-  }
-
-  function acceptCapturedItem(item: CapturedInvoiceItem): boolean {
-    if (pname.trim() || price.trim() || serialText.trim() || tagDetails) return false
-    setPname(item.name)
-    setSelectedProductId(item.productId)
-    setQty('1')
+  function applyCapturedItem(item: CapturedInvoiceItem) {
+    // Keep the invoice editor as the single source of truth for both manual entry
+    // and tag-assisted entry. The scan fills these fields; the same Add product
+    // action then creates the invoice row.
+    setPname(item.name || '')
+    setSelectedProductId(item.productId || '')
+    setBrandText(item.brand || '')
+    setModelText(item.model || '')
+    setCategoryText(item.category || '')
+    setBarcodeText(item.barcode || '')
+    setBarcodeSymbology(item.barcodeSymbology || '')
     setSerialText(item.serials.join(', '))
-    setTagDetails(item)
+    setImei1Text(item.imei1 || '')
+    setImei2Text(item.imei2 || '')
+    setMrpText(item.mrp == null ? '' : String(item.mrp))
+    setHsnText(item.hsn || '')
+    setQty('1')
+    setShowProducts(false)
     setError('')
-    return true
   }
 
   async function removeInvoiceItem(index: number) {
@@ -200,45 +209,50 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function addItem() {
-    const serials = serialText.split(/[\\s,;]+/).map(x => x.trim()).filter(Boolean)
+    const serials = serialText.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)
     const quantity = Number(qty), unitPrice = Number(price), discount = Number(disc || 0)
+    const mrp = mrpText.trim() ? Number(mrpText) : null
     if (!typed || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product, quantity and price.'); return }
+    if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) { setError('Enter a valid MRP.'); return }
     const productId = selectedProductId || match?.id || ''
     const existing = productId ? items.find(item => item.productId === productId) : undefined
     if (existing && (existing.unitPrice !== unitPrice || existing.discount !== discount)) {
       setError('This product is already on the bill with a different price or discount. Keep one price per product line.')
       return
     }
-    if (existing && tagDetails?.barcode && existing.barcode && existing.barcode !== tagDetails.barcode) {
+    if (existing && barcodeText.trim() && existing.barcode && existing.barcode !== barcodeText.trim()) {
       setError('This product already has a different barcode on this bill. Verify the product or add a separate catalogue product.')
       return
     }
     const newItem: Item = {
       productId, name: match?.name ?? pname.trim(), quantity, unitPrice, discount, serials,
-      imei1s: tagDetails?.imei1 ? [tagDetails.imei1.trim()] : [],
-      imei2s: tagDetails?.imei2 ? [tagDetails.imei2.trim()] : [],
-      ...(tagDetails ? {
-        barcode: tagDetails.barcode || undefined,
-        barcodeSymbology: tagDetails.barcodeSymbology || undefined,
-        brand: tagDetails.brand || undefined,
-        model: tagDetails.model || undefined,
-        category: tagDetails.category || undefined,
-        mrp: tagDetails.mrp,
-        hsn: tagDetails.hsn || undefined
-      } : {})
+      imei1s: imei1Text.trim() ? [imei1Text.trim()] : [],
+      imei2s: imei2Text.trim() ? [imei2Text.trim()] : [],
+      barcode: barcodeText.trim() || undefined,
+      barcodeSymbology: barcodeSymbology || undefined,
+      brand: brandText.trim() || undefined,
+      model: modelText.trim() || undefined,
+      category: categoryText.trim() || undefined,
+      mrp,
+      hsn: hsnText.trim() || undefined
     }
     setError('')
     if (existing) {
       setItems(current => current.map(item => item.productId === productId
         ? { ...item, quantity: item.quantity + quantity, serials: [...item.serials, ...serials],
             imei1s: [...item.imei1s, ...newItem.imei1s], imei2s: [...item.imei2s, ...newItem.imei2s],
-            barcode: item.barcode ?? newItem.barcode, barcodeSymbology: item.barcodeSymbology ?? newItem.barcodeSymbology }
+            barcode: item.barcode ?? newItem.barcode, barcodeSymbology: item.barcodeSymbology ?? newItem.barcodeSymbology,
+            brand: item.brand ?? newItem.brand, model: item.model ?? newItem.model,
+            category: item.category ?? newItem.category, mrp: item.mrp ?? newItem.mrp, hsn: item.hsn ?? newItem.hsn }
         : item))
     } else {
       setItems(current => [...current, newItem])
     }
-    setPname(''); setSelectedProductId(''); setTagDetails(null)
+    setPname(''); setSelectedProductId('')
+    setBrandText(''); setModelText(''); setCategoryText(''); setBarcodeText(''); setBarcodeSymbology('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText('')
+    setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
+    setTagCaptureKey(value => value + 1)
   }
 
   function review() {
@@ -328,7 +342,12 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function clearForm() {
-    setItems([]); setSelectedProductId(''); setTagDetails(null); setPname(''); setPrice(''); setSerialText(''); setBillDisc(''); setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
+    setItems([]); setSelectedProductId(''); setPname('')
+    setBrandText(''); setModelText(''); setCategoryText(''); setBarcodeText(''); setBarcodeSymbology('')
+    setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
+    setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
+    setTagCaptureKey(value => value + 1)
+    setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
   async function hold() {
@@ -434,9 +453,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
       <div className="billing-card">
         <h3>{tr('bill.products')}</h3>
-          <div className="billing-row"><button type="button" onClick={addItem}>{tr('bill.add')}</button><button type="button" className="secondary" onClick={() => setScanning(true)}>{tr('bill.scan')}</button>{pname.trim() && !match && <span className="billing-hint">Not in your products. It will be added as a new product when you confirm.</span>}</div>
-        <ItemTagCapture products={products} disabled={offlineMode || !navigator.onLine} onAdd={acceptCapturedItem} />
-        <div className="billing-grid">
+        <div className="billing-grid invoice-product-editor">
           <div className="billing-field billing-col-6 billing-rel">
             <label htmlFor="billing-prod">{tr('bill.product')}</label>
             <input id="billing-prod" autoComplete="off" placeholder="Search or type a new product" value={pname}
@@ -445,16 +462,31 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               {suggestions.map(p => <li key={p.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); setPname(p.name); setSelectedProductId(p.id); setShowProducts(false) }}><strong>{p.name}</strong></li>)}
             </ul>}
           </div>
+          <div className="billing-field billing-col-3"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
+          <div className="billing-field billing-col-3"><label htmlFor="billing-model">Model</label><input id="billing-model" autoComplete="off" value={modelText} onChange={e => setModelText(e.target.value)} /></div>
           <div className="billing-field billing-col-2"><label htmlFor="billing-qty">{tr('bill.qty')}</label><input id="billing-qty" inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => setQty(e.target.value)} /></div>
-          <div className="billing-field billing-col-2"><label htmlFor="billing-price">{tr('bill.price')}</label><input id="billing-price" inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => setPrice(e.target.value)} /></div>
+          <div className="billing-field billing-col-3"><label htmlFor="billing-price">{tr('bill.price')}</label><input id="billing-price" inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => setPrice(e.target.value)} /></div>
           <div className="billing-field billing-col-2"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" inputMode="decimal" value={disc} onChange={e => setDisc(e.target.value)} /></div>
-          <div className="billing-field billing-col-4"><label htmlFor="billing-serial">Serial / IMEI (optional)</label><input id="billing-serial" autoComplete="off" value={serialText} onChange={e => setSerialText(e.target.value)} /></div>
-          
-          {scanning && <BarcodeScanner title="Scan product" onScan={onScan} onClose={() => setScanning(false)} />}
+          <div className="billing-field billing-col-5"><label htmlFor="billing-serial">Serial / IMEI (optional)</label><input id="billing-serial" autoComplete="off" value={serialText} onChange={e => setSerialText(e.target.value)} /></div>
+        </div>
+        <details className="invoice-product-more-details">
+          <summary>More tag details</summary>
+          <div className="billing-grid">
+            <div className="billing-field billing-col-4"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
+            <div className="billing-field billing-col-4"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
+            <div className="billing-field billing-col-4"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" inputMode="decimal" value={mrpText} onChange={e => setMrpText(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-hsn">HSN</label><input id="billing-hsn" value={hsnText} onChange={e => setHsnText(e.target.value)} /></div>
+          </div>
+        </details>
+        <div className="billing-row invoice-product-actions">
+          <button type="button" onClick={addItem}>{tr('bill.add')}</button>
+          <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
+          {pname.trim() && !match && <span className="billing-hint">This product will be added to your catalogue when you confirm the invoice.</span>}
         </div>
         {items.length > 0 && <table className="billing-table">
           <thead><tr><th>{tr('bill.item')}</th><th>{tr('bill.qty')}</th><th>{tr('bill.price')}</th><th>{tr('bill.disc')}</th><th>{tr('bill.amount')}</th><th /></tr></thead>
-          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
+          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.brand && <small> Brand: {i.brand}</small>}{i.model && <small> Model: {i.model}</small>}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
         </table>}
       </div>
 

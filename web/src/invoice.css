@@ -57,31 +57,52 @@
 @media print { .invoice-modal { position: static; background: none; padding: 0; overflow: visible; } .invoice-modal-box { box-shadow: none; padding: 0; max-width: none; } }
 
 
-.item-tag-card { margin-top: 14px; }
-.item-tag-review {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  border: 1px solid var(--line, #d8dee8);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 12px;
+.item-tag-uploader {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   min-width: 0;
 }
-.item-tag-preview {
-  display: block;
-  width: min(100%, 320px);
-  max-height: 240px;
-  aspect-ratio: 4 / 3;
-  object-fit: contain;
-  justify-self: start;
-  border-radius: 8px;
-  background: #f4f6f8;
+.item-tag-source-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.item-tag-status { font-weight: 600; }
-.item-tag-review .billing-grid { margin-top: 4px; }
+.item-tag-feedback {
+  color: var(--muted, #5b6770);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.item-tag-warning, .item-tag-error {
+  flex-basis: 100%;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.item-tag-warning { color: var(--muted, #5b6770); }
+.item-tag-error { color: #b3261e; }
+.invoice-product-actions {
+  align-items: center;
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+.invoice-product-actions .billing-hint { margin: 0; }
 @media (max-width: 640px) {
-  .item-tag-review { padding: 10px; }
-  .item-tag-review .billing-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-  .item-tag-review .billing-col-6 { grid-column: span 12; }
+  .invoice-product-actions { align-items: stretch; }
+  .item-tag-uploader { align-items: stretch; }
+  .item-tag-source-options { width: 100%; }
 }
+
+.invoice-product-more-details {
+  margin-top: 12px;
+  border-top: 1px solid var(--line, #e3e7e5);
+  padding-top: 10px;
+}
+.invoice-product-more-details summary {
+  cursor: pointer;
+  color: var(--muted, #5b6770);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.invoice-product-more-details[open] summary { margin-bottom: 12px; }
