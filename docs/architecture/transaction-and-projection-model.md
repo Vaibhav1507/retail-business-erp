@@ -29,7 +29,7 @@ Sequence inside the transaction:
 2  check idempotency key → if found, return stored response (no writes)
 3  load document FOR UPDATE; verify Draft; verify period not locked
 4  lock affected item_cost rows FOR UPDATE (ordered by variant id to avoid deadlocks)
-5  validate: stock sufficiency (negative blocked), units, tax rule verified/flagged, permissions
+5  validate: units, tax rule verified/flagged, permissions; permit physical deficit only with a positive provisional cost and exact sale-line commitment
 6  assign legal number (series row FOR UPDATE)
 7  insert movements with valuation; update stock_balance and item_cost
 8  build journal entry from posting rule; validate balance in application
@@ -43,7 +43,7 @@ Any failure rolls back everything; the client may retry with the same key.
 
 ## 3. Concurrency
 
-- Item-cost rows locked in deterministic order prevent WAC races and overselling.
+- Stock-balance and item-cost rows are locked in deterministic product order. Physical negative quantity is allowed only through the sale transaction; valued item-cost quantity/value are bounded at zero. Receipt settlement locks affected sale rows before commitment rows to serialize with returns/cancellations.
 - Number series row lock serialises numbering per series only.
 - Drafts use optimistic concurrency (`xmin` / If-Match).
 - Posting is short; no external calls inside the transaction.
@@ -73,3 +73,12 @@ No projection is ever an independent source of truth. No UI edits a projection.
 ## 6. Outbox
 
 Not used in Phase 1A. Introduced only when a side effect must leave the database transaction (e.g. email notification). Documented in ADR-015.
+
+
+## Flexible sales and negative-stock reconciliation (ADR-025; PR #64 branch)
+
+The implementation persists separate physical quantity and valued cost effects. A sale consumes available product-wide valued quantity at WAC and records any remaining deficit at a positive provisional cost on the exact sale line. Location `stock_balance` may become negative; `item_cost` quantity/value cannot. Fallback is current positive WAC, otherwise the latest positive incoming-movement unit cost; no cost history means posting fails. Purchase receipts at the same location allocate FIFO to open commitments. The receipt adds the full physical quantity to the location balance, adds only unconsumed quantity/value to WAC, and posts a balanced adjustment between account 1410 Negative Stock Clearing, Inventory and COGS for actual-versus-provisional cost. Returns reverse provisional and valued quantities separately; cancellations restore full physical quantity but only valued inventory and reverse the clearing balance. Sale-line IDs support repeated products and ad-hoc rows. This is implemented on the feature branch, not yet merged/deployed.
+
+## Proposed extension: handwritten sales invoice capture (ADR-026)
+
+Document extraction is an unposted draft operation. The current slice processes the image in memory without retaining it and returns editable suggestions; it does not create sale lines, stock movements, journals, customer balances or legal invoice numbers. Human-confirmed data enters the existing sales posting transaction. AI output is untrusted and cannot own tax, totals, costing or posting decisions.

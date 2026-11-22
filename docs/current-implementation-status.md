@@ -1,6 +1,6 @@
 # Current implementation and repository status
 
-**Reviewed:** 2026-11-18 (PR #47 documentation refresh)  
+**Reviewed:** 2026-11-22 (PR #64 flexible sales and handwritten invoice follow-up)  
 **Repository:** `Vaibhav1507/retail-business-erp`  
 **Source of truth:** `main` remains the merged-code baseline. Open feature PRs listed below are unmerged proposals/implementations and are not part of `main` or a production deployment. CI results apply only to the exact commit tested. This document is a status index, not a substitute for the detailed architecture, finance, security or workflow specifications.
 
@@ -18,6 +18,29 @@
 | P0.5 One-shop financial E2E | Existing synthetic integration/E2E suites cover opening stock, sales, collections, returns/cancellation, stock verification, tenant isolation, idempotency and negative-stock rejection across focused tests. | Not yet a single repeatable 25-step end-to-end scenario. GST profile setup, both invoice print modes and complete P&L/balance-sheet assertions need explicit consolidated acceptance. Do not mark pilot-accepted. |
 
 No application schema migration was added by this P0 remediation. CI migration validation targets a disposable synthetic PostgreSQL database only. No production database, secret, deployment or AI provider was accessed. Manual acceptance and CA review remain separate from CI. The one-shop consolidated financial journey is still an acceptance gap; do not infer pilot readiness from merging this PR.
+
+
+## Flexible sales and handwritten sales invoice capture — PR #64 (open, draft, unmerged)
+
+**Branch:** `feat/flexible-sales-handwritten-invoice`  
+**Latest implementation/documentation head at this update:** `bcd13c26a16997e2c69ddd6bcf98578724ac00cc`.
+
+| Scope | Implementation state | Remaining gate |
+|---|---|---|
+| Zero/insufficient-stock sales | Implemented through normal sales posting; physical location quantity may be negative while product-wide valued inventory stays non-negative | Full regression and CA/business-owner review of provisional-cost policy |
+| Negative-stock costing | Positive WAC/latest positive incoming movement fallback; fail closed without cost history; same-location FIFO receipt settlement and account 1410 clearing | Review journal/period-lock/partial receipt/return/cancellation edge cases before production |
+| Ad-hoc invoice rows | Implemented with nullable product FK, stable line identity and description/model snapshots; no implicit catalogue creation | Browser workflow and downstream regression acceptance |
+| Duplicate product rows | Implemented as distinct lines; returns/cancellations use exact line identity | Final review of reports/printing/serial/IMEI and offline sync paths |
+| Handwritten invoice capture | Photo capture/upload, editable extraction review and normal sales posting; extraction has no posting authority | Accuracy validation against a representative real-world handwritten corpus |
+| PDF invoice capture | JPEG/PNG/WebP/PDF accepted up to 8 MB; PDF sent natively to Gemini; image-only Groq and local image OCR are skipped for PDF | Exact-head CI and live-provider acceptance with consented sample PDFs |
+| Source invoice metadata | Confirmed source reference/date stored separately from RBOS legal invoice numbering | Regression verification included in latest CI |
+| Source document retention | Original photo/PDF is deliberately not retained; source reference/date are retained after operator confirmation | Revisit only if owner defines tenant-level evidence access, retention and deletion policy |
+| Repository documentation | Plan, ADR-025/026, inventory invariants, transaction model, implementation log and this status index updated | Keep log/status synchronized with final CI and review outcome |
+
+**CI:** Earlier feature-code run #903 passed backend, frontend and PostgreSQL integration. Run #914 exposed a test assertion reading metadata at the wrong response level. After correcting that, run #923 exposed a genuine request-contract omission: the sales HTTP DTO dropped source invoice reference/date before `SellAsync`. The DTO and mapping are now fixed, and the integration test verifies detail and search. Latest exact-head run #926 is running against `b955f92d98bbb4d8caf9583e6f8b647f595b285f`. [Run #926](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45021589052).
+
+**Release boundary:** PR #64 remains draft/open and is not in `main`. No production migration, deployment, merge, secret change or provider configuration change has been made. Do not infer production readiness from branch implementation or earlier green CI. Accounting owner/CA review and real-world document accuracy acceptance remain separate release gates.
+
 
 ## Product and pilot status
 
@@ -223,3 +246,8 @@ Multipart invoice transport and durable asynchronous item-tag extraction remain 
 - Integration tests now exercise the queue worker with Gemini/Groq credentials explicitly disabled, so they do not make real provider calls. Queue permission tests cover the app/worker privilege boundary. These PostgreSQL integration tests are still disabled in the current PR CI workflow.
 - Migration 050 is not applied to any database. The Cloud Run worker Job command and secret mapping have not been changed. After merge approval, migration 050 and the existing Job configuration must be applied/updated in the intended environment before enabling the asynchronous user flow.
 - No provider credentials, API keys, paid services, billing settings, production database, Cloud Run deployment or provider flags were modified.
+
+
+## Flexible sales and handwritten invoice capture — 2026-11-22
+
+A dedicated implementation branch `feat/flexible-sales-handwritten-invoice` and draft PR [#64](https://github.com/Vaibhav1507/retail-business-erp/pull/64) were created from main `ee50405e5fe5ee29ba9f4b5cbbda163aa5a40fe5`. The scope, selected costing policy and dependencies are recorded in [the implementation plan](implementation-plans/flexible-sales-and-handwritten-invoice-capture.md), ADR-025/026, inventory invariants, transaction/projection model and implementation log. The branch now includes the handwritten invoice extraction/review UI; ad-hoc sale lines without catalogue creation; stable line identity and repeated product rows; zero/insufficient-stock posting with positive provisional cost; same-location FIFO receipt settlement with linked clearing/COGS adjustment; and line-specific returns/cancellation. The extraction path follows the existing ItemTag direct image pipeline and explicitly does not use the AI Gateway. No-cost-history sales fail closed. Migrations 055–057 are committed but not applied to production. Run #869 validated the migration after an ordering fix but surfaced stale tests that expected overselling rejection; those tests and barcode failure setup were updated. Run #872 backend and frontend passed; PostgreSQL integration was still in progress at last check. The indexed tuple quantity compile error was fixed in commit d11afbb; blank description normalization and a model-number-only integration test were added. Exact feature-code commit 7870e389b7eb4daa02a2d79f480f80ed1252cb2f passed backend, frontend and PostgreSQL integration in run #903. Later commits only update documentation; no application code or migrations changed after that green run. Documentation-only run #906 was still running at the last check. The uploaded invoice photo is currently processed in memory and not retained; source-photo retention remains a production decision. Source invoice reference/date are persisted separately from RBOS numbering through migration 057. No production migration or deployment was performed; PR #64 remains draft and is not yet pilot-ready.

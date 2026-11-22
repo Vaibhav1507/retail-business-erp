@@ -1,6 +1,7 @@
 namespace Rbos.Domain;
 
 public sealed record ReturnLineInput(Guid ProductId, decimal Quantity);
+public sealed record SaleReturnLineInput(Guid? ProductId, Guid? SaleLineId, decimal Quantity);
 
 /// <summary>Pure rules for customer collections and customer/supplier returns (Slice 5).</summary>
 public static class AfterSalesRules
@@ -24,6 +25,32 @@ public static class AfterSalesRules
         if (owed <= 0) return Fail("This customer has nothing outstanding.", out error);
         if (amount > owed) return Fail($"Amount exceeds the outstanding balance of {owed:0.00} INR.", out error);
         money = Money.Of(amount); error = null; return true;
+    }
+
+    public static bool TryValidateSaleReturnLines(IReadOnlyList<SaleReturnLineInput>? input, string? reason,
+        out IReadOnlyList<(Guid? ProductId, Guid? SaleLineId, Quantity Quantity)> lines, out string? error)
+    {
+        lines = [];
+        if ((reason?.Trim().Length ?? 0) > 200) return Fail("Reason is too long (max 200 characters).", out error);
+        if (input is null || input.Count == 0) return Fail("Choose at least one line to return.", out error);
+        if (input.Count > MaxLines) return Fail($"At most {MaxLines} lines per return.", out error);
+        if (input.Any(x => x.ProductId is null && x.SaleLineId is null))
+            return Fail("Every returned line must identify the original sale line.", out error);
+        if (input.Select(x => x.SaleLineId).Where(x => x.HasValue).Distinct().Count() != input.Count(x => x.SaleLineId.HasValue))
+            return Fail("Each sale line can appear only once per return.", out error);
+        if (input.Where(x => x.SaleLineId is null && x.ProductId.HasValue)
+            .GroupBy(x => x.ProductId).Any(group => group.Count() > 1))
+            return Fail("Select the exact sale line when a product appears more than once.", out error);
+        var list = new List<(Guid?, Guid?, Quantity)>();
+        foreach (var line in input)
+        {
+            if (!Quantity.TryCreate(line.Quantity, out var quantity, out var quantityError))
+                return Fail(quantityError!, out error);
+            list.Add((line.ProductId, line.SaleLineId, quantity));
+        }
+        lines = list;
+        error = null;
+        return true;
     }
 
     public static bool TryValidateReturnLines(IReadOnlyList<ReturnLineInput>? input, string? reason, out IReadOnlyList<(Guid ProductId, Quantity Quantity)> lines, out string? error)
@@ -55,16 +82,24 @@ public static class AfterSalesRules
         return j;
     }
 
-    /// <summary>Dr Sales revenue; Cr Receivable (up to what the customer owes) and Cr Cash for any refund; Dr Inventory, Cr COGS at original cost.</summary>
+    /// <summary>Reverses the sale revenue and both valued and provisional cost portions.</summary>
     public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(Money revenue, Money receivableCredit, Money cashRefund, Money cost)
+        => CustomerReturnJournal(revenue, receivableCredit, cashRefund, cost, Money.Zero);
+
+    public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(
+        Money revenue, Money receivableCredit, Money cashRefund, Money inventoryCost, Money provisionalCost)
     {
-        if (revenue.Amount <= 0 || receivableCredit.Amount + cashRefund.Amount != revenue.Amount) throw new ArgumentException("Return amounts do not add up.");
-        var j = new List<JournalLineDraft> { new(RevenueAccount, revenue.Amount, 0m) };
-        if (receivableCredit.Amount > 0) j.Add(new(ReceivableAccount, 0m, receivableCredit.Amount));
-        if (cashRefund.Amount > 0) j.Add(new(CashAccount, 0m, cashRefund.Amount));
-        if (cost.Amount > 0) { j.Add(new(InventoryAccount, cost.Amount, 0m)); j.Add(new(CogsAccount, 0m, cost.Amount)); }
-        BalancedJournalPolicy.AssertBalanced(j);
-        return j;
+        if (revenue.Amount <= 0 || receivableCredit.Amount + cashRefund.Amount != revenue.Amount)
+            throw new ArgumentException("Return amounts do not add up.");
+        var journal = new List<JournalLineDraft> { new(RevenueAccount, revenue.Amount, 0m) };
+        if (receivableCredit.Amount > 0) journal.Add(new(ReceivableAccount, 0m, receivableCredit.Amount));
+        if (cashRefund.Amount > 0) journal.Add(new(CashAccount, 0m, cashRefund.Amount));
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, inventoryCost.Amount, 0m));
+        if (provisionalCost.Amount > 0) journal.Add(new(SalesRules.NegativeStockClearingAccount, provisionalCost.Amount, 0m));
+        var totalCost = inventoryCost.Amount + provisionalCost.Amount;
+        if (totalCost > 0) journal.Add(new(CogsAccount, 0m, totalCost));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
     }
 
     /// <summary>Dr Accounts Payable at the purchase cost; Cr Inventory at the cost removed; any difference goes to COGS.</summary>

@@ -48,16 +48,21 @@ public class ReconciliationTests(ApiFactory f) : IClassFixture<ApiFactory>
         await AssertSubledgersMatchLedger(c);
     }
 
-    [Fact] public async Task Rejected_sale_leaves_stock_balances_and_ledger_unchanged()
+    [Fact] public async Task Sale_with_insufficient_stock_posts_provisional_cost_and_preserves_subledgers()
     {
         var (c, loc, p, _, cust) = await Setup();
-        var before = (await c.GetJson("/reports/trial-balance")).ToString();
-        var stockBefore = (await c.GetJson("/stock")).ToString();
-        var bad = await c.Send(HttpMethod.Post, "/sales", new { customerId = cust, locationId = loc, saleDate = Today, saleType = "Credit", amountPaid = 0m, lines = new[] { new { productId = p, quantity = 11m, unitPrice = 50m, discount = 0m } } }, K());
-        Assert.NotEqual(HttpStatusCode.OK, bad.StatusCode);
-        Assert.Equal(before, (await c.GetJson("/reports/trial-balance")).ToString());
-        Assert.Equal(stockBefore, (await c.GetJson("/stock")).ToString());
-        Assert.Equal(0m, await SumOf(c, "/customers", "owed"));
+        var sale = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = cust, locationId = loc, saleDate = Today, saleType = "Credit",
+            amountPaid = 0m, lines = new[] { new { productId = p, quantity = 11m, unitPrice = 50m, discount = 0m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, sale.StatusCode);
+        var stock = (await c.GetJson("/stock")).EnumerateArray().Single();
+        Assert.Equal(-1m, stock.GetProperty("quantity").GetDecimal());
+        Assert.Equal(0m, stock.GetProperty("value").GetDecimal());
+        Assert.Equal(-20m, await LedgerBalance(c, "1410"));
+        Assert.Equal(550m, await SumOf(c, "/customers", "owed"));
+        await AssertSubledgersMatchLedger(c);
     }
 
     [Fact] public async Task Rejected_supplier_payment_and_collection_leave_ledger_unchanged()

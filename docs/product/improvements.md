@@ -221,3 +221,11 @@ For each approved item, record:
 - The historical phase summaries and many pre-existing improvement rows remain unverified item by item. Do not mass-change their statuses based only on feature presence.
 
 | 2026-11-14 | Reconciled H2 after PR #24 merge; recorded #22 closed without merge and #25/#26 duplicate UI fix status. |
+
+## Newly approved scope — flexible sales and handwritten invoice capture (2026-11-22)
+
+| ID | Improvement | Category | Priority | Cost | Evidence | Classification | Decision | Status | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| FS-01 | Allow billing when physical stock is zero/insufficient with explicit provisional costing and later receipt reconciliation | Finance / Inventory | Critical | L | Seen | Missing capability | Approved | Implemented on PR branch | ADR-025; current positive WAC, else latest positive incoming-movement cost; same-location FIFO receipt settlement; account 1410 clearing; no-cost-history fails closed. Exact-head CI/review pending. |
+| FS-02 | Support ad-hoc sale lines without implicit catalogue creation; allow repeated product lines | Sales / Catalogue | High | L | Seen | Missing capability | Approved | Implemented on PR branch | Nullable catalogue FK, immutable description/brand/model/HSN snapshots, line identity, repeated rows, exact-line returns and cancellation support. |
+| FS-03 | Upload/capture handwritten sales invoices and extract editable draft data | AI / Sales UX | High | L | Seen | Missing capability | Approved | Implemented on PR branch | Direct ItemTag image pipeline (no AI Gateway); camera/upload and editable review in Generate Invoice. Photo is not retained in this slice; confirm evidence-retention need before production. |

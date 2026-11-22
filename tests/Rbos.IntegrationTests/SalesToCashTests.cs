@@ -53,14 +53,41 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.BadRequest, (await c.Send(HttpMethod.Post, "/sales", Sale(cust, loc, p, 1, 50m, "Credit", 60m), K())).StatusCode);
         Assert.Equal(10m, (await Stock(c)).GetProperty("quantity").GetDecimal());
     }
-    [Fact] public async Task Sale_cannot_make_stock_negative()
+    [Fact] public async Task Insufficient_stock_sale_uses_provisional_cost_and_receipt_reconciles_it()
     {
-        var (c, loc, p) = await Stocked(f, 5);
-        var r = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "UPI"), K());
-        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
-        Assert.Equal(5m, (await Stock(c)).GetProperty("quantity").GetDecimal());
-        Assert.Equal(HttpStatusCode.OK, (await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 5, 50m, "UPI"), K())).StatusCode);
-        var s = await Stock(c); Assert.Equal(0m, s.GetProperty("quantity").GetDecimal()); Assert.Equal(0m, s.GetProperty("value").GetDecimal());
+        var (c, loc, p) = await Stocked(f, 5, 20m);
+        var saleResponse = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "UPI"), K());
+        Assert.Equal(HttpStatusCode.OK, saleResponse.StatusCode);
+        var saleId = (await saleResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var afterSale = await Stock(c);
+        Assert.Equal(-1m, afterSale.GetProperty("quantity").GetDecimal());
+        Assert.Equal(0m, afterSale.GetProperty("value").GetDecimal());
+
+        var supplierResponse = await c.Send(HttpMethod.Post, "/suppliers", new { name = "Settlement supplier" });
+        var supplierId = (await supplierResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var receipt = await c.Send(HttpMethod.Post, "/purchases", new
+        {
+            supplierId, locationId = loc, receiptDate = Today,
+            lines = new[] { new { productId = p, quantity = 1m, unitCost = 30m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, receipt.StatusCode);
+        var settled = await Stock(c);
+        Assert.Equal(0m, settled.GetProperty("quantity").GetDecimal());
+        Assert.Equal(0m, settled.GetProperty("value").GetDecimal());
+
+        var saleDetail = await c.GetJson("/sales/" + saleId);
+        Assert.Equal(6m, saleDetail.GetProperty("lines")[0].GetProperty("quantity").GetDecimal());
+        var returnable = (await c.GetJson("/sales/" + saleId + "/returnable")).EnumerateArray().Single();
+        var returnResponse = await c.Send(HttpMethod.Post, "/sale-returns", new
+        {
+            saleId, returnDate = Today, reason = "Return after settlement",
+            lines = new[] { new { saleLineId = returnable.GetProperty("saleLineId").GetGuid(), productId = p, quantity = 1m } },
+            refundMethod = "Cash"
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, returnResponse.StatusCode);
+        var afterReturn = await Stock(c);
+        Assert.Equal(1m, afterReturn.GetProperty("quantity").GetDecimal());
+        Assert.True(afterReturn.GetProperty("value").GetDecimal() > 0m);
     }
     [Fact] public async Task Duplicate_submission_is_safe_and_key_reuse_conflicts()
     {
@@ -224,7 +251,7 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
             amountPaid = (decimal?)null, payMethod = (string?)null,
             lines = new[] { new
             {
-                productId = product, quantity = 6m, unitPrice = 100m, discount = 0m,
+                productId = product, quantity = 0m, unitPrice = 100m, discount = 0m,
                 serials = Array.Empty<string>(), barcode = code, barcodeSymbology = "EAN_13"
             } }
         }, K());
@@ -342,4 +369,134 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Equal(new[] { imei1 }, line.GetProperty("imei1s").EnumerateArray().Select(x => x.GetString()).ToArray());
         Assert.Equal(new[] { imei2 }, line.GetProperty("imei2s").EnumerateArray().Select(x => x.GetString()).ToArray());
     }
+    [Fact] public async Task Ad_hoc_and_repeated_product_lines_post_without_catalogue_creation_and_return_by_line_id()
+    {
+        var (c, loc, p) = await Stocked(f, qty: 10, cost: 20m);
+        var productsBefore = (await c.GetJson("/products")).EnumerateArray().Count();
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null,
+            locationId = loc,
+            saleDate = Today,
+            saleType = "Cash",
+            lines = new object[]
+            {
+                new { productId = p, description = "catalogue row one", quantity = 1m, unitPrice = 100m, discount = 0m },
+                new { productId = p, description = "catalogue row two", quantity = 1m, unitPrice = 95m, discount = 5m },
+                new { productId = (Guid?)null, description = "Unlisted charger model ZX-90", model = "ZX-90", brand = "Local", hsnCode = "850440", quantity = 1m, unitPrice = 250m, discount = 0m }
+            }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + saleId);
+        var saleLines = detail.GetProperty("lines").EnumerateArray().ToArray();
+        Assert.Equal(3, saleLines.Length);
+        var adHoc = Assert.Single(saleLines, x => x.GetProperty("product").GetString() == "Unlisted charger model ZX-90");
+        Assert.Equal("Unlisted charger model ZX-90", adHoc.GetProperty("product").GetString());
+        Assert.Equal("ZX-90", adHoc.GetProperty("model").GetString());
+        Assert.Equal(productsBefore, (await c.GetJson("/products")).EnumerateArray().Count());
+        var stock = await Stock(c);
+        Assert.Equal(8m, stock.GetProperty("quantity").GetDecimal());
+        Assert.Equal(160m, stock.GetProperty("value").GetDecimal());
+
+        var returnable = (await c.GetJson("/sales/" + saleId + "/returnable")).EnumerateArray().ToArray();
+        var adHocReturn = Assert.Single(returnable, x => x.GetProperty("productId").ValueKind == JsonValueKind.Null);
+        var returnResponse = await c.Send(HttpMethod.Post, "/sale-returns", new
+        {
+            saleId,
+            returnDate = Today,
+            reason = "Customer returned unlisted item",
+            lines = new[] { new { saleLineId = adHocReturn.GetProperty("saleLineId").GetGuid(), productId = (Guid?)null, quantity = 1m } },
+            refundMethod = "Cash"
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, returnResponse.StatusCode);
+        Assert.Equal(8m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+        var postedReturn = (await returnResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var returnDetail = await c.GetJson("/sale-returns/" + postedReturn);
+        Assert.Equal("Unlisted charger model ZX-90", returnDetail.GetProperty("lines")[0].GetProperty("product").GetString());
+
+        var catalogueLine = returnable.First(x => x.GetProperty("productId").ValueKind != JsonValueKind.Null);
+        var catalogueReturn = await c.Send(HttpMethod.Post, "/sale-returns", new
+        {
+            saleId, returnDate = Today, reason = "Return one repeated catalogue line",
+            lines = new[] { new { saleLineId = catalogueLine.GetProperty("saleLineId").GetGuid(), productId = p, quantity = 1m } },
+            refundMethod = "Cash"
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, catalogueReturn.StatusCode);
+        var afterCatalogueReturn = await Stock(c);
+        Assert.Equal(9m, afterCatalogueReturn.GetProperty("quantity").GetDecimal());
+        Assert.Equal(180m, afterCatalogueReturn.GetProperty("value").GetDecimal());
+    }
+
+
+    [Fact] public async Task New_product_without_any_historical_cost_fails_closed_when_stock_is_zero()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var product = await c.AddProduct("Never stocked product");
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new { productId = product, quantity = 1m, unitPrice = 100m, discount = 0m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Empty((await c.GetJson("/sales")).EnumerateArray());
+    }
+
+    [Fact] public async Task Cancelling_sale_with_open_negative_stock_restores_only_valued_inventory_and_closes_commitment()
+    {
+        var (c, loc, p) = await Stocked(f, qty: 5, cost: 20m);
+        var response = await c.Send(HttpMethod.Post, "/sales", Sale(null, loc, p, 6, 50m, "Cash"), K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saleId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal(-1m, (await Stock(c)).GetProperty("quantity").GetDecimal());
+
+        var cancelled = await c.Send(HttpMethod.Post, "/sales/" + saleId + "/cancel",
+            new { reason = "Mistaken invoice" }, K());
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        var restored = await Stock(c);
+        Assert.Equal(5m, restored.GetProperty("quantity").GetDecimal());
+        Assert.Equal(100m, restored.GetProperty("value").GetDecimal());
+
+        var supplierResponse = await c.Send(HttpMethod.Post, "/suppliers", new { name = "After cancellation supplier" });
+        var supplierId = (await supplierResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var receipt = await c.Send(HttpMethod.Post, "/purchases", new
+        {
+            supplierId, locationId = loc, receiptDate = Today,
+            lines = new[] { new { productId = p, quantity = 1m, unitCost = 30m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, receipt.StatusCode);
+        var afterReceipt = await Stock(c);
+        Assert.Equal(6m, afterReceipt.GetProperty("quantity").GetDecimal());
+        Assert.Equal(130m, afterReceipt.GetProperty("value").GetDecimal());
+    }
+
+
+    [Fact] public async Task Model_number_only_ad_hoc_sale_line_is_accepted_without_catalogue_creation()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var before = (await c.GetJson("/products")).EnumerateArray().Count();
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            sourceInvoiceRef = "SRC-2026-1122", sourceInvoiceDate = Today,
+            lines = new[] { new { productId = (Guid?)null, description = "", model = "ZX-9000", quantity = 1m, unitPrice = 125m, discount = 0m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + id);
+        Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("product").GetString());
+        Assert.Equal("ZX-9000", detail.GetProperty("lines")[0].GetProperty("model").GetString());
+        Assert.Equal("SRC-2026-1122", detail.GetProperty("sale").GetProperty("sourceInvoiceRef").GetString());
+        Assert.Equal(Today, detail.GetProperty("sale").GetProperty("sourceInvoiceDate").GetString());
+        var sourceSearch = (await c.GetJson("/sales?q=SRC-2026-1122")).EnumerateArray().Single();
+        Assert.Equal("SRC-2026-1122", sourceSearch.GetProperty("sourceInvoiceRef").GetString());
+        Assert.Equal(Today, sourceSearch.GetProperty("sourceInvoiceDate").GetString());
+        Assert.Equal(before, (await c.GetJson("/products")).EnumerateArray().Count());
+    }
+
+
 }

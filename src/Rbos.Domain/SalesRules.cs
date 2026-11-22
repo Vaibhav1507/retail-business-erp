@@ -1,12 +1,17 @@
 namespace Rbos.Domain;
 
-public sealed record SaleLineInput(Guid ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount,
+public sealed record SaleLineInput(Guid? ProductId, decimal Quantity, decimal UnitPrice, decimal? Discount,
     List<string>? Serials = null, string? Barcode = null,
-    string? BarcodeSymbology = null, List<string>? Imei1s = null, List<string>? Imei2s = null);
+    string? BarcodeSymbology = null, List<string>? Imei1s = null, List<string>? Imei2s = null,
+    string? Description = null, string? Brand = null, string? Model = null, string? HsnCode = null);
 
-public sealed record SaleLine(Guid ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal,
+public sealed record SaleLine(Guid? ProductId, Quantity Quantity, decimal UnitPrice, decimal Discount, decimal LineTotal,
+    string? Description = null, string? Brand = null, string? Model = null, string? HsnCode = null,
     string[]? Serials = null, string? Barcode = null,
-    string? BarcodeSymbology = null, string[]? Imei1s = null, string[]? Imei2s = null);
+    string? BarcodeSymbology = null, string[]? Imei1s = null, string[]? Imei2s = null)
+{
+    public bool IsStockTracked => ProductId.HasValue;
+}
 
 /// <summary>Pure rules for customer sales (Slice 4): validation, totals and the balanced journal.</summary>
 public static class SalesRules
@@ -17,6 +22,7 @@ public static class SalesRules
     public const string RevenueAccount = "4000";
     public const string CogsAccount = "5000";
     public const string InventoryAccount = "1400";
+    public const string NegativeStockClearingAccount = "1410";
     public static readonly string[] SaleTypes = ["Cash", "UPI", "Credit"];
     public static readonly string[] PayMethods = ["Cash", "Bank", "UPI"];
 
@@ -28,12 +34,18 @@ public static class SalesRules
         if (date > today) return Fail("Sale date cannot be in the future.", out error);
         if (date < today.AddYears(-5)) return Fail("Sale date is too far in the past.", out error);
         if (input is null || input.Count == 0) return Fail("At least one sale line is required.", out error);
-        if (input.Count > MaxLines) return Fail($"A sale can have at most {MaxLines} lines.", out error);
-        if (input.Select(l => l.ProductId).Distinct().Count() != input.Count) return Fail("Each product can appear only once per sale.", out error);
-
+        if (input.Count > MaxLines) return Fail($"A sale can have at most {MaxLines} lines.", out error);
         var list = new List<SaleLine>();
         foreach (var l in input)
         {
+            if (l.ProductId is null && string.IsNullOrWhiteSpace(l.Description) && string.IsNullOrWhiteSpace(l.Model))
+                return Fail("An unlisted sale line needs a description or model number.", out error);
+            if ((l.Description?.Trim().Length ?? 0) > 240 || (l.Brand?.Trim().Length ?? 0) > 80 ||
+                (l.Model?.Trim().Length ?? 0) > 100 || (l.HsnCode?.Trim().Length ?? 0) > 12)
+                return Fail("Sale line description, brand, model or HSN is too long.", out error);
+            if (l.ProductId is null && ((l.Serials?.Count ?? 0) > 0 || (l.Imei1s?.Count ?? 0) > 0 ||
+                (l.Imei2s?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(l.Barcode)))
+                return Fail("Serial, IMEI and barcode tracking requires a catalogue product. Add the product to the catalogue first.", out error);
             if (!Quantity.TryCreate(l.Quantity, out var q, out var qe)) return Fail(qe!, out error);
             if (l.UnitPrice <= 0 || decimal.Round(l.UnitPrice, 2) != l.UnitPrice) return Fail("Unit price must be positive with at most 2 decimal places.", out error);
             var discount = l.Discount ?? 0m;
@@ -55,6 +67,10 @@ public static class SalesRules
                 imei1s.Intersect(imei2s, StringComparer.Ordinal).Any())
                 return Fail("The same IMEI cannot appear twice on a sale line.", out error);
             list.Add(new SaleLine(l.ProductId, q, l.UnitPrice, discount, gross - discount,
+                string.IsNullOrWhiteSpace(l.Description) ? null : l.Description.Trim(),
+                string.IsNullOrWhiteSpace(l.Brand) ? null : l.Brand.Trim(),
+                string.IsNullOrWhiteSpace(l.Model) ? null : l.Model.Trim(),
+                string.IsNullOrWhiteSpace(l.HsnCode) ? null : l.HsnCode.Trim(),
                 serials.Length == 0 ? null : serials,
                 l.Barcode, l.BarcodeSymbology, imei1s.Length == 0 ? null : imei1s, imei2s.Length == 0 ? null : imei2s));
         }
@@ -84,14 +100,58 @@ public static class SalesRules
     }
 
     public static IReadOnlyList<JournalLineDraft> SaleJournal(Money total, Money paid, Money cost)
+        => SaleJournal(total, paid, cost, Money.Zero);
+
+    /// <summary>
+    /// Posts COGS at the selected provisional cost while crediting only inventory that
+    /// actually had a positive valuation. The unreceived portion is credited to the
+    /// negative-stock clearing liability until a later receipt settles it.
+    /// </summary>
+    public static IReadOnlyList<JournalLineDraft> SaleJournal(Money total, Money paid, Money inventoryCost, Money provisionalCost)
     {
-        var j = new List<JournalLineDraft>();
-        if (paid.Amount > 0) j.Add(new(CashAccount, paid.Amount, 0m));
-        if (total.Amount - paid.Amount > 0) j.Add(new(ReceivableAccount, total.Amount - paid.Amount, 0m));
-        j.Add(new(RevenueAccount, 0m, total.Amount));
-        if (cost.Amount > 0) { j.Add(new(CogsAccount, cost.Amount, 0m)); j.Add(new(InventoryAccount, 0m, cost.Amount)); }
-        BalancedJournalPolicy.AssertBalanced(j);
-        return j;
+        var journal = new List<JournalLineDraft>();
+        if (paid.Amount > 0) journal.Add(new(CashAccount, paid.Amount, 0m));
+        if (total.Amount - paid.Amount > 0) journal.Add(new(ReceivableAccount, total.Amount - paid.Amount, 0m));
+        journal.Add(new(RevenueAccount, 0m, total.Amount));
+        var cogs = inventoryCost.Amount + provisionalCost.Amount;
+        if (cogs > 0) journal.Add(new(CogsAccount, cogs, 0m));
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, 0m, inventoryCost.Amount));
+        if (provisionalCost.Amount > 0) journal.Add(new(NegativeStockClearingAccount, 0m, provisionalCost.Amount));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
+    }
+
+    /// <summary>Reverses a sale after accounting for any provisional cost already settled by receipts.</summary>
+    public static IReadOnlyList<JournalLineDraft> SaleCancellationJournal(Money total, Money paid, Money inventoryCost, Money provisionalCost)
+    {
+        var journal = new List<JournalLineDraft>();
+        journal.Add(new(RevenueAccount, total.Amount, 0m));
+        if (paid.Amount > 0) journal.Add(new(CashAccount, 0m, paid.Amount));
+        if (total.Amount - paid.Amount > 0) journal.Add(new(ReceivableAccount, 0m, total.Amount - paid.Amount));
+        var cogs = inventoryCost.Amount + provisionalCost.Amount;
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, inventoryCost.Amount, 0m));
+        if (provisionalCost.Amount > 0) journal.Add(new(NegativeStockClearingAccount, provisionalCost.Amount, 0m));
+        if (cogs > 0) journal.Add(new(CogsAccount, 0m, cogs));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
+    }
+
+    public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(Money revenue, Money receivableCredit, Money cashRefund, Money cost)
+        => CustomerReturnJournal(revenue, receivableCredit, cashRefund, cost, Money.Zero);
+
+    public static IReadOnlyList<JournalLineDraft> CustomerReturnJournal(Money revenue, Money receivableCredit, Money cashRefund, Money inventoryCost, Money provisionalCost)
+    {
+        if (revenue.Amount <= 0 || receivableCredit.Amount + cashRefund.Amount != revenue.Amount)
+            throw new ArgumentException("Return amounts do not add up.");
+        var journal = new List<JournalLineDraft> { new(RevenueAccount, revenue.Amount, 0m) };
+        if (receivableCredit.Amount > 0) journal.Add(new(ReceivableAccount, 0m, receivableCredit.Amount));
+        if (cashRefund.Amount > 0) journal.Add(new(CashAccount, 0m, cashRefund.Amount));
+        if (inventoryCost.Amount > 0) journal.Add(new(InventoryAccount, inventoryCost.Amount, 0m));
+        if (provisionalCost.Amount > 0) journal.Add(new(NegativeStockClearingAccount, provisionalCost.Amount, 0m));
+        var totalCost = inventoryCost.Amount + provisionalCost.Amount;
+        if (totalCost > 0) journal.Add(new(CogsAccount, 0m, totalCost));
+        BalancedJournalPolicy.AssertBalanced(journal);
+        return journal;
     }
 
     public static bool TryValidateCustomer(string? name, string? phone, string? notes, out string? error)
