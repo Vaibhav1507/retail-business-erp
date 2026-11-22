@@ -534,7 +534,7 @@ public sealed class AfterSalesService(TenantDb db)
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
-                if (await r.ReadAsync(ct)) { found = true; locationId = r.GetGuid(0); saleDate = r.GetFieldValue<DateOnly>(1); total = r.GetDecimal(2); paid = r.GetDecimal(3); costTotal = r.GetDecimal(4); }
+                if (await r.ReadAsync(ct)) { found = true; locationId = r.GetGuid(0); saleDate = r.GetFieldValue<DateOnly>(1); total = r.GetDecimal(2); paid = r.GetDecimal(3); inventoryCostTotal = r.GetDecimal(4); provisionalCostTotal = r.GetDecimal(5); }
             }
             if (!found) return ServiceResult<object>.Fail("Sale not found.", 404);
             if (await Scalar<Guid?>(s, "select id from sales.sale_cancellation where sale_id=@i", ct, ("i", saleId)) is not null) return ServiceResult<object>.Fail("This sale is already cancelled.", 409);
@@ -554,12 +554,13 @@ public sealed class AfterSalesService(TenantDb db)
             {
                 q.Parameters.AddWithValue("i", saleId);
                 await using var r = await q.ExecuteReaderAsync(ct);
-                while (await r.ReadAsync(ct)) historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2)));
+                while (await r.ReadAsync(ct)) historicalLines.Add((r.GetGuid(0), r.GetDecimal(1), r.GetDecimal(2), r.GetDecimal(3)));
             }
 
-            var lines = new List<(Guid ProductId, Guid InventoryProductId, decimal Qty, decimal Cost)>();
+            var lines = new List<(Guid ProductId, Guid InventoryProductId, decimal Qty, decimal ValuedQty, decimal Cost)>();
             foreach (var line in historicalLines)
-                lines.Add((line.ProductId, await CanonicalProductIdAsync(s, tenantId, line.ProductId, ct), line.Qty, line.Cost));
+                lines.Add((line.ProductId, await CanonicalProductIdAsync(s, tenantId, line.ProductId, ct),
+                    line.Qty, line.ValuedQty, line.Cost));
 
             var id = Guid.NewGuid(); var entry = Guid.NewGuid();
             await Exec(s, ct, "insert into audit.audit_event(tenant_id,id,actor_user_id,action,entity_type,entity_id,summary,correlation_id) values (@t,@a,@u,'SaleCancelled','Sale',@d,@s,@c)",
@@ -610,7 +611,7 @@ public sealed class AfterSalesService(TenantDb db)
     {
         var (name, type) = code switch
         {
-            "1000" => ("Cash and Bank", "Asset"), "1200" => ("Accounts Receivable", "Asset"), "1400" => ("Inventory", "Asset"), "2000" => ("Accounts Payable", "Liability"),
+            "1000" => ("Cash and Bank", "Asset"), "1200" => ("Accounts Receivable", "Asset"), "1400" => ("Inventory", "Asset"), "1410" => ("Negative Stock Clearing", "Liability"), "2000" => ("Accounts Payable", "Liability"),
             "4000" => ("Sales Revenue", "Income"), "5000" => ("Cost of Goods Sold", "Expense"), _ => (code, "Asset")
         };
         await Exec(s, ct, "insert into accounting.account(tenant_id,id,code,name,type) values (@t,@i,@c,@n,@y) on conflict (tenant_id,code) do nothing",
