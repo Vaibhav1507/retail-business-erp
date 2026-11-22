@@ -263,7 +263,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const serials = serialText.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)
     const quantity = Number(qty), unitPrice = Number(price), discount = Number(disc || 0)
     const mrp = mrpText.trim() ? Number(mrpText) : null
-    const manualLabel = pname.trim() || modelText.trim() || brandText.trim() || barcodeText.trim()
+    const manualLabel = pname.trim() || modelText.trim() || brandText.trim()
     if (!manualLabel || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product description or model number, quantity and price.'); return }
     if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) { setError('Enter a valid MRP.'); return }
     const productId = selectedProductId || match?.id || ''
