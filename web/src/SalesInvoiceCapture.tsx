@@ -50,12 +50,12 @@ export function SalesInvoiceCapture({
     setError('')
     setStatus('')
     if (!file) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Use a JPEG, PNG or WebP photo.')
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
+      setError('Use a JPEG, PNG, WebP photo or PDF.')
       return
     }
     if (file.size <= 0 || file.size > 8 * 1024 * 1024) {
-      setError('Invoice photo must be 8 MB or smaller.')
+      setError('Invoice file must be 8 MB or smaller.')
       return
     }
     if (disabled) {
@@ -97,9 +97,9 @@ export function SalesInvoiceCapture({
         <button type="button" className="secondary" disabled={disabled || busy}
           onClick={() => galleryRef.current?.click()}>Choose from device</button>
       </div>}
-      <input ref={cameraRef} hidden type="file" accept="image/jpeg,image/png,image/webp"
+      <input ref={cameraRef} hidden type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
         capture="environment" onChange={handleFileChange} />
-      <input ref={galleryRef} hidden type="file" accept="image/jpeg,image/png,image/webp"
+      <input ref={galleryRef} hidden type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
         onChange={handleFileChange} />
       {busy && <span className="item-tag-feedback" role="status">{status}</span>}
       {!busy && status && <span className="item-tag-feedback" role="status">{status}</span>}
