@@ -4,7 +4,8 @@
 - **Repository baseline:** `main` at `4cfee7d4e1c3560fcdc7e28b8d5823afea14efb0` (23 November 2026)
 - **Scope:** Screen-by-screen usability, accessibility, responsive-layout and interaction improvements
 - **Release boundary:** This document does not authorise application-code changes, production deployment, schema changes or feature expansion.
-- **First screen group:** Billing / invoice creation and preview
+- **Visual audit sequence:** Home first; then Billing & Sales, including the Sell hub and its sales-related sections
+- **First design priority:** Billing / invoice creation and preview
 
 ## 1. Mission
 
@@ -66,6 +67,25 @@ This is a UX work order, not a claim that every listed screen or future capabili
 - Keep a screen marked **not audited** until current visual evidence exists.
 - Do not treat a mockup or green build as proof of usability.
 - Changes to product rules, API contracts, permissions, accounting or data retention require a separate technical/product decision; they are not “CSS fixes”.
+
+### 2.2 Staged visual-audit execution
+
+Do not capture the entire application inventory in one run. Run one connected area at a time, review it, record decisions and only then move to the next area.
+
+| Stage | Included routes | What to review |
+|---|---|---|
+| **1 — Home** | `#/home` | Dashboard summary tiles, quick actions, insights/reminders, navigation hierarchy, loading and empty/error states |
+| **2 — Billing & Sales** | `#/sell/menu`, `#/sell/bill`, `#/sell/bills`, `#/sell/collect`, `#/sell/return` | Sell landing page, new bill, sales history, collecting customer payments and customer returns |
+| **Later stages** | Stock, purchasing, people, money, administration and other programme phases | Do not include these in the first two audit runs |
+
+**Execution rules**
+
+- The GitHub Actions visual-audit workflow must offer one scope per run, with **Home** selected by default.
+- Each scope is captured at the current mobile and tablet viewports (390 × 844 and 768 × 1024); screenshots and reports are stored in a scope-specific artifact.
+- Finish the Home review and agree on findings/design direction before starting the Billing & Sales run.
+- The Billing & Sales route pass is the baseline, not the final interaction audit. Follow it with explicit captures of nested states: new-invoice form → review → saved invoice; Sales History → invoice detail; Collect payment → customer statement; Customer return → selected sale/return detail. Add only the data and steps needed in the isolated synthetic test environment.
+- Do not create or use real customer, invoice or payment data for visual-audit captures.
+- Do not mark nested states as audited until screenshots of those states have actually been captured and reviewed.
 
 ## 3. Standard lifecycle for every screen
 
