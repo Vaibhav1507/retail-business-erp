@@ -28,6 +28,7 @@ beforeEach(() => {
       pinCode: '208001', mobile: '9876543210', gstin: null
     }))
     if (url === '/api/products') return new Response(JSON.stringify(products))
+    if (url === '/api/customers' && method === 'POST') return new Response(JSON.stringify({ id: 'customer-1' }))
     if (url === '/api/sales' && method === 'POST') return new Response(JSON.stringify({ id: 'sale-1' }))
     if (url === '/api/sales/sale-1') return new Response(JSON.stringify({
       sale: { number: 1, whatsappStatus: 'ConsentRequired' }
