@@ -282,7 +282,23 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const productId = selectedProductId || match?.id || ''
     const identifiers = [...serials, ...(imei1Text.trim() ? [imei1Text.trim()] : []), ...(imei2Text.trim() ? [imei2Text.trim()] : [])]
     const existingIdentifiers = items.flatMap(item => [...item.serials, ...item.imei1s, ...item.imei2s]).map(x => x.trim().toLowerCase())
-    if (identifiers.some(value => existingIdentifiers.includes(value.trim().toLowerCase()))) nextErrors.serial = 'This serial/IMEI is already present in this invoice.'
+    const normalizedIdentifiers = identifiers.map(value => value.trim().toLowerCase())
+    if (new Set(normalizedIdentifiers).size !== normalizedIdentifiers.length || normalizedIdentifiers.some(value => existingIdentifiers.includes(value)))
+      nextErrors.serial = 'This serial/IMEI is already present in this invoice.'
+    if (serials.some(value => value.length < 4 || value.length > 40 || /\\s/.test(value)) || serials.length > quantity)
+      nextErrors.serial = 'Enter valid serial numbers (4–40 characters each, no more than the quantity).'
+    const validImei = (value: string) => {
+      if (!/^\\d{15}$/.test(value)) return false
+      let sum = 0
+      for (let i = 0; i < 15; i++) {
+        let digit = Number(value[i])
+        if (i % 2 === 1) { digit *= 2; if (digit > 9) digit -= 9 }
+        sum += digit
+      }
+      return sum % 10 === 0
+    }
+    if ((imei1Text.trim() && !validImei(imei1Text.trim())) || (imei2Text.trim() && !validImei(imei2Text.trim())))
+      nextErrors.serial = 'IMEI must contain 15 digits and pass its check digit.'
     if (Object.keys(nextErrors).length) { setFieldErrors(nextErrors); setError(''); return }
     setFieldErrors({})
     const newItem: Item = {
