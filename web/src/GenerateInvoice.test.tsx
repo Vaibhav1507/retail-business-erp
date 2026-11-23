@@ -151,4 +151,53 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByText(/Catalogue match: LG Fully Automatic Washing Machine/)).toBeInTheDocument()
   })
 
+
+  it('falls back to the extracted model number when the tag has no product name', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:invoice-tag-model-only'),
+      revokeObjectURL: vi.fn()
+    })
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      calls.push({ url, method })
+      if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
+      if (url === '/api/business-profile') return new Response(JSON.stringify({
+        businessName: 'Pilot Shop', address: '', city: '', state: '', pinCode: '', mobile: '', gstin: null
+      }))
+      if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/sales/item-tag-scan' && method === 'POST') return new Response(JSON.stringify({
+        status: 'NeedsAttention',
+        extraction: { model: 'ZX-90', brand: 'Local', serial: 'SERIAL-0090' },
+        suggestedProduct: null,
+        warnings: []
+      }))
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    }))
+
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    const photoInputs = container.querySelectorAll('input[type="file"]')
+    const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
+    fireEvent.change(photoInputs[0], { target: { files: [file] } })
+
+    expect(await screen.findByDisplayValue('ZX-90')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Local')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('SERIAL-0090')).toBeInTheDocument()
+  })
+
+  it('shows a non-blocking missing-serial warning during invoice review', async () => {
+    render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
+    await userEvent.type(await screen.findByPlaceholderText('Search or type a new product'), 'Test Cable')
+    await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
+    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.'
+    )
+    expect(screen.getByRole('button', { name: 'Confirm & print' })).toBeEnabled()
+  })
 })
