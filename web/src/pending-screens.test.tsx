@@ -23,7 +23,7 @@ const csrf: Record<string, Route> = { '/api/csrf': () => ({ body: { token: 't' }
 beforeEach(() => resetCsrf())
 afterEach(() => { setLanguage('en'); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
-describe('HomePage reminders and insights (G5, G10)', () => {
+describe('HomePage overview and reminders (G5, G10)', () => {
   const dash = { salesToday: { bills: 0, total: 0 }, moneyToCollect: 250, moneyToPay: 0, lowStockCount: 2, cashAndBank: 100 }
 
   it('shows overdue-order and unclosed-day reminders from /api/reminders', async () => {
@@ -47,7 +47,7 @@ describe('HomePage reminders and insights (G5, G10)', () => {
     expect(screen.queryByLabelText('Reminders')).toBeNull()
   })
 
-  it('derives rule-based insights from the dashboard figures', async () => {
+  it('renders live dashboard figures in the overview cards', async () => {
     mock({ ...csrf, '/api/dashboard': () => ({ body: dash }), '/api/reminders': () => ({ body: [] }) })
     render(<HomePage />)
     const list = await screen.findByLabelText('Insights')
