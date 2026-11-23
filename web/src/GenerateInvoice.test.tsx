@@ -181,7 +181,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
-    expect(await screen.findByDisplayValue('ZX-90')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Search or type a new product')).toHaveValue('ZX-90')
     expect(screen.getByDisplayValue('Local')).toBeInTheDocument()
     expect(screen.getByDisplayValue('SERIAL-0090')).toBeInTheDocument()
   })
