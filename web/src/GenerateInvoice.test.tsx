@@ -108,4 +108,44 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByText(/Barcode: 4006381333931/)).toBeInTheDocument()
   })
 
+  it('fills the product field from a verified catalogue match when AI returns only a barcode', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:invoice-tag-match-test'),
+      revokeObjectURL: vi.fn()
+    })
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      calls.push({ url, method })
+      if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
+      if (url === '/api/business-profile') return new Response(JSON.stringify({
+        businessName: 'Pilot Shop', address: '', city: '', state: '',
+        pinCode: '', mobile: '', gstin: null
+      }))
+      if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/sales/item-tag-scan' && method === 'POST') return new Response(JSON.stringify({
+        status: 'ReadyForReview',
+        extraction: { barcode: '8806096305935', barcodeSymbology: 'EAN_13' },
+        suggestedProduct: {
+          id: 'p1',
+          name: 'LG Fully Automatic Washing Machine',
+          reason: 'Exact local barcode'
+        },
+        warnings: []
+      }))
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    }))
+
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
+    const photoInputs = container.querySelectorAll('input[type="file"]')
+    const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
+    fireEvent.change(photoInputs[0], { target: { files: [file] } })
+
+    expect(await screen.findByDisplayValue('LG Fully Automatic Washing Machine')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('8806096305935')).toBeInTheDocument()
+    expect(screen.getByText(/Catalogue match: LG Fully Automatic Washing Machine/)).toBeInTheDocument()
+  })
+
 })

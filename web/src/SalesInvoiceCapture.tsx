@@ -1,5 +1,6 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { apiBinary } from './api'
+import { PhotoSourcePicker } from './PhotoSourcePicker'
 
 export type ExtractedSalesInvoiceLine = {
   description: string | null
@@ -38,18 +39,13 @@ export function SalesInvoiceCapture({
   disabled: boolean
   onExtract: (draft: ExtractedSalesInvoice, warnings: string[]) => void
 }) {
-  const [showChoices, setShowChoices] = useState(false)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const cameraRef = useRef<HTMLInputElement>(null)
-  const galleryRef = useRef<HTMLInputElement>(null)
 
-  async function readFile(file: File | undefined) {
-    setShowChoices(false)
+  async function readFile(file: File) {
     setError('')
     setStatus('')
-    if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type)) {
       setError('Use a JPEG, PNG, WebP photo or PDF.')
       return
@@ -79,28 +75,17 @@ export function SalesInvoiceCapture({
     }
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-    void readFile(file)
-  }
-
   return (
     <div className="item-tag-uploader sales-invoice-uploader">
-      <button type="button" className="secondary" disabled={disabled || busy}
-        aria-expanded={showChoices} onClick={() => setShowChoices(value => !value)}>
-        Upload handwritten bill
-      </button>
-      {showChoices && <div className="item-tag-source-options">
-        <button type="button" className="secondary" disabled={disabled || busy}
-          onClick={() => cameraRef.current?.click()}>Take photo</button>
-        <button type="button" className="secondary" disabled={disabled || busy}
-          onClick={() => galleryRef.current?.click()}>Choose from device</button>
-      </div>}
-      <input ref={cameraRef} hidden type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
-        capture="environment" onChange={handleFileChange} />
-      <input ref={galleryRef} hidden type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
-        onChange={handleFileChange} />
+      <PhotoSourcePicker
+        triggerLabel="Upload handwritten bill"
+        title="Add handwritten invoice"
+        description="Take a photo of the bill or choose an image or PDF from your device."
+        disabled={disabled || busy}
+        cameraAccept="image/jpeg,image/png,image/webp"
+        galleryAccept="image/jpeg,image/png,image/webp,application/pdf"
+        onFileSelected={file => { void readFile(file) }}
+      />
       {busy && <span className="item-tag-feedback" role="status">{status}</span>}
       {!busy && status && <span className="item-tag-feedback" role="status">{status}</span>}
       {error && <span className="item-tag-error" role="alert">{error}</span>}

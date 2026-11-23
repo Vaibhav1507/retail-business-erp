@@ -89,7 +89,7 @@ public sealed class SalesInvoiceCaptureService(
             var attempts = new List<VisionProviderAttempt>();
             var apiKey = cfg["Gemini:ApiKey"];
             var models = VisionProviderFallback.ItemTagGeminiModels(cfg);
-            var attemptTimeout = Math.Clamp(cfg.GetValue("AiPerformance:ItemTagAttemptTimeoutSeconds", 7), 5, 15);
+            var attemptTimeout = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceAttemptTimeoutSeconds", 7), 5, 15);
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
                 var primary = models[0];
@@ -119,7 +119,7 @@ public sealed class SalesInvoiceCaptureService(
 
             var parsed = await VisionProviderFallback.ExecuteAsync(
                 "SalesInvoiceCapture", attempts, HasUsableLines, log, ct,
-                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:ItemTagTotalProviderBudgetSeconds", 10), 5, 30)));
+                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceTotalProviderBudgetSeconds", 20), 5, 30)));
 
             var warnings = new List<string>();
             var extraction = Clean(parsed);

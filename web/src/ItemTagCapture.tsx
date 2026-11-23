@@ -1,7 +1,8 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { apiBinary } from './api'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
+import { PhotoSourcePicker } from './PhotoSourcePicker'
 
 type Extraction = {
   productName?: string | null
@@ -46,20 +47,15 @@ export function ItemTagCapture({
   disabled: boolean
   onExtract: (item: CapturedInvoiceItem) => void
 }) {
-  const [showChoices, setShowChoices] = useState(false)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
-  const cameraRef = useRef<HTMLInputElement>(null)
-  const galleryRef = useRef<HTMLInputElement>(null)
 
-  async function readFile(file: File | undefined) {
-    setShowChoices(false)
+  async function readFile(file: File) {
     setError('')
     setWarning('')
     setStatus('')
-    if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setError('Use a JPEG, PNG or WebP photo.')
       return
@@ -79,8 +75,7 @@ export function ItemTagCapture({
     try {
       let decodedBarcode: { code: string; symbology: string } | null = null
       imageUrl = URL.createObjectURL(file)
-      // Decode the original photo on-device. If no supported barcode is found,
-      // the server-side vision extraction remains available.
+      // Keep the existing local barcode fast path and upload the original file bytes.
       try {
         const hints = new Map()
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -110,14 +105,36 @@ export function ItemTagCapture({
         } : undefined
       )
       const extraction = scan.extraction ?? {}
+      const matchedProductName = scan.suggestedProduct?.name?.trim() ?? ''
+      const productName = matchedProductName || extraction.productName?.trim() || ''
+      const hasProductIdentity = Boolean(
+        productName ||
+        extraction.brand?.trim() ||
+        extraction.model?.trim() ||
+        extraction.serial?.trim() ||
+        extraction.imei1?.trim() ||
+        extraction.imei2?.trim() ||
+        scan.suggestedProduct?.id
+      )
+      // A null barcode returned by the server is an explicit validation rejection;
+      // do not reintroduce that rejected local decode into the invoice form.
+      const barcode = extraction.barcode === null ? '' : extraction.barcode?.trim() || decodedBarcode?.code || ''
+      const barcodeSymbology = extraction.barcodeSymbology === null
+        ? ''
+        : extraction.barcodeSymbology || decodedBarcode?.symbology || ''
+      const hasBarcode = Boolean(barcode)
+
       onExtract({
         productId: scan.suggestedProduct?.id ?? '',
-        name: extraction.productName ?? '',
+        // A verified catalogue match is more reliable than an empty or guessed model
+        // product name, and must be shown in the shared invoice editor.
+        name: productName,
         brand: extraction.brand ?? '',
         model: extraction.model ?? '',
         category: extraction.category ?? '',
-        barcode: decodedBarcode?.code ?? extraction.barcode ?? '',
-        barcodeSymbology: decodedBarcode?.symbology ?? extraction.barcodeSymbology ?? '',
+        // Prefer the server-returned value because it has passed server validation.
+        barcode,
+        barcodeSymbology,
         serials: extraction.serial ? [extraction.serial] : [],
         imei1: extraction.imei1 ?? '',
         imei2: extraction.imei2 ?? '',
@@ -125,9 +142,16 @@ export function ItemTagCapture({
         hsn: extraction.hsn ?? ''
       })
       setWarning((scan.warnings ?? []).join(' '))
-      setStatus(scan.status === 'NeedsAttention'
-        ? 'Tag read partially. Review or complete the product fields below.'
-        : 'Tag details filled in. Review the product fields and add to invoice.')
+
+      if (scan.status === 'NeedsAttention' || !hasProductIdentity) {
+        setStatus(hasBarcode
+          ? 'Barcode detected, but product details could not be read. Review or enter the product name, brand or model.'
+          : 'Tag read partially. Review or complete the product fields below.')
+      } else if (matchedProductName) {
+        setStatus(`Catalogue match: ${matchedProductName}. Review the fields and add to invoice.`)
+      } else {
+        setStatus('Product details detected. Review the fields and add to invoice.')
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not read this tag. Try another photo or enter the details manually.')
       setStatus('')
@@ -137,28 +161,17 @@ export function ItemTagCapture({
     }
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-    void readFile(file)
-  }
-
   return (
     <div className="item-tag-uploader">
-      <button type="button" className="secondary" disabled={disabled || busy}
-        aria-expanded={showChoices} onClick={() => setShowChoices(value => !value)}>
-        Add tag photo
-      </button>
-      {showChoices && <div className="item-tag-source-options">
-        <button type="button" className="secondary" disabled={disabled || busy}
-          onClick={() => cameraRef.current?.click()}>Take photo</button>
-        <button type="button" className="secondary" disabled={disabled || busy}
-          onClick={() => galleryRef.current?.click()}>Choose from device</button>
-      </div>}
-      <input ref={cameraRef} hidden type="file" accept="image/jpeg,image/png,image/webp"
-        capture="environment" onChange={handleFileChange} />
-      <input ref={galleryRef} hidden type="file" accept="image/jpeg,image/png,image/webp"
-        onChange={handleFileChange} />
+      <PhotoSourcePicker
+        triggerLabel="Add tag photo"
+        title="Add product tag photo"
+        description="Take a photo of the product label or choose an existing image."
+        disabled={disabled || busy}
+        cameraAccept="image/jpeg,image/png,image/webp"
+        galleryAccept="image/jpeg,image/png,image/webp"
+        onFileSelected={file => { void readFile(file) }}
+      />
       {busy && <span className="item-tag-feedback" role="status">Reading image and extracting product details…</span>}
       {!busy && status && <span className="item-tag-feedback" role="status">{status}</span>}
       {warning && <span className="item-tag-warning" role="status">{warning}</span>}

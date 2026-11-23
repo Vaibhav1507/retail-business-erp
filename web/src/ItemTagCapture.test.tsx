@@ -13,7 +13,7 @@ const fetchMock = vi.fn()
 const scan = {
   status: 'ReadyForReview',
   extraction: {
-    productName: 'Test Cable', brand: 'RBOS', model: 'CB-1',
+    brand: 'RBOS', model: 'CB-1',
     barcode: '4006381333931', barcodeSymbology: 'EAN_13', serial: 'abC-01oI',
     imei1: '490154203237518', imei2: '490154203237526'
   },
@@ -45,8 +45,11 @@ describe('ItemTagCapture', () => {
     const { container } = render(<ItemTagCapture disabled={false} onExtract={onExtract} />)
 
     expect(screen.getByRole('button', { name: 'Add tag photo' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Take photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Take a photo' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Take a photo/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Choose from device/ })).toBeInTheDocument()
 
     const inputs = container.querySelectorAll('input[type="file"]')
     expect(inputs).toHaveLength(2)
@@ -56,7 +59,7 @@ describe('ItemTagCapture', () => {
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'tag.jpg', { type: 'image/jpeg' })
     fireEvent.change(inputs[1], { target: { files: [file] } })
 
-    expect(await screen.findByText(/Tag details filled in/)).toBeInTheDocument()
+    expect(await screen.findByText(/Catalogue match: Test Cable/)).toBeInTheDocument()
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Product name')).not.toBeInTheDocument()
     await waitFor(() => expect(onExtract).toHaveBeenCalledWith({
@@ -72,6 +75,33 @@ describe('ItemTagCapture', () => {
       })
     }))
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/sales/item-tag-captures'))).toBe(false)
+  })
+
+  it('reports barcode-only extraction as partial instead of claiming tag details were filled', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
+      if (url === '/api/sales/item-tag-scan' && init?.method === 'POST') {
+        return new Response(JSON.stringify({
+          status: 'ReadyForReview',
+          extraction: { barcode: '8806096305935', barcodeSymbology: 'EAN_13' },
+          suggestedProduct: null,
+          warnings: []
+        }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    })
+    const onExtract = vi.fn()
+    const { container } = render(<ItemTagCapture disabled={false} onExtract={onExtract} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    const inputs = container.querySelectorAll('input[type="file"]')
+    const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'tag.jpg', { type: 'image/jpeg' })
+    fireEvent.change(inputs[1], { target: { files: [file] } })
+
+    expect(await screen.findByText(/Barcode detected, but product details could not be read/)).toBeInTheDocument()
+    expect(screen.queryByText(/Tag details filled in/)).not.toBeInTheDocument()
+    expect(onExtract).toHaveBeenCalledWith(expect.objectContaining({
+      name: '', brand: '', model: '', barcode: '8806096305935'
+    }))
   })
 
   it('shows a helpful error for unsupported images without uploading', async () => {

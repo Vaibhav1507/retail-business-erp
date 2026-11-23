@@ -72,6 +72,28 @@ public sealed class ItemTagCaptureTests(ApiFactory factory) : IClassFixture<ApiF
     }
 
     [Fact]
+    public async Task Scan_with_valid_barcode_but_no_catalogue_match_or_product_identity_needs_attention()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        const string validButUnmappedEan13 = "9900000000004";
+
+        var response = await client.SendBytes(
+            "/sales/item-tag-scan", Jpeg, "image/jpeg", Key(), validButUnmappedEan13, "EAN_13");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal("NeedsAttention", body.GetProperty("status").GetString());
+        Assert.Equal(validButUnmappedEan13,
+            body.GetProperty("extraction").GetProperty("barcode").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("suggestedProduct").ValueKind);
+        Assert.Contains(body.GetProperty("warnings").EnumerateArray(),
+            warning => warning.GetString()!.Contains(
+                "Barcode detected, but product name/model could not be read",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Scan_rejects_unsupported_type_bad_signature_and_oversized_photo()
     {
         var client = new Client(factory);
