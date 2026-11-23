@@ -10,7 +10,7 @@ namespace Rbos.Api.Application;
 
 public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string? WhatsappConsentStatus = null);
 public sealed record SalePaymentInput(string Method, decimal Amount);
-public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null);
+public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null, bool RequireCustomerDetails = false);
 
 /// <summary>Customers and sales (stock deduction at WAC, balanced journal, customer receivable). All amounts are recomputed server-side.</summary>
 public sealed class SalesService(TenantDb db)
@@ -284,6 +284,16 @@ public sealed class SalesService(TenantDb db)
                     return r.GetString(1) == hash ? ServiceResult<object>.Ok(new { id = r.GetGuid(0), replayed = true }) : ServiceResult<object>.Fail("Idempotency-Key reused with a different request.", 409);
             }
             if (m.CustomerId is not null && await Scalar<Guid?>(s, "select id from sales.customer where id=@i and is_active", ct, ("i", m.CustomerId)) is null) return ServiceResult<object>.Fail("Unknown or inactive customer.");
+            if (m.RequireCustomerDetails)
+            {
+                if (m.CustomerId is null)
+                    return ServiceResult<object>.Fail("Customer name and mobile number are required.");
+                var customerDetails = await Scalar<string?>(s,
+                    "select case when nullif(btrim(name),'') is not null and nullif(regexp_replace(coalesce(phone,''),'[^0-9]','','g'),'') is not null then 'valid' else null end from sales.customer where id=@i and is_active",
+                    ct, ("i", m.CustomerId));
+                if (customerDetails is null)
+                    return ServiceResult<object>.Fail("Customer name and mobile number are required.");
+            }
             if (await Scalar<Guid?>(s, "select id from core.stock_location where id=@i", ct, ("i", m.LocationId)) is null) return ServiceResult<object>.Fail("Unknown location.");
             var ids = lines.Where(l => l.ProductId.HasValue).Select(l => l.ProductId!.Value).Distinct().ToArray();
             await using (var q = s.Command("select count(*) from catalog.product where id = any(@i) and is_active"))
