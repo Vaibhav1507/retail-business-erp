@@ -36,12 +36,8 @@
 .invoice-totals .strong { font-weight: 700; color: #000; }
 .invoice-totals dd { text-align: right; }
 @media (max-width: 720px) {
-  table.invoice-lines { display: table; }
-  .invoice-lines thead { display: table-header-group; position: static; width: auto; height: auto; clip: auto; overflow: visible; }
-  .invoice-lines tbody { display: table-row-group; }
-  .invoice-lines tr { display: table-row; border: 0; padding: 0; margin: 0; background: transparent; }
-  .invoice-lines td, .invoice-lines th { display: table-cell; }
-  .invoice-lines td::before { content: none; }
+  .invoice-lines { display: none; }
+  .invoice-mobile-lines { display: grid; }
   .invoice-foot, .invoice-meta, .invoice-party { grid-template-columns: 1fr; }
   .invoice-meta > dl, .invoice-party > div:first-child { border-right: 0; }
 }
