@@ -382,7 +382,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       const part = Number(paid || 0)
       const part2 = Number(paid2 || 0)
       const payments = credit && part2 > 0 ? [{ method: payMethod, amount: part }, { method: payMethod2, amount: part2 }].filter(x => x.amount > 0) : undefined
-      if (!cid) throw new Error('Select an existing customer or connect to save the new customer before posting this invoice.')
+      if (!cid) throw new Error('Customer name and mobile number must be saved before posting this invoice.')
       saleBody = { customerId: cid, requireCustomerDetails: true, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null,
         sourceInvoiceRef: sourceInvoiceRef.trim() || null, sourceInvoiceDate: sourceInvoiceDate || null }
 
