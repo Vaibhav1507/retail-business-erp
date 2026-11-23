@@ -560,7 +560,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <div className="billing-field billing-col-4"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
-            <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" inputMode="decimal" value={mrpText} onChange={e => setMrpText(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" aria-invalid={Boolean(fieldErrors.mrp)} className={fieldErrors.mrp ? 'field-invalid' : ''} inputMode="decimal" value={mrpText} onChange={e => { setMrpText(e.target.value); setFieldErrors(current => ({ ...current, mrp: '' })) }} />{fieldErrors.mrp && <small className="field-error">{fieldErrors.mrp}</small>}</div>
             <div className="billing-field billing-col-6"><label htmlFor="billing-hsn">HSN</label><input id="billing-hsn" value={hsnText} onChange={e => setHsnText(e.target.value)} /></div>
           </div>
         </details>
