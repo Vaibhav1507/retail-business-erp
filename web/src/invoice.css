@@ -1,4 +1,5 @@
 .invoice-wrap { margin-top: 16px; }
+.invoice-mobile-lines { display: none; }
 .invoice-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .invoice { background: #fff; color: #1a1a1a; border: 1px solid #d5dbe6; border-radius: 12px; overflow: hidden; box-shadow: 0 6px 18px rgba(30, 60, 90, .08); max-width: 800px; margin: 0 auto; font-size: 14px; }
 .invoice p { margin: 2px 0; color: #555; }
