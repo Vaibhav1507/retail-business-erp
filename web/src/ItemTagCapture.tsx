@@ -106,7 +106,7 @@ export function ItemTagCapture({
       )
       const extraction = scan.extraction ?? {}
       const matchedProductName = scan.suggestedProduct?.name?.trim() ?? ''
-      const productName = matchedProductName || extraction.productName?.trim() || ''
+      const productName = matchedProductName || extraction.productName?.trim() || extraction.model?.trim() || ''
       const hasProductIdentity = Boolean(
         productName ||
         extraction.brand?.trim() ||

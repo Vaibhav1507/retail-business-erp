@@ -43,9 +43,6 @@ public static class SalesRules
             if ((l.Description?.Trim().Length ?? 0) > 240 || (l.Brand?.Trim().Length ?? 0) > 80 ||
                 (l.Model?.Trim().Length ?? 0) > 100 || (l.HsnCode?.Trim().Length ?? 0) > 12)
                 return Fail("Sale line description, brand, model or HSN is too long.", out error);
-            if (l.ProductId is null && ((l.Serials?.Count ?? 0) > 0 || (l.Imei1s?.Count ?? 0) > 0 ||
-                (l.Imei2s?.Count ?? 0) > 0 || !string.IsNullOrWhiteSpace(l.Barcode)))
-                return Fail("Serial, IMEI and barcode tracking requires a catalogue product. Add the product to the catalogue first.", out error);
             if (!Quantity.TryCreate(l.Quantity, out var q, out var qe)) return Fail(qe!, out error);
             if (l.UnitPrice <= 0 || decimal.Round(l.UnitPrice, 2) != l.UnitPrice) return Fail("Unit price must be positive with at most 2 decimal places.", out error);
             var discount = l.Discount ?? 0m;
@@ -74,6 +71,14 @@ public static class SalesRules
                 serials.Length == 0 ? null : serials,
                 l.Barcode, l.BarcodeSymbology, imei1s.Length == 0 ? null : imei1s, imei2s.Length == 0 ? null : imei2s));
         }
+        var repeatedIdentifiers = list
+            .SelectMany(l => (l.Serials ?? []).Concat(l.Imei1s ?? []).Concat(l.Imei2s ?? []))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .GroupBy(x => x.Trim(), StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(g => g.Count() > 1);
+        if (repeatedIdentifiers is not null)
+            return Fail($"Identifier {repeatedIdentifiers.Key} appears more than once in this invoice.", out error);
+
         total = list.Aggregate(Money.Zero, (a, l) => a + Money.Of(l.LineTotal));
         if (total.Amount <= 0) return Fail("Sale total must be greater than zero.", out error);
         if (total.Amount > 99_999_999m) return Fail("Sale total is too large.", out error);

@@ -473,6 +473,93 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
     }
 
 
+    [Fact] public async Task Ad_hoc_identifiers_are_saved_and_duplicate_serials_are_warned_without_self_matching()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        const string serial = "SERIAL-ABC-123";
+        const string barcode = "8806096305935";
+
+        var first = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new
+            {
+                productId = (Guid?)null, description = "LG television", model = "32LR600B6LC",
+                quantity = 1m, unitPrice = 15000m, discount = 0m,
+                serials = new[] { serial }, barcode, barcodeSymbology = "EAN_13"
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Empty(firstBody.GetProperty("serialWarnings").EnumerateArray());
+        var firstId = firstBody.GetProperty("id").GetGuid();
+        var detail = await c.GetJson("/sales/" + firstId);
+        Assert.Equal(serial, detail.GetProperty("lines")[0].GetProperty("serials")[0].GetString());
+        Assert.Equal(barcode, detail.GetProperty("lines")[0].GetProperty("barcode").GetString());
+
+        var repeated = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new
+            {
+                productId = (Guid?)null, description = "Another LG television", model = "32LR600B6LC",
+                quantity = 1m, unitPrice = 14000m, discount = 0m, serials = new[] { serial }
+            } }
+        }, K());
+        Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
+        var warnings = (await repeated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("serialWarnings");
+        Assert.Contains(serial, warnings.EnumerateArray().Select(x => x.GetString()));
+
+        var duplicateInOneBill = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new object[]
+            {
+                new { productId = (Guid?)null, description = "Line A", quantity = 1m, unitPrice = 10m, discount = 0m, serials = new[] { serial } },
+                new { productId = (Guid?)null, description = "Line B", quantity = 1m, unitPrice = 10m, discount = 0m, serials = new[] { serial } }
+            }
+        }, K());
+        Assert.Equal(HttpStatusCode.BadRequest, duplicateInOneBill.StatusCode);
+    }
+
+    [Fact] public async Task Invoice_request_can_require_customer_name_and_mobile()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId = (Guid?)null, requireCustomerDetails = true,
+            locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new { productId = (Guid?)null, description = "Manual item", quantity = 1m, unitPrice = 100m, discount = 0m } }
+        }, K());
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Customer name and mobile number", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact] public async Task Invoice_request_rejects_customer_without_valid_mobile_number()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var created = await c.Send(HttpMethod.Post, "/customers", new { name = "No Mobile", phone = (string?)null });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var customerId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId, requireCustomerDetails = true,
+            locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new { productId = (Guid?)null, description = "Manual item", quantity = 1m, unitPrice = 100m, discount = 0m } }
+        }, K());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Customer name and mobile number", await response.Content.ReadAsStringAsync());
+        Assert.Empty((await c.GetJson("/sales")).EnumerateArray());
+    }
+
     [Fact] public async Task Model_number_only_ad_hoc_sale_line_is_accepted_without_catalogue_creation()
     {
         var c = new Client(f);

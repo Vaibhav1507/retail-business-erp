@@ -78,6 +78,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [price, setPrice] = useState('')
   const [disc, setDisc] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [showSerialNotice, setShowSerialNotice] = useState(false)
   const [busy, setBusy] = useState(false)
   const [key, setKey] = useState(() => crypto.randomUUID())
   const [invNo, setInvNo] = useState('')
@@ -186,6 +188,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const tax = total - taxable
   const typed = pname.trim().toLowerCase()
   const match = products.find(p => p.name.toLowerCase() === typed)
+  const selectedProduct = products.find(p => p.id === selectedProductId)
   const suggestions = useMemo(() => (typed ? products.filter(p => p.name.toLowerCase().includes(typed)) : products).slice(0, 8), [products, typed])
 
   function applyCapturedItem(item: CapturedInvoiceItem) {
@@ -207,6 +210,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setQty('1')
     setShowProducts(false)
     setError('')
+    setFieldErrors({})
   }
 
   async function removeInvoiceItem(index: number) {
@@ -267,12 +271,38 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const serials = serialText.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)
     const quantity = Number(qty), unitPrice = Number(price), discount = Number(disc || 0)
     const mrp = mrpText.trim() ? Number(mrpText) : null
-    const manualLabel = pname.trim() || modelText.trim() || brandText.trim()
-    if (!manualLabel || !(quantity > 0) || !(unitPrice > 0) || discount < 0) { setError('Enter a product description or model number, quantity and price.'); return }
-    if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) { setError('Enter a valid MRP.'); return }
+    const manualLabel = pname.trim() || modelText.trim()
+    const nextErrors: Record<string, string> = {}
+    if (!manualLabel) nextErrors.product = 'Enter a product description or model number.'
+    if (!Number.isFinite(quantity) || quantity <= 0) nextErrors.quantity = 'Enter a quantity greater than zero.'
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) nextErrors.price = 'Enter a selling price greater than zero.'
+    if (!Number.isFinite(discount) || discount < 0) nextErrors.discount = 'Discount cannot be negative.'
+    if (Number.isFinite(quantity) && Number.isFinite(unitPrice) && discount > quantity * unitPrice) nextErrors.discount = 'Discount cannot exceed the line amount.'
+    if (mrp !== null && (!Number.isFinite(mrp) || mrp < 0)) nextErrors.mrp = 'Enter a valid MRP.'
     const productId = selectedProductId || match?.id || ''
+    const identifiers = [...serials, ...(imei1Text.trim() ? [imei1Text.trim()] : []), ...(imei2Text.trim() ? [imei2Text.trim()] : [])]
+    const existingIdentifiers = items.flatMap(item => [...item.serials, ...item.imei1s, ...item.imei2s]).map(x => x.trim().toLowerCase())
+    const normalizedIdentifiers = identifiers.map(value => value.trim().toLowerCase())
+    if (new Set(normalizedIdentifiers).size !== normalizedIdentifiers.length || normalizedIdentifiers.some(value => existingIdentifiers.includes(value)))
+      nextErrors.serial = 'This serial/IMEI is already present in this invoice.'
+    if (serials.some(value => value.length < 4 || value.length > 40 || /\\s/.test(value)) || serials.length > quantity)
+      nextErrors.serial = 'Enter valid serial numbers (4–40 characters each, no more than the quantity).'
+    const validImei = (value: string) => {
+      if (!/^\\d{15}$/.test(value)) return false
+      let sum = 0
+      for (let i = 0; i < 15; i++) {
+        let digit = Number(value[i])
+        if (i % 2 === 1) { digit *= 2; if (digit > 9) digit -= 9 }
+        sum += digit
+      }
+      return sum % 10 === 0
+    }
+    if ((imei1Text.trim() && !validImei(imei1Text.trim())) || (imei2Text.trim() && !validImei(imei2Text.trim())))
+      nextErrors.serial = 'IMEI must contain 15 digits and pass its check digit.'
+    if (Object.keys(nextErrors).length) { setFieldErrors(nextErrors); setError(''); return }
+    setFieldErrors({})
     const newItem: Item = {
-      productId, name: match?.name ?? manualLabel, quantity, unitPrice, discount, serials,
+      productId, name: selectedProduct?.name ?? match?.name ?? manualLabel, quantity, unitPrice, discount, serials,
       imei1s: imei1Text.trim() ? [imei1Text.trim()] : [],
       imei2s: imei2Text.trim() ? [imei2Text.trim()] : [],
       barcode: barcodeText.trim() || undefined,
@@ -293,9 +323,21 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function review() {
+    const nextErrors: Record<string, string> = {}
+    if (!name.trim()) nextErrors.customerName = 'Customer name is required.'
+    const mobileDigits = phone.replace(/\D/g, '')
+    if (mobileDigits.length < 10 || mobileDigits.length > 15) nextErrors.customerPhone = 'Enter a valid mobile number (10–15 digits).'
+    if (Object.keys(nextErrors).length) {
+      setFieldErrors(nextErrors)
+      setError('')
+      document.getElementById(Object.keys(nextErrors)[0] === 'customerName' ? 'billing-name' : 'billing-phone')?.focus()
+      return
+    }
     if (!items.length) { setError('Add at least one product.'); return }
-    if (mode === 'Credit' && !(customerId || name.trim())) { setError('A credit bill needs a customer.'); return }
-    setError(''); setStep('review')
+    setFieldErrors({})
+    setShowSerialNotice(items.some(item => item.serials.length === 0))
+    setError('')
+    setStep('review')
   }
 
   async function confirm() {
@@ -340,7 +382,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       const part = Number(paid || 0)
       const part2 = Number(paid2 || 0)
       const payments = credit && part2 > 0 ? [{ method: payMethod, amount: part }, { method: payMethod2, amount: part2 }].filter(x => x.amount > 0) : undefined
-      saleBody = { customerId: cid || null, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null,
+      if (!cid) throw new Error('Customer name and mobile number must be saved before posting this invoice.')
+      saleBody = { customerId: cid, requireCustomerDetails: true, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null,
         sourceInvoiceRef: sourceInvoiceRef.trim() || null, sourceInvoiceDate: sourceInvoiceDate || null }
 
       if (offlineMode || !navigator.onLine) {
@@ -378,7 +421,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function clearForm() {
-    setItems([]); setSelectedProductId(''); setPname('')
+    setItems([]); setSelectedProductId(''); setPname(''); setFieldErrors({}); setShowSerialNotice(false)
     setBrandText(''); setModelText(''); setCategoryText(''); setBarcodeText(''); setBarcodeSymbology('')
     setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
@@ -436,6 +479,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}
+        {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
         {sourceInvoiceRef && <p className="billing-hint">Source invoice reference: {sourceInvoiceRef}{sourceInvoiceDate ? ` · ${sourceInvoiceDate}` : ''}</p>}
         <InvoiceDocument biz={biz} showGst={showGst} rate={rate} invoiceNo={invNo || 'Pending'} date={date} payment={mode} location={locations.length > 1 ? locName : undefined} customerName={name} customerPhone={phone} customerAddress={[address, city, state, pin].filter(Boolean).join(', ')} items={effItems} paid={mode === 'Credit' ? Number(paid || 0) + Number(paid2 || 0) : total} credit={mode === 'Credit'} />
       </section>
@@ -463,14 +507,15 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <div className="billing-grid">
           <div className="billing-field billing-col-4 billing-rel">
             <label htmlFor="billing-phone">Mobile number</label>
-            <input id="billing-phone" inputMode="tel" autoComplete="off" placeholder="Type number to find customer" value={phone}
-              onChange={e => { setPhone(e.target.value.replace(/[^\d+ ]/g, '')); setCustomerId('') }}
+            <input id="billing-phone" inputMode="tel" autoComplete="off" required aria-invalid={Boolean(fieldErrors.customerPhone)} className={fieldErrors.customerPhone ? 'field-invalid' : ''} placeholder="Type number to find customer" value={phone}
+              onChange={e => { setPhone(e.target.value.replace(/[^\d+ ]/g, '')); setCustomerId(''); setFieldErrors(current => ({ ...current, customerPhone: '' })) }}
               onFocus={() => setShowFound(found.length > 0)} onBlur={() => setTimeout(() => setShowFound(false), 150)} />
+            {fieldErrors.customerPhone && <small className="field-error">{fieldErrors.customerPhone}</small>}
             {showFound && found.length > 0 && <ul className="billing-menu" role="listbox" aria-label="Matching customers">
               {found.slice(0, 6).map(c => <li key={c.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); pick(c) }}><strong>{c.name}</strong><span>{c.phone}</span></li>)}
             </ul>}
           </div>
-          <div className="billing-field billing-col-8"><label htmlFor="billing-name">Customer name</label><input id="billing-name" value={name} onChange={e => setName(e.target.value)} /></div>
+          <div className="billing-field billing-col-8"><label htmlFor="billing-name">Customer name *</label><input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} className={fieldErrors.customerName ? 'field-invalid' : ''} value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })) }} />{fieldErrors.customerName && <small className="field-error">{fieldErrors.customerName}</small>}</div>
           <div className="billing-field billing-col-12"><label htmlFor="billing-addr">Address</label><input id="billing-addr" value={address} onChange={e => setAddress(e.target.value)} /></div>
           <div className="billing-field billing-col-3"><label htmlFor="billing-pin">Pincode</label><input id="billing-pin" inputMode="numeric" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} /></div>
           <div className="billing-field billing-col-5"><label htmlFor="billing-city">City</label><input id="billing-city" value={city} onChange={e => setCity(e.target.value)} /></div>
@@ -495,18 +540,19 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <div className="billing-grid invoice-product-editor">
           <div className="billing-field billing-col-6 billing-rel">
             <label htmlFor="billing-prod">{tr('bill.product')}</label>
-            <input id="billing-prod" autoComplete="off" placeholder="Search or type a new product" value={pname}
-              onChange={e => { setPname(e.target.value); setSelectedProductId(''); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
+            <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or type a new product" value={pname}
+              onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
+            {fieldErrors.product && <small className="field-error">{fieldErrors.product}</small>}
             {showProducts && suggestions.length > 0 && !match && <ul className="billing-menu" role="listbox" aria-label="Products">
               {suggestions.map(p => <li key={p.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); setPname(p.name); setSelectedProductId(p.id); setShowProducts(false) }}><strong>{p.name}</strong></li>)}
             </ul>}
           </div>
           <div className="billing-field billing-col-3"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
           <div className="billing-field billing-col-3"><label htmlFor="billing-model">Model</label><input id="billing-model" autoComplete="off" value={modelText} onChange={e => setModelText(e.target.value)} /></div>
-          <div className="billing-field billing-col-2"><label htmlFor="billing-qty">{tr('bill.qty')}</label><input id="billing-qty" inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => setQty(e.target.value)} /></div>
-          <div className="billing-field billing-col-3"><label htmlFor="billing-price">{tr('bill.price')}</label><input id="billing-price" inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => setPrice(e.target.value)} /></div>
-          <div className="billing-field billing-col-2"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" inputMode="decimal" value={disc} onChange={e => setDisc(e.target.value)} /></div>
-          <div className="billing-field billing-col-5"><label htmlFor="billing-serial">Serial / IMEI (optional)</label><input id="billing-serial" autoComplete="off" value={serialText} onChange={e => setSerialText(e.target.value)} /></div>
+          <div className="billing-field billing-col-2"><label htmlFor="billing-qty">{tr('bill.qty')}</label><input id="billing-qty" aria-invalid={Boolean(fieldErrors.quantity)} className={fieldErrors.quantity ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => { setQty(e.target.value); setFieldErrors(current => ({ ...current, quantity: '' })) }} />{fieldErrors.quantity && <small className="field-error">{fieldErrors.quantity}</small>}</div>
+          <div className="billing-field billing-col-3"><label htmlFor="billing-price">{tr('bill.price')}</label><input id="billing-price" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />{fieldErrors.price && <small className="field-error">{fieldErrors.price}</small>}</div>
+          <div className="billing-field billing-col-2"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" aria-invalid={Boolean(fieldErrors.discount)} className={fieldErrors.discount ? 'field-invalid' : ''} inputMode="decimal" value={disc} onChange={e => { setDisc(e.target.value); setFieldErrors(current => ({ ...current, discount: '' })) }} />{fieldErrors.discount && <small className="field-error">{fieldErrors.discount}</small>}</div>
+          <div className="billing-field billing-col-5"><label htmlFor="billing-serial">Serial (optional)</label><input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />{fieldErrors.serial && <small className="field-error">{fieldErrors.serial}</small>}</div>
         </div>
         <details className="invoice-product-more-details">
           <summary>More tag details</summary>
@@ -514,7 +560,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <div className="billing-field billing-col-4"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
-            <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" inputMode="decimal" value={mrpText} onChange={e => setMrpText(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" aria-invalid={Boolean(fieldErrors.mrp)} className={fieldErrors.mrp ? 'field-invalid' : ''} inputMode="decimal" value={mrpText} onChange={e => { setMrpText(e.target.value); setFieldErrors(current => ({ ...current, mrp: '' })) }} />{fieldErrors.mrp && <small className="field-error">{fieldErrors.mrp}</small>}</div>
             <div className="billing-field billing-col-6"><label htmlFor="billing-hsn">HSN</label><input id="billing-hsn" value={hsnText} onChange={e => setHsnText(e.target.value)} /></div>
           </div>
         </details>
@@ -553,6 +599,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </table>}
       </div>
 
+      {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
       <div className="billing-card billing-foot">
         <div className="billing-gst">
           <label className="billing-check"><input type="checkbox" checked={gst} onChange={e => setGst(e.target.checked)} /> GST invoice</label>

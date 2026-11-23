@@ -10,7 +10,7 @@ namespace Rbos.Api.Application;
 
 public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string? WhatsappConsentStatus = null);
 public sealed record SalePaymentInput(string Method, decimal Amount);
-public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null);
+public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null, bool RequireCustomerDetails = false);
 
 /// <summary>Customers and sales (stock deduction at WAC, balanced journal, customer receivable). All amounts are recomputed server-side.</summary>
 public sealed class SalesService(TenantDb db)
@@ -267,7 +267,7 @@ public sealed class SalesService(TenantDb db)
             return ServiceResult<object>.Fail(err!);
         var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
         if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
-        var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
+        var hash = Hash(string.Join('|', m.CustomerId, m.RequireCustomerDetails, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
             string.Join(';', lines.Select(l => $"{l.ProductId?.ToString() ?? "adhoc"}:{l.Description}:{l.Brand}:{l.Model}:{l.HsnCode}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -284,6 +284,16 @@ public sealed class SalesService(TenantDb db)
                     return r.GetString(1) == hash ? ServiceResult<object>.Ok(new { id = r.GetGuid(0), replayed = true }) : ServiceResult<object>.Fail("Idempotency-Key reused with a different request.", 409);
             }
             if (m.CustomerId is not null && await Scalar<Guid?>(s, "select id from sales.customer where id=@i and is_active", ct, ("i", m.CustomerId)) is null) return ServiceResult<object>.Fail("Unknown or inactive customer.");
+            if (m.RequireCustomerDetails)
+            {
+                if (m.CustomerId is null)
+                    return ServiceResult<object>.Fail("Customer name and mobile number are required.");
+                var customerDetails = await Scalar<string?>(s,
+                    "select case when nullif(btrim(name),'') is not null and length(regexp_replace(coalesce(phone,''),'[^0-9]','','g')) between 10 and 15 then 'valid' else null end from sales.customer where id=@i and is_active",
+                    ct, ("i", m.CustomerId));
+                if (customerDetails is null)
+                    return ServiceResult<object>.Fail("Customer name and mobile number are required.");
+            }
             if (await Scalar<Guid?>(s, "select id from core.stock_location where id=@i", ct, ("i", m.LocationId)) is null) return ServiceResult<object>.Fail("Unknown location.");
             var ids = lines.Where(l => l.ProductId.HasValue).Select(l => l.ProductId!.Value).Distinct().ToArray();
             await using (var q = s.Command("select count(*) from catalog.product where id = any(@i) and is_active"))
@@ -521,6 +531,7 @@ public sealed class SalesService(TenantDb db)
             var allIdentifiers = lines
                 .SelectMany(l => (l.Serials ?? [])
                     .Concat(l.Imei1s ?? []).Concat(l.Imei2s ?? []))
+                .Select(x => x.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var soldBefore = new List<string>();
             if (allIdentifiers.Length > 0)
@@ -529,8 +540,11 @@ public sealed class SalesService(TenantDb db)
                     select distinct identifier
                     from sales.sale_line l,
                          unnest(coalesce(l.serials, array[]::text[]) || l.imei1s || l.imei2s) identifier
-                    where identifier = any(@ids)");
-                q.Parameters.AddWithValue("ids", allIdentifiers);
+                    where lower(identifier) = any(@ids)
+                      and l.sale_id <> @saleId
+                      and not exists (select 1 from sales.sale_cancellation c where c.sale_id=l.sale_id)");
+                q.Parameters.AddWithValue("ids", allIdentifiers.Select(x => x.ToLowerInvariant()).ToArray());
+                q.Parameters.AddWithValue("saleId", id);
                 await using var r = await q.ExecuteReaderAsync(ct);
                 while (await r.ReadAsync(ct)) soldBefore.Add(r.GetString(0));
             }

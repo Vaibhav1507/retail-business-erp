@@ -65,7 +65,7 @@ describe('App', () => {
     mock({ ...signedIn, '/api/auth/devices': () => ({ body: [] }) })
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Signed-in devices' })).toBeInTheDocument()
-    expect(screen.getByText(/No devices have been registered/)).toBeInTheDocument()
+    expect(await screen.findByText(/No devices have been registered/)).toBeInTheDocument()
   })
 
   it('clears tenant-specific data after sign out', async () => {
