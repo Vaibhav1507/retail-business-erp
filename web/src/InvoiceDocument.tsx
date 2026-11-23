@@ -41,7 +41,6 @@ export function InvoiceDocument({ biz, showGst, rate, invoiceNo, date, payment, 
         <tbody>{items.map((i, n) => { const t = itemTotal(i); const tv = t / (1 + rate / 100); const half = (t - tv) / 2; return <tr key={n}><td>{n + 1}</td><td>{i.name}{i.model && <small>Model: {i.model}</small>}{showGst && i.hsn && <small>HSN: {i.hsn}</small>}{i.serials && i.serials.length > 0 && <small>Serial: {i.serials.join(', ')}</small>}{i.imei1s && i.imei1s.length > 0 && <small>IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s && i.imei2s.length > 0 && <small>IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small>Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td>{showGst && <><td>{money(tv)}</td><td>{money(half)}<small>{rate / 2}%</small></td><td>{money(half)}<small>{rate / 2}%</small></td></>}<td>{money(t)}</td></tr> })}</tbody>
         <tfoot><tr className="invoice-total-row"><td colSpan={5}>Total</td>{showGst && <><td>{money(taxable)}</td><td>{money(tax / 2)}</td><td>{money(tax / 2)}</td></>}<td>₹{money(total)}</td></tr></tfoot>
       </table>
-      </table>
       <div className="invoice-mobile-lines" aria-label="Invoice items">
         {items.map((i, n) => <section className="invoice-mobile-item" key={n}>
           <div className="invoice-mobile-item-heading"><strong>{n + 1}. {i.name}</strong><strong>₹{money(itemTotal(i))}</strong></div>
