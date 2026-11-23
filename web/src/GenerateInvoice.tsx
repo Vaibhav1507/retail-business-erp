@@ -463,6 +463,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}
+        {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
         {sourceInvoiceRef && <p className="billing-hint">Source invoice reference: {sourceInvoiceRef}{sourceInvoiceDate ? ` · ${sourceInvoiceDate}` : ''}</p>}
         <InvoiceDocument biz={biz} showGst={showGst} rate={rate} invoiceNo={invNo || 'Pending'} date={date} payment={mode} location={locations.length > 1 ? locName : undefined} customerName={name} customerPhone={phone} customerAddress={[address, city, state, pin].filter(Boolean).join(', ')} items={effItems} paid={mode === 'Credit' ? Number(paid || 0) + Number(paid2 || 0) : total} credit={mode === 'Credit'} />
       </section>
