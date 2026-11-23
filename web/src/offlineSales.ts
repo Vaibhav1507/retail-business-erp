@@ -3,6 +3,7 @@ import { deleteOfflineRecord, readOfflineRecords, saveOfflineRecord } from './of
 
 export type OfflineSaleBody = {
   customerId: string | null
+  requireCustomerDetails?: boolean
   locationId: string
   saleDate: string
   saleType: string
