@@ -267,7 +267,7 @@ public sealed class SalesService(TenantDb db)
             return ServiceResult<object>.Fail(err!);
         var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
         if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
-        var hash = Hash(string.Join('|', m.CustomerId, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
+        var hash = Hash(string.Join('|', m.CustomerId, m.RequireCustomerDetails, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
             string.Join(';', lines.Select(l => $"{l.ProductId?.ToString() ?? "adhoc"}:{l.Description}:{l.Brand}:{l.Model}:{l.HsnCode}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
@@ -289,7 +289,7 @@ public sealed class SalesService(TenantDb db)
                 if (m.CustomerId is null)
                     return ServiceResult<object>.Fail("Customer name and mobile number are required.");
                 var customerDetails = await Scalar<string?>(s,
-                    "select case when nullif(btrim(name),'') is not null and nullif(regexp_replace(coalesce(phone,''),'[^0-9]','','g'),'') is not null then 'valid' else null end from sales.customer where id=@i and is_active",
+                    "select case when nullif(btrim(name),'') is not null and length(regexp_replace(coalesce(phone,''),'[^0-9]','','g')) between 10 and 15 then 'valid' else null end from sales.customer where id=@i and is_active",
                     ct, ("i", m.CustomerId));
                 if (customerDetails is null)
                     return ServiceResult<object>.Fail("Customer name and mobile number are required.");
