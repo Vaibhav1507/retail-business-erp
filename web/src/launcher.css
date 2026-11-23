@@ -65,7 +65,7 @@
 .home-cash-link { display: flex; flex: 0 0 auto; align-items: center; gap: 3px; color: var(--brand-dark); font-size: 12px; font-weight: 700; }
 .home-status { margin: 0; padding: 14px; border-radius: 12px; background: var(--card); color: var(--muted); font-size: 13px; }
 .home-error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid var(--danger); border-radius: 12px; background: var(--danger-soft); color: var(--danger); font-size: 13px; }
-.home-error button { min-height: 40px; padding: 7px 12px; border: 1px solid currentColor; border-radius: 9px; background: transparent; color: inherit; font: inherit; font-weight: 700; }
+.home-error button { min-height: 44px; padding: 7px 12px; border: 1px solid currentColor; border-radius: 9px; background: transparent; color: inherit; font: inherit; font-weight: 700; }
 .home-reminders { display: grid; gap: 7px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .home-reminders p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
 @media (min-width: 700px) {
