@@ -531,6 +531,7 @@ public sealed class SalesService(TenantDb db)
             var allIdentifiers = lines
                 .SelectMany(l => (l.Serials ?? [])
                     .Concat(l.Imei1s ?? []).Concat(l.Imei2s ?? []))
+                .Select(x => x.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var soldBefore = new List<string>();
             if (allIdentifiers.Length > 0)
@@ -539,10 +540,10 @@ public sealed class SalesService(TenantDb db)
                     select distinct identifier
                     from sales.sale_line l,
                          unnest(coalesce(l.serials, array[]::text[]) || l.imei1s || l.imei2s) identifier
-                    where identifier = any(@ids)
+                    where lower(identifier) = any(@ids)
                       and l.sale_id <> @saleId
                       and not exists (select 1 from sales.sale_cancellation c where c.sale_id=l.sale_id)");
-                q.Parameters.AddWithValue("ids", allIdentifiers);
+                q.Parameters.AddWithValue("ids", allIdentifiers.Select(x => x.ToLowerInvariant()).ToArray());
                 q.Parameters.AddWithValue("saleId", id);
                 await using var r = await q.ExecuteReaderAsync(ct);
                 while (await r.ReadAsync(ct)) soldBefore.Add(r.GetString(0));
