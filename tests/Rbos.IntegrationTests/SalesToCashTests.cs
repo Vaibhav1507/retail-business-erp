@@ -539,6 +539,27 @@ public class SalesToCashTests(ApiFactory f) : IClassFixture<ApiFactory>
         Assert.Contains("Customer name and mobile number", await response.Content.ReadAsStringAsync());
     }
 
+    [Fact] public async Task Invoice_request_rejects_customer_without_valid_mobile_number()
+    {
+        var c = new Client(f);
+        await c.SignUpAndBootstrap();
+        var location = await c.Location();
+        var created = await c.Send(HttpMethod.Post, "/customers", new { name = "No Mobile", phone = (string?)null });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var customerId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var response = await c.Send(HttpMethod.Post, "/sales", new
+        {
+            customerId, requireCustomerDetails = true,
+            locationId = location, saleDate = Today, saleType = "Cash",
+            lines = new[] { new { productId = (Guid?)null, description = "Manual item", quantity = 1m, unitPrice = 100m, discount = 0m } }
+        }, K());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Customer name and mobile number", await response.Content.ReadAsStringAsync());
+        Assert.Empty((await c.GetJson("/sales")).EnumerateArray());
+    }
+
     [Fact] public async Task Model_number_only_ad_hoc_sale_line_is_accepted_without_catalogue_creation()
     {
         var c = new Client(f);
