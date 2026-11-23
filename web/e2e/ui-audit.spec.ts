@@ -4,14 +4,17 @@ import { expect, test } from '@playwright/test'
 import { signUp } from './signup'
 
 const run = Date.now().toString(36)
-const routes = [
-  'home', 'sell/menu', 'sell/bill', 'sell/bills', 'sell/collect', 'buy',
-  'stock/current', 'stock/products', 'stock/opening', 'parties/customers', 'money', 'more',
-]
-const outDir = 'test-results/ui-audit'
+const routesByScope: Record<string, string[]> = {
+  home: ['home'],
+  'billing-sales': ['sell/menu', 'sell/bill', 'sell/bills', 'sell/collect', 'sell/return'],
+}
+const scope = process.env.UI_AUDIT_SCOPE ?? 'home'
+const routes = routesByScope[scope]
+if (!routes) throw new Error(`Unsupported UI_AUDIT_SCOPE "${scope}". Use "home" or "billing-sales".`)
+const outDir = `test-results/ui-audit/${scope}`
 const viewports = [{ name: 'mobile', w: 390, h: 844 }, { name: 'tablet', w: 768, h: 1024 }]
 
-test('UI audit: overflow, control names, touch targets, headings (synthetic data, report only)', async ({ page }) => {
+test(`UI audit: ${scope} (synthetic data, report only)`, async ({ page }) => {
   mkdirSync(outDir, { recursive: true })
   await signUp(page, { email: `e2e-audit-${run}@example.test`, businessName: 'E2E Audit ' + run })
   await page.goto('/#/stock/products')
@@ -46,7 +49,7 @@ test('UI audit: overflow, control names, touch targets, headings (synthetic data
     })
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
     const violations = axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, sample: v.nodes[0]?.html.slice(0, 110) }))
-    report.push({ viewport: vp.name, route, ...found, violations })
+    report.push({ scope, viewport: vp.name, route, ...found, violations })
   }
   writeFileSync(`${outDir}/report.json`, JSON.stringify(report, null, 2))
   expect(report).toHaveLength(routes.length * viewports.length)

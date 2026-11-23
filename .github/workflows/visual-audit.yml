@@ -1,0 +1,94 @@
+name: RBOS Visual Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Choose one audit stage. Start with Home."
+        required: true
+        type: choice
+        default: home
+        options:
+          - home
+          - billing-sales
+
+permissions:
+  contents: read
+
+jobs:
+  scoped-screen-audit:
+    name: Audit ${{ inputs.scope }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      UI_AUDIT_SCOPE: ${{ inputs.scope }}
+      Rbos__Database: test
+      ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
+      ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
+      ConnectionStrings__RbosTestWhatsAppWorker: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_worker;Password=ci_worker_only_2026
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run selected UI audit stage
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ inputs.scope }}
+          path: web/test-results/ui-audit/${{ inputs.scope }}/
+          if-no-files-found: warn
+          retention-days: 7
