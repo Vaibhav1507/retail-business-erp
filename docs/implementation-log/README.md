@@ -37,8 +37,8 @@ This directory is the durable project handover record. Update it in every implem
   - Encrypted pending-sales outbox and idempotent server-authoritative sync are implemented. CI attempts #489–#492 and later runs #500 and #510 (plus retries) failed before job steps. Follow-up review fixed inherited IndexedDB fixed-ID collisions across user/tenant scopes, kept 401 authentication-expired drafts retryable after reauthentication, and added focused tests. The updated code/test head has no associated CI result yet.
 
 - [Flexible billing, tag extraction and mobile invoice fixes — 2026-11-23](2026-11-23-flexible-billing-mobile-tag-fixes.md)
-  - Branch: `fix/flexible-billing-mobile-tag-validation`; PR pending creation.
-  - Ad-hoc serial/barcode snapshots, invoice-wide duplicate detection, required customer details, field-level validation, stable tag-photo layout, responsive invoice cards and invoice-only print rules are implemented. Exact-head CI and Android print verification are pending.
+  - Branch: `fix/flexible-billing-mobile-tag-validation`; PR [#66](https://github.com/Vaibhav1507/retail-business-erp/pull/66), open/draft.
+  - Ad-hoc serial/barcode snapshots, invoice-wide duplicate detection, corrected previous-sale warnings, invoice-UI customer validation, field-level validation, stable tag-photo layout, responsive invoice cards and invoice-only print rules are implemented. Exact-head CI after latest regression tests and Android print verification remain pending. Direct `/sales` API integrations retain legacy optional-customer compatibility.
 
 ## Superseded branches
 
