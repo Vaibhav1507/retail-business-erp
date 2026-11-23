@@ -2,15 +2,30 @@ name: RBOS Visual Audit
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: "Choose one audit stage. Start with Home."
+        required: true
+        type: choice
+        default: home
+        options:
+          - home
+          - billing-sales
 
 permissions:
   contents: read
 
 jobs:
-  billing-and-screen-audit:
-    name: Capture UI screenshots and accessibility report
+  scoped-screen-audit:
+    name: Audit ${{ inputs.scope }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      UI_AUDIT_SCOPE: ${{ inputs.scope }}
+      Rbos__Database: test
+      ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
+      ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
+      ConnectionStrings__RbosTestWhatsAppWorker: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_worker;Password=ci_worker_only_2026
     services:
       postgres:
         image: postgres:17
@@ -23,11 +38,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
-    env:
-      Rbos__Database: test
-      ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
-      ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
-      ConnectionStrings__RbosTestWhatsAppWorker: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_worker;Password=ci_worker_only_2026
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -70,15 +80,15 @@ jobs:
         working-directory: web
         run: npx playwright install --with-deps chromium
 
-      - name: Run existing UI audit
+      - name: Run selected UI audit stage
         working-directory: web
         run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
 
-      - name: Upload visual audit screenshots and report
+      - name: Upload selected screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rbos-visual-audit
-          path: web/test-results/ui-audit/
+          name: rbos-visual-audit-${{ inputs.scope }}
+          path: web/test-results/ui-audit/${{ inputs.scope }}/
           if-no-files-found: warn
           retention-days: 7
