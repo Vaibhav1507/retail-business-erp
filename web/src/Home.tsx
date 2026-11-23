@@ -6,50 +6,133 @@ import './launcher.css'
 import { t, getLanguage, setLanguage, toLang, formatInr } from './i18n'
 import type { MessageKey } from './i18n'
 
-const AREAS: [string, MessageKey, MessageKey, string][] = [
-  ['🧾', 'area.sell', 'area.sellHint', '#/sell'],
-  ['📦', 'area.buy', 'area.buyHint', '#/buy/receive'],
-  ['🏷️', 'area.stock', 'area.stockHint', '#/stock'],
-  ['👥', 'area.customers', 'area.customersHint', '#/parties/customers'],
-  ['🚚', 'area.suppliers', 'area.suppliersHint', '#/parties/suppliers'],
-  ['💵', 'area.collect', 'area.collectHint', '#/sell/collect'],
-  ['₹', 'area.money', 'area.moneyHint', '#/money'],
-  ['📊', 'area.reports', 'area.reportsHint', '#/more/reports'],
-  ['⚙️', 'area.settings', 'area.settingsHint', '#/settings'],
+type Summary = {
+  salesToday: { bills: number; total: number }
+  moneyToCollect: number
+  moneyToPay: number
+  lowStockCount: number
+  cashAndBank: number
+}
+
+type Reminder = { kind: string; count: number | null }
+type QuickAction = { icon: string; label: MessageKey; hint: MessageKey; href: string }
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { icon: '＋', label: 'area.buy', hint: 'area.buyHint', href: '#/buy/receive' },
+  { icon: '▦', label: 'home.checkStock', hint: 'area.stockHint', href: '#/stock' },
+  { icon: '₹', label: 'home.collectPayment', hint: 'home.customerDues', href: '#/sell/collect' },
+  { icon: '＋', label: 'home.addCustomer', hint: 'area.customersHint', href: '#/parties/customers' },
 ]
 
-type Summary = { salesToday: { bills: number; total: number }; moneyToCollect: number; moneyToPay: number; lowStockCount: number; cashAndBank: number }
+function MetricCard({ label, value, note, href }: { label: string; value: string; note?: string; href: string }) {
+  return (
+    <a className="home-metric" href={href}>
+      <span className="home-metric-label">{label}</span>
+      <strong className="home-metric-value">{value}</strong>
+      {note && <span className="home-metric-note">{note}</span>}
+    </a>
+  )
+}
 
 export function HomePage({ businessName }: { businessName?: string }) {
   const [sum, setSum] = useState<Summary | null>(null)
   const [sumError, setSumError] = useState(false)
-  const [rem, setRem] = useState<{ kind: string; count: number | null }[]>([])
-  useEffect(() => { api<Summary>('GET', '/dashboard').then(setSum).catch(() => setSumError(true)) }, [])
-  useEffect(() => { api<{ kind: string; count: number | null }[]>('GET', '/reminders').then(setRem).catch(() => undefined) }, [])
+  const [sumLoading, setSumLoading] = useState(true)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [reminders, setReminders] = useState<Reminder[]>([])
+
+  useEffect(() => {
+    let active = true
+    setSumLoading(true)
+    setSumError(false)
+    api<Summary>('GET', '/dashboard')
+      .then((value) => { if (active) setSum(value) })
+      .catch(() => { if (active) setSumError(true) })
+      .finally(() => { if (active) setSumLoading(false) })
+    return () => { active = false }
+  }, [reloadKey])
+
+  useEffect(() => {
+    let active = true
+    api<Reminder[]>('GET', '/reminders')
+      .then((value) => { if (active) setReminders(value) })
+      .catch(() => undefined)
+    return () => { active = false }
+  }, [])
+
+  const visibleReminders = reminders.filter((item) =>
+    (item.kind === 'orders' || item.kind === 'dayClosing') && (item.count ?? 0) > 0
+  )
+
   return (
-    <div className="launcher-page">
-      <div className="page-title"><h2>{businessName ? t('home.welcomeNamed', { name: businessName }) : t('home.welcome')}</h2><p>{t('home.prompt')}</p></div>
-      {sumError && <p role="alert">{t('dash.error')}</p>}
-      {sum && <div className="dash-tiles">
-        <a className="dash-tile" href="#/sell"><small>{t('dash.salesToday')}</small><strong>{formatInr(sum.salesToday.total)}</strong><small>{sum.salesToday.bills} {t('dash.bills')}</small></a>
-        <a className="dash-tile" href="#/sell/collect"><small>{t('dash.collect')}</small><strong>{formatInr(sum.moneyToCollect)}</strong></a>
-        <a className="dash-tile" href="#/parties/suppliers"><small>{t('home.toPay')}</small><strong>{formatInr(sum.moneyToPay)}</strong></a>
-        <a className="dash-tile" href="#/stock"><small>{t('dash.lowStock')}</small><strong>{sum.lowStockCount}</strong></a>
-        <a className="dash-tile" href="#/money"><small>{t('dash.cash')}</small><strong>{formatInr(sum.cashAndBank)}</strong></a>
-      </div>}
-      {sum && <ul className="insights" aria-label="Insights">
-        {sum.salesToday.bills === 0 && <li>{t('ins.noSales')}</li>}
-        {sum.moneyToCollect > 0 && <li>{t('ins.collect', { amount: formatInr(sum.moneyToCollect) })}</li>}
-        {sum.lowStockCount > 0 && <li>{t('ins.stock', { n: sum.lowStockCount })}</li>}
-        {sum.moneyToPay > 0 && <li>{t('ins.pay', { amount: formatInr(sum.moneyToPay) })}</li>}
-      </ul>}
-      {rem.some(r => r.kind === 'orders' || r.kind === 'dayClosing') && <ul className="insights" aria-label="Reminders">
-        {rem.filter(r => r.kind === 'orders').map(r => <li key={r.kind}>{t('rem.orders', { n: r.count ?? 0 })}</li>)}
-        {rem.filter(r => r.kind === 'dayClosing').map(r => <li key={r.kind}>{t('rem.dayClosing', { n: r.count ?? 0 })}</li>)}
-      </ul>}
-      <div className="areas">
-        {AREAS.map(([ico, name, hint, href]) => <a key={name} className="area" href={href}><span className="ico" aria-hidden="true">{ico}</span><strong>{t(name)}</strong><small>{t(hint)}</small></a>)}
-      </div>
+    <div className="home-dashboard">
+      <header className="home-greeting">
+        <h2>{businessName ? t('home.welcomeNamed', { name: businessName }) : t('home.welcome')}</h2>
+        <p>{t('home.prompt')}</p>
+      </header>
+
+      <a className="home-primary-action" href="#/sell/bill">
+        <span className="home-primary-icon" aria-hidden="true">▤</span>
+        <span className="home-primary-copy">
+          <strong>{t('home.newBill')}</strong>
+          <small>{t('home.newBillHint')}</small>
+        </span>
+        <span className="home-primary-arrow" aria-hidden="true">→</span>
+      </a>
+
+      <section className="home-section" aria-labelledby="home-quick-actions">
+        <h3 id="home-quick-actions">{t('home.quickActions')}</h3>
+        <div className="home-quick-grid">
+          {QUICK_ACTIONS.map((action) => (
+            <a className="home-quick-action" href={action.href} key={action.label}>
+              <span className="home-quick-icon" aria-hidden="true">{action.icon}</span>
+              <span className="home-quick-copy">
+                <strong>{t(action.label)}</strong>
+                <small>{t(action.hint)}</small>
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section className="home-section" aria-labelledby="home-overview">
+        <h3 id="home-overview">{t('home.overview')}</h3>
+        {sumLoading && !sum && <p className="home-status" role="status">{t('app.loading')}</p>}
+        {sumError && (
+          <div className="home-error" role="alert">
+            <span>{t('dash.error')}</span>
+            <button type="button" onClick={() => setReloadKey((key) => key + 1)}>{t('home.retry')}</button>
+          </div>
+        )}
+        {sum && (
+          <>
+            <div className="home-metric-grid">
+              <MetricCard label={t('dash.salesToday')} value={formatInr(sum.salesToday.total)} note={`${sum.salesToday.bills} ${t('dash.bills')}`} href="#/sell" />
+              <MetricCard label={t('dash.collect')} value={formatInr(sum.moneyToCollect)} note={t('home.customerDues')} href="#/sell/collect" />
+              <MetricCard label={t('dash.lowStock')} value={String(sum.lowStockCount)} note={t('home.lowStockHint')} href="#/stock" />
+              <MetricCard label={t('home.toPay')} value={formatInr(sum.moneyToPay)} note={t('home.supplierDues')} href="#/parties/suppliers" />
+            </div>
+            <a className="home-cash-strip" href="#/money">
+              <span className="home-cash-copy">
+                <small>{t('dash.cash')}</small>
+                <strong>{formatInr(sum.cashAndBank)}</strong>
+              </span>
+              <span className="home-cash-link">{t('home.viewMoney')} <span aria-hidden="true">›</span></span>
+            </a>
+          </>
+        )}
+      </section>
+
+      {visibleReminders.length > 0 && (
+        <section className="home-reminders" aria-label={t('home.reminders')}>
+          {visibleReminders.filter((item) => item.kind === 'orders').map((item) => (
+            <p key={item.kind}>{t('rem.orders', { n: item.count ?? 0 })}</p>
+          ))}
+          {visibleReminders.filter((item) => item.kind === 'dayClosing').map((item) => (
+            <p key={item.kind}>{t('rem.dayClosing', { n: item.count ?? 0 })}</p>
+          ))}
+        </section>
+      )}
     </div>
   )
 }

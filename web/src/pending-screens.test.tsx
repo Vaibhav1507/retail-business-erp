@@ -23,7 +23,7 @@ const csrf: Record<string, Route> = { '/api/csrf': () => ({ body: { token: 't' }
 beforeEach(() => resetCsrf())
 afterEach(() => { setLanguage('en'); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
-describe('HomePage reminders and insights (G5, G10)', () => {
+describe('HomePage overview and reminders (G5, G10)', () => {
   const dash = { salesToday: { bills: 0, total: 0 }, moneyToCollect: 250, moneyToPay: 0, lowStockCount: 2, cashAndBank: 100 }
 
   it('shows overdue-order and unclosed-day reminders from /api/reminders', async () => {
@@ -36,22 +36,25 @@ describe('HomePage reminders and insights (G5, G10)', () => {
   it('hides the reminders list when there is nothing to remind', async () => {
     mock({ ...csrf, '/api/dashboard': () => ({ body: dash }), '/api/reminders': () => ({ body: [{ kind: 'collect', severity: 'info', count: null, amount: 250 }] }) })
     render(<HomePage />)
-    await screen.findByLabelText('Insights')
+    await screen.findByRole('heading', { name: "Today's overview" })
     expect(screen.queryByLabelText('Reminders')).toBeNull()
   })
 
   it('still renders the home screen when reminders fail to load', async () => {
     mock({ ...csrf, '/api/dashboard': () => ({ body: dash }), '/api/reminders': () => ({ status: 500, body: { error: 'boom' } }) })
     render(<HomePage />)
-    await screen.findByLabelText('Insights')
+    await screen.findByRole('heading', { name: "Today's overview" })
     expect(screen.queryByLabelText('Reminders')).toBeNull()
   })
 
-  it('derives rule-based insights from the dashboard figures', async () => {
+  it('renders live dashboard figures in the overview cards', async () => {
     mock({ ...csrf, '/api/dashboard': () => ({ body: dash }), '/api/reminders': () => ({ body: [] }) })
     render(<HomePage />)
-    const list = await screen.findByLabelText('Insights')
-    expect(list.querySelectorAll('li').length).toBe(3)
+    expect(await screen.findByRole('link', { name: /Sales today/ })).toHaveTextContent('₹0.00')
+    expect(screen.getByRole('link', { name: /Money to collect/ })).toHaveTextContent('₹250.00')
+    expect(screen.getByRole('link', { name: /Low stock/ })).toHaveTextContent('2')
+    expect(screen.getByRole('link', { name: /Money you need to pay suppliers/ })).toHaveTextContent('₹0.00')
+    expect(screen.getByRole('link', { name: /Cash and bank/ })).toHaveTextContent('₹100.00')
   })
 
   it('shows an error message when the dashboard fails', async () => {
