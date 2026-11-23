@@ -529,8 +529,11 @@ public sealed class SalesService(TenantDb db)
                     select distinct identifier
                     from sales.sale_line l,
                          unnest(coalesce(l.serials, array[]::text[]) || l.imei1s || l.imei2s) identifier
-                    where identifier = any(@ids)");
+                    where identifier = any(@ids)
+                      and l.sale_id <> @saleId
+                      and not exists (select 1 from sales.sale_cancellation c where c.sale_id=l.sale_id)");
                 q.Parameters.AddWithValue("ids", allIdentifiers);
+                q.Parameters.AddWithValue("saleId", id);
                 await using var r = await q.ExecuteReaderAsync(ct);
                 while (await r.ReadAsync(ct)) soldBefore.Add(r.GetString(0));
             }
