@@ -4,7 +4,7 @@ const SIZES = [10, 25, 50]
 type Sort = { col: number; dir: 1 | -1; keys: Map<unknown, string> }
 const num = (s: string) => { const n = Number(s.replace(/[\u20B9,\s]/g, '')); return s.trim() !== '' && !Number.isNaN(n) ? n : null }
 
-export function Paged<T>({ rows, children, label = 'rows', empty }: { rows: T[]; children: (page: T[]) => ReactNode; label?: string; empty?: string }) {
+export function Paged<T>({ rows, children, label = 'rows', empty, resetKey }: { rows: T[]; children: (page: T[]) => ReactNode; label?: string; empty?: string; resetKey?: string }) {
   const [size, setSize] = useState(10)
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<Sort | null>(null)
@@ -23,6 +23,7 @@ export function Paged<T>({ rows, children, label = 'rows', empty }: { rows: T[];
   const from = rows.length === 0 ? 0 : cur * size + 1
   const to = Math.min(rows.length, (cur + 1) * size)
   useEffect(() => { if (page > pages - 1) setPage(pages - 1) }, [page, pages])
+  useEffect(() => { setPage(0) }, [resetKey])
   useEffect(() => {
     ref.current?.querySelectorAll('table').forEach(t => {
       const b = t.tBodies[0]
