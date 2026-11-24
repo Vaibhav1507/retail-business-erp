@@ -8,7 +8,7 @@ import { setLanguage } from './i18n'
 const supplier = { id: 'sup-1', name: 'Asha Electronics', phone: '9876543210', notes: null, isActive: true, owed: 1500 }
 const location = { id: 'loc-1', name: 'Main shop' }
 const product = { id: 'prod-1', name: 'Mixer' }
-const receipts = [{ id: 'receipt-1', date: '2026-11-23', supplier: supplier.name, supplierRef: 'INV-100', total: 220, hasInvoice: false }]
+const receipts = [{ id: 'receipt-1', date: '2026-11-23', supplier: supplier.name, supplierRef: 'INV-100', total: 220, hasInvoice: true }]
 
 type Post = { url: string; body: any; headers: Record<string, string> }
 let posts: Post[] = []
@@ -20,8 +20,9 @@ function mockProcurement(openBills: { id: string; date: string; reference: strin
     if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
     if (url === '/api/suppliers' && method === 'GET') return new Response(JSON.stringify([supplier]))
     if (url === '/api/purchases' && method === 'GET') return new Response(JSON.stringify(receipts))
-    if (url === '/api/supplier-payments' && method === 'GET') return new Response(JSON.stringify([]))
+    if (url === '/api/supplier-payments' && method === 'GET') return new Response(JSON.stringify([{ id: 'payment-old', date: '2026-11-22', supplier: supplier.name, amount: 350, method: 'UPI', reference: 'UPI-12' }]))
     if (url === '/api/suppliers/sup-1/open-bills' && method === 'GET') return new Response(JSON.stringify(openBills))
+    if (url === '/api/suppliers/sup-1/statement' && method === 'GET') return new Response(JSON.stringify({ supplier: supplier.name, outstanding: 1500, entries: [] }))
     if (url === '/api/suppliers/sup-1/statement' && method === 'GET') return new Response(JSON.stringify({ supplier: supplier.name, outstanding: 1500, entries: [] }))
     if (method === 'POST') {
       posts.push({ url, body: init?.body ? JSON.parse(init.body as string) : {}, headers: init?.headers as Record<string, string> })
@@ -112,11 +113,11 @@ describe('Procurement Buy screens', () => {
     await user.selectOptions(screen.getByLabelText('Product'), 'prod-1')
     await user.type(screen.getByLabelText('Quantity'), '2')
     await user.type(screen.getByLabelText('Unit cost (INR, before GST)'), '100')
-    await user.click(screen.getByRole('button', { name: 'Add item' }))
     await user.click(screen.getByRole('button', { name: 'Add GST details (optional)' }))
     await user.type(screen.getByLabelText('GST on this line (INR)'), '20')
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
 
-    expect(screen.getByText('₹220.00')).toBeInTheDocument()
+    expect(screen.getAllByText('₹220.00').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: 'Review purchase' }))
     expect(screen.getByRole('region', { name: 'Review purchase' })).toHaveTextContent('Mixer')
     await user.click(screen.getByRole('button', { name: 'Post purchase' }))
@@ -130,6 +131,27 @@ describe('Procurement Buy screens', () => {
     })
     expect(post.headers['Idempotency-Key']).toBeTruthy()
     expect(reload).toHaveBeenCalled()
+  })
+
+  it('shows separate receipt and payment history and requires a supplier for the statement', async () => {
+    const user = userEvent.setup()
+    mockProcurement()
+    render(<Procurement products={[]} locations={[]} reload={vi.fn()} show="history" />)
+
+    expect(await screen.findByRole('heading', { name: 'Past purchases' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Purchase receipts' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Supplier payments' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View supplier bill' })).toHaveAttribute('href', '/api/purchases/receipt-1/invoice')
+    expect(screen.getByText('UPI')).toBeInTheDocument()
+
+    const supplierSearch = screen.getByRole('combobox', { name: 'Supplier statement' })
+    const statementButton = screen.getByRole('button', { name: 'View supplier statement' })
+    expect(statementButton).toBeDisabled()
+    await user.type(supplierSearch, 'Asha')
+    await user.click(await screen.findByRole('option', { name: /Asha Electronics/ }))
+    expect(statementButton).toBeEnabled()
+    await user.click(statementButton)
+    expect(await screen.findByRole('region', { name: 'Supplier statement' })).toBeInTheDocument()
   })
 
   it('rejects payment amounts with more than two decimal places', async () => {
