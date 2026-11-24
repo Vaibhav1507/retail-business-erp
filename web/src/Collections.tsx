@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from './api'
 import { Paged } from './Paged'
 import './billing-forms.css'
@@ -81,7 +81,7 @@ export function Collections({ reload }: { reload: () => void }) {
     }
   }
 
-  const collect = async (event: React.FormEvent) => {
+  const collect = async (event: FormEvent) => {
     event.preventDefault()
     if (!payCustomer || !(Number(payAmount) > 0) || submitting) return
     setSubmitting(true)
