@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 
 type PhotoSourcePickerProps = {
   triggerLabel: string
+  triggerIcon?: string
   title: string
   description: string
   disabled: boolean
@@ -17,6 +18,7 @@ type PhotoSourcePickerProps = {
  */
 export function PhotoSourcePicker({
   triggerLabel,
+  triggerIcon,
   title,
   description,
   disabled,
@@ -92,11 +94,12 @@ export function PhotoSourcePicker({
         type="button"
         className="secondary photo-source-trigger"
         disabled={disabled}
+        aria-label={triggerLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}
       >
-        {triggerLabel}
+        {triggerIcon ? <span aria-hidden="true">{triggerIcon}</span> : triggerLabel}
       </button>
 
       <input

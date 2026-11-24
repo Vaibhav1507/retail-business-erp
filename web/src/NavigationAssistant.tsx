@@ -604,7 +604,7 @@ export function NavigationAssistant() {
    if (open) closeAssistant()
    else { panelOpenRef.current = true; setOpen(true) }
   }}>
-   <span aria-hidden="true">✦</span><span>{open ? text.close : 'Assistant'}</span>
+   <span aria-hidden="true">💬</span>
   </button>
   {open && createPortal(<section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={closeAssistant}>×</button></header>

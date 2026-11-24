@@ -255,7 +255,8 @@ export default function App() {
   const invoiceFocus = page === 'sell' && first('menu') === 'bill'
   return (
 	<AppLockGate email={me.email} onSignOut={logout}><div className={invoiceFocus ? 'shell invoice-focus' : 'shell'}>
-	  <header className="topbar"><img className="brand-logo" src="/logo-mark.svg" alt="" width="40" height="40" /><ProfileMenu businessName={businessName ?? me.email} email={me.email} dark={dark} onToggleDark={() => setDark(d => !d)} onLogout={logout} />{!invoiceFocus && <NavigationAssistant />}</header>
+	  <header className="topbar"><img className="brand-logo" src="/logo-mark.svg" alt="" width="40" height="40" /><ProfileMenu businessName={businessName ?? me.email} email={me.email} dark={dark} onToggleDark={() => setDark(d => !d)} onLogout={logout} /></header>
+      <NavigationAssistant />
 	  {!invoiceFocus && <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>}
