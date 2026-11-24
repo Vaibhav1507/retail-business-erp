@@ -132,3 +132,36 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 2. Download and inspect the current audit report/contact sheets; fix any functional, responsive, overflow, touch-target or Axe failures and rerun affected coverage.
 3. If all gates pass, mark PR #74 ready and merge it; do not deploy without separate approval.
 4. Keep native Android camera/gallery permissions, printer/share sheet, TalkBack and shopkeeper acceptance as separate post-merge checks.
+
+
+## 10. Execution update — 2026-11-24: four-screen screenshot-led final polish
+
+### Scope clarified
+- The remaining Sales scope is exactly four screens: Sell hub `#/sell/menu`, Sales history `#/sell/bills`, Collect payment `#/sell/collect`, and Customer returns `#/sell/return`.
+- Home and Generate Invoice are established references only. Generate Invoice is `#/sell/bill`; it is not part of this final polish scope.
+- Current main-branch route wiring was verified in `web/src/Pages.tsx`. Current implementations inspected: `SalesHistory.tsx`, `Collections.tsx`, `CustomerReturns.tsx` and their route-scoped CSS.
+- PR #74 is now **merged** to main (merge commit `c4d71190b69a581dae389d90bcd1e4e9e58f3f00`, merged 2026-11-24 09:03 UTC). Its five-route implementation is the current code baseline. The old statements above that PR #74 was open/draft are historical checkpoints and superseded by this update.
+- PR #67 remains open/draft on `docs/rbos-usability-accessibility-programme`, head observed before this update: `9b806cf6a37ca4352c24000e2069d6332b29340e`. Refresh exact PR head/CI and mergeability after documentation commits.
+
+### Final polish contract
+- Added [Four-screen final polish specification](./billing-sales-four-screen-final-polish.md) to this PR #67 branch.
+- Sell hub: retain the current action-first layout; spacing/alignment polish only.
+- Sales history: flatten nested result panels/cards, make result count compact, keep mobile sale summaries scannable, and prevent the fixed Assistant launcher from obscuring balances or View bill actions without redesigning the global Assistant.
+- Collect payment: compact the initial customer selection and empty-history states; preserve the guided outstanding → payment details → record payment sequence; keep statement on demand.
+- Customer returns: retain the original-bill-first journey; make return history a compact, clearly associated disclosure; keep full-sale cancellation separate and destructive.
+- Preserve existing routes, APIs, server-derived balances/totals, allocation, idempotency, WhatsApp consent/retry, returns/cancellation accounting, stock valuation, tenant/security and print semantics.
+- Research references and rationale are recorded in the new specification. Competitor patterns are references only; RBOS APIs and business invariants remain authoritative.
+
+### Evidence and status
+- Reviewed the supplied Android screenshots for all four screens. These are screenshot findings, not proof of the underlying states beyond what is visible.
+- Read current `main` workflow and route wiring; read existing route design specifications from the PR #67 documentation branch; inspected current `main` implementation files.
+- PR #74's merge makes the five-route implementation present on main. The screenshots now identify a small final-polish gap, not a reason to reopen the overall information architecture.
+- **Design:** final polish decisions documented.
+- **Implementation:** not yet started for this four-screen polish.
+- **Focused tests:** not run for these polish changes because no code has changed.
+- **Final integrated Playwright/screenshots/Axe:** pending until all four polish changes are implemented.
+- **Android visual review:** supplied screenshots reviewed; updated screenshots required after implementation.
+- **Merge/deployment:** no authorisation implied. PR #67 is documentation only; code polish must use one canonical implementation branch/PR after refreshing current GitHub state.
+
+### Next concrete action
+Refresh current open branches/PRs and CI after this handoff update, then create or continue exactly one implementation branch from current main for the four-screen polish. Implement the Sell hub light polish, Sales history hierarchy/Assistant clearance, Collections compact states and Customer Returns history disclosure in that order. Run focused checks as changes land, then perform the agreed four-screen integrated Playwright/screenshot/Axe review and request fresh Android screenshots from the user.
