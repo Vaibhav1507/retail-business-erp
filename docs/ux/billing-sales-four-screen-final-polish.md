@@ -142,3 +142,13 @@ These are pattern references, not instructions to copy competitor screens. RBOS'
 ## 8. Current evidence boundary
 
 The supplied Android screenshots were reviewed for all four screens. The latest main-branch source was inspected for `Pages.tsx`, `SalesHistory.tsx`, `Collections.tsx` and `CustomerReturns.tsx`, with corresponding CSS. PR #74 is merged to main. This specification is a final polish contract, not proof that the polish has been implemented or visually accepted.
+
+
+## 9. Implementation checkpoint — PR #80
+
+- Implementation is in progress in [PR #80](https://github.com/Vaibhav1507/retail-business-erp/pull/80), branch `ux/billing-sales-four-screen-polish`.
+- Current PR head: `774933e32ca77c1a83fed2af3da98cb8d3372e31`.
+- Changed files remain limited to the three route-scoped CSS files listed in the handoff. Sell hub remains unchanged by design.
+- The first PR-triggered CI run (#45393741940) started against the preceding PR head `f4ee4fd19000e95d0459edead3b662f4280c9877`; it is not yet evidence for the latest head. Recheck CI against the current PR head before reporting a pass.
+- No screenshot review of the updated implementation has been completed. User-provided screenshots remain the baseline evidence; request fresh Android screenshots after the CSS changes are available for testing.
+- PR #80 remains draft; no merge or deployment.
