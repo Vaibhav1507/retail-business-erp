@@ -191,7 +191,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
       <div className="invoice-upload-sources" aria-label={tr('buy.invoiceSources')}>
         <button type="button" className="secondary" onClick={() => cameraInput.current?.click()} disabled={busy}>{tr('buy.camera')}</button>
         <button type="button" className="secondary" onClick={() => uploadInput.current?.click()} disabled={busy}>{tr('buy.upload')}</button>
-        <input ref={cameraInput} className="invoice-upload-source-input" type="file" accept="image/*" capture="environment" aria-label={tr('buy.cameraBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+        <input ref={cameraInput} className="invoice-upload-source-input" type="file" hidden accept="image/*" capture="environment" aria-label={tr('buy.cameraBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
         <input ref={uploadInput} className="invoice-upload-source-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple aria-label={tr('buy.uploadBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
       </div>
       {selectedFileNames.length > 0 && <p className="invoice-upload-selected" aria-live="polite">{selectedFileNames.join(', ')}</p>}
