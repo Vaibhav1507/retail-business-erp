@@ -29,3 +29,8 @@
 - Run normal PR CI. No exhaustive Playwright matrix for this narrow refinement; user will review Android screenshots.
 - Camera/gallery, keyboard/fixed-footer and TalkBack remain real-device checks.
 - Merge and production deployment are separate approvals.
+
+
+## Tag extraction disclosure behaviour
+- After Scan tag extraction, populate the visible item fields but keep **More item details** collapsed. Users can expand it deliberately when they need barcode, IMEI, HSN, MRP or discount fields.
+- Extraction must not change disclosure state or unexpectedly increase the form's vertical length.
