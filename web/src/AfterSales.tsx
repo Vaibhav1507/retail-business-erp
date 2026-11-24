@@ -202,7 +202,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
               {receipts.map(r => <option key={r.id} value={r.id}>{r.date} · {r.supplier}{r.supplierRef ? ' · ' + r.supplierRef : ''} · ₹{r.total.toFixed(2)}</option>)}
             </select>
           </label>
-          {retReceipt && }
+          
           {retReceipt && recDetail && <>
             <div className="buy-return-receipt">
               <div><span>{tr('buy.supplier')}</span><strong>{receipts.find(r => r.id === retReceipt)?.supplier}</strong></div>
