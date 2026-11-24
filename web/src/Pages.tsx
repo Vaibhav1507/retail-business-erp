@@ -114,7 +114,7 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
         </>
       ) : (
         <>
-          <p className="sell-route-back"><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p>
+          {tab !== 'bill' && <p className="sell-route-back"><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p>}
         </>
       )}
       {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} />}
