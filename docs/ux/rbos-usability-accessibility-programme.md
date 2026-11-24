@@ -1,6 +1,6 @@
 # RBOS Usability & Accessibility Programme
 
-- **Status:** BILLING & SALES REDESIGN IN PROGRESS — Create Invoice repository design specification completed and compared with PR #74; Sell landing is next. PR #74 exact-head CI and PR #67 documentation CI are verified. Full five-route verification remains deferred until all five routes are implemented. Figma is optional and not a blocker.
+- **Status:** BILLING & SALES REDESIGN IN PROGRESS — Create Invoice, Sell landing, Sales History, Collections and Customer Returns repository design specifications are completed; implementation is now proceeding in route order. PR #74 exact-head CI is verified. PR #74 exact-head CI and PR #67 documentation CI are verified. Full five-route verification remains deferred until all five routes are implemented. Figma is optional and not a blocker.
 - **Repository baseline:** `main` at `17428b20c1974a0a57d00b60774d893831304e64` (24 November 2026; refresh before implementation)
 - **Scope:** Screen-by-screen usability, accessibility, responsive-layout and interaction improvements
 - **Release boundary:** This document does not authorise application-code changes, production deployment, schema changes or feature expansion.
@@ -515,3 +515,18 @@ Fix issues from the group pass and rerun affected coverage and necessary regress
 - **Next route:** Sell landing `#/sell/menu`. Inspect `SellPage` in `web/src/Pages.tsx`, route entry/exit, existing translation keys and shell behaviour. Complete its design specification before implementation.
 - **Verification cadence:** focused checks only during route implementation; full integrated Playwright journeys, responsive screenshots, visual review and Axe WCAG 2 A/AA remain deferred until all five routes are implemented.
 - **Release boundary:** no merge or deployment authorised. Native Android and shopkeeper acceptance remain separate later gates.
+
+
+### 10.11 Execution update — 2026-11-24 (five route design contracts complete)
+
+- Completed repository design specifications for all five in-scope routes:
+  - [Create Invoice](./billing-sales-create-invoice-design.md) — compared with PR #74.
+  - [Sell landing](./billing-sales-sell-landing-design.md).
+  - [Sales History](./billing-sales-sales-history-design.md).
+  - [Collections](./billing-sales-collections-design.md).
+  - [Customer Returns](./billing-sales-customer-returns-design.md).
+- The five specifications preserve the existing route/API and accounting boundaries and define the hierarchy, interactions, states, responsive rules, accessibility requirements and acceptance criteria.
+- Implementation now proceeds in the agreed route order, starting with Sell landing. PR #74 remains the Create Invoice implementation candidate.
+- Focused checks only during each implementation slice. Full integrated Playwright, responsive screenshots, visual review and Axe are deferred until all five routes are implemented.
+- Existing 178-screenshot pre-redesign baseline is not repeated.
+- No merge or deployment is authorised; native Android and shopkeeper acceptance remain later gates.
