@@ -70,7 +70,7 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
         return
       }
       if (event.key !== 'Tab') return
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null)
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
       if (!focusable.length) { event.preventDefault(); dialog.focus(); return }
       const first = focusable[0], last = focusable[focusable.length - 1]
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
@@ -270,9 +270,13 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
           <button type="submit" disabled={submitting || linesLoading || selectedLines.length === 0 || retLines.every(line => line.remaining <= 0)}>
             {submitting ? 'Posting return…' : 'Post customer return'}
           </button>
-          <button type="button" className="customer-return-cancel-link" disabled={submitting} onClick={() => setCancelConfirm(true)}>Cancel entire sale</button>
         </div>}
       </form>
+
+      {retSale && selectedSale && <section className="customer-cancel-section" aria-label="Cancel entire sale">
+        <div><h4>Cancel entire sale</h4><p>Use this only when the whole bill must be reversed. Stock will be restored and the books reversed.</p></div>
+        <button type="button" className="customer-return-danger" disabled={submitting} onClick={() => setCancelConfirm(true)}>Cancel entire sale</button>
+      </section>}
 
       <section className="customer-return-history" aria-label="Customer return history">
         <div className="customer-returns-section-title">
