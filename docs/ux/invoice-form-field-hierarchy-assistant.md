@@ -5,7 +5,7 @@
 **Evidence:** User review of the latest Android preview.
 
 ## Decisions
-- Item description remains full-width with the text-labelled **Scan tag** action beside it.
+- Item description uses a two-line, wrapping field so long extracted product names remain readable; the adjacent compact camera-icon action has the accessible name **Scan tag** and opens the existing camera/gallery chooser.
 - Electronics: **Brand + Model number** share the first row; **Quantity + Selling price** share the next row; optional Serial number is full-width below.
 - Brand is visible outside More item details for every business category. For non-electronics, Brand occupies a full-width row; Model and Serial remain under More item details.
 - Barcode, IMEI, MRP, HSN and line discount remain under More item details.
