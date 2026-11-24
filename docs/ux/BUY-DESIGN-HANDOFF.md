@@ -1,6 +1,6 @@
 # RBOS Buy section — design handoff
 
-**Status:** Four screen design specifications finalized; implementation pending.  
+**Status:** Four screen design specifications finalized; Add Purchase implementation started; remaining three screens pending.  
 **Last reviewed:** 2026-11-24  
 **Repository:** Vaibhav1507/retail-business-erp  
 **Design baseline:** main at b180f59793f265024650731a1f2bd89ead29b342  
@@ -133,6 +133,16 @@ Detailed contract: docs/ux/buy-past-purchases-design.md.
 Flow: choose original receipt → confirm supplier/receipt context → enter return quantities → optional reason → post. Show purchased, already returned and remaining-on-receipt quantities. Keep Fill remaining secondary and explain that the server also checks stock on hand. History is separate and collapsed by default.
 
 Detailed contract: docs/ux/buy-return-to-supplier-design.md.
+
+
+### Add Purchase — implementation in progress (2026-11-24)
+
+- Updated `web/src/Procurement.tsx` for the existing `#/buy/receive` route only.
+- Added scoped `web/src/buy-procurement.css` and English/Hindi copy in `web/src/i18n.ts`.
+- Implemented grouped supplier/receipt fields, compact optional invoice-upload area, item entry, secondary GST disclosure, readable item cards, estimated total, and separate review/post state.
+- Preserved the existing InvoiceUpload component, barcode scanner, POST `/purchases` request and idempotency key; no backend or accounting changes.
+- Focused automated checks have **not yet run**. Playwright is intentionally excluded per the user's instruction; updated Android screenshots will be the visual review evidence.
+- Next: finish focused TypeScript/build/frontend test checks, then proceed to Pay Supplier.
 
 ## 7. Functional findings, separately tracked
 
