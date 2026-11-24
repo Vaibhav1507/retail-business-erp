@@ -186,3 +186,71 @@ For RBOS work, create one ChatGPT Project named **RBOS — Product, UX & Enginee
 For a general rule across unrelated ChatGPT chats too, add a short version of the operating preference to global Custom Instructions. Keep the detailed RBOS process in the RBOS Project and repository so generic chats are not forced to use RBOS-specific tools or constraints.
 
 Project instructions and global custom instructions are product settings; the repository playbook remains the versioned source of truth for the actual UX process.
+
+
+---
+
+## 6. Mandatory decision, assumption and deferral ledger
+
+**Non-negotiable rule: document everything that is decided, changed, rejected, deferred, blocked, discovered or left unfinished.** A chat message, verbal agreement, PR description or the model's memory is not the durable source of truth. The repository must make it possible for a new chat or engineer to resume without guessing or asking the user to reconstruct prior decisions.
+
+For every meaningful UX/engineering scope, maintain a living scope record under `docs/ux/` (either the screen's design note or a linked phase/status note). Update it during the work, not only at the end.
+
+### Record all of the following
+
+- **User input and decisions:** the requested outcome, explicit preferences, constraints, approvals and decisions made by the user. Preserve the intent; do not silently reinterpret it.
+- **Assistant/team recommendations and decisions:** what was recommended or selected, who/what made the decision, the rationale and the alternatives considered.
+- **Rejected options:** what was considered and rejected, why it was rejected, and what evidence would justify revisiting it.
+- **Assumptions:** every assumption that affects scope, design, implementation, test coverage or rollout. Mark it as unverified until checked.
+- **Dependencies and invariants:** affected routes, APIs, data contracts, shared components, permissions, business/accounting rules, integrations and upstream/downstream flows that must remain intact.
+- **Known issues and evidence:** screenshots, Playwright reports, user observations, source locations, test failures, logs and reproducible steps. Separate verified facts from hypotheses.
+- **Deferred work / parking lot:** every issue deliberately not addressed in the current scope, why it is deferred, impact/risk, priority, dependencies, owner or responsible next step, and the event/condition that should bring it back.
+- **Blockers and unanswered questions:** what is missing, why it blocks progress, the exact decision/input needed, and what work can continue safely meanwhile.
+- **Out-of-scope items:** explicitly list neighbouring screens or concerns that were inspected but intentionally not changed.
+- **Validation status:** commands/checks run, exact pass/fail/skip outcomes, screenshots/artifact links, viewport/state coverage, accessibility results and any manual checks still outstanding.
+- **Delivery status:** branch, PR, commits, review state, merge commit and deployment/release status. Never conflate these states.
+- **Handover:** the precise next action, relevant files/links, remaining risks and a short resume instruction for another chat or engineer.
+
+### Status vocabulary
+
+Use explicit statuses rather than ambiguous phrases such as “done” or “handled”:
+
+- `DECIDED` — a choice was made and rationale recorded.
+- `IN_PROGRESS` — work has started but is incomplete.
+- `VERIFIED` — evidence confirms the stated result.
+- `DEFERRED` — intentionally postponed; reason and revisit trigger are recorded.
+- `BLOCKED` — cannot proceed safely until a named dependency/input is resolved.
+- `REJECTED` — option considered and not selected; rationale recorded.
+- `NOT_RUN` — a check or action has not been performed.
+- `OUT_OF_SCOPE` — explicitly not part of this phase.
+
+Do not mark something `VERIFIED` based only on an assumption, a plan, a successful build, or a screenshot of a different state.
+
+### Required decision-log entry format
+
+Use a compact table or structured entries in the relevant UX note:
+
+| ID / date | Type | Decision, finding or deferred item | Rationale / evidence | Impact and dependencies | Status | Owner / next action / revisit trigger |
+|---|---|---|---|---|---|---|
+
+For significant decisions, also record the alternatives considered and why they were not chosen. Link the exact PR, commit, screenshot, audit artifact, issue or design file whenever available.
+
+### Required phase handover
+
+At every meaningful pause, chat transition, design gate, implementation gate and phase closure, update a **Current status / next steps** section with:
+
+1. What has been completed and what evidence proves it.
+2. What has been decided and where the rationale is recorded.
+3. What remains unfinished, deferred, blocked or unverified, including why.
+4. What is explicitly out of scope.
+5. The exact next action and its prerequisites.
+6. Relevant branches, PRs, commits, Figma/MagicPath links and audit artifacts.
+7. Tests, visual checks and manual/user acceptance checks still pending.
+
+When the user changes a prior instruction or decision, update the record and mark the old decision as superseded; do not leave contradictory instructions active.
+
+**No silent leftovers:** if we notice an issue and choose not to fix it now, it must be entered in the deferral/parking-lot record before moving on. If we skip a workflow stage because it is unnecessary or unavailable, record why, the impact and whether/when it should be revisited. If no work is deferred, explicitly state “No known deferred items” rather than leaving the section empty.
+
+### Completion rule
+
+A screen phase is not documentation-complete until the decision log, deferred-work list, validation evidence and handover are current. A PR can be code-complete while the UX phase remains open for visual validation, real-device review, user acceptance or deployment; record those separately.
