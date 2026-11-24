@@ -32,7 +32,7 @@ async function readInvoice(d: InvoiceDraft) {
   mock({ ...csrf, '/api/purchases/extract': () => ({ body: d }) })
   render(<InvoiceUpload products={products} suppliers={[]} onUse={(_d, picked) => { used.picked = picked }} />)
   const file = new File(['x'], 'bill.pdf', { type: 'application/pdf' })
-  await userEvent.upload(screen.getByLabelText(/Upload invoice photo or PDF/), file)
+  await userEvent.upload(screen.getByLabelText(/Upload a supplier bill photo or PDF/), file)
   await screen.findByLabelText('Supplier for this invoice')
   return used
 }
@@ -136,6 +136,6 @@ describe('Procurement manual GST', () => {
     mock(routes(() => ({ body: { total: 1000 } })))
     await addLine('100', '')
     expect(screen.queryByText(/\+ GST/)).toBeNull()
-    expect(screen.getByText(/10 x 100/)).toBeTruthy()
+    expect(screen.getByText(/10 × ₹100\\.00/)).toBeTruthy()
   })
 })
