@@ -19,7 +19,7 @@ const routeViewports = [
   { name: 'tablet-768x1024', width: 768, height: 1024 },
   { name: 'landscape-844x390', width: 844, height: 390 },
 ]
-const stateViewports = [routeViewports[0]!, routeViewports[1]!, routeViewports[2]!, routeViewports[3]!]
+const stateViewports = [...routeViewports]
 const desktopViewport = { name: 'desktop-1280x900', width: 1280, height: 900 }
 type RecordRow = {
   state: string; viewport: string; screenshot: string; overflowX: boolean
@@ -184,7 +184,17 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   const tagPicker = page.getByRole('dialog', { name: 'Add product tag photo' })
   await expect(tagPicker).toBeVisible()
   await capture(page, 'bill-tag-source-picker')
-  await tagPicker.getByRole('button', { name: 'Cancel' }).click()
+  const cameraAction = tagPicker.getByRole('button', { name: 'Take a photo' })
+  const galleryAction = tagPicker.getByRole('button', { name: 'Choose from device' })
+  await cameraAction.focus()
+  await expect(cameraAction).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(galleryAction).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(cameraAction).toBeFocused()
+  await capture(page, 'bill-tag-source-picker-keyboard')
+  await page.keyboard.press('Escape')
+  await expect(tagPicker).toBeHidden()
 
   await bill.getByRole('button', { name: 'Upload handwritten bill' }).click()
   const invoicePicker = page.getByRole('dialog', { name: 'Add handwritten invoice' })
