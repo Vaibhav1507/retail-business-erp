@@ -57,6 +57,18 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(container.querySelector('.invoice-sticky-review')).toBeInTheDocument()
   })
 
+  it('keeps model and serial in optional details for non-electronics businesses', async () => {
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="general_retail" />)
+    const details = container.querySelector('.invoice-product-more-details') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    expect(container.querySelector('#billing-model')?.closest('details')).toBe(details)
+    expect(container.querySelector('#billing-serial')?.closest('details')).toBe(details)
+    await userEvent.click(details.querySelector('summary') as HTMLElement)
+    expect(details.open).toBe(true)
+    expect(screen.getByLabelText('Model number')).toBeInTheDocument()
+    expect(screen.getByLabelText('Serial number (optional)')).toBeInTheDocument()
+  })
+
   it('keeps automatic browser printing when WhatsApp consent is not confirmed', async () => {
     const reload = vi.fn()
     render(<GenerateInvoice products={products} locations={locations} reload={reload} />)
