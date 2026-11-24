@@ -109,6 +109,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rbos-visual-audit-${{ github.event.inputs.scope || 'billing-sales' }}
-          path: web/test-results/ui-audit/${{ github.event.inputs.scope || 'billing-sales' }}/
+          path: |
+            web/test-results/ui-audit/${{ github.event.inputs.scope || 'billing-sales' }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/.last-run.json
           if-no-files-found: warn
           retention-days: 7
