@@ -32,21 +32,21 @@ export function Collections({ reload }: { reload: () => void }) {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [historyError, setHistoryError] = useState('')
   const [done, setDone] = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [c, p] = await Promise.all([
+      const [customerResult, paymentResult] = await Promise.allSettled([
         api<Customer[]>('GET', '/customers'),
         api<Payment[]>('GET', '/customer-payments')
       ])
-      setCustomers(c)
-      setPayments(p)
-    } catch (e) {
-      setError(msg(e))
-      throw e
+      if (customerResult.status === 'fulfilled') setCustomers(customerResult.value)
+      else setError(msg(customerResult.reason))
+      if (paymentResult.status === 'fulfilled') { setPayments(paymentResult.value); setHistoryError('') }
+      else setHistoryError(msg(paymentResult.reason))
     } finally {
       setLoading(false)
     }
@@ -213,7 +213,8 @@ export function Collections({ reload }: { reload: () => void }) {
           <button type="button" className="secondary" disabled={loading} onClick={() => void loadData().catch(() => undefined)}>Refresh</button>
         </div>
         {loading && <p className="collections-muted" role="status">Loading collection history…</p>}
-        {!loading && payments.length === 0 && <p className="collections-muted">No collections recorded yet.</p>}
+        {historyError && <p className="collections-error" role="alert">{historyError}</p>}
+        {!loading && !historyError && payments.length === 0 && <p className="collections-muted">No collections recorded yet.</p>}
         <Paged rows={payments} label="payments">{page => (
           <>
             <div className="collections-history-desktop"><table aria-label="Collection history">
