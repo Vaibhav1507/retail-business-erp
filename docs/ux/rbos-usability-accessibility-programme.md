@@ -1,6 +1,6 @@
 # RBOS Usability & Accessibility Programme
 
-- **Status:** AUTOMATED AUDIT VERIFIED — latest CI and expanded Billing & Sales Visual Audit both pass on `fc974e4e16ca80a14bb71156f482f333372b4600`; design review and Figma authoring remain pending
+- **Status:** BILLING & SALES REDESIGN IN PROGRESS — pre-redesign baseline audit and PR #74 exact-head CI are verified; Create Invoice implementation candidate exists; complete design specifications for the five routes and final grouped verification remain pending. Figma is optional and not a blocker.
 - **Repository baseline:** `main` at `17428b20c1974a0a57d00b60774d893831304e64` (24 November 2026; refresh before implementation)
 - **Scope:** Screen-by-screen usability, accessibility, responsive-layout and interaction improvements
 - **Release boundary:** This document does not authorise application-code changes, production deployment, schema changes or feature expansion.
@@ -98,9 +98,9 @@ Follow this sequence consistently. The tools should each have a distinct job; st
 | 1 | **ChatGPT — orchestration and source analysis** | Resolve the user task, inspect repository implementation and dependencies, record current behaviour, identify constraints and prioritise risks. | Screen brief, source map, initial findings and acceptance questions. |
 | 2 | **RBOS Visual Audit + Playwright — visual capture and accessibility evidence** | Run the repository's scoped GitHub Actions visual-audit workflow, capture real application routes/states with Playwright at agreed viewports, inspect screenshots and review Axe results. | Accepted current screenshots; numbered flow; evidence-linked UX and accessibility findings; explicit capture gaps. |
 | 3 | **MagicPath — design exploration** | Turn the agreed brief and audit findings into genuinely different layout/interaction alternatives. | Three distinct options for complex screens, comparison and prototype links/previews. Use fewer only when the screen is genuinely simple and the owner agrees. |
-| 4 | **Figma — approved design source of truth** | Formalise the selected direction using reusable components, variables, typography, spacing and responsive behaviour. | Approved frame(s), component references, variables/tokens and documented states. |
-| 5 | **GitHub — implementation and verification** | Implement the selected design in scoped components/styles, preserve business behaviour, run tests and open a reviewable PR. | Small PR, before/after evidence, test results, regression checklist and documentation update. |
-| 6 | **ChatGPT + real users — acceptance** | Compare the implementation with the approved Figma design and audit findings; review actual task completion with representative users. | Accepted/rejected checklist, remaining risks and next screen selection. |
+| 4 | **Repository design specification — approved design contract** | Finalize layout, components, tokens, responsive rules, copy, interactions and states in versioned docs/ux documentation. MagicPath remains a supporting prototype/reference when available; Figma is optional. | Complete, reviewable design note with measurable acceptance criteria, screen/state layouts and dependencies. |
+| 5 | **GitHub — implementation and focused checks** | Implement each screen in a focused branch/PR or agreed integration branch, preserve business behaviour and run narrow checks as code changes. | Reviewable implementation, focused tests/build evidence and updated handoff. |
+| 6 | **Playwright + Axe + Android/user review — group verification** | After all five Billing & Sales routes are redesigned and implemented, run the complete integrated journey, responsive screenshot and Axe pass; then review native Android behaviour and shopkeeper feedback. | Group-level verification report, reviewed screenshots, defects fixed, native/user acceptance status and next screen selection. |
 
 **Important distinction:** GitHub is used now to store this programme document. That is documentation/version control only. The GitHub implementation stage remains last in each screen's design lifecycle.
 
@@ -113,7 +113,7 @@ Every screen folder/entry in this document should eventually link to:
 3. UX/accessibility findings with severity and confidence.
 4. Research references or a clear note that no external research was needed.
 5. The selected design direction and rejected alternatives.
-6. Approved Figma frame and component references.
+6. Approved repository design specification with component/token/state definitions; MagicPath prototype/reference when available. Figma is optional and not a delivery prerequisite.
 7. Implementation PR and relevant test results.
 8. Real-device and user-test observations.
 9. Final acceptance status and any deferred work.
@@ -420,24 +420,83 @@ At every design gate, implementation gate, meaningful pause and phase closure, u
 
 A screen phase is not documentation-complete until its decision log, deferral list, validation evidence and handover are current. Code completion, visual acceptance, merge and production deployment are separate states.
 
-## 10. Current phase handover — Billing & Sales
+## 10. Current authoritative handover — Billing & Sales (updated 2026-11-24)
 
-- **Current stage:** first implementation slice in PR #74; exact-head CI is running. Do not restart the already-completed pre-redesign baseline audit work.
-- **Implementation branch / PR:** [PR #74 — action-first invoice entry](https://github.com/Vaibhav1507/retail-business-erp/pull/74), branch `ux/invoice-entry-action-first`, head `72cfe96dd8b361d77123d136f1f6f12ad6ac4768`. Scope is `#/sell/bill` only. The shell enters a focused invoice workspace without the fixed main navigation or Navigation Assistant; the app header and Sell back-link remain. Tag scanning is beside product entry, handwritten-bill import is a secondary page-header action, Add product is the single primary item action, Brand/Model/Serial move to progressive disclosure, and the total/review area is sticky with safe-area spacing.
-- **Code/test files in PR #74:** `web/src/GenerateInvoice.tsx`, `web/src/App.tsx`, `web/src/invoice.css`, `web/src/ItemTagCapture.tsx`, `web/src/GenerateInvoice.test.tsx`, `web/src/ItemTagCapture.test.tsx`, `web/e2e/sales.spec.ts`. Existing posting, customer, GST, payment, inventory, offline and accounting behaviour is intended to remain unchanged.
-- **Current exact-head CI:** run [#45340114617](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45340114617) on `079612f...`; TypeScript check passed when this handover was written, frontend unit tests and remaining frontend checks plus backend and PostgreSQL jobs were still running. No green CI claim yet.
-- **Verified automated baseline:** Standard CI #45316812983 and Billing & Sales Visual Audit #45316812990 passed on commit `fc974e4e16ca80a14bb71156f482f333372b4600`. Audit artifact `14885473196` contains 178 screenshots across 47 states. It records zero page errors, horizontal overflow, unnamed controls, undersized controls or Axe violations in captured screen states. Print media was captured separately and skips screen-media Axe checks. Native Android camera, printer/share sheet, TalkBack and representative shopkeeper acceptance are not covered.
-- **Scope:** `#/sell/menu`, `#/sell/bill`, `#/sell/bills`, `#/sell/collect`, `#/sell/return`. Billing/invoice entry and review are the first design priority. Do not redesign unrelated modules.
-- **Source review:** current `main` contains the playbook at `docs/ux/RBOS-UI-UX-WORKFLOW.md`, Home design note at `docs/ux/home-action-first-design.md`, `web/src/GenerateInvoice.tsx` and `web/src/Pages.tsx` were inspected. `GenerateInvoice` owns the form/review/done/pending steps and customer/product/item/GST/payment state; `Pages.tsx` mounts it inside the Sell route and the app shell. Keep those route and domain responsibilities intact.
-- **Verified visual finding:** the audited mobile empty-form screenshot shows the global fixed navigation and Assistant launcher crossing the long invoice form. Product entry presents Add product, Add tag photo and Upload handwritten bill as adjacent prominent buttons. This is visible in artifact `14885473196`, `ui-audit/billing-sales/mobile-390x844-bill-empty-form.png`.
-- **Selected direction carried forward from MagicPath Concept A:** one dominant Add item action; a compact tag-scan affordance attached to the item-description/search field, opening Camera / Choose from gallery; handwritten-bill import remains separate and quieter at invoice level.
-- **New prototype:** [Invoice Entry — Action-first mobile prototype](https://designs.magicpath.ai/v1/cozily-dusk-6555). Component `475857518220939264`, revision `475857518220939265`; MagicPath build completed on 2026-11-24. It includes customer mobile/name as required fields, item description or model entry, quantity and selling price, optional serial/barcode/IMEI under progressive disclosure, an item cart, GST/discount summary, a review step and a sticky review action.
-- **Decision supersession:** the earlier focused-workspace proposal is now implemented in PR #74 for `#/sell/bill`: main navigation and Navigation Assistant are conditionally hidden only on that route, while the existing top bar and Sell back-link remain; the summary/review action area is sticky. Visual acceptance is still pending on actual Playwright screenshots and Android.
-- **Prototype limitations:** camera/gallery choices only demonstrate the sheet interaction; no native camera permission, real file picker, image upload, extraction API, customer/product lookup, backend posting, print output or real payment is connected. Prototype figures/interaction must never be treated as business data.
-- **Business invariants to preserve:** required customer name and valid mobile; manual/ad-hoc line support when catalogue data is missing; negative stock allowance; serial/IMEI/barcode optional with duplicate/format checks and non-blocking missing-serial warning; GST/server-side totals; Cash/UPI/Credit and split/partial payment; offline bills remain pending drafts; posting remains explicit and idempotent; returns map to original sale lines; print remains an invoice document rather than app-shell capture.
-- **Figma:** [RBOS Billing & Sales — Invoice Entry](https://www.figma.com/design/ACpAOSnl3aeIRl1Hxnllzf). Figma account is on Starter tier with a View seat. A current `get_libraries` call returned the Starter-plan MCP tool-call limit/paywall. No editable invoice screen has been authored or validated in Figma. This is a constraint on the Figma deliverable only; it is not a blocker to MagicPath exploration, requirements documentation or implementation preparation.
-- **Documentation:** keep this living UX document on branch `docs/rbos-usability-accessibility-programme` and PR #67. The main-branch playbook and Home design note are already merged on main. PR #67, #72 (audit infrastructure) and #74 (invoice implementation) are open/draft; none has been merged by this work.
-- **Not completed:** editable Figma screen/components/tokens/states; implementation Playwright visual/screenshots/Axe comparison; native Android testing; shopkeeper user acceptance; merge; production deployment.
-- **Exact next actions:** (1) run/extend the full Playwright visual/a11y audit against PR #74 and inspect screenshots across the required viewport/state matrix; (2) record visual iterations and update this handover; (3) complete native Android and representative shopkeeper acceptance; (4) only then request merge/release approval. Resume editable Figma and further MagicPath variant authoring when their current tool quotas/access permit; this must not block validation of the implementation.
-- **Out of scope:** Home redesign, Stock, Purchasing, unrelated shell/navigation redesign, backend/domain changes and deployment unless a specific dependency is proven and separately approved.
-- **Real-device/user validation still required:** Android camera/gallery permission and return path, TalkBack, native share/print behaviour, viewport scroll/keyboard interactions, long names/translations and a representative shopkeeper completing a real bill.
+> This section and docs/ux/BILLING-SALES-HANDOFF.md supersede older Figma-required instructions and earlier handover statuses in this document. Historic decision-log entries are retained as history, not as active instructions.
+
+### 10.1 Agreed delivery model
+
+- No blocker to continuing. Figma is permanently optional for RBOS. Do not upgrade, wait for quota reset, retry Figma MCP calls, or delete existing Figma files.
+- Design source of truth: the versioned repository design specification in docs/ux/. MagicPath is for visual exploration/prototyping when available; it is not mandatory and its agent/API quota exhaustion does not block code-first specifications.
+- Verification cadence for this five-route group: perform focused code checks while implementing each route; defer the comprehensive integrated Playwright journey, screenshot/visual review and Axe pass until all five routes have been redesigned and implemented. Fix findings and rerun affected coverage only.
+- No screen-group merge or deployment is authorised by this decision. Keep implementation PRs draft/open until the agreed group-level verification and review gates are complete; merge and deployment remain separate approvals.
+
+### 10.2 Screen group and route inventory
+
+| Order | Route | Screen | Status |
+|---|---|---|---|
+| 1 | #/sell/bill | Create Invoice / bill entry, review and completion | Implementation candidate in PR #74; design specification still needs completion |
+| 2 | #/sell/menu | Sell landing / action hub | Not redesigned |
+| 3 | #/sell/bills | Sales History and historical invoice detail | Not redesigned |
+| 4 | #/sell/collect | Payment collection / customer dues | Not redesigned |
+| 5 | #/sell/return | Customer returns / cancellation journey | Not redesigned |
+
+Keep the redesign bounded to these five routes and their necessary shared interactions. Do not expand into Stock, Purchasing, Home or unrelated shell redesign.
+
+### 10.3 Current implementation and evidence
+
+- PR #74: [action-first Create Invoice](https://github.com/Vaibhav1507/retail-business-erp/pull/74), branch ux/invoice-entry-action-first, known head 72cfe96dd8b361d77123d136f1f6f12ad6ac4768, open/draft and not merged at last inspection.
+- PR #74 currently changes GenerateInvoice.tsx, App.tsx, invoice.css, ItemTagCapture.tsx, related unit/component tests and sales.spec.ts. It is the first implementation slice, not final design acceptance.
+- Exact-head standard CI: [run #45340114617](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45340114617) passed on the known PR #74 head. Frontend TypeScript, tests, lint, build and dependency audit; backend Release build, tests and container build (without push); PostgreSQL integration bootstrap/build/tests passed.
+- Pre-redesign five-route baseline: [Visual Audit #45316812990](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45316812990), [artifact #14885473196](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45316812990/artifacts/14885473196), on baseline commit fc974e4e16ca80a14bb71156f482f333372b4600. It captured 178 screenshots across 47 named states and the five routes at the baseline viewport matrix. It is baseline-only, not validation of PR #74 or the redesigned screens.
+- Audit infrastructure: [PR #72](https://github.com/Vaibhav1507/retail-business-erp/pull/72) is open/draft and not merged at last inspection. Preserve its current branch/work; inspect the live PR state before any future action.
+- Programme documentation: [PR #67](https://github.com/Vaibhav1507/retail-business-erp/pull/67), branch docs/rbos-usability-accessibility-programme, is open/draft and not merged at last inspection. This workflow and handoff update are being recorded on that branch.
+- Home: PRs #69, #70 and #73 are already merged. This Billing & Sales phase does not reopen Home.
+
+### 10.4 Selected invoice direction and prototype
+
+- Three concepts were explored; Concept A (action-first) was selected: one dominant Add Product action, contextual Scan Tag beside product description/model, and handwritten-bill import separate and quieter.
+- Existing MagicPath prototype: [Invoice Entry — Action-first mobile prototype](https://designs.magicpath.ai/v1/cozily-dusk-6555), component 475857518220939264, revision 475857518220939265. It is a prototype, not a complete responsive design spec; camera/gallery is simulated and no real upload/OCR/API/posting/payment/print is connected.
+- PR #74 implements part of the selected direction: focused invoice workspace; contextual Scan Tag; single primary Add Product action; separate handwritten-bill import; progressive disclosure for optional product details; sticky total/review area. Actual visual verification remains pending.
+- MagicPath agent/API quota was exhausted at last check. Use its normal editor only if available and useful; otherwise continue with repository design specs.
+- Figma file [RBOS Billing & Sales — Invoice Entry](https://www.figma.com/design/ACpAOSnl3aeIRl1Hxnllzf) exists, but no editable screen was authored or validated. Leave it untouched. Figma is optional and no longer part of acceptance criteria.
+
+### 10.5 Business invariants — preserve
+
+- Customer name and valid 10–15 digit mobile are required to post an invoice.
+- Manual/ad-hoc product lines remain allowed when the catalogue has no suitable item; do not silently create catalogue records. Negative stock remains allowed.
+- Serial/IMEI/barcode remain optional; retain duplicate/format checks and non-blocking missing-serial warning. IMEI validation retains its 15-digit Luhn rule.
+- GST and authoritative totals remain server-calculated; Cash, UPI, Credit, split and partial payment semantics remain unchanged.
+- Returns map to the original sale line and remaining returnable quantity. Accounting posting, inventory valuation, idempotency and audit trail remain unchanged.
+- Offline held bills remain pending and must never be represented as posted. WhatsApp consent, opt-out, delivery state and duplicate protection remain intact.
+- Invoice extraction remains an editable, unposted draft; it must never auto-post. Print output is the invoice document only, not the application shell.
+- Preserve existing routes/API contracts and tenant/security boundaries unless separately documented and approved.
+
+### 10.6 Design specification required for each route
+
+Before implementing a route, its repository design note must define the task/persona; route entry/exit and complete journey; scope/non-goals/dependencies/invariants; screenshot- or source-backed findings; selected hierarchy and interactions; shared component/token reuse; small-phone, standard-phone, tablet, landscape and desktop rules; default/loading/empty/validation/error/retry/success/disabled/cancel/edit/detail/print states as applicable; accessibility and language behaviour; measurable acceptance criteria; and focused checks during implementation.
+
+Repository design notes are the approved design contract. MagicPath is a supporting reference when available; Figma is optional.
+
+### 10.7 Verification and release gates
+
+**While implementing each route:** run focused TypeScript/build/unit/component tests and narrow checks for changed behaviour. Record these as implementation checks, not final visual acceptance.
+
+**After all five routes are redesigned and implemented:** run one integrated Playwright pass across all five routes and shared journeys (invoice create/review/post/print, history/detail, collections/payment, returns/cancellation and cross-navigation); cover key loading/empty/validation/error/retry/success/cancel/edit/held/offline/print states; cover small phone, standard phone, tablet, landscape and desktop; capture viewport and full-page screenshots including scroll, keyboard/focus and fixed/sticky/overlay cases; assert outcomes, semantic names/roles, console/page errors, failed requests, overflow/clipping and touch targets; run Axe WCAG 2 A/AA on important states and review all screenshots. Treat print media separately.
+
+Fix issues from the group pass and rerun affected coverage and necessary regressions. Then perform native Android camera/gallery, TalkBack, share-sheet, printer/print-dialog, keyboard and real-device scrolling checks, followed by representative shopkeeper acceptance. Automated pass, visual acceptance, Android acceptance, user acceptance, merge and deployment are separate statuses.
+
+### 10.8 Exact next actions
+
+1. Refresh PR #67/#72/#74 state, branch heads and workflow runs from GitHub. Read this handoff and current main playbook.
+2. Complete the repository design specification for Create Invoice (route #/sell/bill) using the selected action-first direction and PR #74 as an implementation candidate. Do not rerun the 178-screenshot baseline and do not make Figma a dependency.
+3. Then continue in order: Sell landing (#/sell/menu), Sales History (#/sell/bills), Collections (#/sell/collect), Returns (#/sell/return). Audit and document each route before its implementation.
+4. Inspect branch ancestry and choose a coherent implementation lineage; keep all changes draft/open until the five-route group verification. Do not merge or deploy.
+5. At each pause, update docs/ux/BILLING-SALES-HANDOFF.md and this programme with exact route progress, design decisions, code branch/PR/head, focused checks, blockers and next action.
+
+### 10.9 Outstanding items
+
+- Not complete: repository design spec for Create Invoice; design specs and implementation for the other four routes; final combined five-route Playwright/screenshot/Axe verification; native Android checks; shopkeeper acceptance; merge; production deployment.
+- Optional/not required: editable Figma. Existing file remains untouched.
+- Tool limitation, not a project blocker: MagicPath connected agent/API quota was exhausted at last check. Use normal editor only if available; otherwise continue code-first.
+- No known product decision blocks continuation.
