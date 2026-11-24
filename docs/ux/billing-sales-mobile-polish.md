@@ -137,7 +137,7 @@ These pages do **not** have a MagicPath screen reference. Their layout is derive
 - Desktop uses a table; phone uses receipt cards with receipt number, date, customer, method, amount and **Print receipt**.
 - Refresh is compact and distinct from the form CTA. Show loading, empty, error and retry states.
 
-**Business boundary:** current RBOS supports one optional bill allocation or an on-account payment. Accounting products such as Zoho Books can split a receipt across multiple outstanding invoices, but this research is not authorisation to change RBOS's allocation model. Multi-invoice split allocation is explicitly out of scope unless separately designed and approved. Keep idempotency keys and server balance calculation unchanged.
+**Business boundary:** current RBOS supports one optional bill allocation or an on-account payment. TallyPrime's India-specific guidance explicitly distinguishes invoice-wise bill tracking from party-level On Account receipt handling; Zoho Books and TallyPrime also document allocating payments across multiple bills. This research is not authorisation to change RBOS's current simpler allocation model. Multi-invoice split allocation is explicitly out of scope unless separately designed and approved. Keep idempotency keys and server balance calculation unchanged.
 
 ### 4.4 Customer Returns — #/sell/return
 
@@ -162,7 +162,7 @@ These pages do **not** have a MagicPath screen reference. Their layout is derive
 - Desktop may use a table; phone uses return cards.
 - Detail shows the original bill reference, customer/date, returned lines, reason, total, balance credit and cash refund.
 
-**Business boundary:** returned quantity remains tied to original sale-line IDs and the server's remaining quantity. Refund method and posted accounting remain server-authoritative. Shopify POS demonstrates partial/full returns, refund-method selection and inventory-restock choices; RBOS should not add a new staff-controlled restock option unless the RBOS backend supports and authorises it. Exchanges are not a new flow in this scope: create the replacement sale as a separate bill, as the current RBOS message instructs.
+**Business boundary:** returned quantity remains tied to original sale-line IDs and the server's remaining quantity. Refund method and posted accounting remain server-authoritative. Shopify POS and Odoo POS both document selecting original orders, choosing returned quantities and selecting a refund method; RBOS should not add a new staff-controlled restock option unless the RBOS backend supports and authorises it. Exchanges are not a new flow in this scope: create the replacement sale as a separate bill, as the current RBOS message instructs.
 
 ---
 
@@ -261,6 +261,18 @@ All links below are publicly accessible; they were used as evidence for workflow
    https://developer.android.com/develop/ui/views/layout/webapps/understand-window-insets  
    Explains safe-area inset propagation and visual viewport resizing with the software keyboard. It informs the invoice sticky bar's safe-area treatment and the need for real-device keyboard checks.
 
+11. **TallyPrime — Flexible tracking of outstanding amounts**  
+   https://help.tallysolutions.com/receivables-payables-tracking-methods/  
+   India-specific accounting guidance that distinguishes party-level balance tracking from bill-wise tracking and explicitly describes On Account receipts/payments. It supports explaining the choice between allocating a receipt to an invoice and leaving it on account. RBOS continues to support its existing one-bill-or-on-account model.
+
+12. **TallyPrime — Record receipt transactions**  
+   https://help.tallysolutions.com/record-receipt-transactions/  
+   Documents receipt recording against a bill reference, cash/bank ledgers, transaction mode, bank reference and date. It informs Collections terminology and the optional payment reference/date fields.
+
+13. **Odoo 18 POS — Point of Sale documentation**  
+   https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale.html  
+   Describes searching past orders by order number, receipt number, date or customer, then selecting refund quantities and a refund payment method before validating and printing. It reinforces the original-sale-first Returns workflow and supports the same search-key hierarchy for Sales History.
+   
 10. **W3C — Web Content Accessibility Guidelines (WCAG) 2.2**  
     https://www.w3.org/TR/WCAG22/  
     Used as the accessibility baseline for visible focus, usable target size, keyboard interaction and non-colour-only feedback. RBOS retains its practical 44px touch-target convention.
