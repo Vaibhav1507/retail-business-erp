@@ -211,7 +211,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setHsnText(item.hsn || '')
     setQty('1')
     setShowProducts(false)
-    setShowTagDetails(!isElectronicsBusiness)
+    setShowTagDetails(true)
     setError('')
     setFieldErrors({})
   }
@@ -543,7 +543,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} aria-describedby={fieldErrors.customerName ? "billing-name-error" : undefined} className={fieldErrors.customerName ? 'field-invalid' : ''} placeholder="Name on the bill" value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })) }} />
             {fieldErrors.customerName && <small id="billing-name-error" className="field-error">{fieldErrors.customerName}</small>}
           </div>
-          <div className="billing-field billing-col-12">
+          <div className="billing-field">
             <label htmlFor="billing-address">Address (optional)</label>
             <input id="billing-address" autoComplete="street-address" placeholder="House / shop / street / area" value={address} onChange={e => setAddress(e.target.value)} />
           </div>
