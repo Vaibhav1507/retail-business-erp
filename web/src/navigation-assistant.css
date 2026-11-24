@@ -44,10 +44,12 @@
 
 
 /* The Home launcher is part of page flow; its expanded panel remains an overlay. */
-.shell:has(.home-dashboard) .assistant-launcher {
-  position: relative;
-  right: auto;
-  bottom: auto;
-  align-self: flex-end;
-  margin: 0 16px calc(var(--nav-h) + 12px + env(safe-area-inset-bottom));
+@media (max-width: 899px) {
+  .shell:has(.home-dashboard) .assistant-launcher {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    align-self: flex-end;
+    margin: 0 16px calc(var(--nav-h) + 12px + env(safe-area-inset-bottom));
+  }
 }
