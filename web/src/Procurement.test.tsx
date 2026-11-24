@@ -42,48 +42,6 @@ beforeEach(() => {
   posts = []
   setLanguage('en')
   vi.unstubAllGlobals()
-  it('keeps the selected invoice filename visible while OCR is running', async () => {
-    const user = userEvent.setup()
-    let finishExtraction!: (response: Response) => void
-    const extraction = new Promise<Response>(resolve => { finishExtraction = resolve })
-    mockProcurement([], () => extraction)
-    render(<Procurement products={[]} locations={[]} reload={vi.fn()} show="receive" />)
-
-    const fileInput = await screen.findByLabelText(/Upload a supplier bill photo or PDF/)
-    const file = new File(['%PDF-1.4 test invoice'], 'supplier-invoice.pdf', { type: 'application/pdf' })
-    await user.upload(fileInput, file)
-
-    expect(await screen.findByRole('status')).toHaveTextContent('Reading invoice')
-    expect((fileInput as HTMLInputElement).files?.[0]?.name).toBe('supplier-invoice.pdf')
-    expect(fileInput).toBeDisabled()
-
-    finishExtraction(new Response(JSON.stringify({
-      fileId: 'invoice-file-1',
-      supplierName: supplier.name,
-      supplierId: supplier.id,
-      invoiceNumber: 'INV-100',
-      date: '2026-11-23',
-      total: 220,
-      lines: [],
-      warnings: [],
-    })))
-    await waitFor(() => expect((fileInput as HTMLInputElement).files?.length).toBe(0))
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-  })
-
-  it('renders all four Buy destinations in the dedicated tab navigation', async () => {
-    mockProcurement()
-    render(<BuyPage tab="receive" c={{ products: [], locations: [], reload: vi.fn() }} />)
-
-    const nav = await screen.findByRole('navigation', { name: 'Sections' })
-    expect(nav).toHaveClass('tabs', 'buy-tabs')
-    expect(Array.from(nav.querySelectorAll('a')).map(a => a.getAttribute('href'))).toEqual([
-      '#/buy/receive',
-      '#/buy/pay',
-      '#/buy/history',
-      '#/buy/return',
-    ])
-  })
 
 })
 
@@ -213,4 +171,48 @@ describe('Procurement Buy screens', () => {
     expect(screen.getByRole('button', { name: 'Save payment' })).toBeDisabled()
     expect(posts).toHaveLength(0)
   })
+
+  it('keeps the selected invoice filename visible while OCR is running', async () => {
+      const user = userEvent.setup()
+      let finishExtraction!: (response: Response) => void
+      const extraction = new Promise<Response>(resolve => { finishExtraction = resolve })
+      mockProcurement([], () => extraction)
+      render(<Procurement products={[]} locations={[]} reload={vi.fn()} show="receive" />)
+  
+      const fileInput = await screen.findByLabelText(/Upload a supplier bill photo or PDF/)
+      const file = new File(['%PDF-1.4 test invoice'], 'supplier-invoice.pdf', { type: 'application/pdf' })
+      await user.upload(fileInput, file)
+  
+      expect(await screen.findByRole('status')).toHaveTextContent('Reading invoice')
+      expect((fileInput as HTMLInputElement).files?.[0]?.name).toBe('supplier-invoice.pdf')
+      expect(fileInput).toBeDisabled()
+  
+      finishExtraction(new Response(JSON.stringify({
+        fileId: 'invoice-file-1',
+        supplierName: supplier.name,
+        supplierId: supplier.id,
+        invoiceNumber: 'INV-100',
+        date: '2026-11-23',
+        total: 220,
+        lines: [],
+        warnings: [],
+      })))
+      await waitFor(() => expect((fileInput as HTMLInputElement).files?.length).toBe(0))
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+  
+    it('renders all four Buy destinations in the dedicated tab navigation', async () => {
+      mockProcurement()
+      render(<BuyPage tab="receive" c={{ products: [], locations: [], reload: vi.fn() }} />)
+  
+      const nav = await screen.findByRole('navigation', { name: 'Sections' })
+      expect(nav).toHaveClass('tabs', 'buy-tabs')
+      expect(Array.from(nav.querySelectorAll('a')).map(a => a.getAttribute('href'))).toEqual([
+        '#/buy/receive',
+        '#/buy/pay',
+        '#/buy/history',
+        '#/buy/return',
+      ])
+    })
+
 })
