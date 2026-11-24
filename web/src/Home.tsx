@@ -129,7 +129,7 @@ export function HomePage({ businessName }: { businessName?: string }) {
             <p key={item.kind}>{t('rem.orders', { n: item.count ?? 0 })}</p>
           ))}
           {visibleReminders.filter((item) => item.kind === 'dayClosing').map((item) => (
-            <p key={item.kind}>{t('rem.dayClosing', { n: item.count ?? 0 })}</p>
+            <p key={item.kind}>{item.count === 1 ? t('rem.dayClosingOne') : t('rem.dayClosingMany', { n: item.count ?? 0 })}</p>
           ))}
         </section>
       )}
