@@ -48,7 +48,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       <label><input type="checkbox" checked={unpaid} onChange={e => setUnpaid(e.target.checked)} /> {tr('sales.unpaid')}</label>
       {!loaded && !error && <p role="status">{tr('app.loading')}</p>}
       {loaded && shownSales.length === 0 && <p>{tr('sales.none')}</p>}
-      <Paged rows={shownSales}>{page => (
+      <Paged rows={shownSales} regionLabel="Sales history results">{page => (
       <table aria-label="Sales history">
         <thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Type</th><th>Total (INR)</th><th>Paid (INR)</th><th>Balance (INR)</th><th>WhatsApp</th><th></th></tr></thead>
         <tbody>{page.map(s => <tr key={s.id}><td>{s.invoiceNo ?? s.number}</td><td>{s.date}</td><td>{s.customer}</td><td>{s.saleType}</td><td>{s.total.toFixed(2)}</td><td>{s.amountPaid.toFixed(2)}</td><td>{s.balance.toFixed(2)}</td><td>{whatsappStatusLabel(s.whatsappStatus)}</td><td><button type="button" onClick={() => open(s.id)}>View</button></td></tr>)}</tbody>
