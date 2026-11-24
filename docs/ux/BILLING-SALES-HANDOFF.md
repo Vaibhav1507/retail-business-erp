@@ -3,7 +3,7 @@
 **Repository:** Vaibhav1507/retail-business-erp  
 **Previous baseline PR:** [#76 — UX polish Billing & Sales mobile workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/76) — merged to main at \`96c8ed9930d4495a0bc032c6d4d2a0e161afe58d\`.  
 **Current follow-up branch:** \`ux/invoice-form-compact-electronics-fields\`  
-**Current follow-up design note:** [invoice-form-mobile-compact-followup.md](./invoice-form-mobile-compact-followup.md)  
+**Current follow-up design note:** [invoice-form-field-hierarchy-assistant.md](./invoice-form-field-hierarchy-assistant.md)  
 **Current follow-up PR:** to be created after focused validation.
 
 ## Scope
@@ -46,3 +46,14 @@ The user-supplied MagicPath screenshots remain the invoice hierarchy reference; 
 ## Preserved business rules
 
 Customer name/mobile required; zero-stock billing and ad-hoc lines; optional serial/IMEI/barcode with non-blocking missing-serial warning and duplicate detection; server-authoritative invoice/GST calculations; collection and return semantics in other screens unchanged; WhatsApp consent/retry/duplicate protection; held and offline sale semantics; invoice-only print; tenant boundaries and existing routes.
+
+
+## Latest follow-up — field hierarchy and assistant placement
+
+- Electronics Brand + Model share one row; Quantity + Selling price share the next; Serial remains full-width and optional.
+- Brand is visible outside More item details for every business category.
+- Payment mode is visible by default; Sale date remains in the optional disclosure.
+- Assistant is a compact bottom-right floating chat icon, positioned above the invoice sticky Review bill bar.
+- Existing business logic is preserved.
+
+See [invoice-form-field-hierarchy-assistant.md](./invoice-form-field-hierarchy-assistant.md) for acceptance criteria and validation.
