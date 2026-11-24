@@ -555,7 +555,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <div className="invoice-product-entry">
               <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or type a new product" value={pname}
                 onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
-              <ItemTagCapture disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
+              <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
             </div>
             {fieldErrors.product && <small className="field-error">{fieldErrors.product}</small>}
             {showProducts && suggestions.length > 0 && !match && <ul className="billing-menu" role="listbox" aria-label="Products">
