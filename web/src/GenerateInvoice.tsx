@@ -301,7 +301,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     }
     if ((imei1Text.trim() && !validImei(imei1Text.trim())) || (imei2Text.trim() && !validImei(imei2Text.trim())))
       nextErrors.serial = 'IMEI must contain 15 digits and pass its check digit.'
-    if (Object.keys(nextErrors).length) { setFieldErrors(nextErrors); setError(''); return }
+    if (Object.keys(nextErrors).length) { if (nextErrors.serial) setShowTagDetails(true); setFieldErrors(nextErrors); setError(''); return }
     setFieldErrors({})
     const newItem: Item = {
       productId, name: selectedProduct?.name ?? match?.name ?? manualLabel, quantity, unitPrice, discount, serials,
@@ -553,7 +553,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <div className="billing-field billing-col-5 billing-rel">
             <label htmlFor="billing-prod">{tr('bill.product')}</label>
             <div className="invoice-product-entry">
-              <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or type a new product" value={pname}
+              <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or enter a product/model name" value={pname}
                 onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
               <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
             </div>
