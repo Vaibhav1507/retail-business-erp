@@ -72,7 +72,10 @@ async function capture(page: Page, state: string, viewports = stateViewports, fu
 }
 
 async function ready(page: Page, route: string) {
-  if (route === 'sell/menu') await expect(page.getByText('Choose what you want to do.')).toBeVisible()
+  if (route === 'sell/menu') {
+    await expect(page.locator('.areas .area')).toHaveCount(4)
+    await expect(page.locator('.areas .area').first()).toBeVisible()
+  }
   if (route === 'sell/bill') await expect(page.getByRole('region', { name: 'Generate invoice' })).toBeVisible()
   if (route === 'sell/bills') await expect(page.getByRole('table', { name: 'Sales history' }).locator('tbody tr').first()).toBeVisible()
   if (route === 'sell/collect') await expect(page.getByLabel('Collect from').locator('option', { hasText: customer })).toHaveCount(1)
@@ -82,6 +85,7 @@ async function ready(page: Page, route: string) {
 test('Billing & Sales: exhaustive route and interaction-state visual audit', async ({ page, context, browser }) => {
   test.setTimeout(15 * 60 * 1000)
   mkdirSync(outDir, { recursive: true })
+  writeFileSync(outDir + '/report.json', JSON.stringify({ scope: 'billing-sales', status: 'IN_PROGRESS', captures: [] }, null, 2))
   page.on('pageerror', e => pageErrors.push(e.message))
 
   // signUp installs its own navigation-confirm handler. Replace it after signup so only one
