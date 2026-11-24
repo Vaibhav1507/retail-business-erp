@@ -196,18 +196,29 @@ ton type="button" className="secondary" onClick={() => setReviewReceipt(false)}>
       </div>}
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
-      {v('history') && <>
-      <h3>Past purchases</h3>
-      <Paged rows={receipts}>{page => (
-      <table><thead><tr><th>Date</th><th>Supplier</th><th>Invoice no.</th><th>Total</th><th>Bill copy</th></tr></thead><tbody>{page.map(r => <tr key={r.id}><td data-label="Date">{r.date}</td><td data-label="Supplier">{r.supplier}</td><td data-label="Invoice no.">{r.supplierRef}</td><td data-label="Total">{r.total.toFixed(2)}</td><td data-label="Bill copy">{r.hasInvoice ? <a href={`/api/purchases/${r.id}/invoice`} target="_blank" rel="noreferrer">View</a> : "-"}</td></tr>)}</tbody></table>
-      )}</Paged>
-      {sup && <button type="button" onClick={showStatement}>Show supplier statement</button>}
-      {statement && <div role="region" aria-label="Supplier statement"><h4>Statement: {statement.supplier} (we owe {statement.outstanding.toFixed(2)} INR)</h4><Paged rows={statement.entries}>{page => (<table><thead><tr><th>Date</th><th>Type</th><th>Bill</th><th>Paid/Returned</th><th>Balance</th></tr></thead><tbody>{page.map(e => <tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit ? e.debit.toFixed(2) : ""}</td><td>{e.credit ? e.credit.toFixed(2) : ""}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>)}</Paged><button type="button" onClick={() => setStatement(null)}>Close statement</button></div>}
-      <h3>Payments made to suppliers</h3>
-      <Paged rows={payments}>{page => (
-      <table><thead><tr><th>Date</th><th>Supplier</th><th>Method</th><th>Amount paid</th></tr></thead><tbody>{page.map(p => <tr key={p.id}><td data-label="Date">{p.date}</td><td data-label="Supplier">{p.supplier}</td><td data-label="Method">{p.method}</td><td data-label="Amount paid">{p.amount.toFixed(2)}</td></tr>)}</tbody></table>
-      )}</Paged>
-            </>}
+      {v('history') && <div className="buy-history">
+        <header className="buy-screen-heading"><h2>Past purchases</h2><p>Find an earlier purchase and view its supplier bill.</p></header>
+        <section className="buy-history-section">
+          <h3>Purchase receipts</h3>
+          <Paged rows={receipts} empty="No purchase receipts have been recorded yet.">{page => <div className="buy-history-list">{page.map(r => <article className="buy-history-card" key={r.id}>
+            <div className="buy-history-top"><strong>{r.supplier}</strong><strong>₹{r.total.toFixed(2)}</strong></div>
+            <dl><dt>Date</dt><dd>{r.date}</dd><dt>Supplier invoice no.</dt><dd>{r.supplierRef || '—'}</dd></dl>
+            <div className="buy-history-actions">{r.hasInvoice ? <a href={`/api/purchases/${r.id}/invoice`} target="_blank" rel="noreferrer">View supplier bill</a> : <span className="buy-muted">No bill attached</span>}</div>
+          </article>)}</div>}</Paged>
+        </section>
+        <section className="buy-history-section">
+          <h3>Supplier payments</h3>
+          <Paged rows={payments} empty="No supplier payments have been recorded yet.">{page => <div className="buy-history-list">{page.map(payment => <article className="buy-history-card" key={payment.id}>
+            <div className="buy-history-top"><strong>{payment.supplier}</strong><strong>₹{payment.amount.toFixed(2)}</strong></div>
+            <dl><dt>Date</dt><dd>{payment.date}</dd><dt>Paid by</dt><dd>{payment.method}</dd><dt>Reference</dt><dd>{payment.reference || '—'}</dd></dl>
+          </article>)}</div>}</Paged>
+        </section>
+        <section className="buy-history-statement">
+          <button type="button" className="secondary" onClick={showStatement} disabled={!sup}>View supplier statement</button>
+          {statement && <div role="region" aria-label="Supplier statement"><h3>Statement: {statement.supplier} · Owed ₹{statement.outstanding.toFixed(2)}</h3><Paged rows={statement.entries}>{page => <table><thead><tr><th>Date</th><th>Type</th><th>Purchase</th><th>Paid / returned</th><th>Balance</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>Close statement</button></div>}
+        </section>
+      </div>}
+
           </section>
   )
 }
