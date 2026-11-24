@@ -30,7 +30,8 @@ describe('HomePage overview and reminders (G5, G10)', () => {
     mock({ ...csrf, '/api/dashboard': () => ({ body: dash }), '/api/reminders': () => ({ body: [{ kind: 'orders', severity: 'warn', count: 3, amount: null }, { kind: 'dayClosing', severity: 'info', count: 2, amount: null }] }) })
     render(<HomePage />)
     expect(await screen.findByText('3 purchase order(s) are overdue.')).toBeTruthy()
-    expect(screen.getByText('2 recent day(s) are not closed yet.')).toBeTruthy()
+    expect(screen.getByText('2 days are waiting for closing.')).toBeTruthy()
+    expect(screen.getByText('1 day is waiting for closing.')).not.toBeInTheDocument()
   })
 
   it('hides the reminders list when there is nothing to remind', async () => {
@@ -53,7 +54,7 @@ describe('HomePage overview and reminders (G5, G10)', () => {
     expect(await screen.findByRole('link', { name: /Sales today/ })).toHaveTextContent('₹0.00')
     expect(screen.getByRole('link', { name: /Money to collect/ })).toHaveTextContent('₹250.00')
     expect(screen.getByRole('link', { name: /Low stock/ })).toHaveTextContent('2')
-    expect(screen.getByRole('link', { name: /Money you need to pay suppliers/ })).toHaveTextContent('₹0.00')
+    expect(screen.getByRole('link', { name: /To pay suppliers/ })).toHaveTextContent('₹0.00')
     expect(screen.getByRole('link', { name: /Cash and bank/ })).toHaveTextContent('₹100.00')
   })
 
