@@ -74,7 +74,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       if (event.key !== 'Tab' || !dialog) return
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
         'button:not([disabled]), select:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )).filter(element => element.offsetParent !== null)
+      ))
       if (!focusable.length) { event.preventDefault(); dialog.focus(); return }
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
