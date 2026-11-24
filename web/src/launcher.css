@@ -83,3 +83,21 @@
 @media (prefers-reduced-motion: reduce) {
   .home-quick-action, .home-quick-action:hover { transition: none; transform: none; }
 }
+
+
+/* Final Home polish: keep the Assistant launcher in document flow on Home,
+   so it cannot cover dashboard values while the user scrolls. */
+.shell:has(.home-dashboard) .content {
+  padding-bottom: 24px;
+}
+.shell:has(.home-dashboard) .home-dashboard {
+  padding-bottom: 24px;
+}
+.shell:has(.home-dashboard) .assistant-launcher {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  align-self: flex-end;
+  margin: 0 16px calc(var(--nav-h) + 12px + env(safe-area-inset-bottom));
+  z-index: 7;
+}
