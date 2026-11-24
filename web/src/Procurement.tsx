@@ -184,8 +184,8 @@ export function Procurement({ products, locations, reload, show }: { products: (
           {paySup && payOwed > 0 && <>
             <label className="buy-pay-amount">{tr('buy.amountToPay')} <input inputMode="decimal" value={amount} aria-invalid={!!amountError} aria-describedby={amountError ? 'buy-pay-amount-error' : undefined} onChange={e=>setAmount(e.target.value)} /></label>
             {amountError && <p className="buy-field-error" id="buy-pay-amount-error">{amountError}</p>}
-            {openBills.length>0 && <div className="buy-pay-allocation"><SearchableSelect id="buy-pay-bill" label={tr('buy.applyToBill')} value={billId} options={openBills.map(b=>({value:b.id,label:b.date+(b.reference?' · '+b.reference:''),description:tr('buy.billOpen')+': ₹'+b.open.toFixed(2),searchText:b.id}))} onChange={setBillId} placeholder={tr('buy.onAccount')} emptyMessage={tr('buy.noOpenBills')} />{selectedBill&&<p>{tr('buy.willAllocate')} ₹{allocationAmount.toFixed(2)}{Number(amount)>selectedBill.open?' · Any remaining amount stays on the supplier account.':''}</p>}</div>}
-            <fieldset className="buy-methods"><legend>{tr('buy.paidBy')}</legend>{(['Cash','Bank','UPI'] as const).map(value=><label key={value} className={method===value?'is-selected':''}><input type="radio" name="buy-payment-method" value={value} checked={method===value} onChange={()=>setMethod(value)}/>{value}</label>)}</fieldset>
+            {openBills.length>0 && <div className="buy-pay-allocation"><SearchableSelect id="buy-pay-bill" label={tr('buy.applyToBill')} value={billId} options={openBills.map(b=>({value:b.id,label:b.date+(b.reference?' · '+b.reference:''),description:tr('buy.billOpen')+': ₹'+b.open.toFixed(2),searchText:b.id}))} onChange={setBillId} placeholder={tr('buy.onAccount')} emptyMessage={tr('buy.noOpenBills')} />{selectedBill&&<p>{tr('buy.willAllocate')} ₹{allocationAmount.toFixed(2)}{Number(amount)>selectedBill.open?' · '+tr('buy.excessOnAccount'):''}</p>}</div>}
+            <fieldset className="buy-methods"><legend>{tr('buy.paidBy')}</legend>{(['Cash','Bank','UPI'] as const).map(value=><label key={value} className={method===value?'is-selected':''}><input type="radio" name="buy-payment-method" value={value} checked={method===value} onChange={()=>setMethod(value)}/>{tr(value === 'Cash' ? 'buy.cash' : value === 'Bank' ? 'buy.bank' : 'buy.upi')}</label>)}</fieldset>
             <label>{tr('buy.reference')} <input value={pref} onChange={e=>setPref(e.target.value)}/></label>
             <button type="button" className="buy-pay-primary" onClick={pay} disabled={!paySup||!!amountError||payOwed<=0}>{tr('buy.savePayment')}</button>
           </>}
@@ -201,7 +201,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
           <h3>{tr('buy.purchaseReceipts')}</h3>
           <Paged rows={receipts} empty={tr('buy.noReceipts')}>{page => <div className="buy-history-list">{page.map(r => <article className="buy-history-card" key={r.id}>
             <div className="buy-history-top"><strong>{r.supplier}</strong><strong>₹{r.total.toFixed(2)}</strong></div>
-            <dl><dt>Date</dt><dd>{r.date}</dd><dt>Supplier invoice no.</dt><dd>{r.supplierRef || '—'}</dd></dl>
+            <dl><dt>{tr('buy.date')}</dt><dd>{r.date}</dd><dt>{tr('buy.invoiceNo')}</dt><dd>{r.supplierRef || '—'}</dd></dl>
             <div className="buy-history-actions">{r.hasInvoice ? <a href={`/api/purchases/${r.id}/invoice`} target="_blank" rel="noreferrer">{tr('buy.viewBill')}</a> : <span className="buy-muted">{tr('buy.noBill')}</span>}</div>
           </article>)}</div>}</Paged>
         </section>
@@ -209,13 +209,13 @@ export function Procurement({ products, locations, reload, show }: { products: (
           <h3>{tr('buy.supplierPayments')}</h3>
           <Paged rows={payments} empty={tr('buy.noPayments')}>{page => <div className="buy-history-list">{page.map(payment => <article className="buy-history-card" key={payment.id}>
             <div className="buy-history-top"><strong>{payment.supplier}</strong><strong>₹{payment.amount.toFixed(2)}</strong></div>
-            <dl><dt>Date</dt><dd>{payment.date}</dd><dt>Paid by</dt><dd>{payment.method}</dd><dt>Reference</dt><dd>{payment.reference || '—'}</dd></dl>
+            <dl><dt>{tr('buy.date')}</dt><dd>{payment.date}</dd><dt>{tr('buy.paidBy')}</dt><dd>{payment.method}</dd><dt>{tr('buy.reference')}</dt><dd>{payment.reference || '—'}</dd></dl>
           </article>)}</div>}</Paged>
         </section>
         <section className="buy-history-statement">
-          <SearchableSelect id="buy-history-supplier" label="Supplier statement" value={historySupplierId} options={suppliers.filter(s => s.isActive).map(s => ({value:s.id,label:s.name,description:tr('buy.currentlyOwed')+': ₹'+s.owed.toFixed(2)}))} onChange={value => {setHistorySupplierId(value);setStatement(null)}} placeholder="Choose a supplier" emptyMessage="No matching suppliers." />
+          <SearchableSelect id="buy-history-supplier" label={tr("buy.supplierStatement")} value={historySupplierId} options={suppliers.filter(s => s.isActive).map(s => ({value:s.id,label:s.name,description:tr('buy.currentlyOwed')+': ₹'+s.owed.toFixed(2)}))} onChange={value => {setHistorySupplierId(value);setStatement(null)}} placeholder={tr("buy.searchSupplier")} emptyMessage={tr("buy.noSupplierMatch")} />
           <button type="button" className="secondary" onClick={showStatement} disabled={!historySupplierId}>{tr('buy.viewStatement')}</button>
-          {statement && <div role="region" aria-label={tr('buy.supplierStatement')}><h3>Statement: {statement.supplier} · Owed ₹{statement.outstanding.toFixed(2)}</h3><Paged rows={statement.entries}>{page => <table><thead><tr><th>{tr('buy.date')}</th><th>{tr('buy.type')}</th><th>{tr('buy.purchase')}</th><th>{tr('buy.paidReturned')}</th><th>{tr('buy.balance')}</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>{tr('buy.closeStatement')}</button></div>}
+          {statement && <div role="region" aria-label={tr('buy.supplierStatement')}><h3>{tr('buy.statementFor')} {statement.supplier} · {tr('buy.currentlyOwed')} ₹{statement.outstanding.toFixed(2)}</h3><Paged rows={statement.entries}>{page => <table><thead><tr><th>{tr('buy.date')}</th><th>{tr('buy.type')}</th><th>{tr('buy.purchase')}</th><th>{tr('buy.paidReturned')}</th><th>{tr('buy.balance')}</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>{tr('buy.closeStatement')}</button></div>}
         </section>
       </div>}
 
