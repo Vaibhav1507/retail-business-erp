@@ -211,7 +211,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setHsnText(item.hsn || '')
     setQty('1')
     setShowProducts(false)
-    setShowTagDetails(true)
     setError('')
     setFieldErrors({})
   }
