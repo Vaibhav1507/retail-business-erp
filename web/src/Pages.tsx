@@ -81,14 +81,37 @@ export function Home({ stockCount }: { stockCount: number }) {
 export function SellPage({ tab, c }: { tab: string; c: Common }) {
   const menu = !['bill', 'bills', 'collect', 'return'].includes(tab)
   return (
-    <div className={menu ? 'launcher-page' : undefined}>
-      <Title title={tr('area.sell')} hint={tr('sell.hint')} />
-      {['bill', 'bills', 'collect', 'return'].includes(tab) ? <p><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p> : (
-        <div className="areas">
-          {([['bill', '\u{1F9FE}', tr('sell.invoice')], ['bills', '\u{1F5C2}\uFE0F', tr('sell.old')], ['return', '\u21A9\uFE0F', tr('sell.return')], ['collect', '\u{1F4B0}', tr('sell.due')]] as const).map(([k, i, t]) => (
-            <a key={k} className="area" href={'#/sell/' + k}><span className="ico" aria-hidden="true">{i}</span><strong>{t}</strong></a>
-          ))}
-        </div>
+    <div className={menu ? 'sell-hub' : undefined}>
+      {menu ? (
+        <>
+          <Title title={tr('area.sell')} hint={tr('sell.hint')} />
+          <div className="sell-hub-actions">
+            <a className="sell-hub-primary" href="#/sell/bill">
+              <span className="sell-hub-icon" aria-hidden="true">{'\u{1F9FE}'}</span>
+              <span className="sell-hub-copy"><strong>{tr('sell.createBill')}</strong><small>{tr('sell.createBillHint')}</small></span>
+              <span className="sell-hub-arrow" aria-hidden="true">{'\u2192'}</span>
+            </a>
+            <div className="sell-hub-secondary">
+              <a className="sell-hub-action" href="#/sell/bills">
+                <span className="sell-hub-action-icon" aria-hidden="true">{'\u{1F5C2}\uFE0F'}</span>
+                <span className="sell-hub-copy"><strong>{tr('sell.history')}</strong><small>{tr('sell.historyHint')}</small></span>
+              </a>
+              <a className="sell-hub-action" href="#/sell/collect">
+                <span className="sell-hub-action-icon" aria-hidden="true">{'\u{1F4B0}'}</span>
+                <span className="sell-hub-copy"><strong>{tr('sell.collect')}</strong><small>{tr('sell.collectHint')}</small></span>
+              </a>
+              <a className="sell-hub-action" href="#/sell/return">
+                <span className="sell-hub-action-icon" aria-hidden="true">{'\u21A9\uFE0F'}</span>
+                <span className="sell-hub-copy"><strong>{tr('sell.customerReturns')}</strong><small>{tr('sell.customerReturnsHint')}</small></span>
+              </a>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <Title title={tr('area.sell')} hint={tr('sell.hint')} />
+          <p><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p>
+        </>
       )}
       {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} />}
       {tab === 'bills' && <SalesHistory locations={c.locations} />}
