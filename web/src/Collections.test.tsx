@@ -51,6 +51,7 @@ describe('Collections', () => {
     expect(screen.queryByLabelText('Amount received (INR)')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument()
     const customer = screen.getByRole('combobox', { name: 'Customer' })
+    await waitFor(() => expect(customer).toBeEnabled())
     await userEvent.type(customer, 'Asha')
     await userEvent.click(await screen.findByRole('option', { name: /Asha Stores/ }))
     expect(screen.getByRole('button', { name: 'Record payment' })).toBeDisabled()
