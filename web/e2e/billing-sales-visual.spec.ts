@@ -9,6 +9,8 @@ const business = 'E2E Audit ' + stamp
 const product = 'E2E Audit Cable ' + stamp
 const customer = 'E2E Audit Customer ' + stamp
 const phone = randomMobile()
+const offlineCustomer = 'Audit Offline Customer ' + stamp
+const offlinePhone = randomMobile()
 const outDir = 'test-results/ui-audit/billing-sales'
 const routeViewports = [
   { name: 'mobile-360x800', width: 360, height: 800 },
@@ -111,7 +113,8 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
 
   // More than ten rows makes the real Sales History pagination visible.
   for (let i = 1; i <= 10; i++) {
-    await postInvoice(page, { product, qty: '1', price: '10', name: 'Audit Customer ' + i + ' ' + stamp, phone: randomMobile() })
+    await postInvoice(page, { product, qty: '1', price: '10', name: i === 1 ? offlineCustomer : 'Audit Customer ' + i + ' ' + stamp,
+      phone: i === 1 ? offlinePhone : randomMobile() })
     await expectInvoiceSaved(page)
   }
 
@@ -258,8 +261,8 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
 
   // Held bill and offline pending states; pending is explicitly not a posted invoice.
   await page.getByRole('button', { name: 'New invoice' }).click()
-  await bill.locator('#billing-phone').fill(phone)
-  await bill.locator('#billing-name').fill(customer)
+  await bill.locator('#billing-phone').fill(offlinePhone)
+  await bill.locator('#billing-name').fill(offlineCustomer)
   await bill.locator('#billing-prod').fill('Manual held item')
   await bill.locator('#billing-qty').fill('1')
   await bill.locator('#billing-price').fill('99')
@@ -270,7 +273,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await bill.getByRole('button', { name: 'Resume' }).click()
   await expect(bill.locator('#billing-prod')).toHaveValue('Manual held item')
   await capture(page, 'bill-held-resumed')
-  await bill.locator('#billing-phone').fill(phone.slice(-4))
+  await bill.locator('#billing-phone').fill(offlinePhone.slice(-4))
   const offlineOptions = page.getByRole('listbox', { name: 'Matching customers' })
   await expect(offlineOptions.getByRole('option').first()).toBeVisible()
   await offlineOptions.getByRole('option').first().click()
