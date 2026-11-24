@@ -1,6 +1,6 @@
 # Home dashboard — action-first design
 
-**Status:** Home design implemented and merged in PR #69; screenshot-driven polish in PR pending final CI  
+**Status:** Home phase complete — redesign merged in PR #69 and screenshot-driven polish merged in PR #70; all PR checks passed  
 **Scope:** Home route only (`#/home`)  
 **Design references:** [Figma — RBOS Home](https://www.figma.com/design/F5g0huBlQ1fYTE38HWPeTy) · [MagicPath — Home prototype](https://designs.magicpath.ai/v1/warmly-star-1345)  
 **Programme:** [RBOS usability and accessibility programme](./rbos-usability-accessibility-programme.md)
@@ -49,9 +49,10 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 - [x] Verify actionable reminders still render; singular/plural copy has been corrected.
 - [ ] Verify the in-flow Home Assistant launcher cannot cover metric cards on a fresh mobile capture.
 - [ ] Check English and Hindi layouts for wrapping and horizontal overflow, including the shortened supplier label.
-- [ ] Run web lint, unit tests, build and the Home visual audit.
+- [x] Web lint, unit tests, TypeScript check and production build passed in PR #70 CI.
+- [ ] Run a fresh Home visual audit after the final polish and verify the live page with real shopkeeper tasks.
 - [ ] Review the page with real shopkeeper tasks before starting Billing & Sales UX.
 
 ## Next scope
 
-Home direction has been reviewed against real Android screenshots. The original Home implementation is merged in PR #69. This polish PR addresses the screenshot findings; once CI and the final mobile audit pass, mark Home complete and proceed to Billing & Sales.
+Home redesign and screenshot-driven polish are merged (#69 and #70), and all PR checks are green. The Home implementation phase is closed. The remaining live visual/shopkeeper validation is a release-quality follow-up, not a blocker to beginning the next scoped UX phase: Billing & Sales.
