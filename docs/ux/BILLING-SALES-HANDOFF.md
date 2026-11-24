@@ -2,9 +2,10 @@
 
 **Repository:** Vaibhav1507/retail-business-erp  
 **Previous baseline PR:** [#76 — UX polish Billing & Sales mobile workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/76) — merged to main at \`96c8ed9930d4495a0bc032c6d4d2a0e161afe58d\`.  
-**Current follow-up branch:** \`ux/invoice-form-compact-electronics-fields\`  
-**Current follow-up design note:** [invoice-form-mobile-compact-followup.md](./invoice-form-mobile-compact-followup.md)  
-**Current follow-up PR:** to be created after focused validation.
+**Latest merged invoice follow-up:** [PR #77](https://github.com/Vaibhav1507/retail-business-erp/pull/77) — merged to main at \`4f8fc9c15b029319bc87defb77f9c993b1cf9d40\`.  
+**Current follow-up branch:** \`ux/invoice-product-details-assistant-launcher\`  
+**Current follow-up design note:** [invoice-product-details-assistant-launcher.md](./invoice-product-details-assistant-launcher.md)  
+**Current follow-up PR:** pending focused validation and creation.
 
 ## Scope
 
