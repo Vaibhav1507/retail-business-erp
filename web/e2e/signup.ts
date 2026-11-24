@@ -5,7 +5,7 @@ const dialogHandlers = new WeakMap<Page, (dialog: Dialog) => void | Promise<void
 /** Replace a page's active dialog policy without leaving duplicate listeners behind. */
 export function setDialogHandler(page: Page, handler: (dialog: Dialog) => void | Promise<void>) {
   const previous = dialogHandlers.get(page)
-  if (previous) page.off('dialog', previous)
+  if (previous) page.removeListener('dialog', previous)
   page.on('dialog', handler)
   dialogHandlers.set(page, handler)
 }
