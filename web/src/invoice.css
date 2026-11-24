@@ -885,3 +885,135 @@
   border-top: 1px solid #e1e8e3;
 }
 .invoice-extra-address h3 { margin: 0 0 14px; color: #46534b; font-size: 16px; }
+
+
+
+/* Screenshot follow-up: compact phone scale and electronics-first item entry. */
+.invoice-electronics-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(88px, 1fr);
+  align-items: start;
+  gap: 12px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.invoice-electronics-fields > .billing-field { min-width: 0; }
+.invoice-create-page .invoice-product-entry .item-tag-uploader {
+  flex: 0 0 108px;
+  width: 108px;
+  max-width: 108px;
+}
+.invoice-create-page .invoice-product-entry .photo-source-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  height: 56px;
+  padding: 8px 10px;
+  border: 1.5px solid #bfd4c7;
+  border-radius: 15px;
+  background: #eff7f2;
+  color: #1d7954;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.invoice-create-page .invoice-product-entry .photo-source-trigger::after { content: none; }
+.invoice-create-page .invoice-product-entry .photo-source-trigger:hover {
+  background: #e6f2eb;
+  color: #125e40;
+}
+
+@media (max-width: 700px) {
+  .invoice-create-page { gap: 16px; }
+  .invoice-focus .content {
+    padding-right: 14px;
+    padding-left: 14px;
+    padding-bottom: calc(108px + env(safe-area-inset-bottom));
+  }
+  .invoice-new-sale-header {
+    width: calc(100% + 28px);
+    min-height: 90px;
+    margin: 0 -14px;
+    padding: 11px 14px;
+    gap: 11px;
+  }
+  .invoice-back {
+    flex-basis: 50px;
+    width: 50px;
+    height: 50px;
+    border-radius: 15px;
+    font-size: 30px;
+  }
+  .invoice-new-sale-copy h1 { font-size: 21px; }
+  .invoice-new-sale-copy p { margin-top: 4px; font-size: 14px; }
+  .invoice-draft-pill { padding: 10px 11px; font-size: 11px; }
+  .invoice-stepper { gap: 9px; font-size: 13px; }
+  .invoice-section-card { padding: 18px 14px 17px; border-radius: 20px; }
+  .invoice-section-eyebrow { margin-bottom: 7px; font-size: 12px; }
+  .invoice-section-eyebrow b { width: 38px; height: 38px; font-size: 13px; }
+  .invoice-section-card h2 { margin-bottom: 14px; font-size: 20px; }
+  .invoice-section-subtitle { font-size: 14px; line-height: 1.45; }
+  .invoice-create-page .billing-field { gap: 6px; }
+  .invoice-create-page .billing-field label { font-size: 14px; }
+  .invoice-create-page .billing-field input,
+  .invoice-create-page .billing-field select {
+    min-height: 56px;
+    padding: 10px 13px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+  .invoice-customer-fields { gap: 12px; }
+  .invoice-helper { margin-top: 11px; font-size: 13px; line-height: 1.4; }
+  .invoice-product-editor { gap: 16px 10px; }
+  .invoice-electronics-fields {
+    grid-template-columns: minmax(0, 1.8fr) minmax(84px, 1fr);
+    gap: 10px;
+  }
+  .invoice-product-entry { gap: 7px; }
+  .invoice-create-page .invoice-product-entry .item-tag-uploader {
+    flex-basis: 100px;
+    width: 100px;
+    max-width: 100px;
+  }
+  .invoice-create-page .invoice-product-entry .photo-source-trigger {
+    min-height: 56px;
+    height: 56px;
+    border-radius: 14px;
+    padding: 7px 8px;
+    font-size: 13px;
+  }
+  .invoice-product-more-details { margin-top: 16px; }
+  .invoice-product-more-details > summary { min-height: 48px; font-size: 14px; }
+  .invoice-add-item-action { margin-top: 14px; }
+  .invoice-add-item-action > button {
+    min-height: 58px;
+    border-radius: 16px;
+    font-size: 17px;
+  }
+  .invoice-sticky-review {
+    min-height: 78px;
+    gap: 10px;
+    padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+  }
+  .invoice-sticky-amount span { font-size: 11px; }
+  .invoice-sticky-amount strong { font-size: 20px; }
+  .invoice-sticky-review > button {
+    min-height: 56px;
+    border-radius: 15px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 360px) {
+  .invoice-create-page .invoice-product-entry .item-tag-uploader {
+    flex-basis: 94px;
+    width: 94px;
+    max-width: 94px;
+  }
+  .invoice-create-page .invoice-product-entry .photo-source-trigger { font-size: 12px; }
+  .invoice-electronics-fields { grid-template-columns: minmax(0, 1.55fr) minmax(80px, 1fr); }
+}
