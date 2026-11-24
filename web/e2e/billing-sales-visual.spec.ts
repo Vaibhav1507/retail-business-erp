@@ -302,7 +302,11 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await expect(bill.getByText('Held bills')).toBeVisible()
   await capture(page, 'bill-held-list')
   await bill.getByRole('button', { name: 'Resume' }).click()
-  await expect(bill.locator('#billing-prod')).toHaveValue('Manual held item')
+  // Resume restores saved lines into the invoice cart; the product input is intentionally cleared for the next item.
+  await expect(bill.locator('#billing-prod')).toHaveValue('')
+  const resumedLine = bill.locator('.billing-table tbody tr').filter({ hasText: 'Manual held item' })
+  await expect(resumedLine).toBeVisible()
+  await expect(resumedLine).toContainText('99.00')
   await capture(page, 'bill-held-resumed')
   await bill.locator('#billing-phone').fill(offlinePhone.slice(-4))
   const offlineOptions = page.getByRole('listbox', { name: 'Matching customers' })
