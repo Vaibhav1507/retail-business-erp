@@ -1,6 +1,6 @@
 # Buy screen design — Add Purchase
 
-**Status:** Design specification finalized; implementation pending.  
+**Status:** Design specification finalized; first implementation pass present; focused verification pending.  
 **Last reviewed:** 2026-11-24  
 **Baseline:** main b180f59793f265024650731a1f2bd89ead29b342  
 **Route:** #/buy/receive  
@@ -213,3 +213,8 @@ Focused checks: Add Purchase component coverage for OCR handoff, line creation/r
 - [Nielsen Norman Group: Mobile usability research](https://www.nngroup.com/reports/mobile-website-and-application-usability/)
 - [W3C: WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [W3C: Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification)
+
+
+## Implementation record — 2026-11-24
+
+First implementation pass is present in `web/src/Procurement.tsx`, `web/src/InvoiceUpload.tsx` and scoped `web/src/buy-procurement.css`. It groups supplier/receipt fields, makes the OCR upload compact, uses labelled mobile cards for OCR review and purchase lines, adds an estimated total and preserves the review-before-post flow. Existing extraction, barcode, purchase POST and idempotency behaviour are retained. Focused checks and screenshot review are pending; see `BUY-DESIGN-HANDOFF.md` and draft PR #81.
