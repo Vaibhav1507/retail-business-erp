@@ -146,6 +146,7 @@ Detailed contract: docs/ux/buy-return-to-supplier-design.md.
 - Past Purchases: replaced dense purchase/payment tables with separate mobile cards; retained bill-copy links and supplier statement access.
 - Return to Supplier: implemented receipt-first selection, receipt context, purchased/returned/remaining quantities, quantity bounds, secondary fill-remaining action, optional reason, primary post action and separate searchable history/detail. `show=preturn` now loads only purchases and supplier returns rather than customer/sales datasets.
 - Added English and Hindi copy for the new Buy labels and validation messages.
+- OCR review now switches to compact, labelled item cards on phone widths while preserving the same editable fields and extraction/apply logic.
 - Pay Supplier and Past Purchases now require an explicit supplier selection for supplier-specific views; statement state is retained after data refresh.
 - Remaining: run focused frontend tests, TypeScript, lint and build; inspect all resulting failures; review updated Android screenshots. Playwright remains excluded per user instruction.
 - The draft PR currently has no reported status checks/workflow runs in the GitHub response; this is not a passing CI result.
