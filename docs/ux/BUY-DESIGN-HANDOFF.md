@@ -1,6 +1,6 @@
 # RBOS Buy section — design handoff
 
-**Status:** Four screen design specifications finalized; Add Purchase implementation started; remaining three screens pending.  
+**Status:** Four screen design specifications finalized; implementation changes are present for all four screens; focused checks and screenshot acceptance remain pending.  
 **Last reviewed:** 2026-11-24  
 **Repository:** Vaibhav1507/retail-business-erp  
 **Design baseline:** main at b180f59793f265024650731a1f2bd89ead29b342  
@@ -135,14 +135,17 @@ Flow: choose original receipt → confirm supplier/receipt context → enter ret
 Detailed contract: docs/ux/buy-return-to-supplier-design.md.
 
 
-### Add Purchase — implementation in progress (2026-11-24)
+### Implementation progress — 2026-11-24
 
 - Updated `web/src/Procurement.tsx` for the existing `#/buy/receive` route only.
 - Added scoped `web/src/buy-procurement.css` and English/Hindi copy in `web/src/i18n.ts`.
 - Implemented grouped supplier/receipt fields, compact optional invoice-upload area, item entry, secondary GST disclosure, readable item cards, estimated total, and separate review/post state.
 - Preserved the existing InvoiceUpload component, barcode scanner, POST `/purchases` request and idempotency key; no backend or accounting changes.
 - Focused automated checks have **not yet run**. Playwright is intentionally excluded per the user's instruction; updated Android screenshots will be the visual review evidence.
-- Next: finish focused TypeScript/build/frontend test checks, then proceed to Pay Supplier.
+- Pay Supplier: added explicit searchable supplier selection, prominent balance/amount, method radio choices, optional bill allocation and statement disclosure. Corrected the frontend request to send the existing backend `allocations` contract; allocation is capped to `min(payment amount, bill open amount)`, with excess left unallocated. Backend DTO/service and accounting logic unchanged.
+- Past Purchases: replaced dense purchase/payment tables with separate mobile cards; retained bill-copy links and supplier statement access.
+- Return to Supplier: implemented receipt-first selection, receipt context, purchased/returned/remaining quantities, quantity bounds, secondary fill-remaining action, optional reason, primary post action and separate searchable history/detail. `show=preturn` now loads only purchases and supplier returns rather than customer/sales datasets.
+- Remaining: add focused tests, run frontend build/lint/unit tests, inspect code for regressions, update Hindi copy for the new Pay/History/Return labels, and review updated Android screenshots. Playwright remains excluded per user instruction.
 
 ## 7. Functional findings, separately tracked
 
@@ -218,16 +221,24 @@ No backend changes are planned.
 | Competitor and accessibility research | Complete |
 | Four screen design specifications | Complete |
 | Canonical branch | Created |
-| Implementation | Not started |
-| Focused frontend tests/build/lint | Pending |
+| Implementation | In progress — code changes present on all four screens; not yet build/test verified |
+| Focused frontend tests/build/lint | Pending — not run from this GitHub-only editing session |
 | Playwright | Explicitly not required for this task |
 | Updated Android screenshot review | Pending |
 | Real-device acceptance | Pending |
 | User acceptance | Pending |
-| PR | Not opened |
+| PR | Not opened — pending focused checks |
 | Merge / production | Not authorised |
 
-## 11. References
+## 11. Research findings
+
+- **Vyapar bill scanning:** its documented workflow is upload → review extracted field mappings → confirm details → save. This supports RBOS keeping OCR optional and editable, with an explicit review/post gate rather than auto-posting extracted data. [Source](https://vyaparapp.in/guides/how-to-scan-and-upload-purchase-bills-in-vyapar-app)
+- **Vyapar purchase return:** the documented shortcut starts from an existing purchase invoice and converts it to a return, keeping the supplier and original invoice context. RBOS adopts the original-receipt-first pattern but deliberately retains its server-linked receipt return API and does not add standalone debit notes. [Source](https://vyaparapp.in/videos/how-to-make-debit-note)
+- **myBillBook purchase invoices:** its purchase flow connects supplier, items, quantity, rate, tax and stock update, and supports scanned bill review. This reinforces keeping receipt metadata and item entry together while preserving the existing stock posting boundary. [Source](https://mybillbook.in/s/features/purchase-invoice/)
+- **Zoho Books vendor payments:** payment entry explicitly selects the vendor and amount, and can apply payment to a bill while treating excess separately. RBOS adapts this to its existing single-bill allocation contract and does not introduce multi-bill allocation or vendor-credit features. [Source](https://www.zoho.com/in/books/help/payments-made/vendor-payments.html)
+- **WCAG error identification:** detected input errors need a text description and identification of the affected field. RBOS quantity and amount errors should therefore be adjacent to and programmatically associated with their controls. [Source](https://www.w3.org/TR/wcag2mobile-22/)
+
+## 12. References
 
 - RBOS: [UI/UX workflow](RBOS-UI-UX-WORKFLOW.md), [Billing & Sales handoff](BILLING-SALES-HANDOFF.md), [Home action-first design](home-action-first-design.md), [Billing & Sales mobile polish](billing-sales-mobile-polish.md), [Invoice field hierarchy](invoice-form-field-hierarchy-assistant.md), [Invoice mobile compact follow-up](invoice-form-mobile-compact-followup.md).
 - [Vyapar: purchase bill scanning](https://vyaparapp.in/guides/how-to-scan-and-upload-purchase-bills-in-vyapar-app)
