@@ -1,6 +1,6 @@
 # Home dashboard — action-first design
 
-**Status:** Implemented on `ux/rbos-home-action-first`; awaiting CI and review  
+**Status:** Home design implemented and merged in PR #69; screenshot-driven polish in PR pending final CI  
 **Scope:** Home route only (`#/home`)  
 **Design references:** [Figma — RBOS Home](https://www.figma.com/design/F5g0huBlQ1fYTE38HWPeTy) · [MagicPath — Home prototype](https://designs.magicpath.ai/v1/warmly-star-1345)  
 **Programme:** [RBOS usability and accessibility programme](./rbos-usability-accessibility-programme.md)
@@ -14,7 +14,7 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 1. Welcome heading and short prompt.
 2. Primary **Create new bill** action, linked to the existing `#/sell/bill` route.
 3. Four secondary actions: Purchases, Check stock, Collect payment and Add customer.
-4. A two-column, four-metric overview: Sales today, Money to collect, Low stock and Money to pay.
+4. A two-column, four-metric overview: Sales today, Money to collect, Low stock and To pay suppliers.
 5. A compact Cash and bank strip linked to Finance.
 6. Existing seven-item global navigation and Navigation Assistant remain owned by the app shell; this change does not redesign them.
 
@@ -35,7 +35,10 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 - Loading and error states use status/alert semantics.
 - Reduced-motion preferences are respected.
 - Touch targets are at least 44px on the small controls and larger for the principal actions.
-- Verify on narrow Android viewport, tablet and desktop; check that the fixed bottom navigation and floating Assistant do not obscure actionable content.
+- On Home, the Assistant launcher stays in document flow below the dashboard rather than floating over figures; its expanded panel remains available as an overlay.
+- The mobile shop header uses a compact single-line business name.
+- Supplier dues and quick-action helper text use short shopkeeper-friendly wording.
+- Day-closing reminders use singular/plural grammar.
 
 ## Review checklist
 
@@ -43,11 +46,12 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 - [ ] Verify all four secondary links open their intended areas.
 - [ ] Verify real dashboard values and empty/zero values render correctly.
 - [ ] Simulate dashboard failure and confirm Retry works.
-- [ ] Verify actionable reminders still render.
-- [ ] Check English and Hindi layouts for wrapping and horizontal overflow.
+- [x] Verify actionable reminders still render; singular/plural copy has been corrected.
+- [ ] Verify the Assistant launcher cannot cover metric cards during scrolling.
+- [ ] Check English and Hindi layouts for wrapping and horizontal overflow, including the shortened supplier label.
 - [ ] Run web lint, unit tests, build and the Home visual audit.
 - [ ] Review the page with real shopkeeper tasks before starting Billing & Sales UX.
 
 ## Next scope
 
-Do not start Billing & Sales redesign until the Home implementation has passed its checks and the Home direction is accepted. Then continue with the Billing & Sales route group defined in the programme document.
+Home direction has been reviewed against real Android screenshots. Finish the screenshot-driven polish and required CI/visual audit, then close the Home phase. Billing & Sales is the next UX scope.
