@@ -7,6 +7,7 @@ import { FirstShopOnboarding } from './FirstShopOnboarding'
 import { Procurement } from './Procurement'
 import { SalesHistory } from './SalesHistory'
 import { Collections } from './Collections'
+import { CustomerReturns } from './CustomerReturns'
 import { Customers } from './Customers'
 import { GenerateInvoice } from './GenerateInvoice'
 import { AfterSales } from './AfterSales'
@@ -117,7 +118,7 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
       {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} />}
       {tab === 'bills' && <SalesHistory locations={c.locations} />}
       {tab === 'collect' && <Collections reload={c.reload} />}
-      {tab === 'return' && <AfterSales reload={c.reload} show="sreturn" />}
+      {tab === 'return' && <CustomerReturns reload={c.reload} />}
     </div>
   )
 }
