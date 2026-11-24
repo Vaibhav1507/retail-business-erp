@@ -673,21 +673,22 @@ details>
           <div className="billing-field billing-col-6"><label htmlFor="billing-mode">Payment mode</label><select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
           {mode === 'Credit' && <div className="billing-field billing-col-6"><label htmlFor="billing-paid">{tr('bill.paidNow')}</label><input id="billing-paid" inputMode="decimal" value={paid} onChange={e => setPaid(e.target.value)} /></div>}
           {mode === 'Credit' && <><div className="billing-field billing-col-6"><label htmlFor="billing-paid-method">Paid by</label><select id="billing-paid-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2">Second payment (INR, optional)</label><input id="billing-paid2" inputMode="decimal" value={paid2} onChange={e => setPaid2(e.target.value)} /></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2-method">Second paid by</label><select id="billing-paid2-method" value={payMethod2} onChange={e => setPayMethod2(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div></>}
-          <div className="invoice-extra-address billing-col-12">
-            <h3>Customer address (optional)</h3>
-            <div className="billing-grid">
-              <div className="billing-field billing-col-12"><label htmlFor="billing-addr">Address</label><input id="billing-addr" value={address} onChange={e => setAddress(e.target.value)} /></div>
-              <div className="billing-field billing-col-4"><label htmlFor="billing-pin">Pincode</label><input id="billing-pin" inputMode="numeric" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} /></div>
-              <div className="billing-field billing-col-4"><label htmlFor="billing-city">City</label><input id="billing-city" value={city} onChange={e => setCity(e.target.value)} /></div>
-              <div className="billing-field billing-col-4"><label htmlFor="billing-state">State</label><input id="billing-state" value={state} onChange={e => setState(e.target.value)} /></div>
-            </div>
-          </div>
           <div className="invoice-more-details-actions billing-col-12">
             <button type="button" className="secondary" onClick={() => { void hold() }} disabled={!items.length}>Hold bill</button>
           </div>
         </div>
       </details>
 
+
+      <details className="customer-address-details">
+        <summary>{address || pin || city || state ? 'Edit address (optional)' : 'Add address (optional)'}</summary>
+        <div className="billing-grid">
+          <div className="billing-field billing-col-12"><label htmlFor="billing-addr">Address</label><input id="billing-addr" value={address} onChange={e => setAddress(e.target.value)} /></div>
+          <div className="billing-field billing-col-4"><label htmlFor="billing-pin">Pincode</label><input id="billing-pin" inputMode="numeric" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} /></div>
+          <div className="billing-field billing-col-4"><label htmlFor="billing-city">City</label><input id="billing-city" value={city} onChange={e => setCity(e.target.value)} /></div>
+          <div className="billing-field billing-col-4"><label htmlFor="billing-state">State</label><input id="billing-state" value={state} onChange={e => setState(e.target.value)} /></div>
+        </div>
+      </details>
 
       <footer className="invoice-sticky-review" aria-label="Bill total and review">
         <div className="invoice-sticky-amount">
