@@ -165,3 +165,14 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 
 ### Next concrete action
 Refresh current open branches/PRs and CI after this handoff update, then create or continue exactly one implementation branch from current main for the four-screen polish. Implement the Sell hub light polish, Sales history hierarchy/Assistant clearance, Collections compact states and Customer Returns history disclosure in that order. Run focused checks as changes land, then perform the agreed four-screen integrated Playwright/screenshot/Axe review and request fresh Android screenshots from the user.
+
+
+### Implementation update — PR #80
+- Created one clean implementation branch from current main: `ux/billing-sales-four-screen-polish`.
+- PR [#80 — four-screen Sales mobile polish](https://github.com/Vaibhav1507/retail-business-erp/pull/80) is open/draft. It is based on main commit `1158e049e135f19586fc0eee15b7d7e81660e983` and currently changes only:
+  - `web/src/sales-history.css`
+  - `web/src/collections.css`
+  - `web/src/customer-returns.css`
+- Sell hub is intentionally unchanged because the supplied screenshot already meets the approved action-first design. No unnecessary redesign was added.
+- PR #80 head at creation: `f4ee4fd19000e95d0459edead3b662f4280c9877`. CI and visual screenshots must be refreshed/checked against this exact head.
+- PR #80 remains draft; no merge or deployment.
