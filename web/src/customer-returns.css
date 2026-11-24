@@ -18,8 +18,9 @@
 .customer-return-fill { justify-self: start; }
 .customer-return-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .customer-return-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-.customer-return-cancel-link { border: 0; background: transparent; color: var(--danger); text-decoration: underline; padding: 8px 10px; }
-.customer-return-cancel-link:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+.customer-cancel-section { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 14px 16px; border: 1px solid var(--danger); border-radius: 13px; background: var(--danger-soft); }
+.customer-cancel-section h4 { margin: 0 0 4px; color: var(--danger); }
+.customer-cancel-section p { margin: 0; max-width: 520px; color: var(--danger); font-size: 13px; }
 .customer-returns-muted { margin: 0; color: var(--muted); font-size: 13px; }
 .customer-returns-error, .customer-returns-success { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
 .customer-returns-error { border: 1px solid var(--danger); background: var(--danger-soft); color: var(--danger); }
@@ -44,7 +45,8 @@
   .customer-return-line .billing-field { max-width: none; }
   .customer-return-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
   .customer-return-actions > button { width: 100%; }
-  .customer-return-cancel-link { min-height: 44px; }
+  .customer-cancel-section { align-items: stretch; }
+  .customer-cancel-section button { width: 100%; }
   .customer-return-history-desktop { display: none; }
   .customer-return-history-mobile { display: grid; list-style: none; gap: 10px; margin: 0; padding: 0; }
   .customer-return-history-mobile li { display: grid; gap: 6px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
