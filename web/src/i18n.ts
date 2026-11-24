@@ -367,6 +367,10 @@ const en = {
   'buy.reason': "Reason",
   'buy.cannotExceed': "Cannot exceed the remaining quantity of {qty}.",
   'buy.positiveQty': "Enter zero or a positive quantity.",
+  'buy.returnTitle': "Return to supplier",
+  'buy.amountRequired': "Enter an amount to pay.",
+  'buy.amountPositive': "Enter an amount greater than zero.",
+  'buy.amountBalance': "Payment cannot be more than the supplier balance.",
 } as const
 
 export type MessageKey = keyof typeof en
@@ -734,6 +738,10 @@ const hi: Record<MessageKey, string> = {
   'buy.reason': "कारण",
   'buy.cannotExceed': "बाकी मात्रा {qty} से अधिक नहीं हो सकती।",
   'buy.positiveQty': "शून्य या उससे अधिक मात्रा दर्ज करें।",
+  'buy.returnTitle': "सप्लायर को सामान लौटाएँ",
+  'buy.amountRequired': "भुगतान राशि दर्ज करें।",
+  'buy.amountPositive': "शून्य से अधिक राशि दर्ज करें।",
+  'buy.amountBalance': "भुगतान सप्लायर के बकाया से अधिक नहीं हो सकता।",
 }
 
 const catalogues: Record<Lang, Record<MessageKey, string>> = { en, hi }
