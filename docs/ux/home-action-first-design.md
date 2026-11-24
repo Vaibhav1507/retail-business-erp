@@ -54,4 +54,4 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 
 ## Next scope
 
-Home direction has been reviewed against real Android screenshots. Finish the screenshot-driven polish and required CI/visual audit, then close the Home phase. Billing & Sales is the next UX scope.
+Home direction has been reviewed against real Android screenshots. The original Home implementation is merged in PR #69. This polish PR addresses the screenshot findings; once CI and the final mobile audit pass, mark Home complete and proceed to Billing & Sales.
