@@ -19,12 +19,12 @@ export const toBase64 = (blob: Blob): Promise<string> => new Promise((resolve, r
 })
 
 async function prepareImageBlob(file: File, invoicePage = false): Promise<Blob> {
-  if (!file.type.startsWith('image/')) throw new Error('Choose a photo or a PDF.')
+  if (!file.type.startsWith('image/')) throw new Error(invoicePage ? tr('buy.invoicePhotoOrPdf') : 'Choose a photo or a PDF.')
   if (invoicePage) {
     if (file.size === 0 || file.size > 24 * 1024 * 1024)
-      throw new Error('The original invoice photo must be 24 MB or smaller.')
+      throw new Error(tr('buy.invoiceOriginalPhotoSize'))
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
-      throw new Error('Choose a JPEG, PNG, WebP photo or a PDF.')
+      throw new Error(tr('buy.invoicePhotoType'))
   }
   const bitmap = await createImageBitmap(file)
   try {
@@ -33,12 +33,12 @@ async function prepareImageBlob(file: File, invoicePage = false): Promise<Blob> 
     canvas.width = Math.max(1, Math.round(bitmap.width * scale))
     canvas.height = Math.max(1, Math.round(bitmap.height * scale))
     const context = canvas.getContext('2d')
-    if (!context) throw new Error('Could not prepare the photo.')
+    if (!context) throw new Error(tr('buy.invoicePreparePhoto'))
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
     if (!blob) throw new Error('Could not prepare the photo.')
     if (invoicePage && (blob.size === 0 || blob.size > MAX_BYTES))
-      throw new Error('Prepared invoice photo must be 8 MB or smaller.')
+      throw new Error(tr('buy.invoicePreparedPhotoSize'))
     return blob
   } finally {
     bitmap.close()
@@ -60,7 +60,7 @@ export async function prepare(file: File): Promise<{ contentType: string; data: 
 // Binary-only preparation for the supplier invoice multipart route.
 async function prepareMultipartPage(file: File): Promise<File> {
   if (file.type === 'application/pdf') {
-    if (file.size === 0 || file.size > MAX_BYTES) throw new Error('PDF must be between 1 byte and 8 MB.')
+    if (file.size === 0 || file.size > MAX_BYTES) throw new Error(tr('buy.invoicePdfSize'))
     return file
   }
   const image = await prepareImageBlob(file, true)
@@ -104,7 +104,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     try {
       const pages = await Promise.all(files.map(prepareMultipartPage))
       const totalBytes = pages.reduce((total, file) => total + file.size, 0)
-      if (totalBytes > 12 * 1024 * 1024) throw new Error('The selected invoice pages together exceed 12 MB.')
+      if (totalBytes > 12 * 1024 * 1024) throw new Error(tr('buy.invoiceTotalSize'))
       const form = new FormData()
       pages.forEach(file => form.append('pages', file, file.name))
       const d = await apiForm<InvoiceDraft>('POST', '/purchases/extract', form)
@@ -197,7 +197,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
           <label>{tr('buy.invoiceSupplier')}
             <select aria-label={tr('buy.invoiceSupplierFor')} value={supplierId} onChange={e => { void chooseSupplier(e.target.value) }}>
               <option value="">{draft.supplierName ? tr('buy.invoiceChooseSupplier') : tr('buy.invoiceNoSupplier')}</option>
-              {draft.supplierName && <option value={NEW}>+ Add "{draft.supplierName}" as new supplier</option>}
+              {draft.supplierName && <option value={NEW}>{tr('buy.invoiceAddSupplier', { name: draft.supplierName })}</option>}
               {supOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
@@ -210,10 +210,10 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
                 {rows.map((r, i) => (
                   <tr key={i}>
                     <td data-label={tr('buy.invoiceOnInvoice')}>{r.description}</td>
-                    <td>
+                    <td data-label={tr('buy.invoiceProduct')}>
                       <select aria-label={`${tr('buy.invoiceProduct')} · ${r.description}`} value={r.productId} onChange={e => { void choose(i, e.target.value) }}>
                         <option value="">{tr('buy.invoiceSkipLine')}</option>
-                        <option value={NEW}>+ Add "{r.description}" as new product</option>
+                        <option value={NEW}>{tr('buy.invoiceAddProduct', { name: r.description })}</option>
                         {options.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     </td>
