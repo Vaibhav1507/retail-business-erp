@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from './api'
 import { Paged } from './Paged'
 import './billing-forms.css'
@@ -121,7 +121,7 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
     setFieldErrors({})
   }
 
-  const postReturn = async (event: React.FormEvent) => {
+  const postReturn = async (event: FormEvent) => {
     event.preventDefault()
     if (!retSale || submitting) return
     const nextErrors: Record<string, string> = {}
