@@ -219,7 +219,7 @@ PR #74 is an implementation candidate for this contract, not a substitute for th
 | Single product action | Add product is the only action in the product action row. | **Aligned.** Handwritten import is not in that row. |
 | Handwritten-bill import | Separate page-header action with extraction review. | **Aligned.** Confirm long header copy and small-phone wrapping in group visual review. |
 | Progressive disclosure | Optional details closed by default; opens after extraction and serial validation. | **Aligned.** Ensure keyboard/focus does not jump unexpectedly when details open. |
-| Customer required fields | Review validates name and 10–15 digit mobile; inline messages and first-invalid focus exist. | **Partially aligned.** Verify phone label visibly communicates required status and field error is associated via `aria-describedby`; add tests for blank/invalid phone and name. |
+| Customer required fields | Mobile and name are visibly required; review validates name and 10–15 digit mobile; inline messages are associated with each field through `aria-describedby`; first-invalid focus is retained. | **Aligned in source and focused test.** `GenerateInvoice.test.tsx` now covers both blank fields, invalid mobile length, inline error associations and first-invalid focus. Final visual/keyboard acceptance remains in the five-route group pass. |
 | Product/pricing validation | Inline errors for product, quantity, price, discount and MRP; serial/IMEI checks retained. | **Aligned in source.** Verify all error states, clear-on-edit behaviour and mobile scroll/focus. |
 | Sticky total/action | Summary bar is present with GST, bill discount, total, Review and Hold. | **Direction aligned; visual acceptance pending.** Verify safe-area, keyboard and short-landscape behaviour; do not let fixed summary hide content. |
 | Bill line presentation | Mobile line-card CSS exists; desktop table retained. | **Source aligned; screenshots pending.** Check long product names/identifiers and action reachability. |
@@ -229,9 +229,9 @@ PR #74 is an implementation candidate for this contract, not a substitute for th
 
 ### PR #74 evidence refreshed 2026-11-24
 
-- PR #74 is **open/draft**, branch `ux/invoice-entry-action-first`, head `72cfe96dd8b361d77123d136f1f6f12ad6ac4768`, base `main`; not merged.
+- PR #74 is **open/draft**, branch `ux/invoice-entry-action-first`, head `b5d4236a8c45c552fbb034d328d1b7dd20a8c5a8`, base `main`; not merged.
 - Changed files: `web/e2e/sales.spec.ts`, `web/src/App.tsx`, `web/src/GenerateInvoice.test.tsx`, `web/src/GenerateInvoice.tsx`, `web/src/ItemTagCapture.test.tsx`, `web/src/ItemTagCapture.tsx`, `web/src/invoice.css`.
-- Exact-head standard CI run [#45340114617](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45340114617) completed **success**: frontend TypeScript/tests/lint/build/dependency audit; backend Release build/unit tests/container build (no push); PostgreSQL integration bootstrap/build/tests.
+- Standard CI [#45358795332](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45358795332) passed after the customer-label and search-selector test fixes. The current merge-integrated head `b5d4236a8c45c552fbb034d328d1b7dd20a8c5a8` has a fresh standard CI run [#45359742851](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45359742851) queued; do not treat the earlier run as validation of the merge-integrated tree.
 - Focused component and E2E assertions exist. The full five-route Playwright journey, responsive screenshots, visual review and Axe verification are intentionally deferred until all five routes are implemented.
 - Native Android camera/gallery, printer/share sheet, TalkBack and representative shopkeeper acceptance remain pending.
 - No merge or deployment has occurred or is authorised.
@@ -251,7 +251,7 @@ PR #74 is an implementation candidate for this contract, not a substitute for th
 - **Native camera/gallery:** browser tests do not prove Android permission prompts, native chooser behaviour or actual device camera/gallery. Revisit on Android device.
 - **Print:** browser print CSS intent is present; actual device/browser printer and thermal output remain unverified.
 - **Keyboard/focus:** verify field focus, chooser focus return, details disclosure and sticky summary while the Android keyboard is open in group verification.
-- **Customer required semantics:** verify the required marker for mobile and programmatic field-error association; address with focused code/test change if needed.
+- **Customer required semantics:** resolved in source and focused component tests; final keyboard/focus behaviour remains part of group-level Playwright and native Android acceptance.
 - **MagicPath:** connected agent/API quota was previously exhausted. Normal editor is optional; if unavailable, continue from this specification and existing prototype. This is not a blocker.
 - **Figma:** permanently optional and not required. Do not retry, upgrade or wait for quota.
 
