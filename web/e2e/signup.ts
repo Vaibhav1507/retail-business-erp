@@ -1,4 +1,14 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Dialog, type Locator, type Page } from '@playwright/test'
+
+const dialogHandlers = new WeakMap<Page, (dialog: Dialog) => void | Promise<void>>()
+
+/** Replace a page's active dialog policy without leaving duplicate listeners behind. */
+export function setDialogHandler(page: Page, handler: (dialog: Dialog) => void | Promise<void>) {
+  const previous = dialogHandlers.get(page)
+  if (previous) page.off('dialog', previous)
+  page.on('dialog', handler)
+  dialogHandlers.set(page, handler)
+}
 
 export const PASSWORD = 'Synthetic#Pass123'
 
@@ -23,7 +33,7 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   // The app intentionally asks for confirmation before leaving protected workflows.
   // Playwright dismisses dialogs by default, which silently cancels page.goto() and leaves
   // later assertions on the previous route. Accept the explicit navigation confirmation.
-  page.on('dialog', async dialog => {
+  setDialogHandler(page, async dialog => {
     if (dialog.type() === 'confirm') await dialog.accept()
     else await dialog.dismiss()
   })
