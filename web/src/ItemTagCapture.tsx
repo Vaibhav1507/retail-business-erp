@@ -165,6 +165,7 @@ export function ItemTagCapture({
     <div className="item-tag-uploader">
       <PhotoSourcePicker
         triggerLabel="Scan tag"
+        triggerIcon="📷"
         title="Add product tag photo"
         description="Take a photo of the product label or choose an existing image."
         disabled={disabled || busy}
