@@ -1,5 +1,6 @@
 import { t as tr } from './i18n'
 import './billing-forms.css'
+import './buy-procurement.css'
 import { Paged } from './Paged'
 import { InvoiceUpload } from './InvoiceUpload'
 import type { InvoiceDraft } from './InvoiceUpload'
@@ -38,6 +39,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const [gst, setGst] = useState('')
   const [lines, setLines] = useState<Line[]>([])
   const [reviewReceipt, setReviewReceipt] = useState(false)
+  const [showGst, setShowGst] = useState(false)
   const [rkey, setRkey] = useState(newKey)
   const [invoiceFileId, setInvoiceFileId] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
@@ -80,6 +82,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
     if (!unknownCode || !productId) { setError('Choose the product to link this barcode to first.'); return }
     try { await api('POST', `/products/${productId}/barcodes`, { code: unknownCode.code, symbology: unknownCode.symbology, packQuantity: Number(qty) || 1 }); setUnknownCode(null); setDone('Barcode linked to the selected product.') } catch (e) { setError(msg(e)) }
   }
+  const estimatedTotal = lines.reduce((sum, line) => sum + line.quantity * line.unitCost + (line.gstAmount ?? 0), 0)
   const addLine = () => {
     const quantity = Number(qty); const unitCost = Number(cost); const gstAmount = Number(gst) || 0
     if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError('Choose a product and enter a positive quantity and unit cost.'); return }
@@ -115,36 +118,53 @@ export function Procurement({ products, locations, reload, show }: { products: (
       <Paged rows={suppliers} empty={tr('sup.none')}>{page => (
       <table>
         <thead><tr><th>Supplier</th><th>Phone</th><th>Notes</th><th>You owe</th><th>Actions</th></tr></thead>
-        <tbody>{page.map(s => <tr key={s.id}><td>{s.name}</td><td>{s.phone}</td><td>{s.notes}</td><td>{s.owed.toFixed(2)}</td><td><button type="button" className="secondary" onClick={() => { setSupEditId(s.id); setName(s.name); setPhone(s.phone ?? ''); setSupNotes(s.notes ?? ''); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Edit</button></td></tr>)}</tbody>
-      </table>
-      )}</Paged>
-      </>}
-      {v('receive') && <>
-      
-      <InvoiceUpload products={products} suppliers={suppliers.filter(s => s.isActive)} onSupplierAdded={() => { load().catch(() => undefined) }} onProductAdded={reload} onUse={(d: InvoiceDraft, picked) => { if (d.supplierId) setSupplierId(d.supplierId); if (d.date) setDate(d.date); if (d.invoiceNumber) setRef(d.invoiceNumber); setLines(picked); setInvoiceFileId(d.fileId); setReviewReceipt(false) }} />
-      {suppliers.filter(s => s.isActive).length === 0 && <p className="hint-line">Add the supplier printed on your bill first. <a href="#/parties/suppliers">Add a supplier</a>.</p>}
-      <label>Supplier <select value={sup} onChange={e => { setSupplierId(e.target.value); setReviewReceipt(false) }}><option value="">Select a supplier</option>{suppliers.filter(s => s.isActive).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      <label>Location <select value={loc} onChange={e => { setLocationId(e.target.value); setReviewReceipt(false) }}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-      <label>Receipt date <input type="date" value={date} onChange={e => { setDate(e.target.value); setReviewReceipt(false) }} /></label>
-      <label>Supplier invoice no. <input value={ref} onChange={e => { setRef(e.target.value); setReviewReceipt(false) }} /></label>
-      <div>
-        <label>Product <select value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">Select</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        <label>Quantity <input inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
-        <label>Unit cost (INR, before GST) <input inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
-                <label>GST on this line (INR, optional) <input inputMode="decimal" value={gst} onChange={e => { setGst(e.target.value); setReviewReceipt(false) }} /></label>
-        <button type="button" className="secondary" onClick={() => setScanning(true)}>Scan barcode</button>
-        <button type="button" onClick={addLine}>Add line</button>
-      </div>
-      {scanning && <BarcodeScanner title="Scan product barcode" onScan={onScan} onClose={() => setScanning(false)} />}
-      {unknownCode && <p role="status">Barcode <strong>{unknownCode.code}</strong> is new to your shop. Step 1: choose the matching product in the Product list above. Step 2: tap <button type="button" className="secondary" onClick={linkUnknown}>Link barcode to selected product</button>. Next time this barcode will fill the product automatically. If the product does not exist yet, add it under Manage Products first.</p>}
-      <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)}: {l.quantity} x {l.unitCost}{l.gstAmount ? ` + GST ${l.gstAmount}` : ''} <button type="button" className="secondary" onClick={() => { setLines(current => current.filter(x => x.productId !== l.productId)); setReviewReceipt(false) }} aria-label={`Remove ${nameOf(l.productId)}`}>Remove</button></li>)}</ul>
-      <p className="billing-hint">{tr('onboarding.purchaseGuidance')}</p>
-      <button type="button" onClick={() => setReviewReceipt(true)} disabled={lines.length === 0 || !sup || !loc}>Review purchase</button>
-      {reviewReceipt && <div className="billing-card" role="region" aria-label="Review purchase">
-        <h3>Review purchase bill</h3><p>{tr('onboarding.purchaseReviewNote')}</p>
-        <dl className="review"><dt>Supplier</dt><dd>{suppliers.find(s => s.id === sup)?.name ?? 'Not selected'}</dd><dt>Location</dt><dd>{locations.find(l => l.id === loc)?.name ?? 'Not selected'}</dd><dt>Receipt date</dt><dd>{date}</dd><dt>Supplier bill no.</dt><dd>{ref || 'Not entered'}</dd></dl>
-        <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} × ₹{l.unitCost.toFixed(2)} before GST{l.gstAmount ? `; GST entered ₹${l.gstAmount.toFixed(2)}` : '; no GST amount entered'}</li>)}</ul>
-        <div className="form-actions"><button type="button" className="secondary" onClick={() => setReviewReceipt(false)}>Back to edit</button><button type="button" onClick={receive}>Post receipt</button></div>
+        <tbody>{page.map(s => <tr key={s.id}><td>{s.name}</td><td>{s.phone}</td><td>{s.notes}</td><td>{s.owed.toFixed(2)}</td><td><button type="button" className="secondary" onClick={() => { setSupEditId(s.id); setNam      {v('receive') && <div className="buy-receive">
+        <header className="buy-screen-heading"><h2>{tr('buy.addTitle')}</h2><p>{tr('buy.addIntro')}</p></header>
+        <section className="buy-section buy-upload-section" aria-label={tr('buy.bill')}>
+          <div><h3>{tr('buy.bill')} <span>{tr('buy.optional')}</span></h3><p>{tr('buy.billHelp')}</p></div>
+          <InvoiceUpload products={products} suppliers={suppliers.filter(s => s.isActive)} onSupplierAdded={() => { load().catch(() => undefined) }} onProductAdded={reload} onUse={(d: InvoiceDraft, picked) => { if (d.supplierId) setSupplierId(d.supplierId); if (d.date) setDate(d.date); if (d.invoiceNumber) setRef(d.invoiceNumber); setLines(picked); setInvoiceFileId(d.fileId); setReviewReceipt(false) }} />
+        </section>
+        {suppliers.filter(s => s.isActive).length === 0 && <p className="buy-notice">{tr('buy.noSupplier')} <a href="#/parties/suppliers">{tr('buy.addSupplier')}</a>.</p>}
+        <section className="buy-section">
+          <h3>{tr('buy.supplierReceipt')}</h3>
+          <div className="buy-fields">
+            <label>{tr('buy.supplier')} <select value={sup} onChange={e => { setSupplierId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectSupplier')}</option>{suppliers.filter(s => s.isActive).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+            <label>{tr('buy.location')} <select value={loc} onChange={e => { setLocationId(e.target.value); setReviewReceipt(false) }}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+            <label>{tr('buy.receiptDate')} <input type="date" value={date} onChange={e => { setDate(e.target.value); setReviewReceipt(false) }} /></label>
+            <label>{tr('buy.invoiceNo')} <input value={ref} onChange={e => { setRef(e.target.value); setReviewReceipt(false) }} /></label>
+          </div>
+        </section>
+        <section className="buy-section">
+          <div className="buy-section-heading"><div><h3>{tr('buy.items')}</h3><p>{tr('buy.itemsHelp')}</p></div><span className="buy-count">{lines.length} {lines.length === 1 ? tr('buy.item') : tr('buy.itemsPlural')}</span></div>
+          <div className="buy-item-entry">
+            <label className="buy-product-field">{tr('buy.product')} <select value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectProduct')}</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <label>{tr('buy.quantity')} <input inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
+            <label>{tr('buy.unitCost')} <input inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
+            <button type="button" className="secondary buy-scan" onClick={() => setScanning(true)}>{tr('buy.scan')}</button>
+            <button type="button" className="secondary buy-add-line" onClick={addLine}>{tr('buy.addItem')}</button>
+          </div>
+          <button type="button" className="buy-gst-toggle" aria-expanded={showGst || Number(gst) > 0} onClick={() => setShowGst(x => !x)}>{showGst || Number(gst) > 0 ? tr('buy.hideGst') : tr('buy.gstDetails')}</button>
+          {(showGst || Number(gst) > 0) && <label className="buy-gst-field">{tr('buy.gstAmount')} <input inputMode="decimal" value={gst} onChange={e => { setGst(e.target.value); setReviewReceipt(false) }} /></label>}
+          {scanning && <BarcodeScanner title={tr('buy.scan')} onScan={onScan} onClose={() => setScanning(false)} />}
+          {unknownCode && <p role="status" className="buy-notice">{tr('buy.barcodeNew')} <strong>{unknownCode.code}</strong> <button type="button" className="secondary" onClick={linkUnknown}>{tr('buy.linkBarcode')}</button> {tr('buy.missingProduct')}</p>}
+          {lines.length > 0 && <div className="buy-line-list" aria-label={tr('buy.items')}>{lines.map(l => <article className="buy-line-card" key={l.productId}>
+            <div><strong>{nameOf(l.productId)}</strong><p>{l.quantity} × ₹{l.unitCost.toFixed(2)}{l.gstAmount ? ` · GST ₹${l.gstAmount.toFixed(2)}` : ''}</p></div>
+            <div className="buy-line-end"><strong>₹{(l.quantity * l.unitCost + (l.gstAmount ?? 0)).toFixed(2)}</strong><button type="button" className="secondary" onClick={() => { setLines(current => current.filter(x => x.productId !== l.productId)); setReviewReceipt(false) }} aria-label={`${tr('buy.remove')} ${nameOf(l.productId)}`}>{tr('buy.remove')}</button></div>
+          </article>)}</div>}
+          {lines.length > 0 && <div className="buy-estimate"><span>{tr('buy.estimatedTotal')}</span><strong>₹{estimatedTotal.toFixed(2)}</strong><small>{tr('buy.estimateNote')}</small></div>}
+        </section>
+        <p className="buy-guidance">{tr('onboarding.purchaseGuidance')}</p>
+        <button type="button" className="buy-primary" onClick={() => setReviewReceipt(true)} disabled={lines.length === 0 || !sup || !loc}>{tr('buy.review')}</button>
+        {reviewReceipt && <section className="buy-review" role="region" aria-label={tr('buy.review')}>
+          <h3>{tr('buy.review')}</h3><p>{tr('onboarding.purchaseReviewNote')}</p>
+          <dl><dt>{tr('buy.supplier')}</dt><dd>{suppliers.find(s => s.id === sup)?.name ?? 'Not selected'}</dd><dt>{tr('buy.location')}</dt><dd>{locations.find(l => l.id === loc)?.name ?? 'Not selected'}</dd><dt>{tr('buy.receiptDate')}</dt><dd>{date}</dd><dt>{tr('buy.invoiceNo')}</dt><dd>{ref || 'Not entered'}</dd></dl>
+          <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} × ₹{l.unitCost.toFixed(2)} before GST{l.gstAmount ? `; GST entered ₹${l.gstAmount.toFixed(2)}` : '; no GST amount entered'}</li>)}</ul>
+          <p className="buy-review-total"><span>{tr('buy.totalPreview')}</span><strong>₹{estimatedTotal.toFixed(2)}</strong></p>
+          <p className="buy-guidance">{tr('buy.postingNote')}</p>
+          <div className="buy-review-actions"><button type="button" className="secondary" onClick={() => setReviewReceipt(false)}>{tr('buy.edit')}</button><button type="button" onClick={receive}>{tr('buy.post')}</button></div>
+        </section>}
+      </div>}
+ton type="button" className="secondary" onClick={() => setReviewReceipt(false)}>Back to edit</button><button type="button" onClick={receive}>Post receipt</button></div>
       </div>}
       </>}
       {v('pay') && <>
