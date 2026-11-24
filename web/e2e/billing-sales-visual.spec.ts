@@ -74,33 +74,35 @@ async function capture(page: Page, state: string, viewports = stateViewports, fu
 }
 
 async function openSellRoute(page: Page, route: string) {
-  // Start from the live Sell landing page and use the app's own navigation links.
-  // Direct hash navigation from the posted-invoice state can be blocked by the
-  // unsaved-work confirmation and leave the previous screen mounted.
+  // Use the redesigned Sell hub's real links and the route's own back-link.
+  const hub = page.locator('.sell-hub')
   const mainSell = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Sell' })
-  if (route === 'sell/menu') {
-    if (await page.locator('.areas .area').count() !== 4) await mainSell.click()
-  } else {
-    if (await page.locator('.areas .area').count() !== 4) {
-      const back = page.getByRole('link', { name: /Billing \/ Sales/ })
-      if (await back.isVisible().catch(() => false)) await back.click()
-      else await mainSell.click()
+  if (await hub.count() === 0) {
+    const back = page.getByRole('link', { name: /Billing \/ Sales/ })
+    if (await back.isVisible().catch(() => false)) await back.click()
+    else await mainSell.click()
+  }
+  if (route !== 'sell/menu') {
+    const links: Record<string, RegExp> = {
+      'sell/bill': /Create new bill/,
+      'sell/bills': /Sales history/,
+      'sell/collect': /Collect payment/,
+      'sell/return': /Customer returns/,
     }
-    const index: Record<string, number> = { 'sell/bill': 0, 'sell/bills': 1, 'sell/return': 2, 'sell/collect': 3 }
-    await page.locator('.areas .area').nth(index[route]!).click()
+    await page.locator('.sell-hub').getByRole('link', { name: links[route]! }).click()
   }
   await ready(page, route)
 }
 
 async function ready(page: Page, route: string) {
   if (route === 'sell/menu') {
-    await expect(page.locator('.areas .area')).toHaveCount(4)
-    await expect(page.locator('.areas .area').first()).toBeVisible()
+    await expect(page.locator('.sell-hub-actions')).toBeVisible()
+    await expect(page.getByRole('link', { name: /Create new bill/ })).toBeVisible()
   }
   if (route === 'sell/bill') await expect(page.getByRole('region', { name: 'Generate invoice', exact: true })).toBeVisible()
-  if (route === 'sell/bills') await expect(page.getByRole('table', { name: 'Sales history' }).locator('tbody tr').first()).toBeVisible()
-  if (route === 'sell/collect') await expect(page.getByLabel('Collect from').locator('option', { hasText: customer })).toHaveCount(1)
-  if (route === 'sell/return') await expect(page.getByLabel('Return against sale').locator('option', { hasText: customer })).toHaveCount(1)
+  if (route === 'sell/bills') await expect(page.getByRole('button', { name: 'View bill' }).first()).toBeVisible()
+  if (route === 'sell/collect') await expect(page.getByLabel('Customer').locator('option', { hasText: customer })).toHaveCount(1)
+  if (route === 'sell/return') await expect(page.getByLabel('Choose the original bill').locator('option', { hasText: customer })).toHaveCount(1)
 }
 
 test('Billing & Sales: exhaustive route and interaction-state visual audit', async ({ page, context, browser }) => {
@@ -178,7 +180,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await expect(bill).toBeVisible()
   await capture(page, 'bill-empty-form', routeViewports)
 
-  await bill.getByRole('button', { name: 'Add tag photo' }).click()
+  await bill.getByRole('button', { name: 'Scan tag' }).click()
   const tagPicker = page.getByRole('dialog', { name: 'Add product tag photo' })
   await expect(tagPicker).toBeVisible()
   await capture(page, 'bill-tag-source-picker')
@@ -222,7 +224,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
       suggestedProduct: null, warnings: ['Synthetic audit extraction: verify the serial against the tag.'],
     }) })
   })
-  await bill.getByRole('button', { name: 'Add tag photo' }).click()
+  await bill.getByRole('button', { name: 'Scan tag' }).click()
   const tagFile = page.waitForEvent('filechooser')
   await page.getByRole('dialog', { name: 'Add product tag photo' }).getByRole('button', { name: 'Take a photo' }).click()
   await (await tagFile).setFiles({ name: 'synthetic-tag.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAgACADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD2aiiigAooooAKKKKACiiigD//2Q==', 'base64') })
@@ -328,21 +330,21 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
 
   // Sales History: loaded rows, pagination, search, unpaid filter, detail, thermal and empty state.
   await page.goto('/#/sell/bills')
-  const table = page.getByRole('table', { name: 'Sales history' })
-  await expect(table.locator('tbody tr').first()).toBeVisible()
+  const viewBillButtons = page.getByRole('button', { name: 'View bill' })
+  await expect(viewBillButtons.first()).toBeVisible()
   const pager = page.getByRole('navigation', { name: 'Pagination' })
   await expect(pager).toBeVisible()
   await capture(page, 'history-first-page')
   await pager.getByRole('button', { name: 'Next' }).click()
   await capture(page, 'history-second-page')
   await pager.getByRole('button', { name: 'Previous' }).click()
-  const search = page.getByLabel('Search sales')
+  const search = page.getByRole('searchbox', { name: 'Search sales' })
   await search.fill(customer)
-  await expect(table.locator('tbody tr')).toHaveCount(1)
+  await expect(viewBillButtons).toHaveCount(1)
   await page.getByLabel(/Unpaid only/).check()
   await capture(page, 'history-search-unpaid')
-  await table.getByRole('button', { name: 'View' }).click()
-  const detail = page.getByRole('dialog', { name: 'Sale detail' })
+  await viewBillButtons.first().click()
+  const detail = page.getByRole('dialog', { name: 'Bill details' })
   await expect(detail).toBeVisible()
   await capture(page, 'history-invoice-detail-a4')
   await detail.getByLabel('Paper size').selectOption('thermal')
@@ -353,86 +355,95 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await page.keyboard.press('Escape')
   await expect(detail).toBeHidden()
   await search.fill('no-such-audit-customer')
-  await expect(table.locator('tbody tr')).toHaveCount(0)
+  await expect(page.getByText('No bills match this search. Try another name, mobile number or bill number.')).toBeVisible()
   await capture(page, 'history-empty-search')
 
-  // Collections: customer selected, statement, payment entry, posted confirmation and history.
+  // Collections: customer selection, bill allocation, statement, payment and history.
   await page.goto('/#/sell/collect')
-  const collection = page.getByRole('region', { name: 'Collections and returns', exact: true })
-  const collectSelect = collection.getByLabel('Collect from')
+  const collection = page.getByRole('region', { name: 'Customer collections', exact: true })
+  const collectSelect = collection.getByLabel('Customer')
   await collectSelect.selectOption(await collectSelect.locator('option', { hasText: customer }).getAttribute('value')!)
-  await expect(collection.getByTestId('collect-owed')).toBeVisible()
+  await expect(collection.getByText('Outstanding balance')).toBeVisible()
   await capture(page, 'collection-customer-selected')
-  await collection.getByRole('button', { name: 'Show statement' }).click()
+  const billAllocation = collection.getByLabel('Apply to a bill (optional)')
+  await expect(billAllocation).toBeVisible()
+  await billAllocation.selectOption(await billAllocation.locator('option').nth(1).getAttribute('value')!)
+  await capture(page, 'collection-bill-allocation')
+  await collection.getByRole('button', { name: 'View customer statement' }).click()
   await expect(page.getByRole('region', { name: 'Customer statement', exact: true })).toBeVisible()
   await capture(page, 'collection-statement')
-  await collection.getByLabel('Collection amount (INR)').fill('25')
-  await collection.getByLabel('Collection method').selectOption('UPI')
-  await collection.getByLabel('Collection reference').fill('AUDIT-UPI-REF')
+  await collection.getByLabel('Amount received (INR)').fill('25')
+  await collection.getByLabel('Payment method').selectOption('UPI')
+  await collection.getByLabel('Reference (optional)').fill('AUDIT-UPI-REF')
   await capture(page, 'collection-entry')
   await collection.getByRole('button', { name: 'Record payment' }).click()
   await expect(collection.getByRole('status')).toContainText('Payment recorded')
   await capture(page, 'collection-success')
-  await expect(collection.getByRole('table', { name: 'Collection history' })).toContainText('25.00')
+  const collectionHistory = collection.getByRole('region', { name: 'Collection history', exact: true })
+  await expect(collectionHistory).toContainText('25.00')
   await capture(page, 'collection-history')
 
-  // Customer returns: sale selection, partial/full quantities, posting and detail.
+  // Customer returns: sale-line selection, quantity limits, partial posting and history detail.
   await page.goto('/#/sell/return')
-  const returns = page.getByRole('region', { name: 'Collections and returns', exact: true })
-  const saleSelect = returns.getByLabel('Return against sale')
+  const returns = page.getByRole('region', { name: 'Customer returns', exact: true })
+  const saleSelect = returns.getByLabel('Choose the original bill')
   await saleSelect.selectOption(await saleSelect.locator('option', { hasText: customer }).first().getAttribute('value')!)
-  const returnQty = returns.locator('label').filter({ hasText: 'Return qty:' }).locator('input')
+  const returnQty = returns.getByLabel('Return quantity').first()
   await expect(returnQty).toBeVisible()
   await returnQty.fill('1')
-  await returns.getByLabel('Customer return reason').fill('Synthetic visual audit')
+  await returns.getByLabel('Reason (optional)').fill('Synthetic visual audit')
   await returns.getByLabel('Refund method').selectOption('UPI')
   await capture(page, 'return-selected-partial')
-  await returns.getByRole('button', { name: 'Return everything remaining' }).click()
+  await returns.getByRole('button', { name: 'Return all remaining items' }).click()
   await capture(page, 'return-all-remaining')
   await returnQty.fill('1')
   await returns.getByRole('button', { name: 'Post customer return' }).click()
   await expect(returns.getByRole('status')).toContainText('Return posted')
   await capture(page, 'return-success')
-  const returnTable = returns.getByRole('table', { name: 'Customer returns' })
-  await expect(returnTable.locator('tbody tr').first()).toBeVisible()
-  await returnTable.getByRole('button', { name: 'View return' }).first().click()
-  await expect(page.getByRole('region', { name: 'Customer return detail', exact: true })).toBeVisible()
+  const returnHistory = returns.getByRole('region', { name: 'Customer return history', exact: true })
+  const viewReturn = returnHistory.getByRole('button', { name: 'View return' }).first()
+  await expect(viewReturn).toBeVisible()
+  await viewReturn.click()
+  const returnDetail = page.getByRole('dialog', { name: /Return #/ })
+  await expect(returnDetail).toBeVisible()
   await capture(page, 'return-history-detail')
-  await page.getByRole('button', { name: 'Close return' }).click()
+  await returnDetail.getByRole('button', { name: 'Close' }).click()
 
-  // Browser-native confirm cannot be screenshotted; verify its exact wording and dismiss it.
-  let cancelMessage = ''
-  setDialogHandler(page, async d => { cancelMessage = d.message(); dialogs.push({ type: d.type(), message: d.message(), dismissed: true }); await d.dismiss() })
+  // Whole-sale cancellation is a separate, explicitly confirmed destructive action.
   await returns.getByRole('button', { name: 'Cancel entire sale' }).click()
-  expect(cancelMessage).toContain('Cancel this whole sale?')
+  const cancelDialog = page.getByRole('dialog', { name: 'Cancel entire sale?' })
+  await expect(cancelDialog).toBeVisible()
+  await expect(cancelDialog).toContainText('Stock will be restored and the books reversed')
+  await capture(page, 'return-cancel-confirmation')
+  await cancelDialog.getByRole('button', { name: 'Keep sale' }).click()
 
   // Capture representative nested states in a true desktop browser context as well.
   await desktopPage.goto('/#/sell/bill')
   await expect(desktopPage.getByRole('region', { name: 'Generate invoice', exact: true })).toBeVisible()
   await capture(desktopPage, 'bill-empty-form', [desktopViewport])
-  await desktopPage.getByRole('button', { name: 'Add tag photo' }).click()
+  await desktopPage.getByRole('button', { name: 'Scan tag' }).click()
   await expect(desktopPage.getByRole('dialog', { name: 'Add product tag photo' })).toBeVisible()
   await capture(desktopPage, 'bill-tag-source-picker', [desktopViewport])
   await desktopPage.getByRole('button', { name: 'Cancel' }).click()
   await desktopPage.goto('/#/sell/bills')
   const desktopSalesTable = desktopPage.getByRole('table', { name: 'Sales history' })
   await expect(desktopSalesTable.locator('tbody tr').first()).toBeVisible()
-  await desktopSalesTable.getByRole('button', { name: 'View' }).first().click()
-  await expect(desktopPage.getByRole('dialog', { name: 'Sale detail' })).toBeVisible()
+  await desktopSalesTable.getByRole('button', { name: 'View bill' }).first().click()
+  await expect(desktopPage.getByRole('dialog', { name: 'Bill details' })).toBeVisible()
   await capture(desktopPage, 'history-invoice-detail', [desktopViewport])
   await desktopPage.keyboard.press('Escape')
   await desktopPage.goto('/#/sell/collect')
-  const desktopCollection = desktopPage.getByRole('region', { name: 'Collections and returns', exact: true })
-  const desktopCollectSelect = desktopCollection.getByLabel('Collect from')
+  const desktopCollection = desktopPage.getByRole('region', { name: 'Customer collections', exact: true })
+  const desktopCollectSelect = desktopCollection.getByLabel('Customer')
   await desktopCollectSelect.selectOption(await desktopCollectSelect.locator('option', { hasText: customer }).getAttribute('value')!)
-  await desktopCollection.getByRole('button', { name: 'Show statement' }).click()
+  await desktopCollection.getByRole('button', { name: 'View customer statement' }).click()
   await expect(desktopPage.getByRole('region', { name: 'Customer statement', exact: true })).toBeVisible()
   await capture(desktopPage, 'collection-statement', [desktopViewport])
   await desktopPage.goto('/#/sell/return')
-  const desktopReturns = desktopPage.getByRole('region', { name: 'Collections and returns', exact: true })
-  const desktopSaleSelect = desktopReturns.getByLabel('Return against sale')
+  const desktopReturns = desktopPage.getByRole('region', { name: 'Customer returns', exact: true })
+  const desktopSaleSelect = desktopReturns.getByLabel('Choose the original bill')
   await desktopSaleSelect.selectOption(await desktopSaleSelect.locator('option', { hasText: customer }).first().getAttribute('value')!)
-  await expect(desktopReturns.locator('label').filter({ hasText: 'Return qty:' }).locator('input')).toBeVisible()
+  await expect(desktopReturns.getByLabel('Return quantity').first()).toBeVisible()
   await capture(desktopPage, 'return-sale-selected', [desktopViewport])
 
   // Standalone print route is a separate document surface outside the app shell.
