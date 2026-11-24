@@ -36,3 +36,17 @@
   .collections-history-mobile li a { min-height: 44px; display: inline-flex; align-items: center; }
   .collections-section-heading { align-items: center; }
 }
+
+
+/* Mobile collections: one task card, with progressive disclosure after customer selection. */
+.collections-screen.billing-screen { max-width: 980px; display: grid; grid-template-columns: minmax(0,1fr); align-items: stretch; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.collections-heading h2 { margin: 0 0 4px; font-size: 21px; }
+.collections-start-hint { margin: 0; color: var(--muted); font-size: 14px; }
+.collections-section-heading { align-items: center; }
+.collections-history .collections-section-heading > button { width: auto; min-width: 104px; justify-self: end; padding-inline: 16px; }
+@media (max-width: 700px) {
+  .collections-screen.billing-screen { gap: 12px; }
+  .collections-form, .collections-history, .collections-statement { padding: 14px; }
+  .collections-history .collections-section-heading { align-items: center; }
+  .collections-history .collections-section-heading > button { width: auto; min-width: 104px; justify-self: end; }
+}

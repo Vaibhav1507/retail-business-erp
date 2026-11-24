@@ -26,10 +26,14 @@ beforeEach(() => {
 describe('Collections', () => {
   it('records a payment against a selected bill and shows the updated balance', async () => {
     render(<Collections reload={vi.fn()} />)
-    await userEvent.selectOptions(await screen.findByLabelText('Customer'), 'c1')
+    const customer = await screen.findByRole('combobox', { name: 'Customer' })
+    await userEvent.type(customer, 'Asha')
+    await userEvent.click(await screen.findByRole('option', { name: /Asha Stores/ }))
     expect(await screen.findByText('₹1,200.00')).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Amount received (INR)'), '500')
-    await userEvent.selectOptions(await screen.findByLabelText('Apply to a bill (optional)'), 'sale-1')
+    const bill = screen.getByRole('combobox', { name: 'Apply to a bill (optional)' })
+    await userEvent.type(bill, 'INV-000012')
+    await userEvent.click(await screen.findByRole('option', { name: /INV-000012/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Record payment' }))
 
     expect(await screen.findByText(/Customer now owes 700\.00 INR/)).toBeInTheDocument()
@@ -41,7 +45,11 @@ describe('Collections', () => {
 
   it('does not enable recording without a customer and positive amount', async () => {
     render(<Collections reload={vi.fn()} />)
-    const submit = await screen.findByRole('button', { name: 'Record payment' })
-    expect(submit).toBeDisabled()
+    expect(screen.queryByLabelText('Amount received (INR)')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument()
+    const customer = screen.getByRole('combobox', { name: 'Customer' })
+    await userEvent.type(customer, 'Asha')
+    await userEvent.click(await screen.findByRole('option', { name: /Asha Stores/ }))
+    expect(screen.getByRole('button', { name: 'Record payment' })).toBeDisabled()
   })
 })
