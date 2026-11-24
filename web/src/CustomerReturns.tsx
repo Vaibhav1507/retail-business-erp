@@ -237,9 +237,9 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
             <div className="customer-return-line-name"><strong>{line.product}</strong><small>Sold {line.sold} · Returned {line.returned} · Remaining {line.remaining}</small></div>
             <div className="billing-field">
               <label htmlFor={'return-qty-' + line.saleLineId}>Return quantity</label>
-              <input id={'return-qty-' + line.saleLineId} type="number" min="0" max={line.remaining} step="any" inputMode="decimal"
+              <input id={'return-qty-' + line.saleLineId} type="number" min="0" step="any" inputMode="decimal"
                 value={retQty[line.saleLineId] ?? ''} aria-invalid={Boolean(fieldErrors[line.saleLineId])}
-                onChange={e => { setRetQty(current => ({ ...current, [line.saleLineId]: e.target.value })); setFieldErrors(current => ({ ...current, [line.saleLineId]: '', form: '' })) }} />
+                onChange={e => { const value = e.target.value; const number = Number(value); const validation = value.trim() && (!Number.isFinite(number) || number < 0) ? 'Enter a valid quantity.' : value.trim() && number > line.remaining ? 'Cannot return more than ' + line.remaining + '.' : ''; setRetQty(current => ({ ...current, [line.saleLineId]: value })); setFieldErrors(current => ({ ...current, [line.saleLineId]: validation, form: '' })) }} />
               {fieldErrors[line.saleLineId] && <small className="field-error">{fieldErrors[line.saleLineId]}</small>}
             </div>
           </div>)}
@@ -290,7 +290,7 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
         {loading && <p className="customer-returns-muted" role="status">Loading return history…</p>}
         {historyError && <p className="customer-returns-error" role="alert">{historyError} <button type="button" className="secondary" onClick={() => void loadData().catch(() => undefined)}>Retry</button></p>}
         {!loading && !historyError && saleReturns.length === 0 && <p className="customer-returns-muted">{historyQuery ? 'No returns match this search.' : 'No customer returns recorded yet.'}</p>}
-        <Paged rows={saleReturns} label="returns">{page => (
+        <Paged rows={saleReturns} label="returns" resetKey={historyQuery}>{page => (
           <>
             <div className="customer-return-history-desktop"><table aria-label="Customer returns">
               <thead><tr><th>Return no.</th><th>Date</th><th>Original bill</th><th>Customer</th><th>Total (INR)</th><th></th></tr></thead>
