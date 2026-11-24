@@ -121,7 +121,7 @@ describe('Procurement manual GST', () => {
     let body: { lines?: unknown } = {}
     mock(routes(init => { body = JSON.parse(String(init?.body)); return { body: { total: 1180 } } }))
     await addLine('100', '180')
-    expect(screen.getByText(/\+ GST 180/)).toBeTruthy()
+    expect(screen.getByText(/GST ₹180\.00/)).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Review purchase' }))
     expect(screen.getByRole('region', { name: 'Review purchase' })).toBeTruthy()
     expect(body).toEqual({})
