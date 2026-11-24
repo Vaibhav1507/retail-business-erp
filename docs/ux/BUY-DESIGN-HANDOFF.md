@@ -148,7 +148,7 @@ Detailed contract: docs/ux/buy-return-to-supplier-design.md.
 - Added English and Hindi copy for the new Buy labels and validation messages.
 - OCR review now switches to compact, labelled item cards on phone widths while preserving the same editable fields and extraction/apply logic.
 - Pay Supplier and Past Purchases now require an explicit supplier selection for supplier-specific views; statement state is retained after data refresh.
-- Remaining: run focused frontend tests, TypeScript, lint and build; inspect all resulting failures; review updated Android screenshots. Playwright remains excluded per user instruction.
+- Remaining: run focused frontend tests, TypeScript, lint and build; finish the Hindi-language sweep for secondary history/return helper copy; inspect all resulting failures; review updated Android screenshots. Playwright remains excluded per user instruction.
 - The draft PR currently has no reported status checks/workflow runs in the GitHub response; this is not a passing CI result.
 
 ## 7. Functional findings, separately tracked
@@ -211,7 +211,7 @@ No backend changes are planned.
 - History clearly distinguishes receipts, bills and payments; statement is tied to an explicit supplier.
 - Supplier return begins from the original receipt and distinguishes receipt remaining from actual stock.
 - Loading, empty, error, validation, success and retry states are understandable.
-- English/Hindi work at all agreed viewports with no overflow/clipping.
+- Core new labels and validation copy have English/Hindi entries; a final sweep of secondary helper and history copy is still required before language acceptance.
 - No changes to global nav/Assistant, API semantics, accounting, GST, inventory, WAC, methods, idempotency or tenant boundaries.
 - User-provided updated screenshots have been visually reviewed before acceptance.
 
