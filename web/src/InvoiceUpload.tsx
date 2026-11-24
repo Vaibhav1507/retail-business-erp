@@ -36,7 +36,7 @@ async function prepareImageBlob(file: File, invoicePage = false): Promise<Blob> 
     if (!context) throw new Error(tr('buy.invoicePreparePhoto'))
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-    if (!blob) throw new Error('Could not prepare the photo.')
+    if (!blob) throw new Error(invoicePage ? tr('buy.invoicePreparePhoto') : 'Could not prepare the photo.')
     if (invoicePage && (blob.size === 0 || blob.size > MAX_BYTES))
       throw new Error(tr('buy.invoicePreparedPhotoSize'))
     return blob
