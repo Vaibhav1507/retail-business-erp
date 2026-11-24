@@ -24,7 +24,7 @@ export function SearchableSelect({
 }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const selected = options.find(option => option.value === value)
 
@@ -44,31 +44,40 @@ export function SearchableSelect({
   const choose = (option: SearchableSelectOption) => {
     setQuery(option.label)
     setOpen(false)
-    setActiveIndex(0)
+    setActiveIndex(-1)
     onChange(option.value)
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setOpen(true)
-      setActiveIndex(index => filtered.length ? (index + 1) % filtered.length : 0)
+      if (!open) {
+        setOpen(true)
+        setActiveIndex(filtered.length ? 0 : -1)
+      } else {
+        setActiveIndex(index => filtered.length ? Math.min(index < 0 ? 0 : index + 1, filtered.length - 1) : -1)
+      }
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setOpen(true)
-      setActiveIndex(index => filtered.length ? (index - 1 + filtered.length) % filtered.length : 0)
-    } else if (event.key === 'Enter' && open && filtered[activeIndex]) {
+      if (!open) {
+        setOpen(true)
+        setActiveIndex(filtered.length - 1)
+      } else {
+        setActiveIndex(index => filtered.length ? Math.max(index < 0 ? filtered.length - 1 : index - 1, 0) : -1)
+      }
+    } else if (event.key === 'Enter' && open && activeIndex >= 0 && filtered[activeIndex]) {
       event.preventDefault()
       choose(filtered[activeIndex])
     } else if (event.key === 'Escape' && open) {
       event.preventDefault()
       setOpen(false)
+      setActiveIndex(-1)
       setQuery(selected?.label ?? '')
     }
   }
 
   const listId = id + '-options'
-  const activeId = open && filtered[activeIndex] ? id + '-option-' + activeIndex : undefined
+  const activeId = open && activeIndex >= 0 && filtered[activeIndex] ? id + '-option-' + activeIndex : undefined
 
   return (
     <div className="billing-field searchable-select">
@@ -90,7 +99,7 @@ export function SearchableSelect({
           placeholder={placeholder}
           onFocus={() => {
             setOpen(true)
-            setActiveIndex(0)
+            setActiveIndex(-1)
             if (selected) setQuery('')
           }}
           onBlur={() => window.setTimeout(() => setOpen(false), 120)}
@@ -98,7 +107,7 @@ export function SearchableSelect({
           onChange={event => {
             setQuery(event.target.value)
             setOpen(true)
-            setActiveIndex(0)
+            setActiveIndex(-1)
             if (value) onChange('')
           }}
         />
@@ -110,7 +119,7 @@ export function SearchableSelect({
           onClick={() => {
             setQuery('')
             setOpen(true)
-            setActiveIndex(0)
+            setActiveIndex(-1)
             onChange('')
             inputRef.current?.focus()
           }}
