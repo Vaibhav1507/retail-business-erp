@@ -25,7 +25,7 @@ import './launcher.css'
 import { t as tr } from './i18n'
 
 export type Opt = { id: string; name: string; sku?: string }
-export type Common = { products: Opt[]; locations: Opt[]; reload: () => void; offlineMode?: boolean; ownerKey?: string }
+export type Common = { products: Opt[]; locations: Opt[]; reload: () => void; offlineMode?: boolean; ownerKey?: string; businessCategory?: string | null }
 
 export const NAV = [
   { key: 'home', label: 'Home', ico: '\u{1F3E0}' },
@@ -117,7 +117,7 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
           {tab !== 'bill' && <p className="sell-route-back"><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p>}
         </>
       )}
-      {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} />}
+      {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} businessCategory={c.businessCategory} />}
       {tab === 'bills' && <SalesHistory locations={c.locations} />}
       {tab === 'collect' && <Collections reload={c.reload} />}
       {tab === 'return' && <CustomerReturns reload={c.reload} />}
