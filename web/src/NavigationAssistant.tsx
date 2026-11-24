@@ -604,7 +604,10 @@ export function NavigationAssistant() {
    if (open) closeAssistant()
    else { panelOpenRef.current = true; setOpen(true) }
   }}>
-   <span aria-hidden="true">✦</span><span>{open ? text.close : 'Assistant'}</span>
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z"/>
+    <path d="M8 11h8M8 14h5"/>
+   </svg><span>{open ? text.close : 'Assistant'}</span>
   </button>
   {open && createPortal(<section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={closeAssistant}>×</button></header>
