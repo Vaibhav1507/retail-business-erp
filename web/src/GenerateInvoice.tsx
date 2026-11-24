@@ -60,6 +60,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [pname, setPname] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [tagCaptureKey, setTagCaptureKey] = useState(0)
+  const [showTagDetails, setShowTagDetails] = useState(false)
   const [salesInvoiceDraft, setSalesInvoiceDraft] = useState<ExtractedSalesInvoice | null>(null)
   const [salesInvoiceWarnings, setSalesInvoiceWarnings] = useState<string[]>([])
   const [sourceInvoiceRef, setSourceInvoiceRef] = useState('')
@@ -209,6 +210,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setHsnText(item.hsn || '')
     setQty('1')
     setShowProducts(false)
+    setShowTagDetails(true)
     setError('')
     setFieldErrors({})
   }
@@ -320,6 +322,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setQty('1'); setPrice(''); setDisc(''); setSerialText('')
     setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
     setTagCaptureKey(value => value + 1)
+    setShowTagDetails(false)
   }
 
   function review() {
@@ -426,6 +429,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setImei1Text(''); setImei2Text(''); setMrpText(''); setHsnText('')
     setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
     setTagCaptureKey(value => value + 1)
+    setShowTagDetails(false)
     setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate('')
     setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
@@ -488,8 +492,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
   return (
     <section aria-label="Generate invoice" className="billing-page">
-      <h2>Generate Invoice</h2>
-      <p className="billing-hint">{tr('onboarding.saleGuidance')}</p>
+      <div className="invoice-page-header">
+        <div>
+          <h2>Generate Invoice</h2>
+          <p className="billing-hint">{tr('onboarding.saleGuidance')}</p>
+        </div>
+        <div className="invoice-import-action">
+          <span className="billing-hint">Have a handwritten bill?</span>
+          <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
+        </div>
+      </div>
             {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => { void resume(h) }}>Resume</button> <button type="button" className="secondary" onClick={() => { void discardHeld(h.id) }}>Discard</button></li>)}</ul></div>}
       {offlineQueue.length > 0 && <div className="billing-card" aria-label="Offline bill queue">
         <h3>Offline bills and sync status</h3>
@@ -538,25 +550,28 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       <div className="billing-card">
         <h3>{tr('bill.products')}</h3>
         <div className="billing-grid invoice-product-editor">
-          <div className="billing-field billing-col-6 billing-rel">
+          <div className="billing-field billing-col-5 billing-rel">
             <label htmlFor="billing-prod">{tr('bill.product')}</label>
-            <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or type a new product" value={pname}
-              onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
+            <div className="invoice-product-entry">
+              <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or type a new product" value={pname}
+                onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
+              <ItemTagCapture disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
+            </div>
             {fieldErrors.product && <small className="field-error">{fieldErrors.product}</small>}
             {showProducts && suggestions.length > 0 && !match && <ul className="billing-menu" role="listbox" aria-label="Products">
               {suggestions.map(p => <li key={p.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); setPname(p.name); setSelectedProductId(p.id); setShowProducts(false) }}><strong>{p.name}</strong></li>)}
             </ul>}
           </div>
-          <div className="billing-field billing-col-3"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
-          <div className="billing-field billing-col-3"><label htmlFor="billing-model">Model</label><input id="billing-model" autoComplete="off" value={modelText} onChange={e => setModelText(e.target.value)} /></div>
           <div className="billing-field billing-col-2"><label htmlFor="billing-qty">{tr('bill.qty')}</label><input id="billing-qty" aria-invalid={Boolean(fieldErrors.quantity)} className={fieldErrors.quantity ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => { setQty(e.target.value); setFieldErrors(current => ({ ...current, quantity: '' })) }} />{fieldErrors.quantity && <small className="field-error">{fieldErrors.quantity}</small>}</div>
           <div className="billing-field billing-col-3"><label htmlFor="billing-price">{tr('bill.price')}</label><input id="billing-price" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />{fieldErrors.price && <small className="field-error">{fieldErrors.price}</small>}</div>
           <div className="billing-field billing-col-2"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" aria-invalid={Boolean(fieldErrors.discount)} className={fieldErrors.discount ? 'field-invalid' : ''} inputMode="decimal" value={disc} onChange={e => { setDisc(e.target.value); setFieldErrors(current => ({ ...current, discount: '' })) }} />{fieldErrors.discount && <small className="field-error">{fieldErrors.discount}</small>}</div>
-          <div className="billing-field billing-col-5"><label htmlFor="billing-serial">Serial (optional)</label><input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />{fieldErrors.serial && <small className="field-error">{fieldErrors.serial}</small>}</div>
         </div>
-        <details className="invoice-product-more-details">
-          <summary>More tag details</summary>
+        <details className="invoice-product-more-details" open={showTagDetails} onToggle={event => setShowTagDetails(event.currentTarget.open)}>
+          <summary>Optional product details</summary>
           <div className="billing-grid">
+            <div className="billing-field billing-col-4"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
+            <div className="billing-field billing-col-4"><label htmlFor="billing-model">Model</label><input id="billing-model" autoComplete="off" value={modelText} onChange={e => setModelText(e.target.value)} /></div>
+            <div className="billing-field billing-col-4"><label htmlFor="billing-serial">Serial (optional)</label><input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />{fieldErrors.serial && <small className="field-error">{fieldErrors.serial}</small>}</div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
             <div className="billing-field billing-col-4"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
@@ -566,8 +581,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </details>
         <div className="billing-row invoice-product-actions">
           <button type="button" onClick={addItem}>{tr('bill.add')}</button>
-          <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
-          <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
           {pname.trim() && !match && <span className="billing-hint">This will be billed as an ad-hoc line and will not create a catalogue product.</span>}
         </div>
         {salesInvoiceDraft && <div className="billing-card" role="region" aria-label="Review extracted sales invoice">
@@ -600,7 +613,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       </div>
 
       {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
-      <div className="billing-card billing-foot">
+      <div className="billing-card billing-foot invoice-summary-bar">
         <div className="billing-gst">
           <label className="billing-check"><input type="checkbox" checked={gst} onChange={e => setGst(e.target.checked)} /> GST invoice</label>
           {gst && <select aria-label="GST rate" value={rate} onChange={e => setRate(Number(e.target.value))}>{GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}</select>}
