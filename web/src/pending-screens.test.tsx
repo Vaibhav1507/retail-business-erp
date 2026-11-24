@@ -31,7 +31,12 @@ describe('HomePage overview and reminders (G5, G10)', () => {
     render(<HomePage />)
     expect(await screen.findByText('3 purchase order(s) are overdue.')).toBeTruthy()
     expect(screen.getByText('2 days are waiting for closing.')).toBeTruthy()
-    expect(screen.getByText('1 day is waiting for closing.')).not.toBeInTheDocument()
+  })
+
+  it('uses singular wording when one day is waiting for closing', async () => {
+    mock({ ...csrf, '/api/dashboard': () => ({ body: dash }), '/api/reminders': () => ({ body: [{ kind: 'dayClosing', severity: 'info', count: 1, amount: null }] }) })
+    render(<HomePage />)
+    expect(await screen.findByText('1 day is waiting for closing.')).toBeTruthy()
   })
 
   it('hides the reminders list when there is nothing to remind', async () => {
