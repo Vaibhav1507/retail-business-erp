@@ -1,5 +1,5 @@
 import './invoice-upload.css'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { t as tr } from './i18n'
 import { api, apiForm } from './api'
 
@@ -96,6 +96,15 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
   const [error, setError] = useState('')
   const [draft, setDraft] = useState<InvoiceDraft | null>(null)
   const [rows, setRows] = useState<Row[]>([])
+  const cameraInput = useRef<HTMLInputElement>(null)
+  const uploadInput = useRef<HTMLInputElement>(null)
+  const [selectedFileNames, setSelectedFileNames] = useState<string[]>([])
+  const handleFiles = (input: HTMLInputElement) => {
+    const files = Array.from(input.files ?? [])
+    if (!files.length) return
+    setSelectedFileNames(files.map(file => file.name))
+    void pick(files).finally(() => { input.value = ''; setSelectedFileNames([]) })
+  }
 
   const pick = async (files: File[]) => {
     if (files.length === 0) return
@@ -179,13 +188,13 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
 
   return (
     <div role="region" aria-label={tr('buy.invoiceRead')} className="invoice-upload">
-      <label className="invoice-upload-pick">
-        {tr('buy.invoiceUpload')}
-        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={busy} onChange={e => {
-          const input = e.currentTarget
-          void pick(Array.from(input.files ?? [])).finally(() => { input.value = '' })
-        }} />
-      </label>
+      <div className="invoice-upload-sources" aria-label={tr('buy.invoiceSources')}>
+        <button type="button" className="secondary" onClick={() => cameraInput.current?.click()} disabled={busy}>{tr('buy.camera')}</button>
+        <button type="button" className="secondary" onClick={() => uploadInput.current?.click()} disabled={busy}>{tr('buy.upload')}</button>
+        <input ref={cameraInput} className="invoice-upload-source-input" type="file" accept="image/*" capture="environment" aria-label={tr('buy.cameraBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+        <input ref={uploadInput} className="invoice-upload-source-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple aria-label={tr('buy.uploadBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+      </div>
+      {selectedFileNames.length > 0 && <p className="invoice-upload-selected" aria-live="polite">{selectedFileNames.join(', ')}</p>}
       {busy && <p role="status">{tr('buy.invoiceReading')}</p>}
       {error && <p role="alert">{error}</p>}
       {draft && (
