@@ -113,8 +113,8 @@ describe('Procurement Buy screens', () => {
     const reload = vi.fn()
     render(<Procurement products={[product]} locations={[location]} reload={reload} show="receive" />)
 
-    await screen.findByLabelText('Supplier')
-    await user.selectOptions(screen.getByLabelText('Supplier'), 'sup-1')
+    await screen.findByRole('combobox', { name: 'Supplier' })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Supplier' }), 'sup-1')
     await user.selectOptions(screen.getByLabelText('Product'), 'prod-1')
     await user.type(screen.getByLabelText('Quantity'), '2')
     await user.type(screen.getByLabelText('Unit cost (INR, before GST)'), '100')
