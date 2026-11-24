@@ -56,6 +56,8 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
 
   const [retReceipt, setRetReceipt] = useState('')
   const [recLines, setRecLines] = useState<PurchaseDetail['lines']>([])
+  const [recDetail, setRecDetail] = useState<PurchaseDetail | null>(null)
+  const [receiptLoading, setReceiptLoading] = useState(false)
   const [recQty, setRecQty] = useState<Record<string, string>>({})
   const [recReason, setRecReason] = useState('')
   const [recKey, setRecKey] = useState(newKey)
@@ -114,9 +116,13 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
   })
 
   async function pickReceipt(id: string) {
-    setRetReceipt(id); setRecLines([]); setRecQty({})
+    setRetReceipt(id); setRecLines([]); setRecDetail(null); setRecQty({}); setError('')
     if (!id) return
-    try { setRecLines((await api<PurchaseDetail>('GET', '/purchases/' + id)).lines) } catch (e) { setError(msg(e)) }
+    setReceiptLoading(true)
+    try {
+      const detail = await api<PurchaseDetail>('GET', '/purchases/' + id)
+      setRecDetail(detail); setRecLines(detail.lines)
+    } catch (e) { setError(msg(e)) } finally { setReceiptLoading(false) }
   }
   const returnPurchase = () => run(async () => {
     const r = await api<{ total: number }>('POST', '/purchase-returns', { receiptId: retReceipt, returnDate: today(), reason: recReason || null, lines: toLines(recQty) }, recKey)
@@ -196,13 +202,13 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
             </select>
           </label>
           {retReceipt && <p className="buy-return-loading" role="status">Purchase receipt selected. Loading its items…</p>}
-          {retReceipt && recLines.length > 0 && <>
+          {retReceipt && recDetail && <>
             <div className="buy-return-receipt">
               <div><span>Supplier</span><strong>{receipts.find(r => r.id === retReceipt)?.supplier}</strong></div>
-              <div><span>Receipt no.</span><strong>#{(recLines as any).receiptNumber ?? '—'}</strong></div>
-              <div><span>Receipt date</span><strong>{receipts.find(r => r.id === retReceipt)?.date}</strong></div>
-              <div><span>Supplier invoice</span><strong>{receipts.find(r => r.id === retReceipt)?.supplierRef || '—'}</strong></div>
-              <div><span>Receipt total</span><strong>₹{receipts.find(r => r.id === retReceipt)?.total.toFixed(2)}</strong></div>
+              <div><span>Receipt no.</span><strong>#{recDetail.receipt.number}</strong></div>
+              <div><span>Receipt date</span><strong>{recDetail.receipt.date}</strong></div>
+              <div><span>Supplier invoice</span><strong>{recDetail.receipt.supplierRef || '—'}</strong></div>
+              <div><span>Stock location</span><strong>{recDetail.receipt.location}</strong></div><div><span>Receipt total</span><strong>₹{recDetail.receipt.total.toFixed(2)}</strong></div>
             </div>
             <section className="buy-return-lines">
               <div className="buy-return-section-head"><h3>Items on this purchase</h3><button type="button" className="secondary" onClick={() => setRecQty(Object.fromEntries(recLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>Fill remaining quantities</button></div>
@@ -217,7 +223,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
             <label>Return reason (optional)<input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
             <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining)}>Post supplier return</button>
           </>}
-          {retReceipt && recLines.length === 0 && !error && <p className="buy-return-hint">Loading purchase details or no items are available.</p>}
+          {retReceipt && receiptLoading && <p className="buy-return-loading" role="status">Loading purchase details…</p>}{retReceipt && recDetail && recLines.length === 0 && <p className="buy-return-hint">No purchase items are available to return on this receipt.</p>}
         </section>
         <section className="buy-return-history">
           <h3>Previous supplier returns</h3>
