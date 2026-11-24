@@ -71,6 +71,25 @@ async function capture(page: Page, state: string, viewports = stateViewports, fu
   }
 }
 
+async function openSellRoute(page: Page, route: string) {
+  // Start from the live Sell landing page and use the app's own navigation links.
+  // Direct hash navigation from the posted-invoice state can be blocked by the
+  // unsaved-work confirmation and leave the previous screen mounted.
+  const mainSell = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Sell' })
+  if (route === 'sell/menu') {
+    if (await page.locator('.areas .area').count() !== 4) await mainSell.click()
+  } else {
+    if (await page.locator('.areas .area').count() !== 4) {
+      const back = page.getByRole('link', { name: /Billing \/ Sales/ })
+      if (await back.isVisible().catch(() => false)) await back.click()
+      else await mainSell.click()
+    }
+    const index: Record<string, number> = { 'sell/bill': 0, 'sell/bills': 1, 'sell/return': 2, 'sell/collect': 3 }
+    await page.locator('.areas .area').nth(index[route]!).click()
+  }
+  await ready(page, route)
+}
+
 async function ready(page: Page, route: string) {
   if (route === 'sell/menu') {
     await expect(page.locator('.areas .area')).toHaveCount(4)
@@ -132,14 +151,20 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   const desktopPage = await desktopContext.newPage()
   desktopPage.on('pageerror', e => pageErrors.push('desktop: ' + e.message))
   desktopPage.on('dialog', async d => { dialogs.push({ type: d.type(), message: d.message(), dismissed: false }); await d.accept() })
+  // Load the app shell before routing. Use real in-app links so the route guard and
+  // confirmation behaviour are exercised deterministically rather than bypassed by goto().
+  await desktopPage.goto('/')
+  await expect(desktopPage.getByRole('navigation', { name: 'Main' })).toBeVisible()
   for (const route of routes) {
-    await desktopPage.goto('/#/' + route)
-    await ready(desktopPage, route)
+    await openSellRoute(desktopPage, route)
     await capture(desktopPage, 'route-' + route.replace('/', '-'), [desktopViewport])
   }
+  await desktopContext.close()
+
+  await page.goto('/')
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
   for (const route of routes) {
-    await page.goto('/#/' + route)
-    await ready(page, route)
+    await openSellRoute(page, route)
     await capture(page, 'route-' + route.replace('/', '-'), routeViewports)
   }
 
