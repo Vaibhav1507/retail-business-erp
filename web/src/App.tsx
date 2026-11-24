@@ -252,16 +252,17 @@ export default function App() {
 	default: body = <HomePage businessName={businessName} />
   }
   const active = NAV.some(n => n.key === page) ? page : 'home'
+  const invoiceFocus = page === 'sell' && first('menu') === 'bill'
   return (
-	<AppLockGate email={me.email} onSignOut={logout}><div className="shell">
+	<AppLockGate email={me.email} onSignOut={logout}><div className={invoiceFocus ? 'shell invoice-focus' : 'shell'}>
 	  <header className="topbar"><img className="brand-logo" src="/logo-mark.svg" alt="" width="40" height="40" /><ProfileMenu businessName={businessName ?? me.email} email={me.email} dark={dark} onToggleDark={() => setDark(d => !d)} onLogout={logout} /></header>
-	  <nav className="nav" aria-label="Main">
+	  {!invoiceFocus && <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
-	  </nav>
+	  </nav>}
 	  {authError && <p role="status" className="connection-warning">{authError} <button type="button" onClick={() => { void loadMe() }}>Retry connection</button></p>}
 	
 	  <main className="content">{body}</main>
-      <NavigationAssistant />
+      {!invoiceFocus && <NavigationAssistant />}
 	</div></AppLockGate>
   )
 }

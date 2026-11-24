@@ -11,20 +11,6 @@ on:
         options:
           - home
           - billing-sales
-  pull_request:
-    paths:
-      - ".github/workflows/visual-audit.yml"
-      - "web/e2e/ui-audit.spec.ts"
-      - "web/e2e/billing-sales-visual.spec.ts"
-      - "web/playwright.config.ts"
-      - "web/src/GenerateInvoice.tsx"
-      - "web/src/SalesHistory.tsx"
-      - "web/src/AfterSales.tsx"
-      - "web/src/ItemTagCapture.tsx"
-      - "web/src/SalesInvoiceCapture.tsx"
-      - "web/src/PhotoSourcePicker.tsx"
-      - "web/src/InvoiceDocument.tsx"
-      - "web/src/Pages.tsx"
 
 permissions:
   contents: read

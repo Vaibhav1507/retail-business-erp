@@ -38,13 +38,25 @@ beforeEach(() => {
 })
 
 describe('GenerateInvoice WhatsApp independence', () => {
+  it('keeps tag capture beside the product field and separates handwritten import', () => {
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    const productInput = screen.getByPlaceholderText('Search or enter a product/model name')
+    const productRow = productInput.closest('.invoice-product-entry')
+    expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
+    const actions = container.querySelector('.invoice-product-actions')
+    expect(actions?.querySelectorAll('button')).toHaveLength(1)
+    expect(actions?.querySelector('button')).toHaveTextContent('Add product')
+    expect(actions).not.toContainElement(screen.getByRole('button', { name: 'Upload handwritten bill' }))
+    expect(container.querySelector('.invoice-summary-bar')).toBeInTheDocument()
+  })
+
   it('keeps automatic browser printing when WhatsApp consent is not confirmed', async () => {
     const reload = vi.fn()
     render(<GenerateInvoice products={products} locations={locations} reload={reload} />)
 
-    await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
-    await userEvent.type(await screen.findByPlaceholderText('Search or type a new product'), 'Test Cable')
+    await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
     await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
     await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
     await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
@@ -89,11 +101,12 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Scan product' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByText('Optional product details'))
     expect(screen.getByLabelText('Brand')).toBeInTheDocument()
     expect(screen.getByLabelText('Model')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
-    const photoInputs = container.querySelectorAll('input[type="file"]')
+    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[1], { target: { files: [file] } })
 
@@ -140,9 +153,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     }))
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
     expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
-    const photoInputs = container.querySelectorAll('input[type="file"]')
+    const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
@@ -176,21 +189,43 @@ describe('GenerateInvoice WhatsApp independence', () => {
     }))
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
-    const photoInputs = container.querySelectorAll('input[type="file"]')
+    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
-    expect(await screen.findByPlaceholderText('Search or type a new product')).toHaveValue('ZX-90')
+    expect(await screen.findByPlaceholderText('Search or enter a product/model name')).toHaveValue('ZX-90')
     expect(screen.getByDisplayValue('Local')).toBeInTheDocument()
     expect(screen.getByDisplayValue('SERIAL-0090')).toBeInTheDocument()
   })
 
+  it('requires customer name and a valid mobile number with associated field errors', async () => {
+    render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    const nameInput = screen.getByLabelText('Customer name *')
+    const phoneInput = screen.getByLabelText('Mobile number *')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    expect(screen.getByText('Customer name is required.')).toBeInTheDocument()
+    expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true')
+    expect(nameInput).toHaveAttribute('aria-describedby', 'billing-name-error')
+    expect(phoneInput).toHaveAttribute('aria-invalid', 'true')
+    expect(phoneInput).toHaveAttribute('aria-describedby', 'billing-phone-error')
+    expect(document.activeElement).toBe(nameInput)
+
+    await userEvent.type(nameInput, 'Test Customer')
+    await userEvent.type(phoneInput, '123456789')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    expect(screen.queryByText('Customer name is required.')).not.toBeInTheDocument()
+    expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
+    expect(document.activeElement).toBe(phoneInput)
+  })
+
   it('shows a non-blocking missing-serial warning during invoice review', async () => {
     render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
-    await userEvent.type(await screen.findByPlaceholderText('Search or type a new product'), 'Test Cable')
+    await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
     await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
     await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
     await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))

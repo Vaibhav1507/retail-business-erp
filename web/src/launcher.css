@@ -83,3 +83,28 @@
 @media (prefers-reduced-motion: reduce) {
   .home-quick-action, .home-quick-action:hover { transition: none; transform: none; }
 }
+
+
+/* Sell landing: one dominant billing action and three clearly described secondary tasks. */
+.sell-hub { max-width: 760px; margin: 0 auto; padding: 8px 0 32px; }
+.sell-hub .page-title { text-align: left; margin-bottom: 18px; }
+.sell-hub-actions { display: grid; gap: 12px; }
+.sell-hub-primary, .sell-hub-action { display: flex; align-items: center; min-width: 0; gap: 12px; text-decoration: none; border-radius: 16px; }
+.sell-hub-primary { min-height: 84px; padding: 16px; border: 1px solid var(--brand); background: var(--brand); color: #fff; box-shadow: var(--shadow-1); }
+.sell-hub-primary:hover { background: var(--brand-dark); color: #fff; }
+.sell-hub-icon, .sell-hub-action-icon { display: flex; flex: 0 0 44px; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 12px; font-size: 23px; }
+.sell-hub-icon { background: rgba(255,255,255,.16); }
+.sell-hub-copy { display: grid; min-width: 0; gap: 4px; }
+.sell-hub-copy strong { font-size: 15px; line-height: 1.25; font-weight: 750; overflow-wrap: anywhere; }
+.sell-hub-copy small { font-size: 13px; line-height: 1.35; color: var(--muted); font-weight: 400; }
+.sell-hub-primary .sell-hub-copy strong { font-size: 17px; }
+.sell-hub-primary .sell-hub-copy small { color: rgba(255,255,255,.9); }
+.sell-hub-arrow { margin-left: auto; flex: 0 0 auto; font-size: 25px; line-height: 1; }
+.sell-hub-secondary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sell-hub-action { align-items: flex-start; min-height: 94px; padding: 13px; border: 1px solid var(--line); background: var(--card); color: var(--ink); box-shadow: var(--shadow-1); }
+.sell-hub-action:hover { border-color: var(--brand); color: var(--ink); }
+.sell-hub-action-icon { flex-basis: 38px; width: 38px; height: 38px; background: var(--brand-soft); color: var(--brand-dark); font-size: 20px; }
+.sell-hub-primary:focus-visible, .sell-hub-action:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media (max-width: 380px) { .sell-hub-secondary { grid-template-columns: minmax(0, 1fr); } .sell-hub-action { min-height: 76px; align-items: center; } }
+@media (min-width: 700px) { .sell-hub { padding-top: 16px; } .sell-hub-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); } .sell-hub-action { min-height: 112px; flex-direction: column; align-items: flex-start; } }
+@media (prefers-reduced-motion: reduce) { .sell-hub-primary, .sell-hub-action { transition: none; } }

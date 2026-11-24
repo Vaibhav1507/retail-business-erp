@@ -238,3 +238,106 @@
   margin-bottom: 10px;
 }
 .invoice-product-more-details[open] summary { margin-bottom: 12px; }
+
+
+/* ---------- Focused invoice-entry experience ---------- */
+.invoice-focus.shell { display: flex; flex-direction: column; }
+.invoice-focus .content {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+.invoice-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.invoice-page-header h2 { margin: 0; }
+.invoice-import-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.invoice-import-action .billing-hint { margin: 0; }
+.invoice-import-action .photo-source-trigger {
+  width: auto;
+  min-height: 42px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+.invoice-import-action .item-tag-uploader { align-items: flex-end; }
+.invoice-product-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.invoice-product-entry > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+.invoice-product-entry .item-tag-uploader {
+  flex: 0 0 auto;
+  align-items: stretch;
+  max-width: 116px;
+}
+.invoice-product-entry .photo-source-trigger {
+  width: auto;
+  min-width: 88px;
+  min-height: 44px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+.invoice-product-entry .item-tag-feedback,
+.invoice-product-entry .item-tag-warning,
+.invoice-product-entry .item-tag-error {
+  max-width: 180px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.invoice-product-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.invoice-product-actions > button {
+  min-width: 150px;
+  min-height: 48px;
+}
+.invoice-summary-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-bottom: 0;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  background: var(--card, #fff);
+  box-shadow: 0 -8px 24px rgba(27, 36, 48, .10);
+}
+@media (max-width: 700px) {
+  .invoice-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .invoice-import-action {
+    justify-content: flex-start;
+    align-items: center;
+  }
+  .invoice-import-action .item-tag-uploader { align-items: flex-start; }
+  .invoice-product-entry { gap: 6px; }
+  .invoice-product-entry .item-tag-uploader { max-width: 96px; }
+  .invoice-product-entry .photo-source-trigger {
+    min-width: 82px;
+    padding: 8px;
+    font-size: 13px;
+  }
+  .invoice-product-actions { align-items: stretch; }
+  .invoice-product-actions > button { width: 100%; }
+}

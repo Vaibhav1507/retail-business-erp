@@ -60,6 +60,18 @@ describe('App', () => {
     expect(await screen.findByRole('form', { name: 'Business profile' })).toBeInTheDocument()
   })
 
+  it('shows the action-first Sell hub with all four existing destinations', async () => {
+    window.location.hash = '#/sell/menu'
+    mock(signedIn)
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Billing / Sales' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Create new bill/ })).toHaveAttribute('href', '#/sell/bill')
+    expect(screen.getByRole('link', { name: /Sales history/ })).toHaveAttribute('href', '#/sell/bills')
+    expect(screen.getByRole('link', { name: /Collect payment/ })).toHaveAttribute('href', '#/sell/collect')
+    expect(screen.getByRole('link', { name: /Customer returns/ })).toHaveAttribute('href', '#/sell/return')
+    expect(screen.getByRole('link', { name: /Create new bill/ })).toHaveClass('sell-hub-primary')
+  })
+
   it('shows the signed-in device management screen', async () => {
     window.location.hash = '#/devices'
     mock({ ...signedIn, '/api/auth/devices': () => ({ body: [] }) })
