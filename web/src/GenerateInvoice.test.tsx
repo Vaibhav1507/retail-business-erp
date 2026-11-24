@@ -141,6 +141,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByDisplayValue('PX900H7SD4Z')).toBeInTheDocument()
     expect(screen.getByDisplayValue('610NWHS203785')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /Add item/ })).toHaveLength(1)
+    expect(container.querySelector('.invoice-product-more-details')?.hasAttribute('open')).toBe(false)
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
 
     await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '15000')
