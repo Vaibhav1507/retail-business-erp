@@ -26,6 +26,11 @@ export function SearchableSelect({
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+  }, [])
   const selected = options.find(option => option.value === value)
 
   useEffect(() => {
@@ -98,11 +103,19 @@ export function SearchableSelect({
           value={query}
           placeholder={placeholder}
           onFocus={() => {
+            if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+            blurTimerRef.current = null
             setOpen(true)
             setActiveIndex(-1)
             if (selected) setQuery('')
           }}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onBlur={() => {
+            if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+            blurTimerRef.current = setTimeout(() => {
+              setOpen(false)
+              blurTimerRef.current = null
+            }, 120)
+          }}
           onKeyDown={onKeyDown}
           onChange={event => {
             setQuery(event.target.value)
