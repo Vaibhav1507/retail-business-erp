@@ -303,6 +303,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await capture(page, 'bill-held-list')
   await bill.getByRole('button', { name: 'Resume' }).click()
   // Resume restores saved lines into the invoice cart; the product input is intentionally cleared for the next item.
+  // Assert the persisted line and amount before continuing into the offline-held-bill journey.
   await expect(bill.locator('#billing-prod')).toHaveValue('')
   const resumedLine = bill.locator('.billing-table tbody tr').filter({ hasText: 'Manual held item' })
   await expect(resumedLine).toBeVisible()
