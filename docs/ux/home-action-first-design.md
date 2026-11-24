@@ -2,8 +2,9 @@
 
 **Status:** Home phase complete — redesign merged in PR #69 and screenshot-driven polish merged in PR #70; all PR checks passed  
 **Scope:** Home route only (`#/home`)  
+**Reusable process:** [RBOS UI/UX workflow playbook](./RBOS-UI-UX-WORKFLOW.md)  
 **Design references:** [Figma — RBOS Home](https://www.figma.com/design/F5g0huBlQ1fYTE38HWPeTy) · [MagicPath — Home prototype](https://designs.magicpath.ai/v1/warmly-star-1345)  
-**Programme:** [RBOS usability and accessibility programme](./rbos-usability-accessibility-programme.md)
+**Process:** [RBOS UI/UX workflow playbook](./RBOS-UI-UX-WORKFLOW.md)
 
 ## Decision
 
