@@ -223,7 +223,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await bill.getByRole('button', { name: 'Add tag photo' }).click()
   const tagFile = page.waitForEvent('filechooser')
   await page.getByRole('dialog', { name: 'Add product tag photo' }).getByRole('button', { name: 'Take a photo' }).click()
-  await (await tagFile).setFiles({ name: 'synthetic-tag.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) })
+  await (await tagFile).setFiles({ name: 'synthetic-tag.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABAf/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPxB//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPxB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=', 'base64') })
   await expect(page.getByText('Reading image and extracting product details…')).toBeVisible()
   await capture(page, 'bill-tag-extraction-loading', [routeViewports[1]!])
   await expect(page.getByText(/Product details detected/)).toBeVisible()
