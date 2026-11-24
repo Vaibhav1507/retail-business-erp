@@ -86,6 +86,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
   }, [detail])
 
   const shownSales = unpaid ? sales.filter(s => s.balance > 0) : sales
+  const queryPending = saleSearch.trim() !== query
   const emptyMessage = !sales.length
     ? 'No sales have been recorded yet.'
     : unpaid
@@ -149,10 +150,10 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       </div>
 
       {error && <div className="sales-history-error" role="alert"><span>{error}</span><button type="button" className="secondary" onClick={() => { void loadSales().catch(() => undefined) }} disabled={loading}>Retry</button></div>}
-      {loading && <p className="sales-history-status" role="status">{loaded ? 'Updating sales…' : tr('app.loading')}</p>}
-      {loaded && !loading && <p className="sales-history-count" role="status">{shownSales.length} {shownSales.length === 1 ? 'bill' : 'bills'}{query ? ' found' : ''}</p>}
+      {(loading || queryPending) && <p className="sales-history-status" role="status">{loaded ? 'Updating sales…' : tr('app.loading')}</p>}
+      {loaded && !loading && !queryPending && <p className="sales-history-count" role="status">{shownSales.length} {shownSales.length === 1 ? 'bill' : 'bills'}{query ? ' found' : ''}</p>}
 
-      <Paged rows={shownSales} label="bills" empty={loaded && !loading ? emptyMessage : undefined}>
+      {loaded && !loading && !queryPending && <Paged rows={shownSales} label="bills" resetKey={query + ':' + unpaid} empty={emptyMessage}>
         {page => (
           <>
             <div className="sales-history-desktop">
@@ -183,7 +184,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
             </ul>
           </>
         )}
-      </Paged>
+      </Paged>}
 
       {detail && <div className="invoice-modal sales-history-modal" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) closeDetail() }}>
         <div ref={dialogRef} className="invoice-modal-box sales-history-dialog" role="dialog" aria-modal="true" aria-labelledby="sales-history-dialog-title" tabIndex={-1}>
