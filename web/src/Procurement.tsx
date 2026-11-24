@@ -172,9 +172,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
           <div className="buy-review-actions"><button type="button" className="secondary" onClick={() => setReviewReceipt(false)}>{tr('buy.edit')}</button><button type="button" onClick={receive}>{tr('buy.post')}</button></div>
         </section>}
       </div>}
-ton type="button" className="secondary" onClick={() => setReviewReceipt(false)}>Back to edit</button><button type="button" onClick={receive}>Post receipt</button></div>
-      </div>}
-      </>}
+
       {v('pay') && <div className="buy-pay">
         <header className="buy-screen-heading"><h2>Pay supplier</h2><p>Record a payment made to your supplier.</p></header>
         <section className="buy-pay-form">
