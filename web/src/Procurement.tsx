@@ -32,6 +32,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const [phone, setPhone] = useState(''); const [supNotes, setSupNotes] = useState(''); const [supEditId, setSupEditId] = useState<string | null>(null)
   const [supplierId, setSupplierId] = useState('')
   const [paySupplierId, setPaySupplierId] = useState('')
+  const [historySupplierId, setHistorySupplierId] = useState('')
   const [locationId, setLocationId] = useState('')
   const [date, setDate] = useState(today)
   const [ref, setRef] = useState('')
@@ -110,7 +111,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const payOwed = suppliers.find(s => s.id === paySup)?.owed ?? 0
   const amountError = amount.trim() === '' ? 'Enter an amount to pay.' : !(Number(amount) > 0) ? 'Enter an amount greater than zero.' : Number(amount) > payOwed ? 'Payment cannot be more than the supplier balance.' : ''
   useEffect(() => { setBillId(''); setStatement(null); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
-  const showStatement = () => run(async () => { const id = v('pay') ? paySup : sup; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
+  const showStatement = () => run(async () => { const id = v('pay') ? paySup : historySupplierId; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
   return (
     <section aria-label="Purchasing" className="billing-screen">
@@ -212,7 +213,8 @@ export function Procurement({ products, locations, reload, show }: { products: (
           </article>)}</div>}</Paged>
         </section>
         <section className="buy-history-statement">
-          <button type="button" className="secondary" onClick={showStatement} disabled={!sup}>View supplier statement</button>
+          <SearchableSelect id="buy-history-supplier" label="Supplier statement" value={historySupplierId} options={suppliers.filter(s => s.isActive).map(s => ({value:s.id,label:s.name,description:'Currently owed: ₹'+s.owed.toFixed(2)}))} onChange={value => {setHistorySupplierId(value);setStatement(null)}} placeholder="Choose a supplier" emptyMessage="No matching suppliers." />
+          <button type="button" className="secondary" onClick={showStatement} disabled={!historySupplierId}>View supplier statement</button>
           {statement && <div role="region" aria-label="Supplier statement"><h3>Statement: {statement.supplier} · Owed ₹{statement.outstanding.toFixed(2)}</h3><Paged rows={statement.entries}>{page => <table><thead><tr><th>Date</th><th>Type</th><th>Purchase</th><th>Paid / returned</th><th>Balance</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>Close statement</button></div>}
         </section>
       </div>}
