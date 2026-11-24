@@ -212,6 +212,8 @@ Capture the following using synthetic data only:
 | [45302508735](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302508735) | `7d3feac` | IN_PROGRESS at last check | Introduced a tracked dialog-handler replacement; verify result before relying on it. |
 | [45302584156](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302584156) | `84d7643` | IN_PROGRESS at last check | Switched to the documented listener-removal API; superseded by the single-listener design below. |
 | [45302914826](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302914826) | `db9f0b5` | IN_PROGRESS at last check | Current implementation keeps exactly one dialog listener per page and changes only its active policy. This is the run to inspect first. |
+| [45303312267](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45303312267) | `d0e3fda` | FAILED — harness | The readiness helper expected a Sell-menu hint string that the actual route does not render. Corrected to assert the four `.areas .area` destination links. The initial report is now written before setup and artifact upload includes Playwright failure screenshots/traces. |
+| [45303775116](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45303775116) | `85a20e2` | IN_PROGRESS | Latest run after the route-readiness and failure-artifact fixes. Inspect its report/screenshots before proceeding. |
 
 The failure was in the test harness, not evidence of an application invoice defect. Do not treat the two failed attempts as application test failures. The visual audit remains NOT_VERIFIED until a complete artifact is uploaded and reviewed.
 
@@ -406,5 +408,5 @@ A screen phase is not documentation-complete until its decision log, deferral li
 - **Out of scope:** unrelated Home redesign, Stock, Purchasing, global navigation and backend/business-rule changes unless verified as a dependency.
 - **Uncovered until evidence is added/reviewed:** WhatsApp delivery/status variants beyond the seeded state; collection allocation to a specific bill; extraction failure/recovery; real Android camera permission, printer/share sheet and TalkBack; browser-native confirmation is asserted by dialog text but cannot be captured as a page screenshot.
 - **Existing findings:** BILL-01…BILL-12 remain source-based findings awaiting current-state visual verification and re-prioritisation; do not silently close them based on code inspection alone.
-- **Next action:** review PR #72's latest visual run `45302914826` (and CI run `45302914622`); inspect the complete screenshot/report artifact, resolve harness or UI findings and close the remaining coverage gaps before MagicPath.
+- **Next action:** review PR #72's latest visual run `45303775116` (and CI run `45302914622`); inspect the complete screenshot/report artifact, resolve harness or UI findings and close the remaining coverage gaps before MagicPath.
 - **Documentation branch:** docs/rbos-usability-accessibility-programme (PR #67). Keep related UX programme documentation updates on this existing branch/PR; PR #72 is a separate, justified test/workflow implementation PR.
