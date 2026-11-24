@@ -1017,3 +1017,19 @@
   .invoice-create-page .invoice-product-entry .photo-source-trigger { font-size: 12px; }
   .invoice-electronics-fields { grid-template-columns: minmax(0, 1.55fr) minmax(80px, 1fr); }
 }
+
+
+/* Final invoice refinement: Brand + Model, then Quantity + Selling price. */
+.invoice-brand-model,
+.invoice-quantity-price { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.invoice-brand-only { grid-template-columns: minmax(0, 1fr); }
+.invoice-payment-mode {
+  padding: 18px 22px;
+  border: 1px solid #dfe8e2;
+  border-radius: 18px;
+  background: #fff;
+}
+.invoice-payment-mode .billing-field { max-width: 420px; }
+@media (max-width: 700px) {
+  .invoice-payment-mode { padding: 14px; border-radius: 16px; }
+}
