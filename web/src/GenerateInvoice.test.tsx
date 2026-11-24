@@ -53,6 +53,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByLabelText('Brand').closest('details')).toBeNull()
     expect(screen.getByLabelText('Payment mode').closest('details')).toBeNull()
     expect(container.querySelector('.invoice-more-details #billing-date')).not.toBeNull()
+    expect(productInput.tagName).toBe('TEXTAREA')
+    expect(screen.getByRole('button', { name: 'Scan tag' })).toHaveTextContent('📷')
     const productRow = productInput.closest('.invoice-product-entry')
     expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
     const actions = container.querySelector('.invoice-add-item-action')
