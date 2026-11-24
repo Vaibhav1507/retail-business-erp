@@ -236,7 +236,7 @@ export default function App() {
   const printMatch = /^#\/print\/(sale|purchase|payment)\/([0-9a-f-]{36})$/i.exec(window.location.hash)
   if (printMatch) return <PrintPage kind={printMatch[1]} id={printMatch[2]} />
 
-  const c = { products, locations, reload: () => { if (!offlineMode) loadData().catch(() => undefined) }, offlineMode, ownerKey: me.email.trim().toLowerCase() + ':' + (me.tenantId ?? '') }
+  const c = { products, locations, reload: () => { if (!offlineMode) loadData().catch(() => undefined) }, offlineMode, ownerKey: me.email.trim().toLowerCase() + ':' + (me.tenantId ?? ''), businessCategory: me.businessCategory }
   const { page, tab } = route
   const first = (d: string) => tab || d
   let body: React.ReactNode

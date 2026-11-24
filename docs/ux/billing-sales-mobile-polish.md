@@ -279,11 +279,11 @@ All links below are publicly accessible; they were used as evidence for workflow
 
 ---
 
-## 9. Current implementation checkpoint
+## 9. Delivery checkpoint
 
-- PR #76 is the active draft; it is not merged or deployed.
-- The user-supplied MagicPath screenshots are now available and are the exact New Sale reference. The Create Invoice component has been restructured to implement the specified hierarchy and sticky summary/footer while retaining existing handlers/calculations.
-- Other routes remain research-led and page-specific; they are not claimed to be MagicPath replicas.
-- The current CI failures were traced to stale portal DOM queries, a non-controlled SearchableSelect test harness and a Collections test typing before its async customer list was enabled. Fixes are included on the branch; the resulting current-head CI is the next evidence checkpoint.
-- Visual acceptance requires the user's next Android screenshots. Native camera/gallery, keyboard, print and TalkBack checks remain separate device acceptance.
-- Merge and deployment are separate decisions and are not authorised by this document.
+- PR #76 was merged into main at `96c8ed9930d4495a0bc032c6d4d2a0e161afe58d`. It delivered the original Billing & Sales redesign and the first MagicPath-based Create Invoice implementation.
+- The next Android screenshots identified a narrow Create Invoice follow-up: compact oversized mobile geometry, bring one free-text address field into the Customer card, restore a text-labelled Import tag action, and surface Model/Serial with Quantity beside Model for the electronics/mobile business category.
+- Those changes are tracked separately in [invoice-form-mobile-compact-followup.md](./invoice-form-mobile-compact-followup.md).
+- Current follow-up branch: `ux/invoice-form-compact-electronics-fields`. It is not merged or deployed.
+- The follow-up CI and user screenshot acceptance are pending. Do not treat the PR #76 CI result as validation of this new follow-up.
+- Native Android camera/gallery, keyboard/sticky-footer, printing and TalkBack checks remain separate device acceptance.

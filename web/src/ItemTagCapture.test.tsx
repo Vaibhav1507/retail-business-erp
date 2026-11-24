@@ -44,9 +44,9 @@ describe('ItemTagCapture', () => {
     const onExtract = vi.fn()
     const { container } = render(<ItemTagCapture disabled={false} onExtract={onExtract} />)
 
-    expect(screen.getByRole('button', { name: 'Scan tag' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Import tag' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Take a photo' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Import tag' }))
     expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Take a photo/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Choose from device/ })).toBeInTheDocument()
@@ -92,7 +92,7 @@ describe('ItemTagCapture', () => {
     })
     const onExtract = vi.fn()
     const { container } = render(<ItemTagCapture disabled={false} onExtract={onExtract} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Import tag' }))
     const inputs = container.querySelectorAll('input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'tag.jpg', { type: 'image/jpeg' })
     fireEvent.change(inputs[1], { target: { files: [file] } })
@@ -106,7 +106,7 @@ describe('ItemTagCapture', () => {
 
   it('shows a helpful error for unsupported images without uploading', async () => {
     const { container } = render(<ItemTagCapture disabled={false} onExtract={() => undefined} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Import tag' }))
     const input = container.querySelectorAll('input[type="file"]')[1]
     const file = new File(['not an image'], 'tag.txt', { type: 'text/plain' })
     fireEvent.change(input, { target: { files: [file] } })
@@ -116,6 +116,6 @@ describe('ItemTagCapture', () => {
 
   it('disables tag upload while offline', () => {
     render(<ItemTagCapture disabled onExtract={() => undefined} />)
-    expect(screen.getByRole('button', { name: 'Scan tag' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Import tag' })).toBeDisabled()
   })
 })

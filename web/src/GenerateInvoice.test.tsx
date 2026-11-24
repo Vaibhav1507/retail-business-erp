@@ -39,21 +39,34 @@ beforeEach(() => {
 
 describe('GenerateInvoice WhatsApp independence', () => {
   it('keeps tag capture beside the product field and separates handwritten import', async () => {
-    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="electronics_mobile" />)
     const productInput = screen.getByPlaceholderText('Search product or type a name')
-    const addressDisclosure = container.querySelector('.customer-address-details') as HTMLDetailsElement
-    expect(addressDisclosure.open).toBe(false)
-    await userEvent.click(screen.getByText('Add address (optional)'))
-    expect(addressDisclosure.open).toBe(true)
-    expect(screen.getByLabelText('Address')).toBeInTheDocument()
+    expect(screen.getByLabelText('Address (optional)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('City')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('State')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Pincode')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Model number')).toBeInTheDocument()
+    expect(screen.getByLabelText('Serial number (optional)')).toBeInTheDocument()
     const productRow = productInput.closest('.invoice-product-entry')
-    expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
+    expect(productRow).toContainElement(screen.getByRole('button', { name: 'Import tag' }))
     const actions = container.querySelector('.invoice-add-item-action')
     expect(actions?.querySelectorAll('button')).toHaveLength(1)
     expect(actions?.querySelector('button')).toHaveTextContent('Add item')
     expect(screen.getByRole('button', { name: /Import bill/ })).toBeInTheDocument()
     expect(container.querySelector('.invoice-bill-summary')).toBeInTheDocument()
     expect(container.querySelector('.invoice-sticky-review')).toBeInTheDocument()
+  })
+
+  it('keeps model and serial in optional details for non-electronics businesses', async () => {
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="general_retail" />)
+    const details = container.querySelector('.invoice-product-more-details') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    expect(container.querySelector('#billing-model')?.closest('details')).toBe(details)
+    expect(container.querySelector('#billing-serial')?.closest('details')).toBe(details)
+    await userEvent.click(details.querySelector('summary') as HTMLElement)
+    expect(details.open).toBe(true)
+    expect(screen.getByLabelText('Model number')).toBeInTheDocument()
+    expect(screen.getByLabelText('Serial number (optional)')).toBeInTheDocument()
   })
 
   it('keeps automatic browser printing when WhatsApp consent is not confirmed', async () => {
@@ -106,13 +119,12 @@ describe('GenerateInvoice WhatsApp independence', () => {
       return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
     }))
 
-    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="electronics_mobile" />)
     expect(screen.queryByRole('button', { name: 'Scan product' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByText('More item details'))
-    expect(screen.getByLabelText('Brand')).toBeInTheDocument()
     expect(screen.getByLabelText('Model number')).toBeInTheDocument()
+    expect(screen.getByLabelText('Serial number (optional)')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Import tag' }))
     const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[1], { target: { files: [file] } })
@@ -160,7 +172,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     }))
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Import tag' }))
     expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
     const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
@@ -196,7 +208,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     }))
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Import tag' }))
     const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
