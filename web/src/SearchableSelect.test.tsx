@@ -27,6 +27,23 @@ describe('SearchableSelect', () => {
     expect(screen.getByRole('listbox', { name: 'Customer options' })).not.toBeVisible()
   })
 
+  it('starts keyboard navigation on the first result and does not wrap past the last', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<SearchableSelect id="customer" label="Customer" value="" options={options}
+      onChange={onChange} placeholder="Search by customer name" />)
+
+    const input = screen.getByRole('combobox', { name: 'Customer' })
+    await user.type(input, 'a')
+    await user.keyboard('{ArrowDown}')
+    expect(input).toHaveAttribute('aria-activedescendant', 'customer-option-0')
+    await user.keyboard('{ArrowDown}{ArrowDown}')
+    expect(input).toHaveAttribute('aria-activedescendant', 'customer-option-1')
+    await user.keyboard('{Enter}')
+    expect(onChange).toHaveBeenLastCalledWith('c2')
+    expect(input).toHaveValue('Ravi Kumar')
+  })
+
   it('supports matching by additional reference text and selecting an explicit empty option', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
