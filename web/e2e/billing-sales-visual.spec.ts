@@ -192,9 +192,9 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await capture(page, 'bill-invoice-source-picker')
   await invoicePicker.getByRole('button', { name: 'Cancel' }).click()
 
-  await bill.locator('summary').filter({ hasText: 'More tag details' }).click()
+  await bill.locator('summary').filter({ hasText: 'Optional product details' }).click()
   await capture(page, 'bill-advanced-tag-details')
-  await bill.locator('summary').filter({ hasText: 'More tag details' }).click()
+  await bill.locator('summary').filter({ hasText: 'Optional product details' }).click()
   await bill.getByRole('button', { name: 'Generate invoice' }).click()
   await expect(bill.getByText('Customer name is required.')).toBeVisible()
   await expect(bill.getByText('Enter a valid mobile number (10–15 digits).')).toBeVisible()
