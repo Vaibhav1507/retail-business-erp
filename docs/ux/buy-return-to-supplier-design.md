@@ -1,6 +1,6 @@
 # Buy screen design — Return to Supplier
 
-**Status:** Design specification finalized; implementation pending.  
+**Status:** Design specification finalized; first implementation pass present; focused verification pending.  
 **Last reviewed:** 2026-11-24  
 **Baseline:** main b180f59793f265024650731a1f2bd89ead29b342  
 **Route:** #/buy/return  
@@ -230,3 +230,8 @@ Focused checks: selected receipt detail, line quantities, all-returned state, lo
 - [Nielsen Norman Group: Progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
 - [W3C: WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [W3C: Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification)
+
+
+## Implementation record — 2026-11-24
+
+First implementation pass is present in `web/src/AfterSales.tsx` and scoped `web/src/buy-procurement.css`. It starts from the original purchase, shows receipt context and purchased/already-returned/remaining-on-receipt quantities, bounds return inputs, keeps fill-remaining secondary and reason optional, and separates searchable return history/detail. The `show=preturn` data loader now fetches only purchases and purchase returns. The server remains authoritative for on-hand stock, value, accounting and idempotency. Focused checks and screenshot review are pending; see `BUY-DESIGN-HANDOFF.md` and draft PR #81.
