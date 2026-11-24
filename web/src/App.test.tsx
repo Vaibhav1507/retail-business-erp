@@ -72,6 +72,28 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /Create new bill/ })).toHaveClass('sell-hub-primary')
   })
 
+  it('places the assistant in the header and keeps Sell subroutes to one page heading', async () => {
+    window.location.hash = '#/sell/menu'
+    mock(signedIn)
+    const { container, unmount } = render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Billing / Sales' })).toBeInTheDocument()
+    const assistant = await screen.findByRole('button', { name: 'Open assistant' })
+    expect(container.querySelector('.topbar')).toContainElement(assistant)
+    expect(assistant).toHaveAttribute('aria-expanded', 'false')
+
+    unmount()
+    window.location.hash = '#/sell/collect'
+    mock({
+      ...signedIn,
+      '/api/customers': () => ({ body: [] }),
+      '/api/customer-payments': () => ({ body: [] })
+    })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Collect payment' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Billing / Sales' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Billing \/ Sales/ })).toHaveAttribute('href', '#/sell/menu')
+  })
+
   it('shows the signed-in device management screen', async () => {
     window.location.hash = '#/devices'
     mock({ ...signedIn, '/api/auth/devices': () => ({ body: [] }) })

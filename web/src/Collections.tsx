@@ -5,7 +5,7 @@ import { SearchableSelect } from './SearchableSelect'
 import './billing-forms.css'
 import './collections.css'
 
-type Customer = { id: string; name: string; owed: number }
+type Customer = { id: string; name: string; phone?: string | null; owed: number }
 type Payment = { id: string; number: number; date: string; customer: string; amount: number; method: string; reference: string | null }
 type OpenSale = { id: string; date: string; invoiceNo: string | null; number: number; open: number }
 type Entry = { type: string; number: number; date: string; debit: number; credit: number; balance: number; id: string }
@@ -132,7 +132,7 @@ export function Collections({ reload }: { reload: () => void }) {
             id="collection-customer"
             label="Customer"
             value={payCustomer}
-            options={customers.map(c => ({ value: c.id, label: c.name, description: 'Owes ₹' + money(c.owed), searchText: c.name }))}
+            options={customers.map(c => ({ value: c.id, label: c.name, description: [c.phone, 'Owes ₹' + money(c.owed)].filter(Boolean).join(' · '), searchText: [c.name, c.phone].filter(Boolean).join(' ') }))}
             onChange={value => { setPayCustomer(value); setPayAmount(''); setPayRef(''); setSaleBillId(''); setDone('') }}
             placeholder="Search customer by name or mobile"
             emptyMessage="No customers match this search."

@@ -38,7 +38,7 @@ beforeEach(() => {
 })
 
 describe('GenerateInvoice WhatsApp independence', () => {
-  it('keeps tag capture beside the product field and separates handwritten import', () => {
+  it('keeps tag capture beside the product field and separates handwritten import', async () => {
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     const productInput = screen.getByPlaceholderText('Search product or enter model')
     expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
@@ -65,7 +65,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm & print' }))
 
-    expect(await screen.findByText(/WhatsApp invoice: Permission not confirmed/)).toBeInTheDocument()
+    expect(await screen.findByText(/WhatsApp invoice: Customer consent needed/)).toBeInTheDocument()
+    expect(screen.getByText('Ask the customer for permission before sending this bill on WhatsApp.')).toBeInTheDocument()
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1), { timeout: 2000 })
     expect(calls).toContainEqual({ url: '/api/sales', method: 'POST' })
     expect(calls.some(x => x.url.includes('/whatsapp'))).toBe(false)

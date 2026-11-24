@@ -6,7 +6,7 @@ import { InvoiceDocument } from './InvoiceDocument'
 import { ItemTagCapture, type CapturedInvoiceItem } from './ItemTagCapture'
 import { SalesInvoiceCapture, type ExtractedSalesInvoice } from './SalesInvoiceCapture'
 import { t as tr } from './i18n'
-import { whatsappStatusLabel } from './whatsappStatus'
+import { whatsappStatusDescription, whatsappStatusLabel } from './whatsappStatus'
 import { discardOfflineSale, listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
 import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
 
@@ -480,7 +480,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       <section aria-label="Invoice overview" className="invoice-wrap">
         <div className="invoice-tools no-print">
           {step === 'review' && <><button type="button" disabled={busy} onClick={confirm}>{busy ? 'Saving\u2026' : 'Confirm & print'}</button><button type="button" className="secondary" disabled={busy} onClick={() => setStep('form')}>Back to edit</button></>}
-          {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
+          {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}{whatsappStatusDescription(whatsappStatus) && <small className="invoice-whatsapp-help">{whatsappStatusDescription(whatsappStatus)}</small>}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}
         {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}

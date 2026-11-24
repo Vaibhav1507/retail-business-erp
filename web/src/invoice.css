@@ -341,3 +341,10 @@
   .invoice-product-actions { align-items: stretch; }
   .invoice-product-actions > button { width: 100%; }
 }
+
+
+/* Optional customer address: keep the first-pass invoice task short on mobile. */
+.customer-address-details { min-width: 0; align-self: start; }
+.customer-address-details > summary { display: flex; align-items: center; min-height: 44px; padding: 8px 0; color: var(--brand-dark); font-size: 14px; font-weight: 700; cursor: pointer; }
+.customer-address-details[open] > summary { margin-bottom: 10px; }
+.invoice-whatsapp-help { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.35; }
