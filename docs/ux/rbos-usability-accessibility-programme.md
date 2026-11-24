@@ -94,7 +94,7 @@ Follow this sequence consistently. The tools should each have a distinct job; st
 | Order | Tool / owner | Responsibility | Required output before handoff |
 |---|---|---|---|
 | 1 | **ChatGPT — orchestration and source analysis** | Resolve the user task, inspect repository implementation and dependencies, record current behaviour, identify constraints and prioritise risks. | Screen brief, source map, initial findings and acceptance questions. |
-| 2 | **Product Design — UX and accessibility audit** | Open the actual app, capture the real flow and states at realistic viewports, inspect screenshots and audit the experience. | Accepted current screenshots; numbered flow; evidence-linked UX and accessibility findings; explicit capture gaps. |
+| 2 | **RBOS Visual Audit + Playwright — visual capture and accessibility evidence** | Run the repository's scoped GitHub Actions visual-audit workflow, capture real application routes/states with Playwright at agreed viewports, inspect screenshots and review Axe results. | Accepted current screenshots; numbered flow; evidence-linked UX and accessibility findings; explicit capture gaps. |
 | 3 | **MagicPath — design exploration** | Turn the agreed brief and audit findings into genuinely different layout/interaction alternatives. | Three distinct options for complex screens, comparison and prototype links/previews. Use fewer only when the screen is genuinely simple and the owner agrees. |
 | 4 | **Figma — approved design source of truth** | Formalise the selected direction using reusable components, variables, typography, spacing and responsive behaviour. | Approved frame(s), component references, variables/tokens and documented states. |
 | 5 | **GitHub — implementation and verification** | Implement the selected design in scoped components/styles, preserve business behaviour, run tests and open a reviewable PR. | Small PR, before/after evidence, test results, regression checklist and documentation update. |
@@ -242,7 +242,7 @@ Do not use a tool simply to satisfy a checklist. Record the contribution and the
 | Tool | Value test | Keep using it when… | Do not use it when… |
 |---|---|---|---|
 | ChatGPT | Did it find dependencies, conflicts, source evidence and acceptance risks? | It reduces missed requirements and produces traceable decisions. | It repeats generic design advice without inspecting the code or app. |
-| Product Design | Did it capture the real app flow and identify issues that source inspection cannot reveal? | Its screenshots and evidence-linked audit improve understanding and prioritisation. | It cannot access the running app or provide accepted screenshots. Do not call a source-only review a screenshot audit. |
+| RBOS Visual Audit + Playwright | Did it capture the real app flow and identify issues that source inspection cannot reveal? | Screenshots and accessibility reports are reproducible, scoped, synthetic-data-only and linked to a workflow run. | The workflow cannot reach a required nested state or the screenshot/report artifact is missing. Record the capture gap and extend the audit before claiming coverage. |
 | MagicPath | Are the alternatives materially different and do they clarify interaction/hierarchy? | It lets us compare options before committing to implementation. | It generates decorative variations that do not resolve the identified user problem. |
 | Figma | Does it preserve an approved design and reusable components/tokens? | Developers can inspect exact layout, states, spacing and component rules. | It duplicates a disposable exploration or has no approved source to formalise. |
 | GitHub | Are changes small, reviewable, traceable and tested? | PRs preserve behaviour and document evidence and acceptance. | It is used to patch CSS without an approved design or regression test. |
@@ -252,7 +252,7 @@ Do not use a tool simply to satisfy a checklist. Record the contribution and the
 | Sequence | Tool | Status for this programme | Initial assessment |
 |---|---|---|---|
 | 1 | ChatGPT / repository source analysis | **Used** | Useful for establishing the current implementation and evidence-backed billing questions. Must be followed by live visual/user evidence. |
-| 2 | Product Design | **Blocked — visual capture not available in this chat** | The audit workflow requires a live browser and screenshots. No accepted visual audit is claimed. Resume in a Work environment with browser capture, or use a controlled Playwright/device capture path and record it as an alternative. |
+| 2 | RBOS Visual Audit + Playwright | **Pending** | Run the repository visual-audit workflow with billing-sales; inspect the screenshots and Axe report. The current route pass does not capture all nested states, so add a focused interaction-capture pass after reviewing the route baseline. |
 | 3 | MagicPath | **Not started** | Wait for the Product Design audit findings and confirmed design brief. |
 | 4 | Figma | **Not started** | Wait until a design direction is selected; then formalise the approved direction. |
 | 5 | GitHub implementation | **Not started** | The current GitHub use is repository inspection and this documentation PR only. No application code or deployment is authorised by this programme document. |
@@ -280,11 +280,84 @@ A screen is not complete until the relevant checks are evidenced:
 
 ## 8. Immediate next actions
 
-1. Complete the Product Design visual audit of the Billing flow using the capture matrix in section 4.5.
+1. Run the RBOS Visual Audit GitHub Actions workflow for billing-sales; review its route screenshots and Axe report, then capture the nested interaction states listed in section 2.2 and 4.5.
 2. Update BILL-01…BILL-12 with screenshots, confidence, severity and any issues already resolved by current code.
 3. Choose the top design problems and ask MagicPath for alternatives only where the choice benefits from exploration.
 4. Formalise the selected design in Figma.
 5. Implement only approved changes in a scoped GitHub PR; keep business logic changes separate.
 6. Test the resulting flow with synthetic data and representative shop users before accepting Billing and moving to the next phase.
 
-**Current stop point:** the source-code baseline is documented. The Billing visual audit and three design alternatives are pending. Do not begin implementation from this document alone.
+**Current stop point:** the source-code baseline is documented. The Billing route-level visual audit, nested-state screenshots, screenshot review, MagicPath exploration and Figma design are pending. Do not begin implementation from this document alone.
+
+## 9. Mandatory decision, assumption and deferral ledger
+
+**Non-negotiable:** document every decision, recommendation, rejected option, assumption, dependency, discovered issue, deferral, blocker, skipped step and unfinished task. A chat transcript or someone's memory is not the durable source of truth. Another chat or engineer must be able to resume this programme from the repository without asking the user to reconstruct context.
+
+Maintain this section as a living record throughout the phase. Update it at every meaningful pause and before moving to another stage.
+
+### 9.1 What must be recorded
+
+- User requirements, explicit preferences, constraints, approvals and changes to earlier instructions.
+- Recommendations and selected decisions, with rationale and alternatives considered.
+- Rejected options and the evidence/condition that would justify reconsidering them.
+- Assumptions that remain unverified.
+- Affected routes, source files, APIs, data contracts, components, integrations and business/accounting invariants.
+- Findings with evidence links, screenshot IDs, source references, reproducible steps and confidence.
+- Every issue intentionally left unresolved: why it is deferred, impact/risk, priority, dependencies and revisit trigger.
+- Blockers and unanswered questions, including the exact missing input and safe work that can continue.
+- Items inspected but explicitly kept out of scope.
+- Checks run, exact pass/fail/skip outcomes, viewport/state coverage, artifacts and manual validation still outstanding.
+- Branches, PRs, commits, review/merge status and deployment status separately.
+- A precise handover: next action, prerequisites, relevant links and remaining risks.
+
+### 9.2 Status vocabulary
+
+- **DECIDED** — decision and rationale recorded.
+- **IN_PROGRESS** — work started but incomplete.
+- **VERIFIED** — supported by direct evidence.
+- **DEFERRED** — deliberately postponed with reason and revisit trigger.
+- **BLOCKED** — cannot safely proceed until a named dependency/input is resolved.
+- **REJECTED** — considered and not selected, with rationale.
+- **NOT_RUN** — check/action not performed.
+- **OUT_OF_SCOPE** — explicitly excluded from this phase.
+- **SUPERSEDED** — an earlier decision replaced by a newer one; link the replacement.
+
+Do not use VERIFIED for assumptions, plans, successful builds that do not cover the claim, or screenshots of a different state.
+
+### 9.3 Decision-log template
+
+| ID / date | Type | Decision, finding or deferred item | Rationale / evidence | Impact and dependencies | Status | Next action / revisit trigger |
+|---|---|---|---|---|---|---|
+
+For significant decisions, include alternatives considered and why they were not selected. Link relevant PRs, commits, screenshots, audit artifacts, issues and design files.
+
+### 9.4 No silent leftovers
+
+If an issue is noticed but not fixed now, add it to the deferral/parking-lot record before proceeding. If a stage is skipped because it is unnecessary or unavailable, record the reason, impact and revisit condition. If there is nothing deferred, explicitly write **No known deferred items**; never leave the section blank.
+
+When a user changes an earlier instruction, mark the old decision SUPERSEDED, record the new instruction and ensure there are no contradictory active directions elsewhere in this programme.
+
+### 9.5 Required handover at every pause
+
+At every design gate, implementation gate, meaningful pause and phase closure, update:
+
+1. Completed work and the evidence proving it.
+2. Decisions made and their rationale/location.
+3. Unfinished, deferred, blocked and unverified items, including why.
+4. Explicit out-of-scope items.
+5. Exact next action and prerequisites.
+6. Relevant branch, PR, commit, MagicPath/Figma links and audit artifacts.
+7. Automated tests, visual checks and real-user acceptance still pending.
+
+A screen phase is not documentation-complete until its decision log, deferral list, validation evidence and handover are current. Code completion, visual acceptance, merge and production deployment are separate states.
+
+## 10. Current phase handover — Billing & Sales
+
+- **Completed:** initial source-code audit and route map; workflow supports the five Billing & Sales routes and mobile/tablet route-level screenshots.
+- **Decided:** run the RBOS Visual Audit workflow for billing-sales before MagicPath exploration; retain MagicPath and Figma in the design sequence. Product Design is not a prerequisite.
+- **Pending:** route-level screenshot run; inspect actual screenshots/Axe output; extend Playwright capture to nested bill, history, collection and return states; then MagicPath alternatives and editable Figma design.
+- **Not started:** application implementation for this UX phase.
+- **Out of scope:** unrelated Home, Stock, Purchasing, global navigation and backend/business-rule changes unless a verified dependency requires a separately documented decision.
+- **Known deferred items:** none newly deferred by this documentation update. Existing BILL-01…BILL-12 are source-based findings awaiting visual verification and re-prioritisation; do not silently close them based on code inspection alone.
+- **Next action:** run the RBOS Visual Audit workflow with billing-sales, download the artifact and review every screenshot/report before design exploration.
+- **Documentation branch:** docs/rbos-usability-accessibility-programme (PR #67). Keep all related UX programme documentation updates on this existing branch/PR unless the user explicitly requests a separate PR.
