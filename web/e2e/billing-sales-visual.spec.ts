@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { signUp, setDialogHandler, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
+import { signUp, unlockApp, setDialogHandler, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 
 const stamp = Date.now().toString(36)
 const owner = 'e2e-audit-' + stamp + '@example.test'
@@ -154,6 +154,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   // Load the app shell before routing. Use real in-app links so the route guard and
   // confirmation behaviour are exercised deterministically rather than bypassed by goto().
   await desktopPage.goto('/')
+  await unlockApp(desktopPage)
   await expect(desktopPage.getByRole('navigation', { name: 'Main' })).toBeVisible()
   for (const route of routes) {
     await openSellRoute(desktopPage, route)
@@ -162,6 +163,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await desktopContext.close()
 
   await page.goto('/')
+  await unlockApp(page)
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
   for (const route of routes) {
     await openSellRoute(page, route)
