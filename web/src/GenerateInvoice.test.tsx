@@ -38,13 +38,25 @@ beforeEach(() => {
 })
 
 describe('GenerateInvoice WhatsApp independence', () => {
+  it('keeps tag capture beside the product field and separates handwritten import', () => {
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    const productInput = screen.getByPlaceholderText('Search or enter a product/model name')
+    const productRow = productInput.closest('.invoice-product-entry')
+    expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
+    const actions = container.querySelector('.invoice-product-actions')
+    expect(actions?.querySelectorAll('button')).toHaveLength(1)
+    expect(actions?.querySelector('button')).toHaveTextContent('Add product')
+    expect(actions).not.toContainElement(screen.getByRole('button', { name: 'Upload handwritten bill' }))
+    expect(container.querySelector('.invoice-summary-bar')).toBeInTheDocument()
+  })
+
   it('keeps automatic browser printing when WhatsApp consent is not confirmed', async () => {
     const reload = vi.fn()
     render(<GenerateInvoice products={products} locations={locations} reload={reload} />)
 
     await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
-    await userEvent.type(await screen.findByPlaceholderText('Search or type a new product'), 'Test Cable')
+    await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
     await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
     await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
     await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
@@ -182,7 +194,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
-    expect(await screen.findByPlaceholderText('Search or type a new product')).toHaveValue('ZX-90')
+    expect(await screen.findByPlaceholderText('Search or enter a product/model name')).toHaveValue('ZX-90')
     expect(screen.getByDisplayValue('Local')).toBeInTheDocument()
     expect(screen.getByDisplayValue('SERIAL-0090')).toBeInTheDocument()
   })
@@ -191,7 +203,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
-    await userEvent.type(await screen.findByPlaceholderText('Search or type a new product'), 'Test Cable')
+    await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
     await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
     await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
     await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
