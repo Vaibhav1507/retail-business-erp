@@ -156,7 +156,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       {(loading || queryPending) && <p className="sales-history-status" role="status">{loaded ? 'Updating sales…' : tr('app.loading')}</p>}
       {loaded && resultsCurrent && !loading && !queryPending && <p className="sales-history-count" role="status">{shownSales.length} {shownSales.length === 1 ? 'bill' : 'bills'}{query ? ' found' : ''}</p>}
 
-      {loaded && resultsCurrent && !loading && !queryPending && <Paged rows={shownSales} label="bills" resetKey={query + ':' + unpaid} empty={emptyMessage}>
+      {loaded && resultsCurrent && !loading && !queryPending && <Paged rows={shownSales} label="bills" resetKey={query + ':' + unpaid} empty={emptyMessage} regionLabel="Sales history results">
         {page => (
           <>
             <div className="sales-history-desktop">

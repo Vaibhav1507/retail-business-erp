@@ -1,4 +1,19 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Dialog, type Locator, type Page } from '@playwright/test'
+
+const dialogPolicies = new WeakMap<Page, (dialog: Dialog) => void | Promise<void>>()
+const dialogListeners = new WeakMap<Page, (dialog: Dialog) => void | Promise<void>>()
+
+/** Update the active dialog policy while keeping exactly one listener on the page. */
+export function setDialogHandler(page: Page, handler: (dialog: Dialog) => void | Promise<void>) {
+  dialogPolicies.set(page, handler)
+  if (dialogListeners.has(page)) return
+  const listener = async (dialog: Dialog) => {
+    const activeHandler = dialogPolicies.get(page)
+    if (activeHandler) await activeHandler(dialog)
+  }
+  dialogListeners.set(page, listener)
+  page.on('dialog', listener)
+}
 
 export const PASSWORD = 'Synthetic#Pass123'
 
@@ -23,7 +38,7 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   // The app intentionally asks for confirmation before leaving protected workflows.
   // Playwright dismisses dialogs by default, which silently cancels page.goto() and leaves
   // later assertions on the previous route. Accept the explicit navigation confirmation.
-  page.on('dialog', async dialog => {
+  setDialogHandler(page, async dialog => {
     if (dialog.type() === 'confirm') await dialog.accept()
     else await dialog.dismiss()
   })
@@ -114,6 +129,10 @@ export async function chooseCategory(form: Locator, name: string) {
 /** Posts a sale through the Generate invoice screen (/#/sell/bill). Leaves the page on the "Saved as INV-..." status. */
 export async function postInvoice(page: Page, o: { product: string; qty: string; price: string; discount?: string; mode?: 'Cash' | 'UPI' | 'Credit'; paid?: string; name?: string; phone?: string }) {
   await page.goto('/#/sell/bill')
+  // A same-hash navigation does not remount GenerateInvoice after a successful sale.
+  // Reopen the form explicitly when this helper is used for consecutive invoices.
+  const newInvoice = page.getByRole('button', { name: 'New invoice', exact: true })
+  if (await newInvoice.isVisible().catch(() => false)) await newInvoice.click()
   const bill = page.getByRole('region', { name: 'Generate invoice' })
   if (o.phone) await bill.locator('#billing-phone').fill(o.phone)
   if (o.name) await bill.locator('#billing-name').fill(o.name)
