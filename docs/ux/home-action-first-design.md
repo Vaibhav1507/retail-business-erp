@@ -36,7 +36,7 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 - Loading and error states use status/alert semantics.
 - Reduced-motion preferences are respected.
 - Touch targets are at least 44px on the small controls and larger for the principal actions.
-- On Home, the Assistant launcher stays in document flow below the dashboard rather than floating over figures; its expanded panel remains available as an overlay.
+- The Assistant launcher remains fixed to the viewport on mobile and desktop, above the bottom navigation safe area; it must not scroll with Home content. The expanded assistant panel remains an overlay.
 - The mobile shop header uses a compact single-line business name.
 - Supplier dues and quick-action helper text use short shopkeeper-friendly wording.
 - Day-closing reminders use singular/plural grammar.
@@ -48,7 +48,7 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 - [ ] Verify real dashboard values and empty/zero values render correctly.
 - [ ] Simulate dashboard failure and confirm Retry works.
 - [x] Verify actionable reminders still render; singular/plural copy has been corrected.
-- [ ] Verify the in-flow Home Assistant launcher cannot cover metric cards on a fresh mobile capture.
+- [x] Playwright visual audit asserts the Assistant launcher uses fixed positioning at each audited Home viewport; verify its bottom offset remains clear of bottom navigation in screenshots.
 - [ ] Check English and Hindi layouts for wrapping and horizontal overflow, including the shortened supplier label.
 - [x] Web lint, unit tests, TypeScript check and production build passed in PR #70 CI.
 - [ ] Run a fresh Home visual audit after the final polish and verify the live page with real shopkeeper tasks.
