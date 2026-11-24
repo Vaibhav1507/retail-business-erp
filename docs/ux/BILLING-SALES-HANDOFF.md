@@ -176,3 +176,9 @@ Refresh current open branches/PRs and CI after this handoff update, then create 
 - Sell hub is intentionally unchanged because the supplied screenshot already meets the approved action-first design. No unnecessary redesign was added.
 - PR #80 head at creation: `f4ee4fd19000e95d0459edead3b662f4280c9877`. CI and visual screenshots must be refreshed/checked against this exact head.
 - PR #80 remains draft; no merge or deployment.
+
+
+### Latest checkpoint — 2026-11-24 12:30 UTC
+- PR #80 current head refreshed to `774933e32ca77c1a83fed2af3da98cb8d3372e31` after an accessibility-safe adjustment to the Customer Returns history disclosure label.
+- CI run #45393741940 started against the preceding head `f4ee4fd19000e95d0459edead3b662f4280c9877`; it was still in progress when checked. It does not certify the latest head.
+- Recheck the latest-head workflow before calling tests passed. Full four-screen Playwright/Axe and fresh Android screenshot review remain pending.
