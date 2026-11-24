@@ -115,9 +115,9 @@ describe('Procurement Buy screens', () => {
 
     await screen.findByRole('combobox', { name: 'Supplier' })
     await user.selectOptions(screen.getByRole('combobox', { name: 'Supplier' }), 'sup-1')
-    await user.selectOptions(screen.getByLabelText('Product'), 'prod-1')
-    await user.type(screen.getByLabelText('Quantity'), '2')
-    await user.type(screen.getByLabelText('Unit cost (INR, before GST)'), '100')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Product' }), 'prod-1')
+    await user.type(screen.getByRole('textbox', { name: 'Quantity' }), '2')
+    await user.type(screen.getByRole('textbox', { name: 'Unit cost (INR, before GST)' }), '100')
     await user.click(screen.getByRole('button', { name: 'Add GST details (optional)' }))
     await user.type(screen.getByLabelText('GST on this line (INR)'), '20')
     await user.click(screen.getByRole('button', { name: 'Add item' }))
