@@ -47,3 +47,14 @@ The user-supplied MagicPath screenshots remain the invoice hierarchy reference; 
 ## Preserved business rules
 
 Customer name/mobile required; zero-stock billing and ad-hoc lines; optional serial/IMEI/barcode with non-blocking missing-serial warning and duplicate detection; server-authoritative invoice/GST calculations; collection and return semantics in other screens unchanged; WhatsApp consent/retry/duplicate protection; held and offline sale semantics; invoice-only print; tenant boundaries and existing routes.
+
+
+## Latest Create Invoice polish (new PR)
+
+The compact invoice and electronics fields from [PR #77](https://github.com/Vaibhav1507/retail-business-erp/pull/77) are the merged baseline. The next focused follow-up branch `ux/invoice-product-details-assistant-launcher` applies the final user-requested refinements:
+- **Scan tag** replaces the previous photo-action label; the same camera/gallery capture and extraction path is retained.
+- Brand is surfaced as an always-visible optional product field.
+- Payment mode is visible on the form; Sale date remains inside Payment & bill details.
+- Navigation Assistant moves from the header to a floating bottom-right message icon, preserving its panel and voice/navigation behaviour.
+
+See [invoice-product-details-assistant-launcher.md](./invoice-product-details-assistant-launcher.md) for the full design decisions and acceptance criteria. This follow-up is not merged or deployed until its PR and visual acceptance are complete.
