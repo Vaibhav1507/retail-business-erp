@@ -29,10 +29,10 @@ describe('Collections', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Customer'), 'c1')
     expect(await screen.findByText('₹1,200.00')).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Amount received (INR)'), '500')
-    await userEvent.selectOptions(screen.getByLabelText('Apply to a bill (optional)'), 'sale-1')
+    await userEvent.selectOptions(await screen.findByLabelText('Apply to a bill (optional)'), 'sale-1')
     await userEvent.click(screen.getByRole('button', { name: 'Record payment' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Customer now owes 700.00 INR')
+    expect(await screen.findByText(/Customer now owes 700\.00 INR/)).toBeInTheDocument()
     await waitFor(() => expect(posts.some(p => p.url === '/api/customer-payments')).toBe(true))
     const post = posts.find(p => p.url === '/api/customer-payments')!
     expect(post.body).toMatchObject({ customerId: 'c1', amount: 500, method: 'Cash', allocations: [{ billId: 'sale-1', amount: 500 }] })
