@@ -55,6 +55,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   }, [])
   useEffect(() => { load().catch(e => setError(msg(e))) }, [load])
   const sup = supplierId || suppliers.find(s => s.isActive)?.id || ''
+  const paySup = paySupplierId
   const loc = locationId || locations[0]?.id || ''
   const nameOf = (id: string) => products.find(p => p.id === id)?.name ?? id
   const run = async (fn: () => Promise<string>) => {
@@ -97,12 +98,17 @@ export function Procurement({ products, locations, reload, show }: { products: (
     return 'Receipt posted' + (r.replayed ? ' (already posted earlier).' : '.')
   })
   const pay = () => run(async () => {
-    await api('POST', '/supplier-payments', { supplierId: sup, paymentDate: today(), amount: Number(amount), method, reference: pref || null }, pkey)
-    setAmount(''); setPref(''); setPkey(newKey())
-    return 'Payment recorded.'
+    const allocations = selectedBill && allocationAmount > 0 ? [{ billId: selectedBill.id, amount: allocationAmount }] : undefined
+    const result = await api<{ owed: number }>('POST', '/supplier-payments', { supplierId: paySup, paymentDate: today(), amount: Number(amount), method, reference: pref || null, ...(allocations ? { allocations } : {}) }, pkey)
+    setAmount(''); setPref(''); setBillId(''); setPkey(newKey())
+    return `Payment recorded. New balance: ₹${result.owed.toFixed(2)}.`
   })
   const [statement, setStatement] = useState<{ supplier: string; outstanding: number; entries: { id: string; type: string; date: string; debit: number; credit: number; balance: number }[] } | null>(null)
   const [billId, setBillId] = useState(''); const [openBills, setOpenBills] = useState<{ id: string; date: string; reference: string | null; open: number }[]>([])
+  const selectedBill = openBills.find(b => b.id === billId)
+  const allocationAmount = selectedBill ? Math.min(Number(amount) || 0, selectedBill.open) : 0
+  const payOwed = suppliers.find(s => s.id === paySup)?.owed ?? 0
+  const amountError = amount.trim() === '' ? 'Enter an amount to pay.' : !(Number(amount) > 0) ? 'Enter an amount greater than zero.' : Number(amount) > payOwed ? 'Payment cannot be more than the supplier balance.' : ''
   useEffect(() => { setBillId(''); setStatement(null); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
   const showStatement = () => run(async () => { const id = v('pay') ? paySup : sup; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
