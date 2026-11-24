@@ -1,7 +1,7 @@
 # RBOS Usability & Accessibility Programme
 
-- **Status:** Living programme; initial source-code baseline documented, visual audit pending
-- **Repository baseline:** `main` at `4cfee7d4e1c3560fcdc7e28b8d5823afea14efb0` (23 November 2026)
+- **Status:** IN_PROGRESS — source baseline documented; first route audit reviewed; exhaustive Billing & Sales capture PR #72 is awaiting its CI run and evidence review
+- **Repository baseline:** `main` at `17428b20c1974a0a57d00b60774d893831304e64` (24 November 2026; refresh before implementation)
 - **Scope:** Screen-by-screen usability, accessibility, responsive-layout and interaction improvements
 - **Release boundary:** This document does not authorise application-code changes, production deployment, schema changes or feature expansion.
 - **Visual audit sequence:** Home first; then Billing & Sales, including the Sell hub and its sales-related sections
@@ -81,11 +81,13 @@ Do not capture the entire application inventory in one run. Run one connected ar
 **Execution rules**
 
 - The GitHub Actions visual-audit workflow must offer one scope per run, with **Home** selected by default.
-- Each scope is captured at the current mobile and tablet viewports (390 × 844 and 768 × 1024); screenshots and reports are stored in a scope-specific artifact.
-- Finish the Home review and agree on findings/design direction before starting the Billing & Sales run.
-- The Billing & Sales route pass is the baseline, not the final interaction audit. Follow it with explicit captures of nested states: new-invoice form → review → saved invoice; Sales History → invoice detail; Collect payment → customer statement; Customer return → selected sale/return detail. Add only the data and steps needed in the isolated synthetic test environment.
+- Home retains its original baseline at 390 × 844 and 768 × 1024.
+- Billing & Sales route baselines are captured at 360 × 800, 390 × 844, 412 × 915, 768 × 1024, 1280 × 900 and 844 × 390 landscape. Nested interaction states are captured at compact mobile, standard mobile, tablet and desktop widths; loading/async states use focused captures.
+- Route readiness must be proved with screen-specific data markers (for example, an actual Sales History row), not `networkidle` alone. Seed only the synthetic records needed for each journey.
+- The Billing & Sales route pass is the baseline, not the final interaction audit. The expanded suite must cover bill creation/review/post/print, extraction, history search/filter/pagination/detail, collections/statement/payment, returns/return detail, held bills and offline-pending states.
+- Visual Audit runs automatically on pull requests that change the scoped audit or relevant Billing & Sales UI files; manual dispatch remains available and Home remains the default manual scope.
 - Do not create or use real customer, invoice or payment data for visual-audit captures.
-- Do not mark nested states as audited until screenshots of those states have actually been captured and reviewed.
+- Do not mark any state as audited until its screenshot and corresponding assertions have been reviewed.
 
 ## 3. Standard lifecycle for every screen
 
@@ -201,6 +203,24 @@ Capture the following using synthetic data only:
 - Long historical invoice; toolbar after scrolling; close/backdrop/Escape behaviour.
 - Browser print preview for A4 and 80 mm; verify that mobile cards, app navigation, assistant and action buttons do not print.
 
+### 4.7 First route-audit artifact review — 24 November 2026
+
+**Run:** [RBOS Visual Audit #2](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45299902320)  
+**Artifact:** `rbos-visual-audit-billing-sales` (artifact ID `14878326785`)  
+**Evidence:** 10 screenshots and 10 report rows: five Sell routes at 390 × 844 and 768 × 1024.
+
+The report recorded zero horizontal overflow, unnamed controls, undersized controls and Axe WCAG 2 A/AA violations for the states it actually captured. This is not proof that the whole flow passes.
+
+**Screenshot-by-screenshot findings:**
+
+- `sell/menu`: route shell and four Sell destinations visible; no navigation interaction was exercised.
+- `sell/bill`: initial empty form only; tag/photo chooser, advanced fields, validation, cart, review, success and print were not captured.
+- `sell/bills`: mobile screenshot showed `Loading…`; tablet showed `No bills found` with no seeded sales. The test waited for network idle, not the loaded business state.
+- `sell/collect`: blank customer/payment form and empty collection history only.
+- `sell/return`: blank sale selector and empty return history only.
+
+**Disposition:** route existence is VERIFIED; complete route-state coverage is NOT_VERIFIED. The first audit is a useful shell baseline, not visual acceptance. PR #72 adds synthetic data seeding, explicit readiness assertions, nested-state captures and fail-on-violation gates. Review its artifact before closing this finding.
+
 ### 4.6 Viewports and device checks
 
 Minimum capture matrix for this billing group:
@@ -252,10 +272,10 @@ Do not use a tool simply to satisfy a checklist. Record the contribution and the
 | Sequence | Tool | Status for this programme | Initial assessment |
 |---|---|---|---|
 | 1 | ChatGPT / repository source analysis | **Used** | Useful for establishing the current implementation and evidence-backed billing questions. Must be followed by live visual/user evidence. |
-| 2 | RBOS Visual Audit + Playwright | **Pending** | Run the repository visual-audit workflow with billing-sales; inspect the screenshots and Axe report. The current route pass does not capture all nested states, so add a focused interaction-capture pass after reviewing the route baseline. |
-| 3 | MagicPath | **Not started** | Wait for the Product Design audit findings and confirmed design brief. |
+| 2 | RBOS Visual Audit + Playwright | **IN_PROGRESS** | Run #2 (45299902320) route artifact reviewed: 10 screenshots, five routes × two viewports. The first suite exposed a data-readiness defect (Sales History mobile captured `Loading…`; tablet showed an unseeded empty list). PR #72 adds deterministic data, nested-state capture and enforced checks; its new run/artifact must be reviewed before this stage is accepted. |
+| 3 | MagicPath | **NOT_STARTED** | Wait for the expanded RBOS Visual Audit findings and confirmed design brief. Do not use the Product Design plugin; MagicPath and Figma remain in the workflow. |
 | 4 | Figma | **Not started** | Wait until a design direction is selected; then formalise the approved direction. |
-| 5 | GitHub implementation | **Not started** | The current GitHub use is repository inspection and this documentation PR only. No application code or deployment is authorised by this programme document. |
+| 5 | GitHub implementation | **NOT_STARTED** | PR #72 is audit-test/workflow infrastructure only. No Billing & Sales application redesign or production deployment has been started or authorised by this programme document. |
 
 ## 7. Acceptance checklist for each redesigned screen
 
@@ -280,14 +300,14 @@ A screen is not complete until the relevant checks are evidenced:
 
 ## 8. Immediate next actions
 
-1. Run the RBOS Visual Audit GitHub Actions workflow for billing-sales; review its route screenshots and Axe report, then capture the nested interaction states listed in section 2.2 and 4.5.
-2. Update BILL-01…BILL-12 with screenshots, confidence, severity and any issues already resolved by current code.
-3. Choose the top design problems and ask MagicPath for alternatives only where the choice benefits from exploration.
-4. Formalise the selected design in Figma.
-5. Implement only approved changes in a scoped GitHub PR; keep business logic changes separate.
-6. Test the resulting flow with synthetic data and representative shop users before accepting Billing and moving to the next phase.
+1. Complete PR #72's RBOS Visual Audit CI run; inspect its screenshots, report and any failed assertions, then fix the audit itself or record verified UI findings.
+2. Extend the matrix for any uncovered state discovered during the run (including WhatsApp status variants, collection bill allocation and extraction failure/recovery); do not mark these as covered until evidence exists.
+3. Update BILL-01…BILL-12 with screenshot evidence, confidence, severity and any issues already resolved by current code.
+4. Only after the capture suite is complete and visually reviewed, explore the highest-value alternatives in MagicPath.
+5. Formalise the selected direction in editable Figma with components, tokens, responsive layouts and important states.
+6. Implement only the approved Billing & Sales design in a focused application PR; preserve business rules and APIs, then test and validate with synthetic data and representative shop users.
 
-**Current stop point:** the source-code baseline is documented. The Billing route-level visual audit, nested-state screenshots, screenshot review, MagicPath exploration and Figma design are pending. Do not begin implementation from this document alone.
+**Current stop point:** the first route-level artifact has been reviewed but is not accepted as complete. PR #72 is expanding capture and enforcement; wait for its CI result, inspect the full artifact and close any missing states before MagicPath or Figma. Do not begin application redesign from the first route-only artifact.
 
 ## 9. Mandatory decision, assumption and deferral ledger
 
@@ -353,11 +373,15 @@ A screen phase is not documentation-complete until its decision log, deferral li
 
 ## 10. Current phase handover — Billing & Sales
 
-- **Completed:** initial source-code audit and route map; workflow supports the five Billing & Sales routes and mobile/tablet route-level screenshots.
-- **Decided:** run the RBOS Visual Audit workflow for billing-sales before MagicPath exploration; retain MagicPath and Figma in the design sequence. Product Design is not a prerequisite.
-- **Pending:** route-level screenshot run; inspect actual screenshots/Axe output; extend Playwright capture to nested bill, history, collection and return states; then MagicPath alternatives and editable Figma design.
-- **Not started:** application implementation for this UX phase.
-- **Out of scope:** unrelated Home, Stock, Purchasing, global navigation and backend/business-rule changes unless a verified dependency requires a separately documented decision.
-- **Known deferred items:** none newly deferred by this documentation update. Existing BILL-01…BILL-12 are source-based findings awaiting visual verification and re-prioritisation; do not silently close them based on code inspection alone.
-- **Next action:** run the RBOS Visual Audit workflow with billing-sales, download the artifact and review every screenshot/report before design exploration.
-- **Documentation branch:** docs/rbos-usability-accessibility-programme (PR #67). Keep all related UX programme documentation updates on this existing branch/PR unless the user explicitly requests a separate PR.
+- **Completed:** initial source-code audit and route map; first route-level artifact downloaded and all 10 screenshots inspected (five routes × mobile/tablet); report.json reviewed.
+- **Verified:** run #2 `45299902320` completed; artifact ID `14878326785`; its captured states reported zero horizontal overflow, unnamed controls, undersized controls and Axe WCAG 2 A/AA violations.
+- **Verified finding:** the mobile Sales History screenshot captured `Loading…`, while the tablet screenshot showed `No bills found` because the test did not seed a sale. Therefore the green run did not prove a loaded history screen.
+- **Verified capture limitation:** the first audit captured only initial route states; it did not exercise bill review/post, dialogs, extraction, payment, return or print flows. Full-page screenshots also place fixed navigation at its viewport coordinate, so scroll-position captures are needed to review overlays accurately.
+- **Decided:** retain the existing Home audit as a separate scope; add a dedicated deterministic Billing & Sales suite, seed synthetic data, mock AI extraction and make accessibility/layout checks fail CI. No Product Design plugin; MagicPath and Figma remain the next design stages after audit acceptance.
+- **IN_PROGRESS:** PR #72 (`test/billing-sales-visual-audit-coverage`) adds the interaction suite and PR-triggered workflow. Its CI and visual artifact are not yet accepted.
+- **Not started:** MagicPath exploration, editable Figma design and Billing & Sales application implementation.
+- **Out of scope:** unrelated Home redesign, Stock, Purchasing, global navigation and backend/business-rule changes unless verified as a dependency.
+- **Uncovered until evidence is added/reviewed:** WhatsApp delivery/status variants beyond the seeded state; collection allocation to a specific bill; extraction failure/recovery; real Android camera permission, printer/share sheet and TalkBack; browser-native confirmation is asserted by dialog text but cannot be captured as a page screenshot.
+- **Existing findings:** BILL-01…BILL-12 remain source-based findings awaiting current-state visual verification and re-prioritisation; do not silently close them based on code inspection alone.
+- **Next action:** review PR #72's run `45301760436`, inspect the full screenshot/report artifact, resolve failures and close the remaining coverage gaps before MagicPath.
+- **Documentation branch:** docs/rbos-usability-accessibility-programme (PR #67). Keep related UX programme documentation updates on this existing branch/PR; PR #72 is a separate, justified test/workflow implementation PR.
