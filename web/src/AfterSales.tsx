@@ -18,7 +18,7 @@ type ReturnDetail<T> = { return: T; lines: { product: string; sku: string; quant
 const newKey = () => crypto.randomUUID()
 const today = () => new Date().toISOString().slice(0, 10)
 const msg = (e: unknown) => (e instanceof ApiError && e.status >= 500 ? 'Server error. Retrying is safe.' : e instanceof Error ? e.message : 'Something went wrong')
-const printLink = (kind: string, id: string) => <a href={'#/print/' + kind + '/' + id} target="_blank" rel="noreferrer">Print</a>
+const printLink = (kind: string, id: string) => <a className="billing-action-link" href={'#/print/' + kind + '/' + id} target="_blank" rel="noreferrer">Print</a>
 
 export type AfterPart = 'collect' | 'sreturn' | 'preturn' | 'print'
 
