@@ -575,6 +575,11 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             </ul>}
           </div>
 
+          <div className="billing-field billing-col-12">
+            <label htmlFor="billing-brand">Brand</label>
+            <input id="billing-brand" autoComplete="off" placeholder="Enter brand if available" value={brandText} onChange={e => setBrandText(e.target.value)} />
+          </div>
+
           {isElectronicsBusiness ? (
             <>
               <div className="invoice-electronics-fields billing-col-12">
@@ -619,7 +624,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <summary><span>More item details</span><small>Optional</small></summary>
           <div className="billing-grid invoice-product-extra-grid">
             <div className="billing-field billing-col-6"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" aria-invalid={Boolean(fieldErrors.discount)} className={fieldErrors.discount ? 'field-invalid' : ''} inputMode="decimal" value={disc} onChange={e => { setDisc(e.target.value); setFieldErrors(current => ({ ...current, discount: '' })) }} />{fieldErrors.discount && <small className="field-error">{fieldErrors.discount}</small>}</div>
-            <div className="billing-field billing-col-6"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
             {!isElectronicsBusiness && <div className="billing-field billing-col-6"><label htmlFor="billing-model">Model number</label><input id="billing-model" autoComplete="off" placeholder="Enter model if available" value={modelText} onChange={e => setModelText(e.target.value)} /></div>}
             {!isElectronicsBusiness && <div className="billing-field billing-col-6"><label htmlFor="billing-serial">Serial number (optional)</label><input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} aria-describedby={fieldErrors.serial ? "billing-serial-error" : undefined} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />{fieldErrors.serial && <small id="billing-serial-error" className="field-error">{fieldErrors.serial}</small>}</div>}
             <div className="billing-field billing-col-6"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
@@ -696,12 +700,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         {gst && <small className="invoice-summary-tax">Includes GST of ₹{money(tax)}</small>}
       </section>
 
+      <div className="billing-field invoice-payment-mode">
+        <label htmlFor="billing-mode">Payment mode</label>
+        <select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select>
+      </div>
+
       <details className="invoice-more-details">
         <summary><span>Payment & bill details</span><small>Optional</small></summary>
         <div className="invoice-more-details-content billing-grid">
           {locations.length > 1 && <div className="billing-field billing-col-12"><label htmlFor="billing-store">Store</label><select id="billing-store" value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>}
           <div className="billing-field billing-col-6"><label htmlFor="billing-date">Sale date</label><input id="billing-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-          <div className="billing-field billing-col-6"><label htmlFor="billing-mode">Payment mode</label><select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
           {mode === 'Credit' && <div className="billing-field billing-col-6"><label htmlFor="billing-paid">{tr('bill.paidNow')}</label><input id="billing-paid" inputMode="decimal" value={paid} onChange={e => setPaid(e.target.value)} /></div>}
           {mode === 'Credit' && <><div className="billing-field billing-col-6"><label htmlFor="billing-paid-method">Paid by</label><select id="billing-paid-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2">Second payment (INR, optional)</label><input id="billing-paid2" inputMode="decimal" value={paid2} onChange={e => setPaid2(e.target.value)} /></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2-method">Second paid by</label><select id="billing-paid2-method" value={payMethod2} onChange={e => setPayMethod2(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div></>}
           <div className="invoice-more-details-actions billing-col-12">
