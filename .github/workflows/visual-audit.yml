@@ -29,11 +29,11 @@ permissions:
 
 jobs:
   scoped-screen-audit:
-    name: Audit ${{ inputs.scope || 'billing-sales' }}
+    name: Audit ${{ github.event.inputs.scope || 'billing-sales' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      UI_AUDIT_SCOPE: ${{ inputs.scope || 'billing-sales' }}
+      UI_AUDIT_SCOPE: ${{ github.event.inputs.scope || 'billing-sales' }}
       Rbos__Database: test
       ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
       ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
@@ -100,7 +100,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rbos-visual-audit-billing-sales
-          path: web/test-results/ui-audit/billing-sales/
+          name: rbos-visual-audit-${{ github.event.inputs.scope || 'billing-sales' }}
+          path: web/test-results/ui-audit/${{ github.event.inputs.scope || 'billing-sales' }}/
           if-no-files-found: warn
           retention-days: 7
