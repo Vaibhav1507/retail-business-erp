@@ -11,17 +11,29 @@ on:
         options:
           - home
           - billing-sales
+  pull_request:
+    paths:
+      - ".github/workflows/visual-audit.yml"
+      - "web/e2e/ui-audit.spec.ts"
+      - "web/src/GenerateInvoice.tsx"
+      - "web/src/SalesHistory.tsx"
+      - "web/src/AfterSales.tsx"
+      - "web/src/ItemTagCapture.tsx"
+      - "web/src/SalesInvoiceCapture.tsx"
+      - "web/src/PhotoSourcePicker.tsx"
+      - "web/src/InvoiceDocument.tsx"
+      - "web/src/Pages.tsx"
 
 permissions:
   contents: read
 
 jobs:
   scoped-screen-audit:
-    name: Audit ${{ inputs.scope }}
+    name: Audit ${{ inputs.scope || 'billing-sales' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
-      UI_AUDIT_SCOPE: ${{ inputs.scope }}
+      UI_AUDIT_SCOPE: ${{ inputs.scope || 'billing-sales' }}
       Rbos__Database: test
       ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
       ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
@@ -88,7 +100,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rbos-visual-audit-${{ inputs.scope }}
-          path: web/test-results/ui-audit/${{ inputs.scope }}/
+          name: rbos-visual-audit-billing-sales
+          path: web/test-results/ui-audit/billing-sales/
           if-no-files-found: warn
           retention-days: 7
