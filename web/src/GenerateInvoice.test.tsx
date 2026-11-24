@@ -54,7 +54,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const reload = vi.fn()
     render(<GenerateInvoice products={products} locations={locations} reload={reload} />)
 
-    await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
     await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
     await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
