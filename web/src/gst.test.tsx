@@ -32,7 +32,7 @@ async function readInvoice(d: InvoiceDraft) {
   mock({ ...csrf, '/api/purchases/extract': () => ({ body: d }) })
   render(<InvoiceUpload products={products} suppliers={[]} onUse={(_d, picked) => { used.picked = picked }} />)
   const file = new File(['x'], 'bill.pdf', { type: 'application/pdf' })
-  await userEvent.upload(screen.getByLabelText(/Upload a supplier bill photo or PDF/), file)
+  await userEvent.upload(screen.getByLabelText('Upload supplier bill files'), file)
   await screen.findByLabelText('Supplier for this invoice')
   return used
 }
