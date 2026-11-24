@@ -367,6 +367,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await capture(page, 'collection-customer-selected')
   const billAllocation = collection.getByLabel('Apply to a bill (optional)')
   await expect(billAllocation).toBeVisible()
+  await expect(billAllocation.locator('option')).toHaveCount(2)
   await billAllocation.selectOption(await billAllocation.locator('option').nth(1).getAttribute('value')!)
   await capture(page, 'collection-bill-allocation')
   await collection.getByRole('button', { name: 'View customer statement' }).click()
@@ -413,7 +414,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await returns.getByRole('button', { name: 'Cancel entire sale' }).click()
   const cancelDialog = page.getByRole('dialog', { name: 'Cancel entire sale?' })
   await expect(cancelDialog).toBeVisible()
-  await expect(cancelDialog).toContainText('Stock will be restored and the books reversed')
+  await expect(cancelDialog).toContainText('This reverses the whole sale, restores stock and reverses the books')
   await capture(page, 'return-cancel-confirmation')
   await cancelDialog.getByRole('button', { name: 'Keep sale' }).click()
 
