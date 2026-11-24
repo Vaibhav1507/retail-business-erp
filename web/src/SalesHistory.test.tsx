@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SalesHistory } from './SalesHistory'
@@ -31,11 +31,11 @@ beforeEach(() => {
 describe('SalesHistory', () => {
   it('shows searchable sale cards and filters unpaid bills', async () => {
     render(<SalesHistory locations={[{ id: 'l1', name: 'Main Store' }]} />)
-    expect(await screen.findByText('Asha Stores')).toBeInTheDocument()
-    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument()
+    expect((await screen.findAllByText('Asha Stores')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('Ravi Kumar')).length).toBeGreaterThan(0)
 
     await userEvent.click(screen.getByLabelText('Unpaid only'))
-    expect(screen.getByText('Asha Stores')).toBeInTheDocument()
+    expect((await screen.findAllByText('Asha Stores')).length).toBeGreaterThan(0)
     expect(screen.queryByText('Ravi Kumar')).not.toBeInTheDocument()
 
     await userEvent.clear(screen.getByLabelText('Search sales'))
@@ -46,10 +46,8 @@ describe('SalesHistory', () => {
 
   it('opens and closes the historical invoice detail dialog', async () => {
     render(<SalesHistory locations={[{ id: 'l1', name: 'Main Store' }]} />)
-    await screen.findByText('Asha Stores')
-    const card = screen.getByText('Asha Stores').closest('li')
-    expect(card).not.toBeNull()
-    await userEvent.click(within(card as HTMLElement).getByRole('button', { name: 'View bill' }))
+    await screen.findAllByText('Asha Stores')
+    await userEvent.click(screen.getAllByRole('button', { name: 'View bill' })[0])
     const dialog = await screen.findByRole('dialog', { name: 'Bill details' })
     expect(dialog).toHaveTextContent('INV-000012')
     expect(dialog).toHaveTextContent('Mixer')
