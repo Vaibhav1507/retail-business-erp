@@ -72,13 +72,14 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /Create new bill/ })).toHaveClass('sell-hub-primary')
   })
 
-  it('places the assistant in the header and keeps Sell subroutes to one page heading', async () => {
+  it('places the assistant in a floating launcher and keeps Sell subroutes to one page heading', async () => {
     window.location.hash = '#/sell/menu'
     mock(signedIn)
     const { container, unmount } = render(<App />)
     expect(await screen.findByRole('heading', { name: 'Billing / Sales' })).toBeInTheDocument()
     const assistant = await screen.findByRole('button', { name: 'Open assistant' })
-    expect(container.querySelector('.topbar')).toContainElement(assistant)
+    expect(container.querySelector('.assistant-launcher')).toBe(assistant)
+    expect(container.querySelector('.topbar')).not.toContainElement(assistant)
     expect(assistant).toHaveAttribute('aria-expanded', 'false')
 
     unmount()
