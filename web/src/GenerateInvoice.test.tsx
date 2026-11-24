@@ -41,8 +41,10 @@ describe('GenerateInvoice WhatsApp independence', () => {
   it('keeps tag capture beside the product field and separates handwritten import', async () => {
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     const productInput = screen.getByPlaceholderText('Search product or enter model')
-    expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+    const addressDisclosure = container.querySelector('.customer-address-details') as HTMLDetailsElement
+    expect(addressDisclosure.open).toBe(false)
     await userEvent.click(screen.getByText('Add address (optional)'))
+    expect(addressDisclosure.open).toBe(true)
     expect(screen.getByLabelText('Address')).toBeInTheDocument()
     const productRow = productInput.closest('.invoice-product-entry')
     expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))

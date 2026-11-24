@@ -31,6 +31,8 @@ describe('CustomerReturns', () => {
   it('prevents quantities above remaining and posts a return by sale-line id', async () => {
     render(<CustomerReturns reload={vi.fn()} />)
     const saleSearch = await screen.findByRole('combobox', { name: 'Choose the original bill' })
+    await waitFor(() => expect(saleSearch).toBeEnabled())
+    await waitFor(() => expect(saleSearch).toBeEnabled())
     await userEvent.type(saleSearch, 'Asha')
     await userEvent.click(await screen.findByRole('option', { name: /INV-000012/ }))
     const quantity = await screen.findByLabelText('Return quantity')
