@@ -543,7 +543,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </div>
         </div>
         <p className="invoice-helper">{customerId ? 'Existing customer. You can edit their details before confirming the bill.' : 'New customer? Enter their name and number to add them with this bill.'}</p>
-details>
       </section>
 
       <section className="invoice-section-card invoice-items-card" aria-labelledby="invoice-items-title">
