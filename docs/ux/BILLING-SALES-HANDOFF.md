@@ -21,7 +21,7 @@
 
 | Order | Route | Screen | Design | Implementation |
 |---|---|---|---|---|
-| 1 | #/sell/bill | Create Invoice, review and completion | Concept A selected; repository design specification still needs completion | Candidate in PR #74 |
+| 1 | #/sell/bill | Create Invoice, review and completion | **Completed:** [Create Invoice design specification](./billing-sales-create-invoice-design.md); PR #74 compared | Candidate in PR #74; focused CI passed; group visual acceptance pending |
 | 2 | #/sell/menu | Sell landing/action hub | Not started | Not started |
 | 3 | #/sell/bills | Sales History and historical invoice detail | Not started | Existing baseline only |
 | 4 | #/sell/collect | Payment collection/customer dues | Not started | Existing baseline only |
@@ -31,10 +31,10 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 
 ## 3. PRs and evidence — refresh before relying
 
-- **PR #74 — [action-first Create Invoice](https://github.com/Vaibhav1507/retail-business-erp/pull/74)**. Branch: ux/invoice-entry-action-first. Known head: 72cfe96dd8b361d77123d136f1f6f12ad6ac4768. Last inspected: open/draft, not merged. It hides persistent main navigation and Navigation Assistant on the active invoice route; puts Scan Tag beside product entry; keeps Add Product as the sole primary item action; separates handwritten-bill import; progressively discloses optional Brand/Model/Serial; and provides sticky total/review action. No API/business-rule changes intended.
+- **PR #74 — [action-first Create Invoice](https://github.com/Vaibhav1507/retail-business-erp/pull/74)**. Branch: `ux/invoice-entry-action-first`. Refreshed head: `72cfe96dd8b361d77123d136f1f6f12ad6ac4768`. Open/draft, not merged. It hides persistent main navigation and Navigation Assistant on the active invoice route; puts Scan Tag beside product entry; keeps Add Product as the sole primary item action; separates handwritten-bill import; progressively discloses optional details; and provides sticky total/review action. Exact-head standard CI #45340114617 is completed/success. The implementation is a candidate; visual acceptance remains pending.
 - **PR #74 exact-head CI:** [run #45340114617](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45340114617) passed the known head: frontend TypeScript/tests/lint/build/dependency audit; backend Release build/unit tests/container build (no push); PostgreSQL integration bootstrap/build/tests. Refresh run/head.
 - **PR #72 — [Billing & Sales visual audit infrastructure](https://github.com/Vaibhav1507/retail-business-erp/pull/72)**. Last inspected: open/draft, not merged. Refresh status.
-- **PR #67 — [UX programme and Billing & Sales handoff](https://github.com/Vaibhav1507/retail-business-erp/pull/67)**. Branch: docs/rbos-usability-accessibility-programme; open/draft and mergeable at last inspection. The current handoff has since received another documentation commit, so fetch the latest branch head and workflow status before relying on it. It contains the living programme and this handoff. **PR #75 — [Figma-optional playbook update](https://github.com/Vaibhav1507/retail-business-erp/pull/75)**, branch docs/rbos-figma-optional-workflow; open/draft and mergeable at last inspection; it now includes both the playbook and reusable ChatGPT Project Instructions. Refresh its current head and CI before relying on status. Neither documentation PR is merged; the changes are not on main until merged. Refresh both PR heads/CI.
+- **PR #67 — [UX programme and Billing & Sales handoff](https://github.com/Vaibhav1507/retail-business-erp/pull/67)**. Branch: `docs/rbos-usability-accessibility-programme`; open/draft. Latest documentation commit before this handoff update: `d91b891dea84031a6253410d0dbe8ffce1907dd3` (programme update); handoff is being updated in the same branch. Exact-head CI #45343697012 passed the previous head `fe6f8ca835e94c7404dfbdb51c0e5c51e2cc4902`; refresh CI after the latest documentation commit. **PR #75 — [Figma-optional playbook update](https://github.com/Vaibhav1507/retail-business-erp/pull/75)** is merged; the current main playbook has been fetched and read.
 - **Pre-redesign baseline only:** [Visual Audit #45316812990](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45316812990), artifact [#14885473196](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45316812990/artifacts/14885473196), baseline commit fc974e4e16ca80a14bb71156f482f333372b4600. Captured 178 screenshots across 47 named states and all five routes. The report found zero page errors, horizontal overflow, unnamed controls, undersized controls and Axe violations in captured screen states. This predates PR #74 and is not redesigned-UI verification. Do not rerun to recreate baseline.
 - Home PRs #69, #70 and #73 are merged; not part of this group.
 
@@ -60,14 +60,11 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 
 ## 6. Next actions for the next chat
 
-1. Read current main docs/ux/RBOS-UI-UX-WORKFLOW.md, this handoff, the living programme and route design notes. Inspect current code, screenshots and branches.
-2. Refresh PR #67/#72/#74 status, exact heads and workflow runs. Verify this documentation update is present on PR #67.
-3. Complete the Create Invoice repository design spec for #/sell/bill: layout hierarchy, actions, small/standard phone, tablet, landscape and desktop; important states; token/component reuse; validation/feedback; accessibility; acceptance criteria.
-4. Compare PR #74 with the spec; keep it draft/open and do not merge.
-5. Continue in this order: #/sell/menu, #/sell/bills, #/sell/collect, #/sell/return. Audit dependencies and document each route before implementing it. Make routine design decisions; ask only for a genuine product decision or permission blocker.
-6. Inspect branch ancestry and choose a coherent implementation lineage. Keep changes reviewable and draft until the five-route group verification.
-7. After all five redesigned routes are implemented, run the combined Playwright journeys, responsive screenshots, visual review and Axe described in the workflow/programme. Review artifacts, fix defects and rerun affected coverage.
-8. Perform native Android checks and real shopkeeper review. Update this handoff and the living programme with exact evidence. Do not merge/deploy without explicit approval.
+1. Audit Sell landing `#/sell/menu` from current `Pages.tsx`, route/navigation entry points and translations; create its repository design specification before implementation.
+2. Continue in order: Sales History `#/sell/bills`, Collections `#/sell/collect`, Returns `#/sell/return`. Audit and document each route before implementation.
+3. Inspect branch ancestry and choose a coherent implementation lineage for all five routes. Keep PRs open/draft until group verification; do not merge or deploy.
+4. Run focused checks during implementation. After all five routes are redesigned and implemented, run the single integrated Playwright journey, responsive screenshot, visual review and Axe pass; inspect actual artifacts and fix findings.
+5. Perform native Android checks and representative shopkeeper acceptance after browser verification. Keep these separate from automated CI, merge and deployment.
 
 ## 7. Status ledger
 
@@ -76,7 +73,7 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 | Five-route baseline audit | Done | Visual Audit #45316812990 / artifact #14885473196 |
 | Invoice concept exploration | Done | MagicPath Concept A selected |
 | Invoice interaction prototype | Done, prototype only | MagicPath link above |
-| Invoice repository design spec | Next / incomplete | Complete before proceeding to route 2 implementation |
+| Invoice repository design spec | **Done** | [billing-sales-create-invoice-design.md](./billing-sales-create-invoice-design.md); compared with PR #74 |
 | PR #74 invoice implementation | Candidate implemented | Draft PR; CI passed known head; final group verification pending |
 | Sell landing | Not started | Second route |
 | Sales History | Not started | Third route |
@@ -88,4 +85,16 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 | Figma | Optional/not required | Existing file untouched |
 | MagicPath agent/API | Tool-limited at last check | Continue code-first; normal editor only if available |
 
-**No known product decision blocks continuation.** Update this handoff and the relevant route design note at every meaningful pause so another chat can resume from repository state.
+**No known product decision blocks continuation.** Next concrete deliverable is the Sell landing design specification. Update this handoff and the relevant route design note at every meaningful pause so another chat can resume from repository state.
+
+
+## 8. Execution update — 2026-11-24: Create Invoice design gate completed
+
+- **Repository design specification:** [billing-sales-create-invoice-design.md](./billing-sales-create-invoice-design.md) is complete and authoritative for `#/sell/bill`. It includes layout, actions, interactions, states, responsive rules, component/token reuse, accessibility and measurable acceptance criteria.
+- **PR #74 comparison:** refreshed source head `72cfe96dd8b361d77123d136f1f6f12ad6ac4768`; aligned with Concept A for focus mode, contextual Scan tag, single Add product action, separate handwritten import, progressive disclosure and sticky summary. One focused follow-up is to verify the mobile required marker and programmatic error association. No full visual review has been run.
+- **PR #74 CI:** exact-head run [#45340114617](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45340114617) passed. Full five-route Playwright/screenshots/Axe remain deferred.
+- **PR #75:** merged; Figma-optional workflow is on main. Do not retry Figma. MagicPath remains optional.
+- **PR #67:** open/draft. Programme update commit `d91b891dea84031a6253410d0dbe8ffce1907dd3`; handoff update follows in this commit. CI #45343697012 passed the prior head `fe6f8ca835e94c7404dfbdb51c0e5c51e2cc4902`; refresh CI on the resulting branch head.
+- **PR #72:** open/draft, head `fc974e4e16ca80a14bb71156f482f333372b4600`; preserve existing audit infrastructure.
+- **Next:** Sell landing `#/sell/menu` source audit and design specification. Then Sales History, Collections and Returns in the agreed order.
+- **No merge/deployment:** neither is authorised. Native Android and shopkeeper acceptance remain pending.
