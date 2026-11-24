@@ -1017,3 +1017,8 @@
   .invoice-create-page .invoice-product-entry .photo-source-trigger { font-size: 12px; }
   .invoice-electronics-fields { grid-template-columns: minmax(0, 1.55fr) minmax(80px, 1fr); }
 }
+
+
+/* Payment method is a primary billing choice; sale date stays in optional details. */
+.invoice-payment-mode { margin: 16px 0; max-width: 360px; }
+@media (max-width: 700px) { .invoice-payment-mode { margin: 12px 0; max-width: none; } }
