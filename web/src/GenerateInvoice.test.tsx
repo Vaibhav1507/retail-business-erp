@@ -123,8 +123,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getAllByRole('button', { name: /Add item/ })).toHaveLength(1)
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
 
-    await userEvent.type(screen.getByLabelText('Price (INR)'), '15000')
-    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '15000')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
 
     expect(screen.getByText('Semi Automatic Washing Machine')).toBeInTheDocument()
     expect(screen.getByText(/Serial: 610NWHS203785/)).toBeInTheDocument()
@@ -211,7 +211,10 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const nameInput = screen.getByLabelText('Customer name *')
     const phoneInput = screen.getByLabelText('Mobile number *')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.type(screen.getByPlaceholderText('Search product or type a name'), 'Test Cable')
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '100')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
     expect(screen.getByText('Customer name is required.')).toBeInTheDocument()
     expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
     expect(nameInput).toHaveAttribute('aria-invalid', 'true')
@@ -222,7 +225,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     await userEvent.type(nameInput, 'Test Customer')
     await userEvent.type(phoneInput, '123456789')
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
     expect(screen.queryByText('Customer name is required.')).not.toBeInTheDocument()
     expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
     expect(document.activeElement).toBe(phoneInput)
@@ -233,9 +236,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
     await userEvent.type(await screen.findByPlaceholderText('Search product or type a name'), 'Test Cable')
-    await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
-    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '100')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.'
