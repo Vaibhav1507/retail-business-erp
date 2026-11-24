@@ -1,0 +1,38 @@
+/* Customer collections: guided receipt entry, statement and responsive receipt history. */
+.collections-screen { display: grid; gap: 14px; }
+.collections-heading h3, .collections-section-heading h3 { margin: 0 0 4px; }
+.collections-heading p, .collections-section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+.collections-form { display: grid; gap: 16px; margin: 0; }
+.collections-customer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, .65fr); gap: 12px; align-items: end; }
+.collections-outstanding { display: grid; gap: 4px; min-height: 72px; align-content: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--brand-soft); }
+.collections-outstanding small { color: var(--brand-dark); font-size: 12px; font-weight: 650; }
+.collections-outstanding strong { color: var(--brand-dark); font-size: 22px; line-height: 1.2; }
+.collections-payment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.collections-payment-grid .billing-field { min-width: 0; }
+.collections-payment-grid .collections-reference { grid-column: 1 / -1; }
+.collections-fill { align-self: flex-start; min-height: 36px; margin-top: 6px; padding: 5px 10px; border: 0; background: transparent; color: var(--brand-dark); text-decoration: underline; }
+.collections-fill:hover { background: var(--brand-soft); color: var(--brand-dark); }
+.collections-form-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.collections-form-actions button:first-child { min-width: 180px; }
+.collections-muted { margin: 0; color: var(--muted); font-size: 13px; }
+.collections-error, .collections-success { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.collections-error { border: 1px solid var(--danger); background: var(--danger-soft); color: var(--danger); }
+.collections-success { border: 1px solid var(--line); background: var(--brand-soft); color: var(--brand-dark); }
+.collections-statement, .collections-history { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.collections-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.collections-history-desktop { overflow-x: auto; }
+.collections-history-mobile { display: none; }
+.collections-history-desktop table { min-width: 560px; }
+@media (max-width: 700px) {
+  .collections-customer, .collections-payment-grid { grid-template-columns: minmax(0, 1fr); }
+  .collections-payment-grid .collections-reference { grid-column: auto; }
+  .collections-form-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .collections-form-actions button { width: 100%; }
+  .collections-history-desktop { display: none; }
+  .collections-history-mobile { display: grid; list-style: none; gap: 10px; padding: 0; margin: 0; }
+  .collections-history-mobile li { display: grid; gap: 6px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .collections-history-mobile li > div { display: flex; justify-content: space-between; gap: 10px; }
+  .collections-history-mobile li span, .collections-history-mobile li p { color: var(--muted); font-size: 12px; margin: 0; }
+  .collections-history-mobile li a { min-height: 44px; display: inline-flex; align-items: center; }
+  .collections-section-heading { align-items: center; }
+}
