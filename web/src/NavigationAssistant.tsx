@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { getLanguage } from './i18n'
 import { resampleAudio } from './audio-utils'
 import { createSpeechWorker, type SpeechTranscriptResult } from './speech-provider'
@@ -605,7 +606,7 @@ export function NavigationAssistant() {
   }}>
    <span aria-hidden="true">✦</span><span>{open ? text.close : 'Assistant'}</span>
   </button>
-  {open && <section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
+  {open && createPortal(<section id="rbos-assistant-panel" className="navigation-assistant" aria-label="Navigation assistant">
    <header className="assistant-heading"><div><strong>{text.title}</strong><p>Find any screen by typing or speaking</p></div><button type="button" className="assistant-close" aria-label={text.close} onClick={closeAssistant}>×</button></header>
    <div className="navigation-top-actions" aria-label={choices.length ? text.suggestions : text.shortcuts}>
     {(choices.length ? choices : quick).map(target => <button type="button" key={target.id}
@@ -645,6 +646,6 @@ export function NavigationAssistant() {
     {voiceError && <div className="voice-error" role="alert">{voiceError}</div>}
     {!voiceError && <p className="navigation-privacy">{text.voiceNote}</p>}
    </div>
-  </section>}
+  </section>, document.body)}
  </>
 }

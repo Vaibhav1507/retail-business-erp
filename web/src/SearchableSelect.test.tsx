@@ -1,0 +1,45 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import { SearchableSelect, type SearchableSelectOption } from './SearchableSelect'
+
+const options: SearchableSelectOption[] = [
+  { value: 'c1', label: 'Asha Stores', description: 'Owes ₹1,200', searchText: '9876543210' },
+  { value: 'c2', label: 'Ravi Kumar', description: 'Owes ₹300', searchText: '9123456780' }
+]
+
+describe('SearchableSelect', () => {
+  it('filters by customer name and selects with the keyboard', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<SearchableSelect id="customer" label="Customer" value="" options={options}
+      onChange={onChange} placeholder="Search by customer name" />)
+
+    const input = screen.getByRole('combobox', { name: 'Customer' })
+    await user.type(input, 'Ravi')
+    expect(screen.getByRole('listbox', { name: 'Customer options' })).toBeVisible()
+    expect(screen.getByRole('option', { name: /Ravi Kumar/ })).toBeVisible()
+    expect(screen.queryByRole('option', { name: /Asha Stores/ })).not.toBeInTheDocument()
+
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(onChange).toHaveBeenLastCalledWith('c2')
+    expect(input).toHaveValue('Ravi Kumar')
+    expect(screen.getByRole('listbox', { name: 'Customer options' })).not.toBeVisible()
+  })
+
+  it('supports matching by additional reference text and selecting an explicit empty option', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<SearchableSelect id="bill" label="Apply to a bill (optional)" value=""
+      options={[{ value: '', label: 'On account (no specific bill)' }, ...options]}
+      onChange={onChange} placeholder="Search bill or choose on account" />)
+
+    const input = screen.getByRole('combobox', { name: 'Apply to a bill (optional)' })
+    await user.click(input)
+    expect(input).toHaveValue('')
+    await user.type(input, '9876543210')
+    await user.click(screen.getByRole('option', { name: /Asha Stores/ }))
+    expect(onChange).toHaveBeenLastCalledWith('c1')
+    expect(input).toHaveValue('Asha Stores')
+  })
+})

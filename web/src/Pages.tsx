@@ -97,22 +97,24 @@ export function SellPage({ tab, c }: { tab: string; c: Common }) {
               <a className="sell-hub-action" href="#/sell/bills">
                 <span className="sell-hub-action-icon" aria-hidden="true">{'\u{1F5C2}\uFE0F'}</span>
                 <span className="sell-hub-copy"><strong>{tr('sell.history')}</strong><small>{tr('sell.historyHint')}</small></span>
+                <span className="sell-hub-action-arrow" aria-hidden="true">{'\u2192'}</span>
               </a>
               <a className="sell-hub-action" href="#/sell/collect">
                 <span className="sell-hub-action-icon" aria-hidden="true">{'\u{1F4B0}'}</span>
                 <span className="sell-hub-copy"><strong>{tr('sell.collect')}</strong><small>{tr('sell.collectHint')}</small></span>
+                <span className="sell-hub-action-arrow" aria-hidden="true">{'\u2192'}</span>
               </a>
               <a className="sell-hub-action" href="#/sell/return">
                 <span className="sell-hub-action-icon" aria-hidden="true">{'\u21A9\uFE0F'}</span>
                 <span className="sell-hub-copy"><strong>{tr('sell.customerReturns')}</strong><small>{tr('sell.customerReturnsHint')}</small></span>
+                <span className="sell-hub-action-arrow" aria-hidden="true">{'\u2192'}</span>
               </a>
             </div>
           </div>
         </>
       ) : (
         <>
-          <Title title={tr('area.sell')} hint={tr('sell.hint')} />
-          <p><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p>
+          <p className="sell-route-back"><a className="back-link" href="#/sell/menu">{'\u2190'} {tr('area.sell')}</a></p>
         </>
       )}
       {tab === 'bill' && <GenerateInvoice products={c.products} locations={c.locations} reload={c.reload} offlineMode={c.offlineMode ?? false} ownerKey={c.ownerKey ?? ''} />}
