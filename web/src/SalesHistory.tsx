@@ -25,6 +25,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
   const [unpaid, setUnpaid] = useState(false)
   const [biz, setBiz] = useState<BizProfile | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [openingId, setOpeningId] = useState('')
   const [retrying, setRetrying] = useState(false)
@@ -45,6 +46,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
       const rows = await api<SaleRow[]>('GET', '/sales' + (query ? '?q=' + encodeURIComponent(query) : ''))
       setSales(rows)
       setLoaded(true)
+      setLoadedQuery(query)
     } catch (e) {
       setError(msg(e))
       throw e
@@ -87,6 +89,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
 
   const shownSales = unpaid ? sales.filter(s => s.balance > 0) : sales
   const queryPending = saleSearch.trim() !== query
+  const resultsCurrent = loadedQuery === query
   const emptyMessage = !sales.length
     ? 'No sales have been recorded yet.'
     : unpaid
@@ -151,9 +154,9 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
 
       {error && <div className="sales-history-error" role="alert"><span>{error}</span><button type="button" className="secondary" onClick={() => { void loadSales().catch(() => undefined) }} disabled={loading}>Retry</button></div>}
       {(loading || queryPending) && <p className="sales-history-status" role="status">{loaded ? 'Updating sales…' : tr('app.loading')}</p>}
-      {loaded && !loading && !queryPending && <p className="sales-history-count" role="status">{shownSales.length} {shownSales.length === 1 ? 'bill' : 'bills'}{query ? ' found' : ''}</p>}
+      {loaded && resultsCurrent && !loading && !queryPending && <p className="sales-history-count" role="status">{shownSales.length} {shownSales.length === 1 ? 'bill' : 'bills'}{query ? ' found' : ''}</p>}
 
-      {loaded && !loading && !queryPending && <Paged rows={shownSales} label="bills" resetKey={query + ':' + unpaid} empty={emptyMessage}>
+      {loaded && resultsCurrent && !loading && !queryPending && <Paged rows={shownSales} label="bills" resetKey={query + ':' + unpaid} empty={emptyMessage}>
         {page => (
           <>
             <div className="sales-history-desktop">
