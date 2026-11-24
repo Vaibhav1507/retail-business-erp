@@ -116,6 +116,7 @@ jobs:
           path: |
             web/test-results/ui-audit/${{ github.event.inputs.scope || (github.event_name == 'pull_request' && 'buy') || 'billing-sales' }}/
             web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
             web/test-results/ui-audit/buy/
             web/test-results/.last-run.json
           if-no-files-found: warn
