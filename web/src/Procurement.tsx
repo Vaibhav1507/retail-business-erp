@@ -73,43 +73,43 @@ export function Procurement({ products, locations, reload, show }: { products: (
       setUnknownCode(null)
       if (lines.some(l => l.productId === hit.productId)) {
         setLines(lines.map(l => l.productId === hit.productId ? { ...l, quantity: l.quantity + hit.packQuantity } : l))
-        setDone(`${hit.name}: added ${hit.packQuantity} more. Check the quantity before posting.`)
+        setDone(tr('buy.barcodeQuantityAdded', { product: hit.name, quantity: hit.packQuantity }))
       } else {
         setProductId(hit.productId); setQty(String(hit.packQuantity)); setCost('')
-        setDone(`${hit.name} selected with quantity ${hit.packQuantity}. Enter the unit cost and choose Add line.`)
+        setDone(tr('buy.barcodeProductSelected', { product: hit.name, quantity: hit.packQuantity }))
       }
     } catch (e) {
       if (msg(e).includes('No product has this barcode')) setUnknownCode(r); else setError(msg(e))
     }
   }
   async function linkUnknown() {
-    if (!unknownCode || !productId) { setError('Choose the product to link this barcode to first.'); return }
-    try { await api('POST', `/products/${productId}/barcodes`, { code: unknownCode.code, symbology: unknownCode.symbology, packQuantity: Number(qty) || 1 }); setUnknownCode(null); setDone('Barcode linked to the selected product.') } catch (e) { setError(msg(e)) }
+    if (!unknownCode || !productId) { setError(tr('buy.linkBarcodeSelectProduct')); return }
+    try { await api('POST', `/products/${productId}/barcodes`, { code: unknownCode.code, symbology: unknownCode.symbology, packQuantity: Number(qty) || 1 }); setUnknownCode(null); setDone(tr('buy.barcodeLinked')) } catch (e) { setError(msg(e)) }
   }
   const estimatedTotal = lines.reduce((sum, line) => sum + line.quantity * line.unitCost + (line.gstAmount ?? 0), 0)
   const addLine = () => {
     const quantity = Number(qty); const unitCost = Number(cost); const gstAmount = Number(gst) || 0
-    if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError('Choose a product and enter a positive quantity and unit cost.'); return }
-    if (gstAmount < 0 || gstAmount > quantity * unitCost) { setError('GST amount must be between 0 and the line value before tax.'); return }
+    if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError(tr('buy.lineFieldsRequired')); return }
+    if (gstAmount < 0 || gstAmount > quantity * unitCost) { setError(tr('buy.gstAmountRange')); return }
     setError(''); setLines([...lines.filter(l => l.productId !== productId), { productId, quantity, unitCost, gstAmount }]); setQty(''); setCost(''); setGst(''); setReviewReceipt(false)
   }
   const receive = () => run(async () => {
     const r = await api<{ total: number; replayed?: boolean }>('POST', '/purchases', { supplierId: sup, locationId: loc, receiptDate: date, supplierRef: ref || null, lines, invoiceFileId }, rkey)
     setLines([]); setRef(''); setInvoiceFileId(null); setRkey(newKey()); setReviewReceipt(false)
-    return 'Receipt posted' + (r.replayed ? ' (already posted earlier).' : '.')
+    return tr('buy.receiptPosted') + (r.replayed ? ' ' + tr('buy.receiptPostedEarlier') : '')
   })
   const pay = () => run(async () => {
     const allocations = selectedBill && allocationAmount > 0 ? [{ billId: selectedBill.id, amount: allocationAmount }] : undefined
     const result = await api<{ owed: number }>('POST', '/supplier-payments', { supplierId: paySup, paymentDate: today(), amount: Number(amount), method, reference: pref || null, ...(allocations ? { allocations } : {}) }, pkey)
     setAmount(''); setPref(''); setBillId(''); setPkey(newKey())
-    return `Payment recorded. New balance: ₹${result.owed.toFixed(2)}.`
+    return tr('buy.paymentSuccess', { balance: result.owed.toFixed(2) })
   })
   const [statement, setStatement] = useState<{ supplier: string; outstanding: number; entries: { id: string; type: string; date: string; debit: number; credit: number; balance: number }[] } | null>(null)
   const [billId, setBillId] = useState(''); const [openBills, setOpenBills] = useState<{ id: string; date: string; reference: string | null; open: number }[]>([])
   const selectedBill = openBills.find(b => b.id === billId)
   const allocationAmount = selectedBill ? Math.min(Number(amount) || 0, selectedBill.open) : 0
   const payOwed = suppliers.find(s => s.id === paySup)?.owed ?? 0
-  const amountError = amount.trim() === '' ? tr('buy.amountRequired') : !(Number(amount) > 0) ? tr('buy.amountPositive') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''
+  const amountError = amount.trim() === '' ? tr('buy.amountRequired') : !(Number(amount) > 0) ? tr('buy.amountPositive') : !/^\\d+(?:\\.\\d{1,2})?$/.test(amount) ? tr('buy.amountDecimals') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''
   useEffect(() => { setBillId(''); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
   const showStatement = () => run(async () => { const id = v('pay') ? paySup : historySupplierId; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
@@ -166,8 +166,8 @@ export function Procurement({ products, locations, reload, show }: { products: (
         <button type="button" className="buy-primary" onClick={() => setReviewReceipt(true)} disabled={lines.length === 0 || !sup || !loc}>{tr('buy.review')}</button>
         {reviewReceipt && <section className="buy-review" role="region" aria-label={tr('buy.review')}>
           <h3>{tr('buy.review')}</h3><p>{tr('onboarding.purchaseReviewNote')}</p>
-          <dl><dt>{tr('buy.supplier')}</dt><dd>{suppliers.find(s => s.id === sup)?.name ?? 'Not selected'}</dd><dt>{tr('buy.location')}</dt><dd>{locations.find(l => l.id === loc)?.name ?? 'Not selected'}</dd><dt>{tr('buy.receiptDate')}</dt><dd>{date}</dd><dt>{tr('buy.invoiceNo')}</dt><dd>{ref || 'Not entered'}</dd></dl>
-          <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} × ₹{l.unitCost.toFixed(2)} before GST{l.gstAmount ? `; GST entered ₹${l.gstAmount.toFixed(2)}` : '; no GST amount entered'}</li>)}</ul>
+          <dl><dt>{tr('buy.supplier')}</dt><dd>{suppliers.find(s => s.id === sup)?.name ?? tr('buy.notSelected')}</dd><dt>{tr('buy.location')}</dt><dd>{locations.find(l => l.id === loc)?.name ?? 'Not selected'}</dd><dt>{tr('buy.receiptDate')}</dt><dd>{date}</dd><dt>{tr('buy.invoiceNo')}</dt><dd>{ref || tr('buy.notEntered')}</dd></dl>
+          <ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} × ₹{l.unitCost.toFixed(2)} {tr('buy.beforeGst')}{l.gstAmount ? `; GST entered ₹${l.gstAmount.toFixed(2)}`  : '; ' + tr('buy.noGstEntered')}</li>)}</ul>
           <p className="buy-review-total"><span>{tr('buy.totalPreview')}</span><strong>₹{estimatedTotal.toFixed(2)}</strong></p>
           <p className="buy-guidance">{tr('buy.postingNote')}</p>
           <div className="buy-review-actions"><button type="button" className="secondary" onClick={() => setReviewReceipt(false)}>{tr('buy.edit')}</button><button type="button" onClick={receive}>{tr('buy.post')}</button></div>
@@ -177,7 +177,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
       {v('pay') && <div className="buy-pay">
         <header className="buy-screen-heading"><h2>{tr('buy.payTitle')}</h2><p>{tr('buy.payIntro')}</p></header>
         <section className="buy-pay-form">
-          <SearchableSelect id="buy-pay-supplier" label={tr('buy.supplier')} value={paySup} options={suppliers.filter(s => s.isActive).map(s => ({value:s.id,label:s.name,description:tr('buy.currentlyOwed')+': ₹'+s.owed.toFixed(2),searchText:s.phone ?? ''}))} onChange={value => {setPaySupplierId(value);setBillId('');setStatement(null);setError('');setDone('')}} placeholder={tr('buy.searchSupplier')} emptyMessage={tr('buy.noSupplierMatch')} />
+          <SearchableSelect id="buy-pay-supplier" label={tr('buy.supplier')} value={paySup} options={suppliers.filter(s => s.isActive).map(s => ({value:s.id,label:s.name,description:tr('buy.statementOwed', { amount: s.owed.toFixed(2) }),searchText:s.phone ?? ''}))} onChange={value => {setPaySupplierId(value);setBillId('');setStatement(null);setError('');setDone('')}} placeholder={tr('buy.searchSupplier')} emptyMessage={tr('buy.noSupplierMatch')} />
           {paySup && <div className="buy-balance"><span>{tr('buy.currentlyOwed')}</span><strong>₹{payOwed.toFixed(2)}</strong></div>}
           {!paySup && <p className="buy-pay-hint">{tr('buy.chooseSupplier')}</p>}
           {paySup && payOwed <= 0 && <p className="buy-pay-hint">{tr('buy.noDues')}</p>}
@@ -190,7 +190,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
             <button type="button" className="buy-pay-primary" onClick={pay} disabled={!paySup||!!amountError||payOwed<=0}>{tr('buy.savePayment')}</button>
           </>}
           {paySup&&<button type="button" className="buy-statement-link" onClick={showStatement}>{tr('buy.viewStatement')}</button>}
-          {statement&&v('pay')&&<div className="buy-statement" role="region" aria-label={tr('buy.supplierStatement')}><h3>{tr('buy.statementFor')} {statement.supplier}</h3><p>Currently owed: ₹{statement.outstanding.toFixed(2)}</p><Paged rows={statement.entries}>{page=><table><thead><tr><th>{tr('buy.date')}</th><th>{tr('buy.type')}</th><th>{tr('buy.purchase')}</th><th>{tr('buy.paidReturned')}</th><th>{tr('buy.balance')}</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>{tr('buy.closeStatement')}</button></div>}
+          {statement&&v('pay')&&<div className="buy-statement" role="region" aria-label={tr('buy.supplierStatement')}><h3>{tr('buy.statementFor')} {statement.supplier}</h3><p>{tr('buy.statementOwed', { amount: statement.outstanding.toFixed(2) })}</p><Paged rows={statement.entries}>{page=><table><thead><tr><th>{tr('buy.date')}</th><th>{tr('buy.type')}</th><th>{tr('buy.purchase')}</th><th>{tr('buy.paidReturned')}</th><th>{tr('buy.balance')}</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type === 'Purchase' ? tr('buy.purchase') : e.type === 'Payment' ? tr('buy.payment') : e.type === 'Return' ? tr('buy.returnType') : e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>{tr('buy.closeStatement')}</button></div>}
         </section>
       </div>}
       {error && <p role="alert">{error}</p>}
@@ -209,7 +209,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
           <h3>{tr('buy.supplierPayments')}</h3>
           <Paged rows={payments} empty={tr('buy.noPayments')}>{page => <div className="buy-history-list">{page.map(payment => <article className="buy-history-card" key={payment.id}>
             <div className="buy-history-top"><strong>{payment.supplier}</strong><strong>₹{payment.amount.toFixed(2)}</strong></div>
-            <dl><dt>{tr('buy.date')}</dt><dd>{payment.date}</dd><dt>{tr('buy.paidBy')}</dt><dd>{payment.method}</dd><dt>{tr('buy.reference')}</dt><dd>{payment.reference || '—'}</dd></dl>
+            <dl><dt>{tr('buy.date')}</dt><dd>{payment.date}</dd><dt>{tr('buy.paidBy')}</dt><dd>{payment.method === 'Cash' ? tr('buy.cash') : payment.method === 'Bank' ? tr('buy.bank') : payment.method === 'UPI' ? tr('buy.upi') : payment.method}</dd><dt>{tr('buy.reference')}</dt><dd>{payment.reference || '—'}</dd></dl>
           </article>)}</div>}</Paged>
         </section>
         <section className="buy-history-statement">
