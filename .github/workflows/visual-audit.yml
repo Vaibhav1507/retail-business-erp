@@ -15,6 +15,8 @@ on:
     paths:
       - ".github/workflows/visual-audit.yml"
       - "web/e2e/ui-audit.spec.ts"
+      - "web/e2e/billing-sales-visual.spec.ts"
+      - "web/playwright.config.ts"
       - "web/src/GenerateInvoice.tsx"
       - "web/src/SalesHistory.tsx"
       - "web/src/AfterSales.tsx"
@@ -92,9 +94,15 @@ jobs:
         working-directory: web
         run: npx playwright install --with-deps chromium
 
-      - name: Run selected UI audit stage
+      - name: Run Home visual audit
+        if: env.UI_AUDIT_SCOPE == 'home'
         working-directory: web
         run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: env.UI_AUDIT_SCOPE == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
 
       - name: Upload selected screenshots and report
         if: always()
