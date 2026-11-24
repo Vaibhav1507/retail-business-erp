@@ -25,12 +25,13 @@ type RecordRow = {
   state: string; viewport: string; screenshot: string; overflowX: boolean
   unnamed: string[]; undersized: string[]
   axe: { id: string; impact: string | null; nodes: number; sample: string }[]
+  axeSkipped?: string
 }
 const records: RecordRow[] = []
 const pageErrors: string[] = []
 const dialogs: { type: string; message: string; dismissed: boolean }[] = []
 
-async function capture(page: Page, state: string, viewports = stateViewports, fullPage = true) {
+async function capture(page: Page, state: string, viewports = stateViewports, fullPage = true, runAxe = true) {
   for (const vp of viewports) {
     await page.setViewportSize({ width: vp.width, height: vp.height })
     await page.waitForTimeout(60)
@@ -56,13 +57,14 @@ async function capture(page: Page, state: string, viewports = stateViewports, fu
       })
       return { overflowX: document.documentElement.scrollWidth > window.innerWidth, unnamed, undersized }
     })
-    const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+    const axe = runAxe ? await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze() : null
     records.push({
       state, viewport: vp.name, screenshot: filename, ...metrics,
-      axe: axe.violations.map(v => ({
+      axe: axe?.violations.map(v => ({
         id: v.id, impact: v.impact ?? null, nodes: v.nodes.length,
         sample: v.nodes[0]?.html.slice(0, 120) ?? '',
-      })),
+      })) ?? [],
+      axeSkipped: runAxe ? undefined : 'Print media screenshot; WCAG screen-state audit is run in screen media.',
     })
     writeFileSync(outDir + '/report.json', JSON.stringify({
       scope: 'billing-sales', screenshotCount: records.length,
@@ -287,7 +289,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await page.getByLabel('Paper size').selectOption('thermal')
   await capture(page, 'bill-posted-thermal')
   await page.emulateMedia({ media: 'print' })
-  await capture(page, 'bill-print-media', [routeViewports[1]!])
+  await capture(page, 'bill-print-media', [routeViewports[1]!], true, false)
   await page.emulateMedia({ media: 'screen' })
 
   // Held bill and offline pending states; pending is explicitly not a posted invoice.
@@ -346,7 +348,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await detail.getByLabel('Paper size').selectOption('thermal')
   await capture(page, 'history-invoice-detail-thermal')
   await page.emulateMedia({ media: 'print' })
-  await capture(page, 'history-invoice-detail-print', [routeViewports[1]!])
+  await capture(page, 'history-invoice-detail-print', [routeViewports[1]!], true, false)
   await page.emulateMedia({ media: 'screen' })
   await page.keyboard.press('Escape')
   await expect(detail).toBeHidden()
@@ -444,13 +446,13 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await expect(page.getByRole('heading', { name: /Sale invoice/ })).toBeVisible()
   await capture(page, 'standalone-sale-print')
   await page.emulateMedia({ media: 'print' })
-  await capture(page, 'standalone-sale-print-media', [routeViewports[1]!])
+  await capture(page, 'standalone-sale-print-media', [routeViewports[1]!], true, false)
   await page.emulateMedia({ media: 'screen' })
   await desktopPage.goto('/#/print/sale/' + sale!.id)
   await expect(desktopPage.getByRole('main', { name: 'Printable document' })).toBeVisible()
   await capture(desktopPage, 'standalone-sale-print', [desktopViewport])
   await desktopPage.emulateMedia({ media: 'print' })
-  await capture(desktopPage, 'standalone-sale-print-media', [desktopViewport])
+  await capture(desktopPage, 'standalone-sale-print-media', [desktopViewport], true, false)
   await desktopContext.close()
 
   writeFileSync(outDir + '/report.json', JSON.stringify({
