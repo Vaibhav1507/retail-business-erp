@@ -6,3 +6,17 @@
 .profile-dropdown .profile-email { margin: 0; padding: 8px 12px; font-size: 13px; opacity: 0.7; overflow-wrap: anywhere; border-bottom: 1px solid var(--line, #d9e0dd); }
 .profile-dropdown a, .topbar .profile-dropdown button { display: block; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink, #1c2430); font: inherit; font-size: 16px; text-align: left; text-decoration: none; cursor: pointer; }
 .profile-dropdown a:hover, .topbar .profile-dropdown button:hover:not(:disabled) { background: rgba(16, 124, 82, 0.12); color: var(--ink, #1c2430); }
+
+
+/* Compact mobile business header: keep the shop name on one line. */
+@media (max-width: 699px) {
+  .topbar { padding-top: 7px; padding-bottom: 7px; }
+  .topbar .brand-logo { width: 36px; height: 36px; }
+  .topbar .profile-name {
+    font-size: 17px;
+    line-height: 1.2;
+    display: block;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
