@@ -210,7 +210,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await expect(bill.getByText('Enter a valid mobile number (10–15 digits).')).toBeVisible()
   await capture(page, 'bill-customer-validation')
 
-  await bill.locator('#billing-phone').fill(phone.slice(-4))
+  await bill.locator('#billing-phone').fill(phone)
   const customerOptions = page.getByRole('listbox', { name: 'Matching customers' })
   await expect(customerOptions.getByRole('option').first()).toBeVisible()
   await capture(page, 'bill-customer-suggestions')
@@ -323,7 +323,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await expect(resumedLine).toBeVisible()
   await expect(resumedLine).toContainText('99.00')
   await capture(page, 'bill-held-resumed')
-  await bill.locator('#billing-phone').fill(offlinePhone.slice(-4))
+  await bill.locator('#billing-phone').fill(offlinePhone)
   const offlineOptions = page.getByRole('listbox', { name: 'Matching customers' })
   await expect(offlineOptions.getByRole('option').first()).toBeVisible()
   await offlineOptions.getByRole('option').first().click()
