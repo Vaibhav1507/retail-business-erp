@@ -5,7 +5,7 @@
 **Repository:** Vaibhav1507/retail-business-erp  
 **Design baseline:** main at b180f59793f265024650731a1f2bd89ead29b342  
 **Canonical branch:** ux/buy-four-screen-redesign  
-**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) (draft).  
+**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) (draft; latest head `f18b109b66e1ec9d845d23a08784062f67bea849`).  
 **Visual acceptance:** Pending updated Android screenshots from the user.  
 **Merge / production:** Not authorised.
 
