@@ -1,13 +1,18 @@
 import { expect, type Dialog, type Locator, type Page } from '@playwright/test'
 
-const dialogHandlers = new WeakMap<Page, (dialog: Dialog) => void | Promise<void>>()
+const dialogPolicies = new WeakMap<Page, (dialog: Dialog) => void | Promise<void>>()
+const dialogListeners = new WeakMap<Page, (dialog: Dialog) => void | Promise<void>>()
 
-/** Replace a page's active dialog policy without leaving duplicate listeners behind. */
+/** Update the active dialog policy while keeping exactly one listener on the page. */
 export function setDialogHandler(page: Page, handler: (dialog: Dialog) => void | Promise<void>) {
-  const previous = dialogHandlers.get(page)
-  if (previous) page.removeListener('dialog', previous)
-  page.on('dialog', handler)
-  dialogHandlers.set(page, handler)
+  dialogPolicies.set(page, handler)
+  if (dialogListeners.has(page)) return
+  const listener = async (dialog: Dialog) => {
+    const activeHandler = dialogPolicies.get(page)
+    if (activeHandler) await activeHandler(dialog)
+  }
+  dialogListeners.set(page, listener)
+  page.on('dialog', listener)
 }
 
 export const PASSWORD = 'Synthetic#Pass123'
