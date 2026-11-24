@@ -81,3 +81,58 @@
   .customer-return-history-content .customer-returns-section-title { align-items: center; }
   .customer-return-history-content .customer-returns-section-title > button { width: auto; min-width: 104px; justify-self: end; }
 }
+
+
+/* Screenshot-led final polish: make the collapsed history control read as one section. */
+.customer-return-history {
+  gap: 12px;
+  padding: 14px 16px;
+}
+.customer-return-history-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  cursor: pointer;
+  list-style: none;
+}
+.customer-return-history-summary::-webkit-details-marker {
+  display: none;
+}
+.customer-return-history-summary > span:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.customer-return-history-summary strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+.customer-return-history-summary small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.customer-return-history-toggle {
+  flex: 0 0 auto;
+  color: var(--brand-dark);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.customer-return-history[open] .customer-return-history-toggle {
+  text-decoration: none;
+}
+.customer-return-history-content {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .customer-return-history {
+    padding: 14px;
+  }
+  .customer-return-history-summary {
+    min-height: 44px;
+  }
+}
