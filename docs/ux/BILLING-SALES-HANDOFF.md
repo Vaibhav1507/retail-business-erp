@@ -57,3 +57,9 @@ Customer name/mobile required; zero-stock billing and ad-hoc lines; optional ser
 - Existing business logic is preserved.
 
 See [invoice-form-field-hierarchy-assistant.md](./invoice-form-field-hierarchy-assistant.md) for acceptance criteria and validation.
+
+
+### Product-name readability follow-up
+- Product description is a two-line wrapping field so long scanned/extracted names remain visible instead of being clipped in a single-line input.
+- Tag capture is a compact camera-icon action with accessible name “Scan tag”; the existing camera/gallery chooser and extraction path are unchanged.
+- Layout keeps balanced spacing and preserves the form card's mobile gutters.
