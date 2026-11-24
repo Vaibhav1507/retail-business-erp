@@ -1,14 +1,14 @@
 # RBOS Buy section — design handoff
 
-**Status:** Four Buy screen redesign merged; user-provided Android screenshots reviewed; two focused mobile polish corrections are in progress.  
+**Status:** Four-screen Buy redesign is merged in PR #81. Screenshot-driven fixes and the approved MagicPath Add Purchase interaction polish are implemented on the PR #82 follow-up branch; automated CI and the integrated Playwright/Axe visual audit are pending.  
 **Last reviewed:** 2026-11-24  
 **Repository:** Vaibhav1507/retail-business-erp  
 **Merged baseline:** main at `004071617aa41bb8a2846f840f33d44f7ff10d5c` (PR #81 merge commit).  
 **Original implementation branch:** `ux/buy-four-screen-redesign`  
 **Follow-up branch:** `fix/buy-mobile-tabs-invoice-upload-feedback`  
-**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) merged 2026-11-24.  
-**Visual acceptance:** Screenshot review completed for the four screens; two defects found and targeted for correction.  
-**Merge / production:** PR #81 is merged. Deployment of this exact merge commit was not independently verified in this review; follow-up fixes are not merged or deployed.
+**PRs:** [#81 — four Buy workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/81) merged 2026-11-24; [#82 — Buy mobile and Add Purchase polish](https://github.com/Vaibhav1507/retail-business-erp/pull/82) open.  
+**Visual acceptance:** Original four-screen screenshots reviewed. The MagicPath Add Purchase reference has been translated into repository implementation; Playwright screenshots/Axe and fresh Android acceptance remain pending.  
+**Merge / production:** PR #81 is merged. PR #82 is not merged or deployed; deployment of PR #81's exact merge commit is not independently verified here.
 
 ## 1. Objective and strict scope
 
@@ -273,3 +273,17 @@ No backend changes are planned.
 - [NN/G: progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
 - [W3C: WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [W3C: error identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification)
+
+
+### Latest Add Purchase polish — 2026-11-24
+
+The user selected the supplied MagicPath Add Purchase prototype as the visual direction. PR #82 now carries the following scoped implementation:
+
+- Separate Camera (rear capture) and Upload (multi-page/PDF) actions, reusing the existing invoice OCR endpoint and image preparation.
+- Selected filename feedback remains visible while OCR is active; input reset happens after extraction settles.
+- Inline required markers wrapped with their label copy to prevent the prototype's broken asterisk wrapping.
+- A 1-of-2 / 2-of-2 step indicator and a persistent mobile Review purchase summary/action above the existing bottom navigation. It is hidden while the review step is open and becomes in-flow sticky on desktop.
+- Supplier and invoice reference stay full-width on phones; location and receipt date share a row at widths >=400px and stack below that.
+- Added focused component coverage and a dedicated Playwright/Axe audit for all four Buy routes, OCR loading, responsive profiles, fixed-bar clearance, touch targets, accessible names, browser errors and network failures.
+
+The implementation does not change purchase extraction, barcode resolution, purchase POST payloads, idempotency, server validation, stock, WAC, payable or accounting rules. The camera picker is a native browser/device surface and still requires physical Android verification.
