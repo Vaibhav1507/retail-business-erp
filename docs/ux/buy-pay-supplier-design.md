@@ -1,6 +1,6 @@
 # Buy screen design — Pay Supplier
 
-**Status:** Design specification finalized; implementation pending.  
+**Status:** Design specification finalized; first implementation pass present; focused verification pending.  
 **Last reviewed:** 2026-11-24  
 **Baseline:** main b180f59793f265024650731a1f2bd89ead29b342  
 **Route:** #/buy/pay  
@@ -190,3 +190,8 @@ Verify explicit supplier selection, supplier-change clearing of bill/statement s
 - [Nielsen Norman Group: Progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
 - [W3C: WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [W3C: Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification)
+
+
+## Implementation record — 2026-11-24
+
+First implementation pass is present in `web/src/Procurement.tsx` and scoped `web/src/buy-procurement.css`. It requires explicit supplier selection, highlights the current balance and payment amount, uses accessible Cash/Bank/UPI radio options, separates statement access and keeps bill allocation optional. The previously inert bill selector now sends the existing `allocations` request property using `min(payment amount, bill open amount)`; no backend/accounting change was made. Focused checks and screenshot review are pending; see `BUY-DESIGN-HANDOFF.md` and draft PR #81.
