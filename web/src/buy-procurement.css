@@ -43,3 +43,5 @@
 .buy-return-history{display:grid;gap:12px;border-top:1px solid var(--line,#e3e7e5);padding-top:16px}.buy-return-history label{display:grid;gap:6px;color:var(--muted,#5b6770);font-weight:600}.buy-return-detail{display:grid;gap:10px;padding:14px;border:1px solid var(--line,#e3e7e5);border-radius:12px}.buy-return-detail p{margin:0}.buy-return-detail ul{margin:0;padding-left:20px}
 @media(max-width:700px){.buy-return-entry{padding:14px}.buy-return-receipt{grid-template-columns:1fr 1fr}.buy-return-section-head{align-items:flex-start;flex-direction:column}.buy-return-section-head button{width:100%}.buy-return-line dl{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:380px){.buy-return-receipt{grid-template-columns:1fr}.buy-return-line dl{grid-template-columns:1fr 1fr}}
+
+.billing-screen > .buy-pay,.billing-screen > .buy-history,.billing-screen > .buy-return{grid-template-columns:minmax(0,1fr);align-items:stretch}
