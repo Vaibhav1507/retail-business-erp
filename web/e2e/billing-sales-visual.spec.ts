@@ -81,13 +81,15 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   test.setTimeout(15 * 60 * 1000)
   mkdirSync(outDir, { recursive: true })
   page.on('pageerror', e => pageErrors.push(e.message))
+
+  // signUp installs its own navigation-confirm handler. Replace it after signup so only one
+  // listener handles each dialog during the rest of this audit.
+  await signUp(page, { email: owner, businessName: business })
+  page.removeAllListeners('dialog')
   page.on('dialog', async d => {
     dialogs.push({ type: d.type(), message: d.message(), dismissed: false })
     await d.accept()
   })
-
-  // Seed synthetic product, stock and a credit invoice so the audit never screenshots loading placeholders.
-  await signUp(page, { email: owner, businessName: business })
   await page.goto('/#/stock/products')
   const form = await openAddProduct(page)
   await form.getByLabel('Name', { exact: true }).fill(product)
