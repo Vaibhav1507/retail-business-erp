@@ -518,16 +518,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <h3>Customer</h3>
         <div className="billing-grid">
           <div className="billing-field billing-col-4 billing-rel">
-            <label htmlFor="billing-phone">Mobile number</label>
-            <input id="billing-phone" inputMode="tel" autoComplete="off" required aria-invalid={Boolean(fieldErrors.customerPhone)} className={fieldErrors.customerPhone ? 'field-invalid' : ''} placeholder="Type number to find customer" value={phone}
+            <label htmlFor="billing-phone">Mobile number *</label>
+            <input id="billing-phone" inputMode="tel" autoComplete="off" required aria-invalid={Boolean(fieldErrors.customerPhone)} aria-describedby={fieldErrors.customerPhone ? "billing-phone-error" : undefined} className={fieldErrors.customerPhone ? 'field-invalid' : ''} placeholder="Type number to find customer" value={phone}
               onChange={e => { setPhone(e.target.value.replace(/[^\d+ ]/g, '')); setCustomerId(''); setFieldErrors(current => ({ ...current, customerPhone: '' })) }}
               onFocus={() => setShowFound(found.length > 0)} onBlur={() => setTimeout(() => setShowFound(false), 150)} />
-            {fieldErrors.customerPhone && <small className="field-error">{fieldErrors.customerPhone}</small>}
+            {fieldErrors.customerPhone && <small id="billing-phone-error" className="field-error">{fieldErrors.customerPhone}</small>}
             {showFound && found.length > 0 && <ul className="billing-menu" role="listbox" aria-label="Matching customers">
               {found.slice(0, 6).map(c => <li key={c.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); pick(c) }}><strong>{c.name}</strong><span>{c.phone}</span></li>)}
             </ul>}
           </div>
-          <div className="billing-field billing-col-8"><label htmlFor="billing-name">Customer name *</label><input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} className={fieldErrors.customerName ? 'field-invalid' : ''} value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })) }} />{fieldErrors.customerName && <small className="field-error">{fieldErrors.customerName}</small>}</div>
+          <div className="billing-field billing-col-8"><label htmlFor="billing-name">Customer name *</label><input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} aria-describedby={fieldErrors.customerName ? "billing-name-error" : undefined} className={fieldErrors.customerName ? 'field-invalid' : ''} value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })) }} />{fieldErrors.customerName && <small id="billing-name-error" className="field-error">{fieldErrors.customerName}</small>}</div>
           <div className="billing-field billing-col-12"><label htmlFor="billing-addr">Address</label><input id="billing-addr" value={address} onChange={e => setAddress(e.target.value)} /></div>
           <div className="billing-field billing-col-3"><label htmlFor="billing-pin">Pincode</label><input id="billing-pin" inputMode="numeric" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} /></div>
           <div className="billing-field billing-col-5"><label htmlFor="billing-city">City</label><input id="billing-city" value={city} onChange={e => setCity(e.target.value)} /></div>
