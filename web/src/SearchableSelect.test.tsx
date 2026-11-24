@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -8,11 +9,19 @@ const options: SearchableSelectOption[] = [
   { value: 'c2', label: 'Ravi Kumar', description: 'Owes ₹300', searchText: '9123456780' }
 ]
 
+function ControlledSelect({ id, label, options, placeholder, onChange }: {
+  id: string; label: string; options: SearchableSelectOption[]; placeholder: string; onChange: (value: string) => void
+}) {
+  const [value, setValue] = useState('')
+  return <SearchableSelect id={id} label={label} value={value} options={options}
+    onChange={next => { onChange(next); setValue(next) }} placeholder={placeholder} />
+}
+
 describe('SearchableSelect', () => {
   it('filters by customer name and selects with the keyboard', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<SearchableSelect id="customer" label="Customer" value="" options={options}
+    render(<ControlledSelect id="customer" label="Customer" options={options}
       onChange={onChange} placeholder="Search by customer name" />)
 
     const input = screen.getByRole('combobox', { name: 'Customer' })
@@ -47,7 +56,7 @@ describe('SearchableSelect', () => {
   it('supports matching by additional reference text and selecting an explicit empty option', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<SearchableSelect id="bill" label="Apply to a bill (optional)" value=""
+    render(<ControlledSelect id="bill" label="Apply to a bill (optional)"
       options={[{ value: '', label: 'On account (no specific bill)' }, ...options]}
       onChange={onChange} placeholder="Search bill or choose on account" />)
 
