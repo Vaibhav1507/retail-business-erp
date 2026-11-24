@@ -6,7 +6,7 @@ import './buy-procurement.css'
 
 type Customer = { id: string; name: string; owed: number }
 type SaleRow = { id: string; number: number; customer: string; total: number; cancelled: boolean }
-type Receipt = { id: string; date: string; supplier: string; total: number }
+type Receipt = { id: string; date: string; supplier: string; supplierRef: string | null; total: number }
 type Payment = { id: string; number: number; date: string; customer: string; amount: number; method: string; reference: string | null }
 type Entry = { type: string; number: number; date: string; debit: number; credit: number; balance: number; id: string }
 type Statement = { customer: string; outstanding: number; entries: Entry[] }
