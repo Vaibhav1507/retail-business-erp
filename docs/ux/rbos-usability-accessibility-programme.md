@@ -530,3 +530,15 @@ Fix issues from the group pass and rerun affected coverage and necessary regress
 - Focused checks only during each implementation slice. Full integrated Playwright, responsive screenshots, visual review and Axe are deferred until all five routes are implemented.
 - Existing 178-screenshot pre-redesign baseline is not repeated.
 - No merge or deployment is authorised; native Android and shopkeeper acceptance remain later gates.
+
+
+## Implementation checkpoint — 2026-11-24
+
+- **Five-route implementation:** PR #74 now implements Create Invoice, Sell landing, Sales History, Collections and Customer Returns on `ux/invoice-entry-action-first`, current head `b5d4236a8c45c552fbb034d328d1b7dd20a8c5a8`.
+- **Create Invoice contract:** required customer name/mobile, field-associated errors and first-invalid focus are aligned in source; a focused regression test covers blank fields, invalid mobile length, `aria-describedby` and focus.
+- **PR #72:** merged to `main` as `87b1c6892e7a1ad2251d207ab463a20c72f8067f`. It contributes the reusable Billing & Sales Playwright/Axe audit workflow and keyboard/touch-target improvements.
+- **Baseline discipline:** PR #72 run #45316812990 is the historical pre-redesign 178-screenshot baseline. Do not recreate it or use it as post-redesign acceptance evidence.
+- **Current group verification:** the post-redesign audit is running on the current PR #74 head: [run #45359742608](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45359742608). This is the required integrated five-route run, not a repeat of the historical baseline.
+- **Current standard CI:** [run #45359742851](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45359742851). Frontend TypeScript, 207 tests across 22 files, lint, build and dependency audit passed. Backend build/unit tests and PostgreSQL integration are still running at this checkpoint.
+- **Gate:** PR #74 remains draft/open. No merge or deployment until the current exact-head CI and integrated visual/Axe evidence are reviewed. No deployment is authorised by this checkpoint.
+- **Real-device checks:** Android camera/gallery permission flow, printer/share sheet and TalkBack remain separate acceptance checks after browser verification.
