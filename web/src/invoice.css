@@ -340,5 +340,4 @@
   }
   .invoice-product-actions { align-items: stretch; }
   .invoice-product-actions > button { width: 100%; }
-  .invoice-summary-bar { max-height: 52vh; overflow-y: auto; }
 }
