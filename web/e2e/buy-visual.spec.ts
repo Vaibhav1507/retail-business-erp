@@ -67,7 +67,7 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
   await expect(page.locator('.buy-review-bar')).toContainText('0 items')
   await expect(page.getByRole('button', { name: /Review purchase/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Camera' })).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Upload' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeEnabled()
   await expect(page.getByLabel('Take supplier bill photo')).toHaveAttribute('capture', 'environment')
   await expect(page.getByLabel('Upload supplier bill files')).toHaveAttribute('multiple', '')
 
