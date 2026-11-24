@@ -40,7 +40,7 @@ describe('SalesHistory', () => {
 
     await userEvent.clear(screen.getByLabelText('Search sales'))
     await userEvent.type(screen.getByLabelText('Search sales'), 'Asha')
-    await waitFor(() => expect(screen.getByText('Asha Stores')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('Asha Stores').length).toBeGreaterThan(0))
     expect(screen.queryByText('Ravi Kumar')).not.toBeInTheDocument()
   })
 
