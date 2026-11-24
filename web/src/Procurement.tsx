@@ -7,6 +7,7 @@ import type { InvoiceDraft } from './InvoiceUpload'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
 import { BarcodeScanner, type ScanResult } from './BarcodeScanner'
+import { SearchableSelect } from './SearchableSelect'
 
 type Supplier = { id: string; name: string; phone: string | null; notes: string | null; isActive: boolean; owed: number }
 type Receipt = { id: string; date: string; supplier: string; supplierRef: string | null; total: number; hasInvoice?: boolean }
@@ -30,6 +31,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const [name, setName] = useState('')
   const [phone, setPhone] = useState(''); const [supNotes, setSupNotes] = useState(''); const [supEditId, setSupEditId] = useState<string | null>(null)
   const [supplierId, setSupplierId] = useState('')
+  const [paySupplierId, setPaySupplierId] = useState('')
   const [locationId, setLocationId] = useState('')
   const [date, setDate] = useState(today)
   const [ref, setRef] = useState('')
@@ -101,8 +103,8 @@ export function Procurement({ products, locations, reload, show }: { products: (
   })
   const [statement, setStatement] = useState<{ supplier: string; outstanding: number; entries: { id: string; type: string; date: string; debit: number; credit: number; balance: number }[] } | null>(null)
   const [billId, setBillId] = useState(''); const [openBills, setOpenBills] = useState<{ id: string; date: string; reference: string | null; open: number }[]>([])
-  useEffect(() => { setBillId(''); if (!sup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + sup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [sup, payments])
-  const showStatement = () => run(async () => { setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + sup + '/statement')); return '' })
+  useEffect(() => { setBillId(''); setStatement(null); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
+  const showStatement = () => run(async () => { const id = v('pay') ? paySup : sup; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
   return (
     <section aria-label="Purchasing" className="billing-screen">
@@ -167,15 +169,25 @@ export function Procurement({ products, locations, reload, show }: { products: (
 ton type="button" className="secondary" onClick={() => setReviewReceipt(false)}>Back to edit</button><button type="button" onClick={receive}>Post receipt</button></div>
       </div>}
       </>}
-      {v('pay') && <>
-      
-      <p>You owe this supplier: Rs. {owed.toFixed(2)}</p>
-      <label>Amount to pay (Rs.) <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} /></label>
-      {openBills.length > 0 && <label>Apply to bill (optional) <select value={billId} onChange={e => setBillId(e.target.value)}><option value="">On account (no specific bill)</option>{openBills.map(b => <option key={b.id} value={b.id}>{b.date} {b.reference ?? ""} - open {b.open.toFixed(2)}</option>)}</select></label>}
-      <label>Paid by <select value={method} onChange={e => setMethod(e.target.value)}><option>Cash</option><option>Bank</option><option>UPI</option></select></label>
-      <label>Note or reference no. <input value={pref} onChange={e => setPref(e.target.value)} /></label>
-      <button type="button" onClick={pay} disabled={!sup || !(Number(amount) > 0)}>Save payment</button>
-      </>}
+      {v('pay') && <div className="buy-pay">
+        <header className="buy-screen-heading"><h2>Pay supplier</h2><p>Record a payment made to your supplier.</p></header>
+        <section className="buy-pay-form">
+          <SearchableSelect id="buy-pay-supplier" label="Supplier" value={paySup} options={suppliers.filter(s => s.isActive).map(s => ({value:s.id,label:s.name,description:'Currently owed: ₹'+s.owed.toFixed(2),searchText:s.phone ?? ''}))} onChange={value => {setPaySupplierId(value);setBillId('');setStatement(null);setError('');setDone('')}} placeholder="Search and select supplier" emptyMessage="No supplier matches this search." />
+          {paySup && <div className="buy-balance"><span>Currently owed</span><strong>₹{payOwed.toFixed(2)}</strong></div>}
+          {!paySup && <p className="buy-pay-hint">Choose a supplier to see the amount due.</p>}
+          {paySup && payOwed <= 0 && <p className="buy-pay-hint">No amount is currently due to this supplier.</p>}
+          {paySup && payOwed > 0 && <>
+            <label className="buy-pay-amount">Amount to pay (INR) <input inputMode="decimal" value={amount} aria-invalid={!!amountError} aria-describedby={amountError ? 'buy-pay-amount-error' : undefined} onChange={e=>setAmount(e.target.value)} /></label>
+            {amountError && <p className="buy-field-error" id="buy-pay-amount-error">{amountError}</p>}
+            {openBills.length>0 && <div className="buy-pay-allocation"><SearchableSelect id="buy-pay-bill" label="Apply to purchase bill (optional)" value={billId} options={openBills.map(b=>({value:b.id,label:b.date+(b.reference?' · '+b.reference:''),description:'Open amount: ₹'+b.open.toFixed(2),searchText:b.id}))} onChange={setBillId} placeholder="On supplier account (no specific bill)" emptyMessage="No open purchase bills." />{selectedBill&&<p>Will allocate ₹{allocationAmount.toFixed(2)}{Number(amount)>selectedBill.open?' · Any remaining amount stays on the supplier account.':''}</p>}</div>}
+            <fieldset className="buy-methods"><legend>Paid by</legend>{(['Cash','Bank','UPI'] as const).map(value=><label key={value} className={method===value?'is-selected':''}><input type="radio" name="buy-payment-method" value={value} checked={method===value} onChange={()=>setMethod(value)}/>{value}</label>)}</fieldset>
+            <label>Reference number (optional) <input value={pref} onChange={e=>setPref(e.target.value)}/></label>
+            <button type="button" className="buy-pay-primary" onClick={pay} disabled={!paySup||!!amountError||payOwed<=0}>Save payment</button>
+          </>}
+          {paySup&&<button type="button" className="buy-statement-link" onClick={showStatement}>View supplier statement</button>}
+          {statement&&v('pay')&&<div className="buy-statement" role="region" aria-label="Supplier statement"><h3>Statement for {statement.supplier}</h3><p>Currently owed: ₹{statement.outstanding.toFixed(2)}</p><Paged rows={statement.entries}>{page=><table><thead><tr><th>Date</th><th>Type</th><th>Purchase</th><th>Paid / returned</th><th>Balance</th></tr></thead><tbody>{page.map(e=><tr key={e.id}><td>{e.date}</td><td>{e.type}</td><td>{e.debit?e.debit.toFixed(2):'—'}</td><td>{e.credit?e.credit.toFixed(2):'—'}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>}</Paged><button type="button" className="secondary" onClick={()=>setStatement(null)}>Close statement</button></div>}
+        </section>
+      </div>}
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {v('history') && <>
