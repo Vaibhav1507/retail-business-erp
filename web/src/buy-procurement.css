@@ -15,3 +15,15 @@
 @media(max-width:380px){.buy-item-entry{grid-template-columns:1fr}.buy-product-field{grid-column:auto}.buy-line-card{flex-direction:column}.buy-line-end{width:100%;flex-direction:row;justify-content:space-between;align-items:center}}
 
 .billing-screen > .buy-receive{grid-template-columns:minmax(0,1fr);align-items:stretch}
+
+.buy-pay{max-width:720px;margin:0 auto;width:100%;display:grid;gap:16px}
+.buy-pay-form{display:grid;gap:16px;background:#fff;border:1px solid var(--line,#e3e7e5);border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(30,60,90,.05)}
+.buy-balance{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:#edf6f1;color:var(--brand-dark,#0b5e3b)}.buy-balance strong{font-size:23px}.buy-pay-hint{margin:0;color:var(--muted,#5b6770)}
+.buy-pay-amount input{min-height:58px!important;font-size:24px;font-weight:650}.buy-field-error{margin:-10px 0 0;color:var(--danger,#b42318);font-size:13px}
+.buy-pay-allocation{display:grid;gap:6px}.buy-pay-allocation p{margin:0;color:var(--muted,#5b6770);font-size:13px}
+.buy-methods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border:0;padding:0;margin:0}.buy-methods legend{font-weight:600;color:var(--muted,#5b6770);margin-bottom:8px}
+.buy-methods label{min-height:48px;border:1px solid var(--line,#d9dfdc);border-radius:10px;display:flex;align-items:center;justify-content:center;gap:7px;padding:8px;color:var(--text,#202832)}.buy-methods label.is-selected{border-color:var(--brand,#107c52);background:#edf6f1;color:var(--brand-dark,#0b5e3b)}.buy-methods input{width:18px;min-height:18px;accent-color:var(--brand,#107c52)}
+.buy-pay-primary{width:100%;min-height:52px}.buy-statement-link{justify-self:start;background:transparent!important;color:var(--brand-dark,#0b5e3b)!important;border:0!important;text-decoration:underline}
+.buy-statement{display:grid;gap:10px;border-top:1px solid var(--line,#e3e7e5);padding-top:14px;min-width:0}.buy-statement h3,.buy-statement p{margin:0}.buy-statement .paged{min-width:0;overflow:auto}
+.billing-screen > .buy-receive{grid-template-columns:minmax(0,1fr);align-items:stretch}
+@media(max-width:700px){.buy-pay-form{padding:14px}.buy-methods label{padding:6px 2px;font-size:14px}}
