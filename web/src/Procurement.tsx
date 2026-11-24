@@ -109,7 +109,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const selectedBill = openBills.find(b => b.id === billId)
   const allocationAmount = selectedBill ? Math.min(Number(amount) || 0, selectedBill.open) : 0
   const payOwed = suppliers.find(s => s.id === paySup)?.owed ?? 0
-  const amountError = amount.trim() === '' ? 'Enter an amount to pay.' : !(Number(amount) > 0) ? 'Enter an amount greater than zero.' : Number(amount) > payOwed ? 'Payment cannot be more than the supplier balance.' : ''
+  const amountError = amount.trim() === '' ? tr('buy.amountRequired') : !(Number(amount) > 0) ? tr('buy.amountPositive') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''
   useEffect(() => { setBillId(''); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
   const showStatement = () => run(async () => { const id = v('pay') ? paySup : historySupplierId; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
@@ -184,7 +184,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
           {paySup && payOwed > 0 && <>
             <label className="buy-pay-amount">{tr('buy.amountToPay')} <input inputMode="decimal" value={amount} aria-invalid={!!amountError} aria-describedby={amountError ? 'buy-pay-amount-error' : undefined} onChange={e=>setAmount(e.target.value)} /></label>
             {amountError && <p className="buy-field-error" id="buy-pay-amount-error">{amountError}</p>}
-            {openBills.length>0 && <div className="buy-pay-allocation"><SearchableSelect id="buy-pay-bill" label={tr('buy.applyToBill')} value={billId} options={openBills.map(b=>({value:b.id,label:b.date+(b.reference?' · '+b.reference:''),description:tr('buy.billOpen')+': ₹'+b.open.toFixed(2),searchText:b.id}))} onChange={setBillId} placeholder={tr('buy.onAccount')} emptyMessage={tr('buy.noOpenBills')} />{selectedBill&&<p>Will allocate ₹{allocationAmount.toFixed(2)}{Number(amount)>selectedBill.open?' · Any remaining amount stays on the supplier account.':''}</p>}</div>}
+            {openBills.length>0 && <div className="buy-pay-allocation"><SearchableSelect id="buy-pay-bill" label={tr('buy.applyToBill')} value={billId} options={openBills.map(b=>({value:b.id,label:b.date+(b.reference?' · '+b.reference:''),description:tr('buy.billOpen')+': ₹'+b.open.toFixed(2),searchText:b.id}))} onChange={setBillId} placeholder={tr('buy.onAccount')} emptyMessage={tr('buy.noOpenBills')} />{selectedBill&&<p>{tr('buy.willAllocate')} ₹{allocationAmount.toFixed(2)}{Number(amount)>selectedBill.open?' · Any remaining amount stays on the supplier account.':''}</p>}</div>}
             <fieldset className="buy-methods"><legend>{tr('buy.paidBy')}</legend>{(['Cash','Bank','UPI'] as const).map(value=><label key={value} className={method===value?'is-selected':''}><input type="radio" name="buy-payment-method" value={value} checked={method===value} onChange={()=>setMethod(value)}/>{value}</label>)}</fieldset>
             <label>{tr('buy.reference')} <input value={pref} onChange={e=>setPref(e.target.value)}/></label>
             <button type="button" className="buy-pay-primary" onClick={pay} disabled={!paySup||!!amountError||payOwed<=0}>{tr('buy.savePayment')}</button>
