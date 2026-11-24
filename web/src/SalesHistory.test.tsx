@@ -38,8 +38,8 @@ describe('SalesHistory', () => {
     expect((await screen.findAllByText('Asha Stores')).length).toBeGreaterThan(0)
     expect(screen.queryByText('Ravi Kumar')).not.toBeInTheDocument()
 
-    await userEvent.clear(screen.getByLabelText('Search sales'))
-    await userEvent.type(screen.getByLabelText('Search sales'), 'Asha')
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Search sales' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search sales' }), 'Asha')
     await waitFor(() => expect(screen.getAllByText('Asha Stores').length).toBeGreaterThan(0))
     expect(screen.queryByText('Ravi Kumar')).not.toBeInTheDocument()
   })
