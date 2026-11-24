@@ -159,7 +159,7 @@ Detailed contract: docs/ux/buy-return-to-supplier-design.md.
 - Added English and Hindi copy for the new Buy labels and validation messages.
 - OCR review now switches to compact, labelled item cards on phone widths while preserving the same editable fields and extraction/apply logic.
 - Pay Supplier and Past Purchases now require an explicit supplier selection for supplier-specific views; statement state is retained after data refresh.
-- Remaining: run focused frontend tests, TypeScript, lint and build; finish the Hindi-language sweep for secondary history/return helper copy; inspect all resulting failures; review updated Android screenshots. Playwright remains excluded per user instruction.
+- Remaining: finish the Hindi-language sweep for secondary history/return helper copy; resolve any focused frontend/CI failures; complete the Buy Playwright/Axe visual audit; inspect responsive screenshots and review the updated Android Add Purchase flow.
 - The draft PR currently has no reported status checks/workflow runs in the GitHub response; this is not a passing CI result.
 
 ## 7. Functional findings, separately tracked
@@ -211,7 +211,7 @@ No backend changes are planned.
 4. Implement Return to Supplier and scoped BF-04 loading.
 5. Add/update focused frontend tests for the four flows, supplier-required behaviour, allocation request mapping, OCR handoff, history states, quantity bounds and return detail.
 6. Run frontend build, lint and unit tests; run relevant .NET integration tests if backend/shared contracts change.
-7. **Do not run Playwright for this scope.** User will supply Android screenshots. Review updated screenshots at agreed viewport sizes before visual acceptance.
+7. Run the RBOS Visual Audit workflow for the complete Buy group after the four routes are implemented. Review responsive screenshots and Axe WCAG 2 A/AA results; separately track native Android camera and real-device acceptance.
 
 ### Acceptance criteria
 
@@ -239,10 +239,10 @@ No backend changes are planned.
 | Frontend verification on PR #81 | Passed: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
 | Backend verification on PR #81 | Passed: .NET solution build, backend unit tests, deployment Docker image build |
 | PostgreSQL integration on PR #81 | Passed: disposable database bootstrap, migrations and integration tests |
-| Playwright | Explicitly not run, per user instruction |
-| Updated Android screenshot review | Complete — two follow-up defects identified (Buy tab clipping and OCR filename feedback) |
+| Playwright / Axe | Buy audit added in PR #82; latest run pending; inspect captured screenshots before visual acceptance |
+| Updated Android screenshot review | Initial screenshots reviewed — follow-up defects identified (Buy tab clipping, OCR filename feedback, and Add Purchase visual alignment); final implementation screenshots pending |
 | Follow-up implementation | In progress on `fix/buy-mobile-tabs-invoice-upload-feedback` |
-| Follow-up tests / CI | Pending for the follow-up branch |
+| Follow-up tests / CI | Frontend test failure identified and corrected in follow-up commits; rerun pending |
 | Real-device acceptance | Pending user verification after follow-up deployment |
 | User acceptance | Pending user verification |
 | Production revision | Not independently verified from this repository review |
