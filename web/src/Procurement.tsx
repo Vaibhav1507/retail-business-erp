@@ -112,7 +112,6 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const amountError = amount.trim() === '' ? tr('buy.amountRequired') : !(Number(amount) > 0) ? tr('buy.amountPositive') : !/^\d+(?:\.\d{1,2})?$/.test(amount) ? tr('buy.amountDecimals') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''
   useEffect(() => { setBillId(''); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
   const showStatement = () => run(async () => { const id = v('pay') ? paySup : historySupplierId; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
-  const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
   return (
     <section aria-label="Purchasing" className="billing-screen">
       {!show && <h2>Suppliers and purchasing</h2>}
