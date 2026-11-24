@@ -20,6 +20,7 @@
 .billing-menu li:hover { background: #eef6f2; }
 .billing-menu li span { color: var(--muted, #5b6770); }
 .billing-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+.billing-action-link { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px 10px; border-radius: 8px; font-weight: 600; }
 .billing-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }
 .billing-table-wrap .billing-table { min-width: 800px; margin-top: 0; }
 .billing-table-wrap td input { box-sizing: border-box; min-width: 64px; min-height: 44px; }
