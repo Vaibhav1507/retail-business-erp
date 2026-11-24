@@ -88,3 +88,26 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+
+/* Add Purchase: inline field markers, clear two-step context and thumb-reachable review. */
+.buy-step-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;color:var(--brand-dark,#0b5e3b);font-size:12px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}
+.buy-step-count{padding:7px 11px;border-radius:999px;background:var(--brand-soft,#edf6f1);font-size:12px;letter-spacing:0;white-space:nowrap}
+.buy-field-label{display:inline-flex;align-items:center;gap:4px;line-height:1.35}
+.buy-required{display:inline;color:var(--danger,#b42318);font-size:15px;line-height:1}
+.buy-review-bar{position:fixed;left:0;right:0;bottom:calc(var(--nav-h,64px) + env(safe-area-inset-bottom));z-index:5;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;background:var(--card,#fff);border-top:1px solid var(--line,#e3e7e5);box-shadow:0 -6px 18px rgba(30,60,90,.07)}
+.buy-review-bar-summary{display:grid;gap:3px;min-width:0}
+.buy-review-bar-summary strong{font-size:16px;color:var(--ink,#202832)}
+.buy-review-bar-summary span{font-size:13px;color:var(--muted,#5b6770);overflow-wrap:anywhere}
+.buy-review-bar-action{min-height:48px;min-width:42%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 16px;border-radius:12px;background:var(--brand,#107c52);color:#fff;font-weight:700}
+.buy-review-bar-action:disabled{opacity:.38;cursor:not-allowed}
+.buy-receive{padding-bottom:104px}
+@media(min-width:400px) and (max-width:700px){
+ .buy-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .buy-fields label:first-child,.buy-fields label:last-child{grid-column:1/-1}
+}
+@media(max-width:399px){.buy-fields{grid-template-columns:1fr}}
+@media(min-width:960px){
+ .buy-review-bar{position:sticky;left:auto;right:auto;bottom:0;max-width:980px;margin:0 auto;border:1px solid var(--line,#e3e7e5);border-radius:14px;box-shadow:0 4px 14px rgba(30,60,90,.06)}
+ .buy-receive{padding-bottom:0}
+}
