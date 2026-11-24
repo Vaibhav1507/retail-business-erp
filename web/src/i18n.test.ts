@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { formatInr, setLanguage, t, toLang } from './i18n'
+import { catalogueKeys, formatInr, setLanguage, t, toLang } from './i18n'
 
 afterEach(() => setLanguage('en'))
 
@@ -24,4 +24,14 @@ describe('i18n', () => {
   it('formats INR with Indian digit grouping', () => {
     expect(formatInr(1234567.5)).toContain('12,34,567.50')
   })
+  it('provides Hindi entries for every Buy and invoice-import message', () => {
+    const enKeys = catalogueKeys('en').filter(key => key.startsWith('buy.'))
+    const hiKeys = new Set(catalogueKeys('hi'))
+    expect(enKeys.filter(key => !hiKeys.has(key))).toEqual([])
+    setLanguage('hi')
+    expect(t('buy.payTitle')).toBe('सप्लायर को भुगतान')
+    expect(t('buy.invoiceUpload')).toContain('PDF')
+    expect(t('buy.returnTitle')).toBe('सप्लायर को सामान लौटाएँ')
+  })
+
 })
