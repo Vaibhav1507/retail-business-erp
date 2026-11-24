@@ -1,4 +1,5 @@
 import { Paged } from './Paged'
+import { t as tr } from './i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
 import './billing-forms.css'
@@ -193,53 +194,53 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
 
       </>}
       {v('preturn') && <div className="buy-return">
-        <header className="buy-screen-heading"><h2>Return to supplier</h2><p>Choose the purchase bill these goods came from.</p></header>
+        <header className="buy-screen-heading"><h2>{tr('buy.postSupplierReturn')}</h2><p>{tr('buy.returnIntro')}</p></header>
         <section className="buy-return-entry">
-          <label>Original purchase
+          <label>{tr('buy.originalPurchase')}
             <select value={retReceipt} onChange={e => { void pickReceipt(e.target.value); setError(''); setDone('') }}>
-              <option value="">Select a purchase bill</option>
+              <option value="">{tr('buy.selectPurchase')}</option>
               {receipts.map(r => <option key={r.id} value={r.id}>{r.date} · {r.supplier}{r.supplierRef ? ' · ' + r.supplierRef : ''} · ₹{r.total.toFixed(2)}</option>)}
             </select>
           </label>
           {retReceipt && }
           {retReceipt && recDetail && <>
             <div className="buy-return-receipt">
-              <div><span>Supplier</span><strong>{receipts.find(r => r.id === retReceipt)?.supplier}</strong></div>
-              <div><span>Receipt no.</span><strong>#{recDetail.receipt.number}</strong></div>
-              <div><span>Receipt date</span><strong>{recDetail.receipt.date}</strong></div>
-              <div><span>Supplier invoice</span><strong>{recDetail.receipt.supplierRef || '—'}</strong></div>
-              <div><span>Stock location</span><strong>{recDetail.receipt.location}</strong></div><div><span>Receipt total</span><strong>₹{recDetail.receipt.total.toFixed(2)}</strong></div>
+              <div><span>{tr('buy.supplier')}</span><strong>{receipts.find(r => r.id === retReceipt)?.supplier}</strong></div>
+              <div><span>{tr('buy.receiptNo')}</span><strong>#{recDetail.receipt.number}</strong></div>
+              <div><span>{tr('buy.receiptDate')}</span><strong>{recDetail.receipt.date}</strong></div>
+              <div><span>{tr('buy.supplierInvoice')}</span><strong>{recDetail.receipt.supplierRef || '—'}</strong></div>
+              <div><span>{tr('buy.stockLocation')}</span><strong>{recDetail.receipt.location}</strong></div><div><span>{tr('buy.receiptTotal')}</span><strong>₹{recDetail.receipt.total.toFixed(2)}</strong></div>
             </div>
             <section className="buy-return-lines">
-              <div className="buy-return-section-head"><h3>Items on this purchase</h3><button type="button" className="secondary" onClick={() => setRecQty(Object.fromEntries(recLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>Fill remaining quantities</button></div>
+              <div className="buy-return-section-head"><h3>{tr('buy.itemsOnPurchase')}</h3><button type="button" className="secondary" onClick={() => setRecQty(Object.fromEntries(recLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>{tr('buy.fillRemaining')}</button></div>
               {recLines.map(l => <article className="buy-return-line" key={l.productId}>
                 <strong>{l.product}</strong><small>{l.sku}</small>
-                <dl><dt>Purchased</dt><dd>{l.quantity}</dd><dt>Already returned</dt><dd>{l.returned}</dd><dt>Remaining on receipt</dt><dd>{l.remaining}</dd></dl>
-                {l.remaining > 0 ? <label>Quantity to return<input type="number" min="0" max={l.remaining} step="0.001" inputMode="decimal" value={recQty[l.productId] ?? ''} aria-invalid={Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0} aria-label={`Quantity to return for ${l.product}`} onChange={e => setRecQty({ ...recQty, [l.productId]: e.target.value })} /></label> : <p className="buy-return-complete">Fully returned</p>}
-                {Number(recQty[l.productId] ?? 0) > l.remaining && <p className="buy-field-error" role="alert">Cannot exceed the remaining quantity of {l.remaining}.</p>}
-                {Number(recQty[l.productId] ?? 0) < 0 && <p className="buy-field-error" role="alert">Enter zero or a positive quantity.</p>}
+                <dl><dt>{tr('buy.purchased')}</dt><dd>{l.quantity}</dd><dt>{tr('buy.alreadyReturned')}</dt><dd>{l.returned}</dd><dt>{tr('buy.remainingOnReceipt')}</dt><dd>{l.remaining}</dd></dl>
+                {l.remaining > 0 ? <label>{tr('buy.quantityToReturn')}<input type="number" min="0" max={l.remaining} step="0.001" inputMode="decimal" value={recQty[l.productId] ?? ''} aria-invalid={Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0} aria-label={`Quantity to return for ${l.product}`} onChange={e => setRecQty({ ...recQty, [l.productId]: e.target.value })} /></label> : <p className="buy-return-complete">{tr('buy.fullyReturned')}</p>}
+                {Number(recQty[l.productId] ?? 0) > l.remaining && <p className="buy-field-error" role="alert">{tr('buy.cannotExceed', { qty: l.remaining })}</p>}
+                {Number(recQty[l.productId] ?? 0) < 0 && <p className="buy-field-error" role="alert">{tr('buy.positiveQty')}</p>}
               </article>)}
-              <p className="buy-return-hint">The system also checks current stock at this location when you post the return.</p>
+              <p className="buy-return-hint">{tr('buy.stockHint')}</p>
             </section>
-            <label>Return reason (optional)<input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
-            <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0)}>Post supplier return</button>
+            <label>{tr('buy.returnReason')}<input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
+            <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0)}>{tr('buy.postSupplierReturn')}</button>
           </>}
           {retReceipt && receiptLoading && <p className="buy-return-loading" role="status">Loading purchase details…</p>}{retReceipt && recDetail && recLines.length === 0 && <p className="buy-return-hint">No purchase items are available to return on this receipt.</p>}
         </section>
         <section className="buy-return-history">
-          <h3>Previous supplier returns</h3>
-          <label>Search supplier returns<input value={prSearch} onChange={e => setPrSearch(e.target.value)} placeholder="Supplier, return number or receipt number" /></label>
-          <Paged rows={purchaseReturns} empty="No supplier returns have been recorded.">{page => <div className="buy-history-list">{page.map(r => <article className="buy-history-card" key={r.id}>
+          <h3>{tr('buy.previousReturns')}</h3>
+          <label>{tr('buy.searchReturns')}<input value={prSearch} onChange={e => setPrSearch(e.target.value)} placeholder="Supplier, return number or receipt number" /></label>
+          <Paged rows={purchaseReturns} empty={tr('buy.noReturns')}>{page => <div className="buy-history-list">{page.map(r => <article className="buy-history-card" key={r.id}>
             <div className="buy-history-top"><strong>Return #{r.number} · {r.supplier}</strong><strong>₹{r.total.toFixed(2)}</strong></div>
             <dl><dt>Date</dt><dd>{r.date}</dd><dt>Original receipt</dt><dd>#{r.receiptNumber}</dd><dt>Reason</dt><dd>{r.reason || '—'}</dd></dl>
             <button type="button" className="secondary" onClick={async () => { try { setPrDetail(await api<ReturnDetail<PurchaseReturn>>('GET', '/purchase-returns/' + r.id)) } catch (e) { setError(msg(e)) } }}>View details</button>
           </article>)}</div>}</Paged>
-          {prDetail && <div className="buy-return-detail" role="region" aria-label="Supplier return details">
+          {prDetail && <div className="buy-return-detail" role="region" aria-label={tr('buy.returnDetails')}>
             <h3>Return #{prDetail.return.number} · Receipt #{prDetail.return.receiptNumber}</h3>
             <p>{prDetail.return.supplier} · {prDetail.return.date}</p>
             <p>{prDetail.return.reason || 'No reason provided'}</p>
             <ul>{prDetail.lines.map(l => <li key={l.sku}>{l.product} · {l.quantity} × ₹{l.amount.toFixed(2)}</li>)}</ul>
-            <button type="button" className="secondary" onClick={() => setPrDetail(null)}>Close details</button>
+            <button type="button" className="secondary" onClick={() => setPrDetail(null)}>{tr('buy.closeDetails')}</button>
           </div>}
         </section>
       </div>}
