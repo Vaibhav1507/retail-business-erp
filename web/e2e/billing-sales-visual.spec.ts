@@ -15,10 +15,10 @@ const routeViewports = [
   { name: 'mobile-390x844', width: 390, height: 844 },
   { name: 'mobile-412x915', width: 412, height: 915 },
   { name: 'tablet-768x1024', width: 768, height: 1024 },
-  { name: 'desktop-1280x900', width: 1280, height: 900 },
   { name: 'landscape-844x390', width: 844, height: 390 },
 ]
-const stateViewports = [routeViewports[0]!, routeViewports[1]!, routeViewports[3]!, routeViewports[4]!]
+const stateViewports = [routeViewports[0]!, routeViewports[1]!, routeViewports[2]!, routeViewports[3]!]
+const desktopViewport = { name: 'desktop-1280x900', width: 1280, height: 900 }
 type RecordRow = {
   state: string; viewport: string; screenshot: string; overflowX: boolean
   unnamed: string[]; undersized: string[]
@@ -77,7 +77,7 @@ async function ready(page: Page, route: string) {
   if (route === 'sell/return') await expect(page.getByLabel('Return against sale').locator('option', { hasText: customer })).toHaveCount(1)
 }
 
-test('Billing & Sales: exhaustive route and interaction-state visual audit', async ({ page, context }) => {
+test('Billing & Sales: exhaustive route and interaction-state visual audit', async ({ page, context, browser }) => {
   test.setTimeout(15 * 60 * 1000)
   mkdirSync(outDir, { recursive: true })
   page.on('pageerror', e => pageErrors.push(e.message))
@@ -114,6 +114,20 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   }
 
   const routes = ['sell/menu', 'sell/bill', 'sell/bills', 'sell/collect', 'sell/return']
+  // Capture desktop in a true non-mobile browser context; changing viewport width in the mobile project
+  // does not turn off isMobile/hasTouch and must not be labelled as desktop evidence.
+  const desktopContext = await browser.newContext({
+    baseURL: 'http://localhost:5173',
+    storageState: await context.storageState(),
+    viewport: { width: desktopViewport.width, height: desktopViewport.height },
+  })
+  const desktopPage = await desktopContext.newPage()
+  desktopPage.on('pageerror', e => pageErrors.push('desktop: ' + e.message))
+  for (const route of routes) {
+    await desktopPage.goto('/#/' + route)
+    await ready(desktopPage, route)
+    await capture(desktopPage, 'route-' + route.replace('/', '-'), [desktopViewport])
+  }
   for (const route of routes) {
     await page.goto('/#/' + route)
     await ready(page, route)
@@ -350,6 +364,35 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await returns.getByRole('button', { name: 'Cancel entire sale' }).click()
   expect(cancelMessage).toContain('Cancel this whole sale?')
 
+  // Capture representative nested states in a true desktop browser context as well.
+  await desktopPage.goto('/#/sell/bill')
+  await expect(desktopPage.getByRole('region', { name: 'Generate invoice' })).toBeVisible()
+  await capture(desktopPage, 'bill-empty-form', [desktopViewport])
+  await desktopPage.getByRole('button', { name: 'Add tag photo' }).click()
+  await expect(desktopPage.getByRole('dialog', { name: 'Add product tag photo' })).toBeVisible()
+  await capture(desktopPage, 'bill-tag-source-picker', [desktopViewport])
+  await desktopPage.getByRole('button', { name: 'Cancel' }).click()
+  await desktopPage.goto('/#/sell/bills')
+  const desktopSalesTable = desktopPage.getByRole('table', { name: 'Sales history' })
+  await expect(desktopSalesTable.locator('tbody tr').first()).toBeVisible()
+  await desktopSalesTable.getByRole('button', { name: 'View' }).first().click()
+  await expect(desktopPage.getByRole('dialog', { name: 'Sale detail' })).toBeVisible()
+  await capture(desktopPage, 'history-invoice-detail', [desktopViewport])
+  await desktopPage.keyboard.press('Escape')
+  await desktopPage.goto('/#/sell/collect')
+  const desktopCollection = desktopPage.getByRole('region', { name: 'Collections and returns' })
+  const desktopCollectSelect = desktopCollection.getByLabel('Collect from')
+  await desktopCollectSelect.selectOption(await desktopCollectSelect.locator('option', { hasText: customer }).getAttribute('value')!)
+  await desktopCollection.getByRole('button', { name: 'Show statement' }).click()
+  await expect(desktopPage.getByRole('region', { name: 'Customer statement' })).toBeVisible()
+  await capture(desktopPage, 'collection-statement', [desktopViewport])
+  await desktopPage.goto('/#/sell/return')
+  const desktopReturns = desktopPage.getByRole('region', { name: 'Collections and returns' })
+  const desktopSaleSelect = desktopReturns.getByLabel('Return against sale')
+  await desktopSaleSelect.selectOption(await desktopSaleSelect.locator('option', { hasText: customer }).first().getAttribute('value')!)
+  await expect(desktopReturns.locator('label').filter({ hasText: 'Return qty:' }).locator('input')).toBeVisible()
+  await capture(desktopPage, 'return-sale-selected', [desktopViewport])
+
   // Standalone print route is a separate document surface outside the app shell.
   const response = await page.request.get('/api/sales')
   expect(response.ok()).toBeTruthy()
@@ -363,6 +406,12 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await page.emulateMedia({ media: 'print' })
   await capture(page, 'standalone-sale-print-media', [routeViewports[1]!])
   await page.emulateMedia({ media: 'screen' })
+  await desktopPage.goto('/#/print/sale/' + sale!.id)
+  await expect(desktopPage.getByRole('main', { name: 'Printable document' })).toBeVisible()
+  await capture(desktopPage, 'standalone-sale-print', [desktopViewport])
+  await desktopPage.emulateMedia({ media: 'print' })
+  await capture(desktopPage, 'standalone-sale-print-media', [desktopViewport])
+  await desktopContext.close()
 
   writeFileSync(outDir + '/report.json', JSON.stringify({
     scope: 'billing-sales', generatedAt: new Date().toISOString(), expectedRoutes: routes,
