@@ -210,7 +210,9 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await expect(bill.getByText('Enter a valid mobile number (10–15 digits).')).toBeVisible()
   await capture(page, 'bill-customer-validation')
 
-  await bill.locator('#billing-phone').fill(phone)
+  // Use a partial number so the autocomplete remains visible. A full exact number
+  // is intentionally auto-selected by GenerateInvoice and does not render a suggestion list.
+  await bill.locator('#billing-phone').fill(phone.slice(0, 6))
   const customerOptions = page.getByRole('listbox', { name: 'Matching customers' })
   await expect(customerOptions.getByRole('option').first()).toBeVisible()
   await capture(page, 'bill-customer-suggestions')
