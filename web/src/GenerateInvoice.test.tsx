@@ -199,6 +199,28 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByDisplayValue('SERIAL-0090')).toBeInTheDocument()
   })
 
+  it('requires customer name and a valid mobile number with associated field errors', async () => {
+    render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    const nameInput = screen.getByLabelText('Customer name *')
+    const phoneInput = screen.getByLabelText('Mobile number *')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    expect(screen.getByText('Customer name is required.')).toBeInTheDocument()
+    expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true')
+    expect(nameInput).toHaveAttribute('aria-describedby', 'billing-name-error')
+    expect(phoneInput).toHaveAttribute('aria-invalid', 'true')
+    expect(phoneInput).toHaveAttribute('aria-describedby', 'billing-phone-error')
+    expect(document.activeElement).toBe(nameInput)
+
+    await userEvent.type(nameInput, 'Test Customer')
+    await userEvent.type(phoneInput, '123456789')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    expect(screen.queryByText('Customer name is required.')).not.toBeInTheDocument()
+    expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
+    expect(document.activeElement).toBe(phoneInput)
+  })
+
   it('shows a non-blocking missing-serial warning during invoice review', async () => {
     render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
