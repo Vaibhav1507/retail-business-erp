@@ -125,7 +125,7 @@ describe('Procurement manual GST', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Review purchase' }))
     expect(screen.getByRole('region', { name: 'Review purchase' })).toBeTruthy()
     expect(body).toEqual({})
-    await userEvent.click(screen.getByRole('button', { name: 'Post receipt' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Post purchase' }))
     await waitFor(() => expect(body.lines).toEqual([{ productId: 'p1', quantity: 10, unitCost: 100, gstAmount: 180 }]))
   })
 
