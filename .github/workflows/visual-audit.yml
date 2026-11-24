@@ -11,17 +11,31 @@ on:
         options:
           - home
           - billing-sales
+  pull_request:
+    paths:
+      - ".github/workflows/visual-audit.yml"
+      - "web/e2e/ui-audit.spec.ts"
+      - "web/e2e/billing-sales-visual.spec.ts"
+      - "web/playwright.config.ts"
+      - "web/src/GenerateInvoice.tsx"
+      - "web/src/SalesHistory.tsx"
+      - "web/src/AfterSales.tsx"
+      - "web/src/ItemTagCapture.tsx"
+      - "web/src/SalesInvoiceCapture.tsx"
+      - "web/src/PhotoSourcePicker.tsx"
+      - "web/src/InvoiceDocument.tsx"
+      - "web/src/Pages.tsx"
 
 permissions:
   contents: read
 
 jobs:
   scoped-screen-audit:
-    name: Audit ${{ inputs.scope }}
+    name: Audit ${{ github.event.inputs.scope || 'billing-sales' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
-      UI_AUDIT_SCOPE: ${{ inputs.scope }}
+      UI_AUDIT_SCOPE: ${{ github.event.inputs.scope || 'billing-sales' }}
       Rbos__Database: test
       ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
       ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
@@ -80,15 +94,24 @@ jobs:
         working-directory: web
         run: npx playwright install --with-deps chromium
 
-      - name: Run selected UI audit stage
+      - name: Run Home visual audit
+        if: env.UI_AUDIT_SCOPE == 'home'
         working-directory: web
         run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: env.UI_AUDIT_SCOPE == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
 
       - name: Upload selected screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rbos-visual-audit-${{ inputs.scope }}
-          path: web/test-results/ui-audit/${{ inputs.scope }}/
+          name: rbos-visual-audit-${{ github.event.inputs.scope || 'billing-sales' }}
+          path: |
+            web/test-results/ui-audit/${{ github.event.inputs.scope || 'billing-sales' }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/.last-run.json
           if-no-files-found: warn
           retention-days: 7

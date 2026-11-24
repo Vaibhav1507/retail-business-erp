@@ -18,7 +18,7 @@ type ReturnDetail<T> = { return: T; lines: { product: string; sku: string; quant
 const newKey = () => crypto.randomUUID()
 const today = () => new Date().toISOString().slice(0, 10)
 const msg = (e: unknown) => (e instanceof ApiError && e.status >= 500 ? 'Server error. Retrying is safe.' : e instanceof Error ? e.message : 'Something went wrong')
-const printLink = (kind: string, id: string) => <a href={'#/print/' + kind + '/' + id} target="_blank" rel="noreferrer">Print</a>
+const printLink = (kind: string, id: string) => <a className="billing-action-link" href={'#/print/' + kind + '/' + id} target="_blank" rel="noreferrer">Print</a>
 
 export type AfterPart = 'collect' | 'sreturn' | 'preturn' | 'print'
 
@@ -137,7 +137,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
 
       {statement && <div role="region" aria-label="Customer statement">
         <h4>Statement: {statement.customer} (owes {statement.outstanding.toFixed(2)} INR)</h4>
-      <Paged rows={statement.entries}>{page => (
+      <Paged rows={statement.entries} regionLabel="Customer statement entries">{page => (
         <table><thead><tr><th>Date</th><th>Type</th><th>No.</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
           <tbody>{page.map((e, i) => <tr key={i}><td>{e.date}</td><td>{e.type}</td><td>{e.number}</td><td>{e.debit.toFixed(2)}</td><td>{e.credit.toFixed(2)}</td><td>{e.balance.toFixed(2)}</td></tr>)}</tbody></table>
       )}</Paged>
@@ -145,7 +145,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
       </div>}
 
       <h3>Collection history</h3>
-      <Paged rows={payments}>{page => (
+      <Paged rows={payments} regionLabel="Collection history results">{page => (
       <table aria-label="Collection history"><thead><tr><th>No.</th><th>Date</th><th>Customer</th><th>Method</th><th>Amount (INR)</th><th></th></tr></thead>
         <tbody>{page.map(p => <tr key={p.id}><td>{p.number}</td><td>{p.date}</td><td>{p.customer}</td><td>{p.method}</td><td>{p.amount.toFixed(2)}</td><td>{printLink('payment', p.id)}</td></tr>)}</tbody></table>
       )}</Paged>
@@ -164,7 +164,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
 
       <h3>Customer returns</h3>
       <label>Search customer returns <input value={srSearch} onChange={e => setSrSearch(e.target.value)} /></label>
-      <Paged rows={saleReturns}>{page => (
+      <Paged rows={saleReturns} regionLabel="Customer return history results">{page => (
       <table aria-label="Customer returns"><thead><tr><th>No.</th><th>Date</th><th>Sale</th><th>Customer</th><th>Total (INR)</th><th></th></tr></thead>
         <tbody>{page.map(r => <tr key={r.id}><td>{r.number}</td><td>{r.date}</td><td>{r.saleNumber}</td><td>{r.customer}</td><td>{r.total.toFixed(2)}</td>
           <td><button type="button" onClick={async () => setSrDetail(await api<ReturnDetail<SaleReturn>>('GET', '/sale-returns/' + r.id))}>View return</button></td></tr>)}</tbody></table>
@@ -188,7 +188,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
 
       <h3>Supplier returns</h3>
       <label>Search supplier returns <input value={prSearch} onChange={e => setPrSearch(e.target.value)} /></label>
-      <Paged rows={purchaseReturns}>{page => (
+      <Paged rows={purchaseReturns} regionLabel="Supplier return history results">{page => (
       <table aria-label="Supplier returns"><thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Receipt</th><th>Total (INR)</th><th></th></tr></thead>
         <tbody>{page.map(r => <tr key={r.id}><td>{r.number}</td><td>{r.date}</td><td>{r.supplier}</td><td>{r.receiptNumber}</td><td>{r.total.toFixed(2)}</td>
           <td><button type="button" onClick={async () => setPrDetail(await api<ReturnDetail<PurchaseReturn>>('GET', '/purchase-returns/' + r.id))}>View supplier return</button></td></tr>)}</tbody></table>
@@ -224,7 +224,7 @@ export function PrintPage({ kind, id }: { kind: string; id: string }) {
   const f = (n: number) => Number(n).toFixed(2)
   return (
     <main className="print-page" aria-label="Printable document">
-      <style>{'@media print{.no-print{display:none}} .print-page table{border-collapse:collapse;width:100%} .print-page th,.print-page td{border:1px solid #888;padding:4px;text-align:left}'}</style>
+      <style>{'@media print{body *{visibility:hidden!important}.print-page,.print-page *{visibility:visible!important}.print-page{position:absolute!important;inset:0 auto auto 0!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important}.print-page .no-print{display:none!important}} .print-page table{border-collapse:collapse;width:100%} .print-page th,.print-page td{border:1px solid #888;padding:4px;text-align:left}'}</style>
       <h1>{biz}</h1>
       {kind === 'sale' && <>
         <h2>Sale invoice #{data.sale.number}</h2>

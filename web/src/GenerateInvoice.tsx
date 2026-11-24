@@ -491,7 +491,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       <h2>Generate Invoice</h2>
       <p className="billing-hint">{tr('onboarding.saleGuidance')}</p>
             {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => { void resume(h) }}>Resume</button> <button type="button" className="secondary" onClick={() => { void discardHeld(h.id) }}>Discard</button></li>)}</ul></div>}
-      {offlineQueue.length > 0 && <div className="billing-card" aria-label="Offline bill queue">
+      {offlineQueue.length > 0 && <section className="billing-card" aria-label="Offline bill queue">
         <h3>Offline bills and sync status</h3>
         <p>{offlineQueue.filter(x => x.state === 'pending-sync' || x.state === 'syncing').length} waiting to sync · {offlineQueue.filter(x => x.state === 'needs-attention').length} need attention · {offlineQueue.filter(x => x.state === 'posted').length} posted</p>
         <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue()}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
@@ -499,7 +499,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {new Date(item.createdAt).toLocaleString('en-IN')} — {item.state === 'posted' ? (item.value.invoiceNumber ? 'Posted as INV-' + String(item.value.invoiceNumber).padStart(6, '0') : 'Posted; invoice details are still loading') : item.state === 'needs-attention' ? 'Needs attention: ' + (item.value.lastError ?? 'Server rejected this draft') : item.state === 'syncing' ? 'Syncing…' : 'Pending sync' + (item.value.lastError ? ': ' + item.value.lastError : '')}
           {(item.state === 'posted' || item.state === 'needs-attention') && <button type="button" className="secondary" onClick={() => { void removeQueueItem(item) }}>Remove from device</button>}
         </li>)}</ul>
-      </div>}
+      </section>}
       {error && <p role="alert" className="billing-err">{error}</p>}
 
       <div className="billing-card">
@@ -576,7 +576,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {salesInvoiceDraft.total != null && <p>Handwritten total detected: {money(salesInvoiceDraft.total)} INR — verify it against the line values.</p>}
           {salesInvoiceWarnings.length > 0 && <ul className="billing-hint">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
           {salesInvoiceDraft.lines.length === 0 && <p>No usable lines were detected. You can still enter the bill manually.</p>}
-          {salesInvoiceDraft.lines.length > 0 && <div className="billing-table-wrap"><table className="billing-table">
+          {salesInvoiceDraft.lines.length > 0 && <div className="billing-table-wrap" role="region" aria-label="Extracted invoice lines" tabIndex={0}><table className="billing-table">
             <thead><tr><th>Description / model</th><th>Brand</th><th>Model</th><th>HSN</th><th>Qty</th><th>Unit price</th><th>Discount</th></tr></thead>
             <tbody>{salesInvoiceDraft.lines.map((line, index) => <tr key={index}>
               <td><input aria-label={`Extracted line ${index + 1} description`} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} />{line.confidence != null && <small>Extraction confidence: {Math.round(line.confidence * 100)}%</small>}</td>
