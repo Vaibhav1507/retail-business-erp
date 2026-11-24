@@ -434,6 +434,7 @@ const en = {
   'buy.invoicePreparedPhotoSize': "Prepared invoice photo must be 8 MB or smaller.",
   'buy.invoicePdfSize': "PDF must be between 1 byte and 8 MB.",
   'buy.invoiceTotalSize': "The selected invoice pages together exceed 12 MB.",
+  'buy.gstEntered': "GST entered ₹{amount}",
 } as const
 
 export type MessageKey = keyof typeof en
@@ -869,6 +870,7 @@ const hi: Record<MessageKey, string> = {
   'buy.invoicePdfSize': "PDF 1 बाइट से 8 MB के बीच होनी चाहिए।",
   'buy.invoiceTotalSize': "चुने गए इनवॉइस पेज कुल 12 MB से बड़े हैं।",
   'ca.preparing': 'तैयार हो रहा है...',
+  'buy.gstEntered': "GST दर्ज ₹{amount}",
 }
 
 const catalogues: Record<Lang, Record<MessageKey, string>> = { en, hi }
