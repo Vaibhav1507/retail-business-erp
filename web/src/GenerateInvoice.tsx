@@ -554,20 +554,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         </details>
       </section>
 
-      <details className="invoice-more-details">
-        <summary><span>Payment & bill details</span><small>Optional</small></summary>
-        <div className="invoice-more-details-content billing-grid">
-          {locations.length > 1 && <div className="billing-field billing-col-12"><label htmlFor="billing-store">Store</label><select id="billing-store" value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>}
-          <div className="billing-field billing-col-6"><label htmlFor="billing-date">Sale date</label><input id="billing-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-          <div className="billing-field billing-col-6"><label htmlFor="billing-mode">Payment mode</label><select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
-          {mode === 'Credit' && <div className="billing-field billing-col-6"><label htmlFor="billing-paid">{tr('bill.paidNow')}</label><input id="billing-paid" inputMode="decimal" value={paid} onChange={e => setPaid(e.target.value)} /></div>}
-          {mode === 'Credit' && <><div className="billing-field billing-col-6"><label htmlFor="billing-paid-method">Paid by</label><select id="billing-paid-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2">Second payment (INR, optional)</label><input id="billing-paid2" inputMode="decimal" value={paid2} onChange={e => setPaid2(e.target.value)} /></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2-method">Second paid by</label><select id="billing-paid2-method" value={payMethod2} onChange={e => setPayMethod2(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div></>}
-          <div className="invoice-more-details-actions billing-col-12">
-            <button type="button" className="secondary" onClick={() => { void hold() }} disabled={!items.length}>Hold bill</button>
-          </div>
-        </div>
-      </details>
-
       <section className="invoice-section-card invoice-items-card" aria-labelledby="invoice-items-title">
         <div className="invoice-section-eyebrow"><span>ITEMS</span><b>02</b></div>
         <h2 id="invoice-items-title">Add products</h2>
@@ -602,7 +588,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </div>
           <div className="billing-field billing-col-6">
             <label htmlFor="billing-price">Selling price (₹) *</label>
-            <input id="billing-price" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />
+            <input id="billing-price" inputMode="decimal" placeholder="0.00" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />
             {fieldErrors.price && <small className="field-error">{fieldErrors.price}</small>}
           </div>
         </div>
@@ -686,6 +672,21 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <div className="invoice-summary-total"><strong>Amount to collect</strong><strong>₹{money(total)}</strong></div>
         {gst && <small className="invoice-summary-tax">Includes GST of ₹{money(tax)}</small>}
       </section>
+
+      <details className="invoice-more-details">
+        <summary><span>Payment & bill details</span><small>Optional</small></summary>
+        <div className="invoice-more-details-content billing-grid">
+          {locations.length > 1 && <div className="billing-field billing-col-12"><label htmlFor="billing-store">Store</label><select id="billing-store" value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>}
+          <div className="billing-field billing-col-6"><label htmlFor="billing-date">Sale date</label><input id="billing-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+          <div className="billing-field billing-col-6"><label htmlFor="billing-mode">Payment mode</label><select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
+          {mode === 'Credit' && <div className="billing-field billing-col-6"><label htmlFor="billing-paid">{tr('bill.paidNow')}</label><input id="billing-paid" inputMode="decimal" value={paid} onChange={e => setPaid(e.target.value)} /></div>}
+          {mode === 'Credit' && <><div className="billing-field billing-col-6"><label htmlFor="billing-paid-method">Paid by</label><select id="billing-paid-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2">Second payment (INR, optional)</label><input id="billing-paid2" inputMode="decimal" value={paid2} onChange={e => setPaid2(e.target.value)} /></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2-method">Second paid by</label><select id="billing-paid2-method" value={payMethod2} onChange={e => setPayMethod2(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div></>}
+          <div className="invoice-more-details-actions billing-col-12">
+            <button type="button" className="secondary" onClick={() => { void hold() }} disabled={!items.length}>Hold bill</button>
+          </div>
+        </div>
+      </details>
+
 
       <footer className="invoice-sticky-review" aria-label="Bill total and review">
         <div className="invoice-sticky-amount">
