@@ -1,13 +1,14 @@
 # RBOS Buy section — design handoff
 
-**Status:** Four screen design specifications finalized; first implementation pass is present for all four screens; focused checks and screenshot acceptance remain pending.  
+**Status:** Four Buy screen redesign merged; user-provided Android screenshots reviewed; two focused mobile polish corrections are in progress.  
 **Last reviewed:** 2026-11-24  
 **Repository:** Vaibhav1507/retail-business-erp  
-**Design baseline:** main at b180f59793f265024650731a1f2bd89ead29b342  
-**Canonical branch:** ux/buy-four-screen-redesign  
-**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) (draft; latest head `f18b109b66e1ec9d845d23a08784062f67bea849`).  
-**Visual acceptance:** Pending updated Android screenshots from the user.  
-**Merge / production:** Not authorised.
+**Merged baseline:** main at `004071617aa41bb8a2846f840f33d44f7ff10d5c` (PR #81 merge commit).  
+**Original implementation branch:** `ux/buy-four-screen-redesign`  
+**Follow-up branch:** `fix/buy-mobile-tabs-invoice-upload-feedback`  
+**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) merged 2026-11-24.  
+**Visual acceptance:** Screenshot review completed for the four screens; two defects found and targeted for correction.  
+**Merge / production:** PR #81 is merged. Deployment of this exact merge commit was not independently verified in this review; follow-up fixes are not merged or deployed.
 
 ## 1. Objective and strict scope
 
@@ -63,6 +64,16 @@ The six user-provided Android screenshots are the current visual baseline. They 
 - Global Assistant and bottom navigation are part of the existing shell and must remain unchanged. Buy content must leave sufficient scroll room around them.
 
 Screenshots are baseline evidence only. Updated screenshots are required for visual acceptance.
+
+### Post-implementation Android screenshot review — 2026-11-24
+
+The user supplied updated phone screenshots for all four Buy destinations. Review confirms the main layouts render, with two acceptance misses:
+
+- **P0 / mobile navigation:** the four Buy tabs still inherit the generic horizontal-scrolling `.tabs` rule, leaving “Return to Supplier” partly clipped. This contradicts the design contract's two-column/two-row phone grid and the acceptance criterion that all four destinations remain visible without horizontal scrolling.
+- **P1 / invoice OCR feedback:** the file input is reset immediately in its change handler while the asynchronous extraction is still running. The native picker therefore reports “No file chosen” beside “Reading invoice…”. Keep the selected filename visible until extraction settles, then reset the input to allow retrying the same file.
+
+Pay Supplier's no-selection state, Past Purchases cards and Return to Supplier's initial receipt selector appear structurally consistent with the intended flows in the supplied screenshots. No unrelated feature or accounting changes are inferred from the screenshots.
+
 
 ## 4. Research synthesis
 
@@ -221,20 +232,21 @@ No backend changes are planned.
 |---|---|
 | Current-main workflow and handoff review | Complete |
 | Routes, source files, dependencies and backend contract audit | Complete |
-| Six baseline Android screenshots reviewed | Complete |
+| Four baseline Buy screenshots reviewed | Complete |
 | Competitor and accessibility research | Complete |
 | Four screen design specifications | Complete |
-| Canonical branch | Created — `ux/buy-four-screen-redesign` |
-| Implementation | Complete first implementation pass across all four existing Buy routes |
-| Frontend verification | Passed on PR head: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
-| Backend verification | Passed: .NET solution build, backend unit tests, deployment Docker image build |
-| PostgreSQL integration | Passed: disposable database bootstrap, migrations and integration tests |
+| Four-screen implementation | Merged in PR #81 on 2026-11-24 (merge commit `004071617aa41bb8a2846f840f33d44f7ff10d5c`) |
+| Frontend verification on PR #81 | Passed: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
+| Backend verification on PR #81 | Passed: .NET solution build, backend unit tests, deployment Docker image build |
+| PostgreSQL integration on PR #81 | Passed: disposable database bootstrap, migrations and integration tests |
 | Playwright | Explicitly not run, per user instruction |
-| Updated Android screenshot review | Pending — user will verify after production deployment and provide feedback |
-| Real-device acceptance | Pending user verification |
+| Updated Android screenshot review | Complete — two follow-up defects identified (Buy tab clipping and OCR filename feedback) |
+| Follow-up implementation | In progress on `fix/buy-mobile-tabs-invoice-upload-feedback` |
+| Follow-up tests / CI | Pending for the follow-up branch |
+| Real-device acceptance | Pending user verification after follow-up deployment |
 | User acceptance | Pending user verification |
-| PR | #81 ready for review; all required CI checks green |
-| Merge / production | Not performed here; awaiting the user's merge/deployment step |
+| Production revision | Not independently verified from this repository review |
+| Merge / deployment of follow-up | Not performed; awaiting the user's review/authorization |
 
 ## 11. Research findings
 

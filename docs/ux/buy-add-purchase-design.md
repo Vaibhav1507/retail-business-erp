@@ -1,8 +1,8 @@
 # Buy screen design — Add Purchase
 
-**Status:** Design specification finalized; first implementation pass present; focused verification pending.  
+**Status:** Design specification finalized; initial implementation merged in PR #81; screenshot-driven follow-up polish is in progress.  
 **Last reviewed:** 2026-11-24  
-**Baseline:** main b180f59793f265024650731a1f2bd89ead29b342  
+**Baseline:** main 004071617aa41bb8a2846f840f33d44f7ff10d5c  
 **Route:** #/buy/receive  
 **Active implementation:** web/src/Pages.tsx → Procurement with show=receive.
 
@@ -146,7 +146,7 @@ Do not introduce a Save draft endpoint or a direct “Post OCR result” shortcu
 | Loading suppliers | Text status; do not show an empty supplier list while loading |
 | No active supplier | Explain that a supplier is needed and link to existing supplier management under People; do not create a supplier flow here |
 | OCR idle | Compact optional upload action |
-| OCR processing | Visible “Reading invoice…” status; prevent duplicate uploads |
+| OCR processing | Keep the selected filename visible beside “Reading invoice…”; disable duplicate uploads until processing settles |
 | OCR failure | Text error and retry path; keep manual entry usable |
 | OCR warnings/unmatched lines | Explain which fields need review; do not hide skipped financial values |
 | No purchase lines | Empty guidance and disabled Review purchase with explanation |
@@ -217,4 +217,4 @@ Focused checks: Add Purchase component coverage for OCR handoff, line creation/r
 
 ## Implementation record — 2026-11-24
 
-First implementation pass is present in `web/src/Procurement.tsx`, `web/src/InvoiceUpload.tsx` and scoped `web/src/buy-procurement.css`. It groups supplier/receipt fields, makes the OCR upload compact, uses labelled mobile cards for OCR review and purchase lines, adds an estimated total and preserves the review-before-post flow. Existing extraction, barcode, purchase POST and idempotency behaviour are retained. Focused checks and screenshot review are pending; see `BUY-DESIGN-HANDOFF.md` and draft PR #81.
+The initial implementation is merged in PR #81. User-provided Android screenshots then exposed a file-picker feedback defect: the input was cleared as soon as OCR started, hiding the selected filename while the “Reading invoice…” status remained active. The follow-up keeps the selected filename until extraction settles and adds a regression test for the in-flight state. The Buy tab navigation is also changed to a two-column phone grid so all four destinations stay visible. No extraction, barcode, purchase POST, idempotency or accounting semantics change. See `BUY-DESIGN-HANDOFF.md` and the follow-up PR.

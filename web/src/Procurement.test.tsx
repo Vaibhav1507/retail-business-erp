@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Procurement } from './Procurement'
+import { BuyPage } from './Pages'
 import { resetCsrf } from './api'
 import { setLanguage } from './i18n'
 
@@ -13,7 +14,10 @@ const receipts = [{ id: 'receipt-1', date: '2026-11-23', supplier: supplier.name
 type Post = { url: string; body: any; headers: Record<string, string> }
 let posts: Post[] = []
 
-function mockProcurement(openBills: { id: string; date: string; reference: string | null; open: number }[] = []) {
+function mockProcurement(
+  openBills: { id: string; date: string; reference: string | null; open: number }[] = [],
+  extract?: () => Promise<Response>,
+) {
   vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method ?? 'GET'
@@ -23,7 +27,7 @@ function mockProcurement(openBills: { id: string; date: string; reference: strin
     if (url === '/api/supplier-payments' && method === 'GET') return new Response(JSON.stringify([{ id: 'payment-old', date: '2026-11-22', supplier: supplier.name, amount: 350, method: 'UPI', reference: 'UPI-12' }]))
     if (url === '/api/suppliers/sup-1/open-bills' && method === 'GET') return new Response(JSON.stringify(openBills))
     if (url === '/api/suppliers/sup-1/statement' && method === 'GET') return new Response(JSON.stringify({ supplier: supplier.name, outstanding: 1500, entries: [] }))
-    if (url === '/api/suppliers/sup-1/statement' && method === 'GET') return new Response(JSON.stringify({ supplier: supplier.name, outstanding: 1500, entries: [] }))
+    if (url === '/api/purchases/extract' && method === 'POST' && extract) return extract()
     if (method === 'POST') {
       posts.push({ url, body: init?.body ? JSON.parse(init.body as string) : {}, headers: init?.headers as Record<string, string> })
       if (url === '/api/supplier-payments') return new Response(JSON.stringify({ id: 'payment-1', owed: 500 }))
@@ -38,6 +42,49 @@ beforeEach(() => {
   posts = []
   setLanguage('en')
   vi.unstubAllGlobals()
+  it('keeps the selected invoice filename visible while OCR is running', async () => {
+    const user = userEvent.setup()
+    let finishExtraction!: (response: Response) => void
+    const extraction = new Promise<Response>(resolve => { finishExtraction = resolve })
+    mockProcurement([], () => extraction)
+    render(<Procurement products={[]} locations={[]} reload={vi.fn()} show="receive" />)
+
+    const fileInput = await screen.findByLabelText(/Upload a supplier bill photo or PDF/)
+    const file = new File(['%PDF-1.4 test invoice'], 'supplier-invoice.pdf', { type: 'application/pdf' })
+    await user.upload(fileInput, file)
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Reading invoice')
+    expect((fileInput as HTMLInputElement).files?.[0]?.name).toBe('supplier-invoice.pdf')
+    expect(fileInput).toBeDisabled()
+
+    finishExtraction(new Response(JSON.stringify({
+      fileId: 'invoice-file-1',
+      supplierName: supplier.name,
+      supplierId: supplier.id,
+      invoiceNumber: 'INV-100',
+      date: '2026-11-23',
+      total: 220,
+      lines: [],
+      warnings: [],
+    })))
+    await waitFor(() => expect((fileInput as HTMLInputElement).files?.length).toBe(0))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('renders all four Buy destinations in the dedicated tab navigation', async () => {
+    mockProcurement()
+    render(<BuyPage tab="receive" c={{ products: [], locations: [], reload: vi.fn() }} />)
+
+    const nav = await screen.findByRole('navigation', { name: 'Sections' })
+    expect(nav).toHaveClass('tabs', 'buy-tabs')
+    expect(Array.from(nav.querySelectorAll('a')).map(a => a.getAttribute('href'))).toEqual([
+      '#/buy/receive',
+      '#/buy/pay',
+      '#/buy/history',
+      '#/buy/return',
+    ])
+  })
+
 })
 
 afterEach(() => {

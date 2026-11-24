@@ -181,7 +181,10 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
     <div role="region" aria-label={tr('buy.invoiceRead')} className="invoice-upload">
       <label className="invoice-upload-pick">
         {tr('buy.invoiceUpload')}
-        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={busy} onChange={e => {
+          const input = e.currentTarget
+          void pick(Array.from(input.files ?? [])).finally(() => { input.value = '' })
+        }} />
       </label>
       {busy && <p role="status">{tr('buy.invoiceReading')}</p>}
       {error && <p role="alert">{error}</p>}
