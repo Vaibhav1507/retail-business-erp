@@ -4,7 +4,7 @@
 
 **Product context:** RBOS is an India-first retail business app for small shopkeepers, including people with limited digital confidence. Default to simple language, mobile-first layouts, visible actions, clear feedback, accessible controls and minimal cognitive load. The electronics-shop pilot is the current proving ground, but avoid hard-coding electronics-only assumptions into shared UX.
 
-**Primary tools:** ChatGPT as orchestrator; GitHub for source, tests, branches, PRs and CI; MagicPath for rapid visual exploration/prototyping; Figma for the selected editable design and reusable components/tokens; Playwright as the mandatory end-to-end, screenshot, interaction and visual-regression engine, together with Axe accessibility checks. Do not use the Product Design plugin/skill for RBOS. Use web research when current conventions, standards, platform behaviour or competitor patterns need verification.
+**Primary tools:** ChatGPT as orchestrator; GitHub for source, tests, branches, PRs and CI; MagicPath for visual exploration/prototyping when its editor is available; the RBOS repository design specification as the authoritative design contract; React as implementation truth; and Playwright as the end-to-end, screenshot, interaction and visual-regression engine, together with Axe accessibility checks. Figma is optional and is not a delivery gate. Use web research when current conventions, standards, platform behaviour or competitor patterns need verification. Do not use the Product Design plugin/skill for RBOS.
 
 ---
 
@@ -66,19 +66,18 @@ Before proposing a visual solution:
 
 **Output:** tangible prototype and concise design decision explaining why the selected direction is best.
 
-### Stage D — Finalize in Figma
+### Stage D — Finalize the design (Figma-optional)
 
-**Tool constraint is not a project stop condition.** If Figma access, plan quota, MCP calls, library discovery or authoring is unavailable, record the exact limitation, keep Figma marked BLOCKED/NOT COMPLETE, and continue refining the design in MagicPath and documenting components/tokens/states in the repository. Continue implementation preparation and other unblocked work. Do not repeatedly retry a known quota/paywall failure. Resume Figma when an authorised editing route becomes available.
+**The repository design specification is the authoritative design source of truth. Figma is optional and is not a project or delivery gate.** RBOS must not require a paid Figma plan, editor seat, quota reset or Figma MCP availability to complete a redesign.
 
+- When MagicPath's normal editor is available, use it to refine the selected visual direction and interaction prototype. Do not assume its connected agent/API is available; if it is quota-limited, record that and continue code-first.
+- When MagicPath is unavailable or adds no further value, finalize the design directly in the repository design note. Use annotated layouts, state tables, responsive rules, content examples and (where useful) Mermaid or simple diagrams.
+- Define reusable components and variants, design tokens (colour, typography, spacing, radius, border, elevation and interaction states), responsive behaviour and all important states.
+- Cover default, loading, empty, success, validation/error, disabled, long text, required languages and relevant edge cases.
+- Keep the design aligned with existing RBOS components and realistic backend data. Mark proposed API/data changes separately.
+- Do not retry known Figma quota/paywall failures. Existing Figma files may remain untouched; do not delete them or claim they are current/approved designs.
 
-- Translate the selected direction into an editable Figma screen or flow. Do not treat a static image or MagicPath preview as the final source of truth.
-- Use actual screen sizes and content density expected in the app; include narrow Android phone and any relevant tablet/desktop layouts.
-- Reuse/create components and variants for repeated controls, cards, actions, status states and navigation elements.
-- Define or reuse design tokens for colour, typography, spacing, radius, border, elevation and interaction states.
-- Cover key states: default, loading, empty, success, validation/error, disabled, long text, Hindi/other required language, and relevant edge cases.
-- Keep the design aligned with existing RBOS components and realistic backend data. Mark any proposed API/data changes separately.
-
-**Output:** editable Figma design, reusable components/tokens, interaction notes and responsive/state coverage.
+**Output:** a complete, reviewable repository design specification, with a MagicPath prototype/reference when available. Figma links may be recorded as optional references only; no editable Figma file is required for approval or delivery.
 
 ### Stage E — Record the decision in the repository
 
@@ -88,13 +87,13 @@ Before implementation, add or update a design note under docs/ux/ containing:
 - Scope, non-goals, affected routes and dependencies.
 - Current-state evidence and prioritised findings.
 - Selected direction and rejected/alternative options (briefly).
-- MagicPath and Figma links.
+- MagicPath prototype/link when available; Figma reference is optional and never required.
 - Screen structure, interaction rules, content/copy decisions and state handling.
 - Accessibility/responsive rules and acceptance criteria.
 - Risks, assumptions and decisions that must not change.
 - Implementation plan and test/visual audit plan.
 
-Keep the design note current as decisions or implementation change. Do not leave stale claims or broken reference links.
+Keep the design note current as decisions or implementation change. The repository design note is the approved design contract and must be sufficient for a new developer/chat to implement and verify the screen without opening Figma. Do not leave stale claims or broken reference links.
 
 ### Stage F — Implement safely
 
@@ -110,7 +109,7 @@ Keep the design note current as decisions or implementation change. Do not leave
 
 ### Stage G — Validate like a real user
 
-**Playwright is mandatory and must cover the complete affected experience, not just a smoke test.** Cover every in-scope route and critical journey, meaningful interaction/validation/loading/empty/error/retry/success/cancel/edit/print states, and the supported small-phone/standard-phone/tablet/landscape/desktop viewport matrix. Capture and inspect viewport and full-page screenshots, including scrolled positions, keyboard-open states and fixed/sticky overlay collisions. Assert user outcomes, accessible roles/names, console/page errors, failed requests, overflow, clipping, focus/keyboard operation and touch targets. Run Axe WCAG 2 A/AA on important states and report print-media checks separately. Use deterministic fixtures and fresh sessions; reuse the complete RBOS Visual Audit workflow. Browser tests do not prove native camera, printer, share sheet or TalkBack behaviour; label these for real-device acceptance.
+**Playwright is mandatory; verification cadence follows the agreed screen-group scope.** For a multi-screen redesign such as the five Billing & Sales routes, do targeted implementation checks as each screen is changed (type-check/build/unit or component tests and focused behaviour checks needed to avoid accumulating broken code), but defer the **full combined Playwright journey, responsive screenshot review and Axe verification until all five screens have been redesigned and implemented**. Then run one coherent final verification pass across all five routes and their shared journeys/states. If that final pass reveals defects, fix them and rerun only the affected journey/state plus any required regression checks; do not repeat the entire audit without a reason. For a single-screen scope, perform its full Playwright/Axe validation when that screen is complete. Full coverage includes every in-scope route and critical journey, meaningful interaction/validation/loading/empty/error/retry/success/cancel/edit/print states, and the supported small-phone/standard-phone/tablet/landscape/desktop viewport matrix. Capture and inspect viewport and full-page screenshots, including scrolled positions, keyboard-open states and fixed/sticky overlay collisions. Assert user outcomes, accessible roles/names, console/page errors, failed requests, overflow, clipping, focus/keyboard operation and touch targets. Run Axe WCAG 2 A/AA on important states and report print-media checks separately. Use deterministic fixtures and fresh sessions; reuse the complete RBOS Visual Audit workflow. Browser tests do not prove native camera, printer, share sheet or TalkBack behaviour; label these for real-device acceptance.
 
 
 Run the repository's actual CI checks. At minimum, where applicable:
@@ -130,7 +129,7 @@ Perform a visual and accessibility review at realistic viewports:
 - Buttons/links have clear names, visible focus, adequate contrast and approximately 44px touch targets.
 - Check axe WCAG 2 A/AA or the repo's configured accessibility scan; investigate every violation rather than claiming a pass from a different screen or earlier baseline.
 - Check English and Hindi wrapping and all key loading/empty/error/success states.
-- Compare Playwright screenshots with the approved Figma design and the user's real-device screenshots.
+- Compare final Playwright screenshots with the approved repository design specification, MagicPath reference when available, and the user's real-device screenshots.
 
 **Important:** A green CI run proves the configured automated checks passed; it does not prove that the live screen looks right or that a shopkeeper can complete the task. Keep code checks, visual audit and real-user acceptance as separate statuses.
 
@@ -164,13 +163,13 @@ When the user asks for a UI/UX improvement, ChatGPT must:
 1. Act as the UX/engineering orchestrator, not only a code generator.
 2. Read this playbook and the latest relevant design notes before starting, including in a new chat.
 3. Inspect the live repository state and current screenshots before relying on old chat context.
-4. Use MagicPath for exploration and Figma for the selected editable design when the task is a meaningful redesign. Never invoke the Product Design plugin/skill for RBOS. If Figma is unavailable, document the constraint and continue; it must not stall the workstream. For a tiny isolated bug/copy fix, explain why a full design cycle is unnecessary and keep the scope proportionate.
+4. Use MagicPath for exploration when available and finalize the approved design specification in docs/ux/. Figma is permanently optional for RBOS and must never be retried as a prerequisite or treated as a delivery gate. Never invoke the Product Design plugin/skill for RBOS. For a tiny isolated bug/copy fix, explain why a full design cycle is unnecessary and keep the scope proportionate.
 5. Trace dependencies and protect backend/API/business behaviour.
 6. Produce an actionable recommendation and proceed through the workflow without asking the user to repeat known context.
 7. Keep scope narrow and stage-gated. Do not start the next screen group prematurely.
 8. Maintain repository documentation, tests, PRs and status so another ChatGPT conversation can resume from the source of truth.
 9. Distinguish completed, automated, visually verified, user-accepted, merged and deployed states. Never claim one proves another.
-10. Give the user useful checkpoints: brief/decision, prototype/Figma, implementation PR, CI/visual results, and closure summary.
+10. Give the user useful checkpoints: brief/decision, repository design specification and optional prototype, implementation PR, automated/visual results, and closure summary.
 
 ---
 
@@ -180,11 +179,11 @@ Use this at the start of a new ChatGPT chat in the RBOS project:
 
 > We are continuing UI/UX work on RBOS (Vaibhav1507/retail-business-erp). Before doing anything, read and follow docs/ux/RBOS-UI-UX-WORKFLOW.md from the repository's current main branch, then read the relevant existing design note and inspect the current code/screenshots/PR state. Treat the repository docs as the source of truth, not previous chat recollection.
 >
-> Follow the full workflow: understand the user/task and dependencies; audit the current flow and baseline; research only where it affects the decision; explore concepts in MagicPath; finalize an editable design with components/tokens/states in Figma; document the decision in docs/ux/; implement in a focused branch/PR; run behaviour tests, CI and Playwright visual/accessibility checks; review actual screenshots and iterate on feedback; then report merge/deployment status separately.
+> Follow the full workflow: understand the user/task and dependencies; audit the current flow and baseline; research only where it affects the decision; explore in MagicPath when available; finalize the design specification in docs/ux/ with components, tokens, responsive rules and important states (Figma is optional); implement in a focused branch/PR; perform targeted checks while building and the complete Playwright journey/viewport/state screenshot audit plus Axe at the agreed screen-group completion gate; inspect actual screenshots and iterate; then report merge/deployment status separately. Do not use the Product Design plugin/skill. Do not retry Figma or let design-tool quotas stop work.
 >
 > Keep the scope limited to the screen group I name. Preserve existing routes, APIs, accounting/business rules and shared shell unless the documented analysis justifies a change. Default to simple, mobile-first, accessible UX for Indian shopkeepers with limited digital confidence. Use the existing RBOS design system. Do not make me repeat this process, do not keep asking me to choose minor design options, and do not jump to implementation before the design direction is clear. Make reasoned decisions and continue; ask only if a genuine blocker or product decision requires me.
 >
-> At the end of every phase, update the repository design note so the next chat can continue without re-explaining context. Do not claim visual validation, merge or production deployment unless it actually happened. My next scope is: [name the screen or flow].
+> At the end of every phase, update the repository design note and docs/ux/BILLING-SALES-HANDOFF.md (for Billing & Sales) so the next chat can continue without re-explaining context. Do not claim visual validation, merge or production deployment unless it actually happened. My next scope is: [name the screen or flow].
 
 ---
 
@@ -199,7 +198,7 @@ Project instructions and global custom instructions are product settings; the re
 
 ## 6. Non-negotiable RBOS execution rules (added 2026-11-24)
 
-- **Product Design plugin: prohibited.** Do not load or invoke the Product Design plugin or its skills for RBOS UX research, audits, prototypes or implementation. Use the repository playbook, MagicPath, Figma (when available), Playwright and Axe.
+Use the repository playbook, MagicPath when available, repository design specifications, Playwright and Axe.
 - **Playwright: complete coverage required.** For meaningful UI/UX work, use Playwright as the end-to-end journey runner and screenshot/visual audit tool across all in-scope routes, key states and responsive profiles. Capture and review viewport and full-page states, including scrolled/fixed-overlay cases. Assert real user outcomes, console/network errors, accessibility semantics, overflow and touch targets. Run Axe on relevant states. Explicitly separate browser coverage from native-device checks.
 - **Do not let tools stop product delivery.** Figma quota/access failure is a documented constraint, not a reason to stop MagicPath, documentation, implementation preparation or other safe work. Never misrepresent a MagicPath prototype as completed Figma work.
 - **No repeated loops.** Diagnose a failure from current evidence, fix its root cause once, rerun the smallest relevant check, then continue. Do not rerun green CI/audits without a code change or a clearly identified evidence gap.
@@ -207,3 +206,15 @@ Project instructions and global custom instructions are product settings; the re
 - **Always maintain momentum.** Every update must identify what was actually delivered, what remains blocked and why, what can continue in parallel, and the next concrete action. A status update must not substitute for execution.
 - **Keep evidence honest.** Report design prototype, editable Figma, implementation, automated tests, visual review, real-device acceptance, user acceptance, merge and deployment as separate statuses.
 
+
+
+## 7. Figma-optional delivery and grouped verification (effective 2026-11-24)
+
+- Figma is optional for all RBOS work. The authoritative design contract is the versioned specification under docs/ux/; a MagicPath prototype is a supporting exploration artifact, not the implementation source of truth.
+- MagicPath is used when its editor/API is available and materially helps. Quota exhaustion does not block repository-based design specification or implementation.
+- For a named multi-screen group, use per-screen design/implementation gates, but defer the full integrated Playwright, visual screenshot and Axe verification pass until every screen in that group has been redesigned and implemented.
+- While building each screen, run only focused checks necessary to prevent broken work accumulating (format/typecheck, component/unit tests, build, and narrow behaviour checks for changed code). Do not represent these as final visual verification.
+- At group completion, run the entire combined user journey across all included routes, state transitions, error/retry/cancel paths, viewport profiles, scroll/fixed overlay/keyboard/print states and Axe WCAG 2 A/AA. Review all generated screenshots.
+- Fix issues from that pass and rerun affected coverage. Group verification is not a reason to leave known defects unaddressed during implementation.
+- Keep automated checks, final visual verification, native Android acceptance, user acceptance, merge and deployment as distinct statuses.
+- Every significant pause must update the living programme and docs/ux/BILLING-SALES-HANDOFF.md with the exact next task and latest branch/PR/commit/test evidence.
