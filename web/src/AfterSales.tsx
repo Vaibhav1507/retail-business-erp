@@ -194,7 +194,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
 
       </>}
       {v('preturn') && <div className="buy-return">
-        <header className="buy-screen-heading"><h2>{tr('buy.postSupplierReturn')}</h2><p>{tr('buy.returnIntro')}</p></header>
+        <header className="buy-screen-heading"><h2>{tr('buy.returnTitle')}</h2><p>{tr('buy.returnIntro')}</p></header>
         <section className="buy-return-entry">
           <label>{tr('buy.originalPurchase')}
             <select value={retReceipt} onChange={e => { void pickReceipt(e.target.value); setError(''); setDone('') }}>
@@ -225,7 +225,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
             <label>{tr('buy.returnReason')}<input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
             <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0)}>{tr('buy.postSupplierReturn')}</button>
           </>}
-          {retReceipt && receiptLoading && <p className="buy-return-loading" role="status">Loading purchase details…</p>}{retReceipt && recDetail && recLines.length === 0 && <p className="buy-return-hint">No purchase items are available to return on this receipt.</p>}
+          {retReceipt && receiptLoading && <p className="buy-return-loading" role="status">{tr('buy.loadingPurchase')}</p>}{retReceipt && recDetail && recLines.length === 0 && <p className="buy-return-hint">No purchase items are available to return on this receipt.</p>}
         </section>
         <section className="buy-return-history">
           <h3>{tr('buy.previousReturns')}</h3>
