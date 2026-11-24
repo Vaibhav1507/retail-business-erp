@@ -877,3 +877,11 @@
   .invoice-create-page { max-width: 708px; }
   .invoice-new-sale-header { width: calc(100% + 52px); }
 }
+
+
+.invoice-extra-address {
+  grid-column: 1 / -1;
+  padding-top: 18px;
+  border-top: 1px solid #e1e8e3;
+}
+.invoice-extra-address h3 { margin: 0 0 14px; color: #46534b; font-size: 16px; }
