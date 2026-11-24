@@ -224,7 +224,7 @@ export function PrintPage({ kind, id }: { kind: string; id: string }) {
   const f = (n: number) => Number(n).toFixed(2)
   return (
     <main className="print-page" aria-label="Printable document">
-      <style>{'@media print{.no-print{display:none}} .print-page table{border-collapse:collapse;width:100%} .print-page th,.print-page td{border:1px solid #888;padding:4px;text-align:left}'}</style>
+      <style>{'@media print{body *{visibility:hidden!important}.print-page,.print-page *{visibility:visible!important}.print-page{position:absolute!important;inset:0 auto auto 0!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important;color:#111!important}.print-page .no-print{display:none!important}} .print-page table{border-collapse:collapse;width:100%} .print-page th,.print-page td{border:1px solid #888;padding:4px;text-align:left}'}</style>
       <h1>{biz}</h1>
       {kind === 'sale' && <>
         <h2>Sale invoice #{data.sale.number}</h2>
