@@ -201,7 +201,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
   it('shows a non-blocking missing-serial warning during invoice review', async () => {
     render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.type(screen.getByLabelText('Mobile number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
     await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
     await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
