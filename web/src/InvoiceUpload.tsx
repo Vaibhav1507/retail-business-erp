@@ -208,7 +208,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={i}>
-                    <td>{r.description}</td>
+                    <td data-label="On invoice">{r.description}</td>
                     <td>
                       <select aria-label={`Product for ${r.description}`} value={r.productId} onChange={e => { void choose(i, e.target.value) }}>
                         <option value="">Skip this line</option>
@@ -216,9 +216,9 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
                         {options.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     </td>
-                    <td><input aria-label="Quantity" inputMode="decimal" value={r.qty} onChange={e => edit(i, { qty: e.target.value })} /></td>
-                    <td><input aria-label="Unit cost" inputMode="decimal" value={r.cost} onChange={e => edit(i, { cost: e.target.value })} /></td>
-                    <td><input aria-label="GST amount" inputMode="decimal" value={r.gst} onChange={e => edit(i, { gst: e.target.value })} /></td>
+                    <td data-label="Quantity"><input aria-label="Quantity" inputMode="decimal" value={r.qty} onChange={e => edit(i, { qty: e.target.value })} /></td>
+                    <td data-label="Unit cost"><input aria-label="Unit cost" inputMode="decimal" value={r.cost} onChange={e => edit(i, { cost: e.target.value })} /></td>
+                    <td data-label="GST amount"><input aria-label="GST amount" inputMode="decimal" value={r.gst} onChange={e => edit(i, { gst: e.target.value })} /></td>
                   </tr>
                 ))}
               </tbody>
