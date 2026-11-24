@@ -20,9 +20,9 @@ describe('NavigationAssistant', () => {
   expect(screen.getByLabelText('Ask your business assistant')).toBeInTheDocument()
  })
  it('keeps quick actions directly below the header and the microphone outside the scrolling chat', async () => {
-  const { container } = render(<NavigationAssistant />)
+  render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
-  const panel = container.querySelector('.navigation-assistant') as HTMLElement
+  const panel = screen.getByRole('region', { name: 'Navigation assistant' }) as HTMLElement
   const header = panel.querySelector('.assistant-heading') as HTMLElement
   const actions = panel.querySelector('.navigation-top-actions') as HTMLElement
   const history = panel.querySelector('.navigation-history') as HTMLElement
@@ -36,11 +36,11 @@ describe('NavigationAssistant', () => {
  })
 
  it('shows resolver suggestions in the top action row without navigating automatically', async () => {
-  const { container } = render(<NavigationAssistant />)
+  render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
   const input = screen.getByLabelText('Ask your business assistant')
   await userEvent.type(input, 'check stock')
-  const actions = container.querySelector('.navigation-top-actions') as HTMLElement
+  const actions = screen.getByLabelText('Suggestions') as HTMLElement
   expect(within(actions).getByRole('button', { name: 'Current stock' })).toBeInTheDocument()
   expect(window.location.hash).toBe('')
  })

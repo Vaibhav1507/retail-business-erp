@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SalesHistory } from './SalesHistory'
 import { resetCsrf } from './api'
+import { whatsappStatusDescription, whatsappStatusLabel } from './whatsappStatus'
 
 const sales = [
   { id: 'sale-1', number: 12, invoiceNo: 'INV-000012', date: '2026-11-23', saleType: 'Credit', total: 1500, amountPaid: 500, balance: 1000, customer: 'Asha Stores', whatsappStatus: 'ConsentRequired' },
@@ -29,6 +30,11 @@ beforeEach(() => {
 })
 
 describe('SalesHistory', () => {
+  it('uses clear, actionable copy for missing WhatsApp customer consent', () => {
+    expect(whatsappStatusLabel('ConsentRequired')).toBe('Customer consent needed')
+    expect(whatsappStatusDescription('ConsentRequired')).toBe('Ask the customer for permission before sending this bill on WhatsApp.')
+  })
+
   it('shows searchable sale cards and filters unpaid bills', async () => {
     render(<SalesHistory locations={[{ id: 'l1', name: 'Main Store' }]} />)
     expect((await screen.findAllByText('Asha Stores')).length).toBeGreaterThan(0)

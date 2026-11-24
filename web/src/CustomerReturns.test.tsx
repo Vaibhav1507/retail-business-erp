@@ -30,7 +30,11 @@ beforeEach(() => {
 describe('CustomerReturns', () => {
   it('prevents quantities above remaining and posts a return by sale-line id', async () => {
     render(<CustomerReturns reload={vi.fn()} />)
-    await userEvent.selectOptions(await screen.findByLabelText('Choose the original bill'), 'sale-1')
+    const saleSearch = await screen.findByRole('combobox', { name: 'Choose the original bill' })
+    await waitFor(() => expect(saleSearch).toBeEnabled())
+    await waitFor(() => expect(saleSearch).toBeEnabled())
+    await userEvent.type(saleSearch, 'Asha')
+    await userEvent.click(await screen.findByRole('option', { name: /INV-000012/ }))
     const quantity = await screen.findByLabelText('Return quantity')
     await userEvent.type(quantity, '3')
     await userEvent.click(screen.getByRole('button', { name: 'Post customer return' }))
@@ -46,9 +50,20 @@ describe('CustomerReturns', () => {
     expect(post.headers['Idempotency-Key']).toBeTruthy()
   })
 
+  it('keeps return history collapsed until the shopkeeper opens it', async () => {
+    render(<CustomerReturns reload={vi.fn()} />)
+    const history = screen.getByText('Customer return history').closest('details')
+    expect(history).not.toHaveAttribute('open')
+    await userEvent.click(screen.getByText('Customer return history'))
+    expect(history).toHaveAttribute('open')
+    expect(await screen.findByText('No customer returns recorded yet.')).toBeInTheDocument()
+  })
+
   it('requires a separate explicit confirmation to cancel the entire sale', async () => {
     render(<CustomerReturns reload={vi.fn()} />)
-    await userEvent.selectOptions(await screen.findByLabelText('Choose the original bill'), 'sale-1')
+    const saleSearch = await screen.findByRole('combobox', { name: 'Choose the original bill' })
+    await userEvent.type(saleSearch, 'Asha')
+    await userEvent.click(await screen.findByRole('option', { name: /INV-000012/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Cancel entire sale' }))
     const dialog = screen.getByRole('dialog', { name: 'Cancel entire sale?' })
     expect(dialog).toHaveTextContent('restores stock')

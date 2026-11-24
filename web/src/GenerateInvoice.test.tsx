@@ -38,16 +38,22 @@ beforeEach(() => {
 })
 
 describe('GenerateInvoice WhatsApp independence', () => {
-  it('keeps tag capture beside the product field and separates handwritten import', () => {
+  it('keeps tag capture beside the product field and separates handwritten import', async () => {
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    const productInput = screen.getByPlaceholderText('Search or enter a product/model name')
+    const productInput = screen.getByPlaceholderText('Search product or type a name')
+    const addressDisclosure = container.querySelector('.customer-address-details') as HTMLDetailsElement
+    expect(addressDisclosure.open).toBe(false)
+    await userEvent.click(screen.getByText('Add address (optional)'))
+    expect(addressDisclosure.open).toBe(true)
+    expect(screen.getByLabelText('Address')).toBeInTheDocument()
     const productRow = productInput.closest('.invoice-product-entry')
     expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
-    const actions = container.querySelector('.invoice-product-actions')
+    const actions = container.querySelector('.invoice-add-item-action')
     expect(actions?.querySelectorAll('button')).toHaveLength(1)
-    expect(actions?.querySelector('button')).toHaveTextContent('Add product')
-    expect(actions).not.toContainElement(screen.getByRole('button', { name: 'Upload handwritten bill' }))
-    expect(container.querySelector('.invoice-summary-bar')).toBeInTheDocument()
+    expect(actions?.querySelector('button')).toHaveTextContent('Add item')
+    expect(screen.getByRole('button', { name: /Import bill/ })).toBeInTheDocument()
+    expect(container.querySelector('.invoice-bill-summary')).toBeInTheDocument()
+    expect(container.querySelector('.invoice-sticky-review')).toBeInTheDocument()
   })
 
   it('keeps automatic browser printing when WhatsApp consent is not confirmed', async () => {
@@ -56,13 +62,14 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
-    await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
-    await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
-    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.type(await screen.findByPlaceholderText('Search product or type a name'), 'Test Cable')
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '100')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm & print' }))
 
-    expect(await screen.findByText(/WhatsApp invoice: Permission not confirmed/)).toBeInTheDocument()
+    expect(await screen.findByText(/WhatsApp invoice: Customer consent needed/)).toBeInTheDocument()
+    expect(screen.getByText('Ask the customer for permission before sending this bill on WhatsApp.')).toBeInTheDocument()
     await waitFor(() => expect(window.print).toHaveBeenCalledTimes(1), { timeout: 2000 })
     expect(calls).toContainEqual({ url: '/api/sales', method: 'POST' })
     expect(calls.some(x => x.url.includes('/whatsapp'))).toBe(false)
@@ -101,9 +108,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Scan product' })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByText('Optional product details'))
+    await userEvent.click(screen.getByText('More item details'))
     expect(screen.getByLabelText('Brand')).toBeInTheDocument()
-    expect(screen.getByLabelText('Model')).toBeInTheDocument()
+    expect(screen.getByLabelText('Model number')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
     const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
@@ -113,11 +120,11 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(await screen.findByDisplayValue('LG')).toBeInTheDocument()
     expect(screen.getByDisplayValue('PX900H7SD4Z')).toBeInTheDocument()
     expect(screen.getByDisplayValue('610NWHS203785')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Add product' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Add item/ })).toHaveLength(1)
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
 
-    await userEvent.type(screen.getByLabelText('Price (INR)'), '15000')
-    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '15000')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
 
     expect(screen.getByText('Semi Automatic Washing Machine')).toBeInTheDocument()
     expect(screen.getByText(/Serial: 610NWHS203785/)).toBeInTheDocument()
@@ -194,7 +201,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
-    expect(await screen.findByPlaceholderText('Search or enter a product/model name')).toHaveValue('ZX-90')
+    expect(await screen.findByPlaceholderText('Search product or type a name')).toHaveValue('ZX-90')
     expect(screen.getByDisplayValue('Local')).toBeInTheDocument()
     expect(screen.getByDisplayValue('SERIAL-0090')).toBeInTheDocument()
   })
@@ -204,7 +211,10 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const nameInput = screen.getByLabelText('Customer name *')
     const phoneInput = screen.getByLabelText('Mobile number *')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.type(screen.getByPlaceholderText('Search product or type a name'), 'Test Cable')
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '100')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
     expect(screen.getByText('Customer name is required.')).toBeInTheDocument()
     expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
     expect(nameInput).toHaveAttribute('aria-invalid', 'true')
@@ -215,7 +225,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     await userEvent.type(nameInput, 'Test Customer')
     await userEvent.type(phoneInput, '123456789')
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
     expect(screen.queryByText('Customer name is required.')).not.toBeInTheDocument()
     expect(screen.getByText('Enter a valid mobile number (10–15 digits).')).toBeInTheDocument()
     expect(document.activeElement).toBe(phoneInput)
@@ -225,10 +235,10 @@ describe('GenerateInvoice WhatsApp independence', () => {
     render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     await userEvent.type(screen.getByLabelText('Mobile number *'), '9876543210')
     await userEvent.type(screen.getByLabelText('Customer name *'), 'Test Customer')
-    await userEvent.type(await screen.findByPlaceholderText('Search or enter a product/model name'), 'Test Cable')
-    await userEvent.type(screen.getByLabelText('Price (INR)'), '100')
-    await userEvent.click(screen.getByRole('button', { name: 'Add product' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Generate invoice' }))
+    await userEvent.type(await screen.findByPlaceholderText('Search product or type a name'), 'Test Cable')
+    await userEvent.type(screen.getByLabelText('Selling price (₹) *'), '100')
+    await userEvent.click(screen.getByRole('button', { name: /Add item/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.'

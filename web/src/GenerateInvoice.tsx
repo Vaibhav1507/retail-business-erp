@@ -6,7 +6,7 @@ import { InvoiceDocument } from './InvoiceDocument'
 import { ItemTagCapture, type CapturedInvoiceItem } from './ItemTagCapture'
 import { SalesInvoiceCapture, type ExtractedSalesInvoice } from './SalesInvoiceCapture'
 import { t as tr } from './i18n'
-import { whatsappStatusLabel } from './whatsappStatus'
+import { whatsappStatusDescription, whatsappStatusLabel } from './whatsappStatus'
 import { discardOfflineSale, listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
 import { readOfflineRecords, saveOfflineRecord } from './offlineStore'
 
@@ -480,7 +480,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       <section aria-label="Invoice overview" className="invoice-wrap">
         <div className="invoice-tools no-print">
           {step === 'review' && <><button type="button" disabled={busy} onClick={confirm}>{busy ? 'Saving\u2026' : 'Confirm & print'}</button><button type="button" className="secondary" disabled={busy} onClick={() => setStep('form')}>Back to edit</button></>}
-          {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
+          {step === 'done' && <><span role="status">Saved as {invNo}.{warn && ' ' + warn}</span><span role="status">WhatsApp invoice: {whatsappStatusLabel(whatsappStatus)}{whatsappStatusDescription(whatsappStatus) && <small className="invoice-whatsapp-help">{whatsappStatusDescription(whatsappStatus)}</small>}</span><select aria-label="Paper size" value={paper} onChange={e => setPaper(e.target.value)}><option value="a4">A4</option><option value="thermal">80 mm thermal</option></select><style>{paper === 'thermal' ? '@page{size:80mm auto;margin:3mm} @media print{.invoice{font-size:11px}}' : '@page{size:A4;margin:10mm}'}</style><button type="button" onClick={() => window.print()}>Print again</button><button type="button" onClick={reset}>New invoice</button></>}
         </div>
         {error && <p role="alert">{error}</p>}
         {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
@@ -491,19 +491,27 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   return (
-    <section aria-label="Generate invoice" className="billing-page">
-      <div className="invoice-page-header">
-        <div>
-          <h2>Generate Invoice</h2>
-          <p className="billing-hint">{tr('onboarding.saleGuidance')}</p>
+    <section aria-label="Generate invoice" className="billing-page invoice-create-page">
+      <header className="invoice-new-sale-header">
+        <a href="#/sell/menu" className="invoice-back" aria-label="Back to Billing and Sales">‹</a>
+        <div className="invoice-new-sale-copy">
+          <h1>New sale</h1>
+          <p>Create a bill for your customer</p>
         </div>
-        <div className="invoice-import-action">
-          <span className="billing-hint">Have a handwritten bill?</span>
-          <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
-        </div>
-      </div>
-            {held.length > 0 && <div className="billing-card"><h3>Held bills</h3><ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => { void resume(h) }}>Resume</button> <button type="button" className="secondary" onClick={() => { void discardHeld(h.id) }}>Discard</button></li>)}</ul></div>}
-      {offlineQueue.length > 0 && <section className="billing-card" aria-label="Offline bill queue">
+        <span className="invoice-draft-pill">DRAFT</span>
+      </header>
+
+      <ol className="invoice-stepper" aria-label="Invoice steps">
+        <li aria-current="step"><strong>1</strong> Add items</li>
+        <li className="invoice-stepper-line" aria-hidden="true" />
+        <li><strong>2</strong> Review</li>
+      </ol>
+
+      {held.length > 0 && <section className="invoice-utility-card" aria-label="Held bills">
+        <h3>Held bills</h3>
+        <ul>{held.map(h => <li key={h.id}>{h.label} <button type="button" className="secondary" onClick={() => { void resume(h) }}>Resume</button> <button type="button" className="secondary" onClick={() => { void discardHeld(h.id) }}>Discard</button></li>)}</ul>
+      </section>}
+      {offlineQueue.length > 0 && <section className="invoice-utility-card" aria-label="Offline bill queue">
         <h3>Offline bills and sync status</h3>
         <p>{offlineQueue.filter(x => x.state === 'pending-sync' || x.state === 'syncing').length} waiting to sync · {offlineQueue.filter(x => x.state === 'needs-attention').length} need attention · {offlineQueue.filter(x => x.state === 'posted').length} posted</p>
         <button type="button" className="secondary" disabled={!navigator.onLine || syncingOffline} onClick={() => void syncQueue()}>{syncingOffline ? 'Syncing…' : 'Sync pending bills'}</button>
@@ -512,14 +520,15 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {(item.state === 'posted' || item.state === 'needs-attention') && <button type="button" className="secondary" onClick={() => { void removeQueueItem(item) }}>Remove from device</button>}
         </li>)}</ul>
       </section>}
-      {error && <p role="alert" className="billing-err">{error}</p>}
+      {error && <p role="alert" className="billing-err invoice-form-error">{error}</p>}
 
-      <div className="billing-card">
-        <h3>Customer</h3>
-        <div className="billing-grid">
-          <div className="billing-field billing-col-4 billing-rel">
+      <section className="invoice-section-card invoice-customer-card" aria-labelledby="invoice-customer-title">
+        <div className="invoice-section-eyebrow"><span>CUSTOMER</span><b>01</b></div>
+        <h2 id="invoice-customer-title">Who are you billing?</h2>
+        <div className="invoice-customer-fields">
+          <div className="billing-field billing-rel">
             <label htmlFor="billing-phone">Mobile number *</label>
-            <input id="billing-phone" inputMode="tel" autoComplete="off" required aria-invalid={Boolean(fieldErrors.customerPhone)} aria-describedby={fieldErrors.customerPhone ? "billing-phone-error" : undefined} className={fieldErrors.customerPhone ? 'field-invalid' : ''} placeholder="Type number to find customer" value={phone}
+            <input id="billing-phone" inputMode="tel" autoComplete="off" required aria-invalid={Boolean(fieldErrors.customerPhone)} aria-describedby={fieldErrors.customerPhone ? "billing-phone-error" : undefined} className={fieldErrors.customerPhone ? 'field-invalid' : ''} placeholder="Enter 10-digit mobile number" value={phone}
               onChange={e => { setPhone(e.target.value.replace(/[^\d+ ]/g, '')); setCustomerId(''); setFieldErrors(current => ({ ...current, customerPhone: '' })) }}
               onFocus={() => setShowFound(found.length > 0)} onBlur={() => setTimeout(() => setShowFound(false), 150)} />
             {fieldErrors.customerPhone && <small id="billing-phone-error" className="field-error">{fieldErrors.customerPhone}</small>}
@@ -527,33 +536,30 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               {found.slice(0, 6).map(c => <li key={c.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); pick(c) }}><strong>{c.name}</strong><span>{c.phone}</span></li>)}
             </ul>}
           </div>
-          <div className="billing-field billing-col-8"><label htmlFor="billing-name">Customer name *</label><input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} aria-describedby={fieldErrors.customerName ? "billing-name-error" : undefined} className={fieldErrors.customerName ? 'field-invalid' : ''} value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })) }} />{fieldErrors.customerName && <small id="billing-name-error" className="field-error">{fieldErrors.customerName}</small>}</div>
-          <div className="billing-field billing-col-12"><label htmlFor="billing-addr">Address</label><input id="billing-addr" value={address} onChange={e => setAddress(e.target.value)} /></div>
-          <div className="billing-field billing-col-3"><label htmlFor="billing-pin">Pincode</label><input id="billing-pin" inputMode="numeric" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} /></div>
-          <div className="billing-field billing-col-5"><label htmlFor="billing-city">City</label><input id="billing-city" value={city} onChange={e => setCity(e.target.value)} /></div>
-          <div className="billing-field billing-col-4"><label htmlFor="billing-state">State</label><input id="billing-state" value={state} onChange={e => setState(e.target.value)} /></div>
+          <div className="billing-field">
+            <label htmlFor="billing-name">Customer name *</label>
+            <input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} aria-describedby={fieldErrors.customerName ? "billing-name-error" : undefined} className={fieldErrors.customerName ? 'field-invalid' : ''} placeholder="Name on the bill" value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })) }} />
+            {fieldErrors.customerName && <small id="billing-name-error" className="field-error">{fieldErrors.customerName}</small>}
+          </div>
         </div>
-        <p className="billing-hint">{customerId ? 'Existing customer. Edit any detail and it is saved when you confirm.' : 'New number? Fill the details once; they are saved for next time.'}</p>
-      </div>
+        <p className="invoice-helper">{customerId ? 'Existing customer. You can edit their details before confirming the bill.' : 'New customer? Enter their name and number to add them with this bill.'}</p>
+      </section>
 
-      <div className="billing-card">
-        <h3>Invoice details</h3>
-        <div className="billing-grid">
-          {locations.length > 1 && <div className="billing-field billing-col-4"><label htmlFor="billing-store">Store</label><select id="billing-store" value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>}
-          <div className="billing-field billing-col-4"><label htmlFor="billing-date">Sale date</label><input id="billing-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-          <div className="billing-field billing-col-4"><label htmlFor="billing-mode">Payment mode</label><select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
-          {mode === 'Credit' && <div className="billing-field billing-col-4"><label htmlFor="billing-paid">{tr('bill.paidNow')}</label><input id="billing-paid" inputMode="decimal" value={paid} onChange={e => setPaid(e.target.value)} /></div>}
-          {mode === 'Credit' && <><div className="billing-field billing-col-4"><label htmlFor="billing-paid-method">Paid by</label><select id="billing-paid-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div><div className="billing-field billing-col-4"><label htmlFor="billing-paid2">Second payment (INR, optional)</label><input id="billing-paid2" inputMode="decimal" value={paid2} onChange={e => setPaid2(e.target.value)} /></div><div className="billing-field billing-col-4"><label htmlFor="billing-paid2-method">Second paid by</label><select id="billing-paid2-method" value={payMethod2} onChange={e => setPayMethod2(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div></>}
+      <section className="invoice-section-card invoice-items-card" aria-labelledby="invoice-items-title">
+        <div className="invoice-section-eyebrow"><span>ITEMS</span><b>02</b></div>
+        <h2 id="invoice-items-title">Add products</h2>
+        <p className="invoice-section-subtitle">Search your catalogue or enter the item manually.</p>
+
+        <div className="invoice-import-callout">
+          <span>Have a handwritten bill?</span>
+          <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
         </div>
-      </div>
 
-      <div className="billing-card">
-        <h3>{tr('bill.products')}</h3>
         <div className="billing-grid invoice-product-editor">
-          <div className="billing-field billing-col-5 billing-rel">
-            <label htmlFor="billing-prod">{tr('bill.product')}</label>
+          <div className="billing-field billing-col-12 billing-rel">
+            <label htmlFor="billing-prod">Item description *</label>
             <div className="invoice-product-entry">
-              <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search or enter a product/model name" value={pname}
+              <input id="billing-prod" autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search product or type a name" value={pname}
                 onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
               <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
             </div>
@@ -562,29 +568,43 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               {suggestions.map(p => <li key={p.id} role="option" aria-selected={false} onMouseDown={e => { e.preventDefault(); setPname(p.name); setSelectedProductId(p.id); setShowProducts(false) }}><strong>{p.name}</strong></li>)}
             </ul>}
           </div>
-          <div className="billing-field billing-col-2"><label htmlFor="billing-qty">{tr('bill.qty')}</label><input id="billing-qty" aria-invalid={Boolean(fieldErrors.quantity)} className={fieldErrors.quantity ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => { setQty(e.target.value); setFieldErrors(current => ({ ...current, quantity: '' })) }} />{fieldErrors.quantity && <small className="field-error">{fieldErrors.quantity}</small>}</div>
-          <div className="billing-field billing-col-3"><label htmlFor="billing-price">{tr('bill.price')}</label><input id="billing-price" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />{fieldErrors.price && <small className="field-error">{fieldErrors.price}</small>}</div>
-          <div className="billing-field billing-col-2"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" aria-invalid={Boolean(fieldErrors.discount)} className={fieldErrors.discount ? 'field-invalid' : ''} inputMode="decimal" value={disc} onChange={e => { setDisc(e.target.value); setFieldErrors(current => ({ ...current, discount: '' })) }} />{fieldErrors.discount && <small className="field-error">{fieldErrors.discount}</small>}</div>
+          <div className="billing-field billing-col-12">
+            <label htmlFor="billing-model">Model number</label>
+            <input id="billing-model" autoComplete="off" placeholder="Enter model if available" value={modelText} onChange={e => setModelText(e.target.value)} />
+          </div>
+          <div className="billing-field billing-col-6">
+            <label htmlFor="billing-qty">Quantity *</label>
+            <input id="billing-qty" aria-invalid={Boolean(fieldErrors.quantity)} className={fieldErrors.quantity ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => { setQty(e.target.value); setFieldErrors(current => ({ ...current, quantity: '' })) }} />
+            {fieldErrors.quantity && <small className="field-error">{fieldErrors.quantity}</small>}
+          </div>
+          <div className="billing-field billing-col-6">
+            <label htmlFor="billing-price">Selling price (₹) *</label>
+            <input id="billing-price" inputMode="decimal" placeholder="0.00" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />
+            {fieldErrors.price && <small className="field-error">{fieldErrors.price}</small>}
+          </div>
         </div>
+
         <details className="invoice-product-more-details" open={showTagDetails} onToggle={event => setShowTagDetails(event.currentTarget.open)}>
-          <summary>Optional product details</summary>
-          <div className="billing-grid">
-            <div className="billing-field billing-col-4"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
-            <div className="billing-field billing-col-4"><label htmlFor="billing-model">Model</label><input id="billing-model" autoComplete="off" value={modelText} onChange={e => setModelText(e.target.value)} /></div>
-            <div className="billing-field billing-col-4"><label htmlFor="billing-serial">Serial (optional)</label><input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />{fieldErrors.serial && <small className="field-error">{fieldErrors.serial}</small>}</div>
-            <div className="billing-field billing-col-4"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
-            <div className="billing-field billing-col-4"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
-            <div className="billing-field billing-col-4"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
+          <summary><span>More item details</span><small>Optional</small></summary>
+          <div className="billing-grid invoice-product-extra-grid">
+            <div className="billing-field billing-col-6"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" aria-invalid={Boolean(fieldErrors.discount)} className={fieldErrors.discount ? 'field-invalid' : ''} inputMode="decimal" value={disc} onChange={e => { setDisc(e.target.value); setFieldErrors(current => ({ ...current, discount: '' })) }} />{fieldErrors.discount && <small className="field-error">{fieldErrors.discount}</small>}</div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-brand">Brand</label><input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-serial">Serial (optional)</label><input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />{fieldErrors.serial && <small className="field-error">{fieldErrors.serial}</small>}</div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-barcode">Barcode</label><input id="billing-barcode" autoComplete="off" value={barcodeText} onChange={e => setBarcodeText(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-imei1">IMEI 1</label><input id="billing-imei1" inputMode="numeric" value={imei1Text} onChange={e => setImei1Text(e.target.value)} /></div>
+            <div className="billing-field billing-col-6"><label htmlFor="billing-imei2">IMEI 2</label><input id="billing-imei2" inputMode="numeric" value={imei2Text} onChange={e => setImei2Text(e.target.value)} /></div>
             <div className="billing-field billing-col-6"><label htmlFor="billing-mrp">MRP (reference only)</label><input id="billing-mrp" aria-invalid={Boolean(fieldErrors.mrp)} className={fieldErrors.mrp ? 'field-invalid' : ''} inputMode="decimal" value={mrpText} onChange={e => { setMrpText(e.target.value); setFieldErrors(current => ({ ...current, mrp: '' })) }} />{fieldErrors.mrp && <small className="field-error">{fieldErrors.mrp}</small>}</div>
             <div className="billing-field billing-col-6"><label htmlFor="billing-hsn">HSN</label><input id="billing-hsn" value={hsnText} onChange={e => setHsnText(e.target.value)} /></div>
           </div>
         </details>
-        <div className="billing-row invoice-product-actions">
-          <button type="button" onClick={addItem}>{tr('bill.add')}</button>
+
+        <div className="invoice-add-item-action">
+          <button type="button" onClick={addItem}>＋ Add item</button>
           {pname.trim() && !match && <span className="billing-hint">This will be billed as an ad-hoc line and will not create a catalogue product.</span>}
         </div>
-        {salesInvoiceDraft && <div className="billing-card" role="region" aria-label="Review extracted sales invoice">
-          <h4>Review extracted invoice before adding it to the bill</h4>
+
+        {salesInvoiceDraft && <div className="invoice-extraction-review" role="region" aria-label="Review extracted sales invoice">
+          <h3>Review extracted invoice before adding it to the bill</h3>
           {salesInvoiceDraft.invoiceNumber && <p>Source invoice reference: <strong>{salesInvoiceDraft.invoiceNumber}</strong> (not the RBOS invoice number)</p>}
           {salesInvoiceDraft.total != null && <p>Handwritten total detected: {money(salesInvoiceDraft.total)} INR — verify it against the line values.</p>}
           {salesInvoiceWarnings.length > 0 && <ul className="billing-hint">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
@@ -592,13 +612,13 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {salesInvoiceDraft.lines.length > 0 && <div className="billing-table-wrap" role="region" aria-label="Extracted invoice lines" tabIndex={0}><table className="billing-table">
             <thead><tr><th>Description / model</th><th>Brand</th><th>Model</th><th>HSN</th><th>Qty</th><th>Unit price</th><th>Discount</th></tr></thead>
             <tbody>{salesInvoiceDraft.lines.map((line, index) => <tr key={index}>
-              <td><input aria-label={`Extracted line ${index + 1} description`} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} />{line.confidence != null && <small>Extraction confidence: {Math.round(line.confidence * 100)}%</small>}</td>
-              <td><input aria-label={`Extracted line ${index + 1} brand`} value={line.brand ?? ''} onChange={e => updateCapturedLine(index, 'brand', e.target.value)} /></td>
-              <td><input aria-label={`Extracted line ${index + 1} model`} value={line.model ?? ''} onChange={e => updateCapturedLine(index, 'model', e.target.value)} /></td>
-              <td><input aria-label={`Extracted line ${index + 1} HSN`} value={line.hsn ?? ''} onChange={e => updateCapturedLine(index, 'hsn', e.target.value)} /></td>
-              <td><input aria-label={`Extracted line ${index + 1} quantity`} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></td>
-              <td><input aria-label={`Extracted line ${index + 1} unit price`} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></td>
-              <td><input aria-label={`Extracted line ${index + 1} discount`} inputMode="decimal" value={line.discount ?? ''} onChange={e => updateCapturedLine(index, 'discount', e.target.value)} /></td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' description'} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} />{line.confidence != null && <small>Extraction confidence: {Math.round(line.confidence * 100)}%</small>}</td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' brand'} value={line.brand ?? ''} onChange={e => updateCapturedLine(index, 'brand', e.target.value)} /></td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' model'} value={line.model ?? ''} onChange={e => updateCapturedLine(index, 'model', e.target.value)} /></td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' HSN'} value={line.hsn ?? ''} onChange={e => updateCapturedLine(index, 'hsn', e.target.value)} /></td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></td>
+              <td><input aria-label={'Extracted line ' + (index + 1) + ' discount'} inputMode="decimal" value={line.discount ?? ''} onChange={e => updateCapturedLine(index, 'discount', e.target.value)} /></td>
             </tr>)}</tbody>
           </table></div>}
           <div className="billing-row">
@@ -606,23 +626,76 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <button type="button" className="secondary" onClick={() => { setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate('') }}>Discard extraction</button>
           </div>
         </div>}
-        {items.length > 0 && <table className="billing-table">
-          <thead><tr><th>{tr('bill.item')}</th><th>{tr('bill.qty')}</th><th>{tr('bill.price')}</th><th>{tr('bill.disc')}</th><th>{tr('bill.amount')}</th><th /></tr></thead>
-          <tbody>{items.map((i, n) => <tr key={n}><td>{i.name}{i.brand && <small> Brand: {i.brand}</small>}{i.model && <small> Model: {i.model}</small>}{i.serials.length > 0 && <small> Serial: {i.serials.join(', ')}</small>}{i.imei1s.length > 0 && <small> IMEI 1: {i.imei1s.join(', ')}</small>}{i.imei2s.length > 0 && <small> IMEI 2: {i.imei2s.join(', ')}</small>}{i.barcode && <small> Barcode: {i.barcode}</small>}</td><td>{i.quantity}</td><td>{money(i.unitPrice)}</td><td>{money(i.discount)}</td><td>{money(itemTotal(i))}</td><td><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>{tr('bill.remove')}</button></td></tr>)}</tbody>
-        </table>}
-      </div>
 
-      {showSerialNotice && <p className="billing-hint" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
-      <div className="billing-card billing-foot invoice-summary-bar">
-        <div className="billing-gst">
-          <label className="billing-check"><input type="checkbox" checked={gst} onChange={e => setGst(e.target.checked)} /> GST invoice</label>
-          {gst && <select aria-label="GST rate" value={rate} onChange={e => setRate(Number(e.target.value))}>{GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}</select>}
+        {items.length > 0 && <div className="invoice-added-items" aria-label="Items added to this bill">
+          {items.map((i, n) => <article className="invoice-added-item" key={n}>
+            <div className="invoice-added-item-main"><strong>{i.name}</strong>
+              {i.brand && <small>Brand: {i.brand}</small>}
+              {i.model && <small>Model: {i.model}</small>}
+              {i.serials.length > 0 && <small>Serial: {i.serials.join(', ')}</small>}
+              {i.imei1s.length > 0 && <small>IMEI 1: {i.imei1s.join(', ')}</small>}
+              {i.imei2s.length > 0 && <small>IMEI 2: {i.imei2s.join(', ')}</small>}
+              {i.barcode && <small>Barcode: {i.barcode}</small>}
+              <span>{i.quantity} × ₹{money(i.unitPrice)}</span>
+            </div>
+            <div className="invoice-added-item-total"><strong>₹{money(itemTotal(i))}</strong><button type="button" className="secondary" onClick={() => { void removeInvoiceItem(n) }}>Remove</button></div>
+          </article>)}
+        </div>}
+      </section>
+
+      {showSerialNotice && <p className="billing-hint invoice-serial-notice" role="status">Serial number not entered for one or more items. You can still continue; serial, IMEI and barcode are optional.</p>}
+
+      <section className="invoice-section-card invoice-bill-summary" aria-label="Bill summary">
+        <div className="invoice-gst-row">
+          <label className="invoice-gst-toggle">
+            <input type="checkbox" checked={gst} onChange={e => setGst(e.target.checked)} />
+            <span><strong>GST invoice</strong><small>Include GST details on this bill</small></span>
+          </label>
+          {gst && <label className="invoice-gst-rate">GST rate
+            <select aria-label="GST rate" value={rate} onChange={e => setRate(Number(e.target.value))}>{GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}</select>
+          </label>}
         </div>
-        <div className="billing-field"><label htmlFor="billing-bill-disc">{tr('bill.billDisc')}</label><input id="billing-bill-disc" inputMode="decimal" value={billDisc} onChange={e => setBillDisc(e.target.value)} /></div>
-        <div className="billing-total">{tr('bill.total')} <strong>{money(total)} INR</strong>{gst && <small> incl. GST {money(tax)}</small>}</div>
-        <button type="button" onClick={review}>{tr('bill.generate')}</button>
-        <button type="button" className="secondary" onClick={() => { void hold() }} disabled={!items.length}>{tr('bill.hold')}</button>
-      </div>
+        <div className="invoice-summary-line"><span>Subtotal</span><strong>₹{money(grossTotal)}</strong></div>
+        <div className="invoice-summary-line invoice-discount-line">
+          <label htmlFor="billing-bill-disc">Bill discount (₹)</label>
+          <input id="billing-bill-disc" inputMode="decimal" value={billDisc} onChange={e => setBillDisc(e.target.value)} />
+        </div>
+        <div className="invoice-summary-total"><strong>Amount to collect</strong><strong>₹{money(total)}</strong></div>
+        {gst && <small className="invoice-summary-tax">Includes GST of ₹{money(tax)}</small>}
+      </section>
+
+      <details className="invoice-more-details">
+        <summary><span>Payment & bill details</span><small>Optional</small></summary>
+        <div className="invoice-more-details-content billing-grid">
+          {locations.length > 1 && <div className="billing-field billing-col-12"><label htmlFor="billing-store">Store</label><select id="billing-store" value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>}
+          <div className="billing-field billing-col-6"><label htmlFor="billing-date">Sale date</label><input id="billing-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+          <div className="billing-field billing-col-6"><label htmlFor="billing-mode">Payment mode</label><select id="billing-mode" value={mode} onChange={e => setMode(e.target.value)}><option>Cash</option><option>UPI</option><option>Credit</option></select></div>
+          {mode === 'Credit' && <div className="billing-field billing-col-6"><label htmlFor="billing-paid">{tr('bill.paidNow')}</label><input id="billing-paid" inputMode="decimal" value={paid} onChange={e => setPaid(e.target.value)} /></div>}
+          {mode === 'Credit' && <><div className="billing-field billing-col-6"><label htmlFor="billing-paid-method">Paid by</label><select id="billing-paid-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2">Second payment (INR, optional)</label><input id="billing-paid2" inputMode="decimal" value={paid2} onChange={e => setPaid2(e.target.value)} /></div><div className="billing-field billing-col-6"><label htmlFor="billing-paid2-method">Second paid by</label><select id="billing-paid2-method" value={payMethod2} onChange={e => setPayMethod2(e.target.value)}><option>Cash</option><option value="Bank">Card / Bank</option><option>UPI</option></select></div></>}
+          <div className="invoice-more-details-actions billing-col-12">
+            <button type="button" className="secondary" onClick={() => { void hold() }} disabled={!items.length}>Hold bill</button>
+          </div>
+        </div>
+      </details>
+
+
+      <details className="customer-address-details">
+        <summary>{address || pin || city || state ? 'Edit address (optional)' : 'Add address (optional)'}</summary>
+        <div className="billing-grid">
+          <div className="billing-field billing-col-12"><label htmlFor="billing-addr">Address</label><input id="billing-addr" value={address} onChange={e => setAddress(e.target.value)} /></div>
+          <div className="billing-field billing-col-4"><label htmlFor="billing-pin">Pincode</label><input id="billing-pin" inputMode="numeric" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} /></div>
+          <div className="billing-field billing-col-4"><label htmlFor="billing-city">City</label><input id="billing-city" value={city} onChange={e => setCity(e.target.value)} /></div>
+          <div className="billing-field billing-col-4"><label htmlFor="billing-state">State</label><input id="billing-state" value={state} onChange={e => setState(e.target.value)} /></div>
+        </div>
+      </details>
+
+      <footer className="invoice-sticky-review" aria-label="Bill total and review">
+        <div className="invoice-sticky-amount">
+          <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+          <strong>₹{money(total)}</strong>
+        </div>
+        <button type="button" onClick={review} disabled={!items.length}>Review bill <span aria-hidden="true">→</span></button>
+      </footer>
     </section>
   )
 }

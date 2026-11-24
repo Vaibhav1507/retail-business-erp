@@ -78,7 +78,7 @@ export function SalesInvoiceCapture({
   return (
     <div className="item-tag-uploader sales-invoice-uploader">
       <PhotoSourcePicker
-        triggerLabel="Upload handwritten bill"
+        triggerLabel="Import bill ↗"
         title="Add handwritten invoice"
         description="Take a photo of the bill or choose an image or PDF from your device."
         disabled={disabled || busy}

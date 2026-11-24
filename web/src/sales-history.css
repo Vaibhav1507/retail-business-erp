@@ -112,3 +112,7 @@
   .sales-history-toolbar > button { flex: 1 1 auto; }
   .sales-history-paper { flex: 1 1 120px; }
 }
+
+
+.sales-history-heading h2 { margin: 0 0 4px; font-size: 21px; }
+.sales-history-whatsapp-help { display: block; margin-top: 3px; line-height: 1.35; }

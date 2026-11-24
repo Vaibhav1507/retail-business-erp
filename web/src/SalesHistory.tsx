@@ -2,7 +2,7 @@ import { Paged } from './Paged'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from './api'
 import { t as tr } from './i18n'
-import { whatsappStatusLabel } from './whatsappStatus'
+import { whatsappStatusDescription, whatsappStatusLabel } from './whatsappStatus'
 import './billing-forms.css'
 import './sales-history.css'
 import { InvoiceDocument } from './InvoiceDocument'
@@ -134,7 +134,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
   return (
     <section aria-label="Sales" className="billing-screen sales-history">
       <div className="sales-history-heading">
-        <h3>Sales history</h3>
+        <h2>Sales history</h2>
         <p>Find an earlier bill, check its balance or print a copy.</p>
       </div>
 
@@ -196,7 +196,7 @@ export function SalesHistory({ locations }: { locations: Opt[] }) {
             <button type="button" className="secondary" onClick={closeDetail}>Close</button>
           </div>
           <div className="invoice-tools no-print sales-history-toolbar">
-            <span className="sales-history-whatsapp" role="status">WhatsApp: {whatsappStatusLabel(detail.sale.whatsappStatus)}</span>
+            <span className="sales-history-whatsapp" role="status">WhatsApp: {whatsappStatusLabel(detail.sale.whatsappStatus)}{whatsappStatusDescription(detail.sale.whatsappStatus) && <small className="sales-history-whatsapp-help">{whatsappStatusDescription(detail.sale.whatsappStatus)}</small>}</span>
             {(['Failed', 'WaitingForSetup', 'ConsentRequired', 'Suppressed', 'NoRecipient', 'NeedsReview'].includes(detail.sale.whatsappStatus)) &&
               <button type="button" className="secondary" disabled={retrying} onClick={retryWhatsApp}>{retrying ? 'Retrying…' : detail.sale.whatsappStatus === 'NeedsReview' ? 'Check & retry WhatsApp' : 'Retry WhatsApp'}</button>}
             <label className="sales-history-paper">Paper size

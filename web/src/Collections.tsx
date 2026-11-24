@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from './api'
 import { Paged } from './Paged'
+import { SearchableSelect } from './SearchableSelect'
 import './billing-forms.css'
 import './collections.css'
 
-type Customer = { id: string; name: string; owed: number }
+type Customer = { id: string; name: string; phone?: string | null; owed: number }
 type Payment = { id: string; number: number; date: string; customer: string; amount: number; method: string; reference: string | null }
 type OpenSale = { id: string; date: string; invoiceNo: string | null; number: number; open: number }
 type Entry = { type: string; number: number; date: string; debit: number; credit: number; balance: number; id: string }
@@ -121,20 +122,22 @@ export function Collections({ reload }: { reload: () => void }) {
   return (
     <section className="billing-screen collections-screen" aria-label="Customer collections">
       <div className="collections-heading">
-        <h3>Collect payment</h3>
+        <h2>Collect payment</h2>
         <p>Record money received from a customer.</p>
       </div>
 
       <form className="collections-form billing-card" aria-label="Record customer payment" onSubmit={collect}>
         <div className="collections-customer">
-          <div className="billing-field">
-            <label htmlFor="collection-customer">Customer</label>
-            <select id="collection-customer" value={payCustomer}
-              onChange={e => { setPayCustomer(e.target.value); setPayAmount(''); setPayRef(''); setDone('') }}>
-              <option value="">Choose a customer</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name} · owes ₹{money(c.owed)}</option>)}
-            </select>
-          </div>
+          <SearchableSelect
+            id="collection-customer"
+            label="Customer"
+            value={payCustomer}
+            options={customers.map(c => ({ value: c.id, label: c.name, description: [c.phone, 'Owes ₹' + money(c.owed)].filter(Boolean).join(' · '), searchText: [c.name, c.phone].filter(Boolean).join(' ') }))}
+            onChange={value => { setPayCustomer(value); setPayAmount(''); setPayRef(''); setSaleBillId(''); setDone('') }}
+            placeholder="Search customer by name or mobile"
+            emptyMessage="No customers match this search."
+            disabled={loading || customers.length === 0}
+          />
           {selectedCustomer && <div className="collections-outstanding" aria-live="polite">
             <small>Outstanding balance</small>
             <strong>₹{money(selectedCustomer.owed)}</strong>
@@ -144,52 +147,66 @@ export function Collections({ reload }: { reload: () => void }) {
         {loading && <p className="collections-muted" role="status">Loading customers and collection history…</p>}
         {!loading && customers.length === 0 && <p className="collections-muted">No customers found. Add a customer before recording a collection.</p>}
 
-        <div className="collections-payment-grid">
-          <div className="billing-field">
-            <label htmlFor="collection-amount">Amount received (INR)</label>
-            <input id="collection-amount" type="number" min="0.01" step="0.01" inputMode="decimal"
-              value={payAmount} onChange={e => setPayAmount(e.target.value)} aria-invalid={Boolean(payAmount) && !(Number(payAmount) > 0)} />
-            {payAmount && !(Number(payAmount) > 0) && <small className="field-error">Enter an amount greater than zero.</small>}
-            {selectedCustomer && selectedCustomer.owed > 0 &&
-              <button type="button" className="collections-fill" onClick={() => setPayAmount(String(selectedCustomer.owed))}>Fill full balance</button>}
-          </div>
+        {!loading && customers.length > 0 && !selectedCustomer && <p className="collections-start-hint">Choose a customer to see their outstanding balance and record a payment.</p>}
 
-          {openSales.length > 0 && <div className="billing-field">
-            <label htmlFor="collection-bill">Apply to a bill (optional)</label>
-            <select id="collection-bill" value={saleBillId} onChange={e => setSaleBillId(e.target.value)}>
-              <option value="">On account (no specific bill)</option>
-              {openSales.map(b => <option key={b.id} value={b.id}>{b.date} · {b.invoiceNo ?? 'Bill ' + b.number} · balance ₹{money(b.open)}</option>)}
-            </select>
-            <small>Leave as On account to record this payment against the customer's account.</small>
-          </div>}
-          {openSalesLoading && <p className="collections-muted" role="status">Loading unpaid bills…</p>}
-          {openSalesError && <p className="collections-muted" role="status">Bill balances could not be loaded. You can still record an on-account payment.</p>}
+        {selectedCustomer && <>
+          <div className="collections-payment-grid">
+            <div className="billing-field">
+              <label htmlFor="collection-amount">Amount received (INR)</label>
+              <input id="collection-amount" type="number" min="0.01" step="0.01" inputMode="decimal"
+                value={payAmount} onChange={e => setPayAmount(e.target.value)} aria-invalid={Boolean(payAmount) && !(Number(payAmount) > 0)} />
+              {payAmount && !(Number(payAmount) > 0) && <small className="field-error">Enter an amount greater than zero.</small>}
+              {selectedCustomer.owed > 0 &&
+                <button type="button" className="collections-fill" onClick={() => setPayAmount(String(selectedCustomer.owed))}>Fill full balance</button>}
+            </div>
 
-          <div className="billing-field">
-            <label htmlFor="collection-method">Payment method</label>
-            <select id="collection-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}>
-              <option>Cash</option><option>UPI</option><option>Bank</option>
-            </select>
+            <SearchableSelect
+              id="collection-bill"
+              label="Apply to a bill (optional)"
+              value={saleBillId}
+              options={[
+                { value: '', label: 'On account (no specific bill)', searchText: 'on account account' },
+                ...openSales.map(b => ({
+                  value: b.id,
+                  label: b.invoiceNo ?? 'Bill ' + b.number,
+                  description: b.date + ' · Balance ₹' + money(b.open),
+                  searchText: [b.invoiceNo, b.number, b.date].filter(Boolean).join(' ')
+                }))
+              ]}
+              onChange={setSaleBillId}
+              placeholder="Search bill or choose on account"
+              emptyMessage="No unpaid bills match this search."
+              disabled={openSalesLoading || (!openSales.length && !openSalesError)}
+            />
+            {openSalesLoading && <p className="collections-muted" role="status">Loading unpaid bills…</p>}
+            {openSalesError && <p className="collections-muted" role="status">Bill balances could not be loaded. You can still record an on-account payment.</p>}
+            {!openSalesLoading && !openSalesError && openSales.length === 0 && <p className="collections-muted">This customer has no unpaid bills. Payments will be recorded on account.</p>}
+
+            <div className="billing-field">
+              <label htmlFor="collection-method">Payment method</label>
+              <select id="collection-method" value={payMethod} onChange={e => setPayMethod(e.target.value)}>
+                <option>Cash</option><option>UPI</option><option>Bank</option>
+              </select>
+            </div>
+            <div className="billing-field">
+              <label htmlFor="collection-date">Payment date</label>
+              <input id="collection-date" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
+            </div>
+            <div className="billing-field collections-reference">
+              <label htmlFor="collection-reference">Reference (optional)</label>
+              <input id="collection-reference" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="UPI or bank reference" />
+            </div>
           </div>
-          <div className="billing-field">
-            <label htmlFor="collection-date">Payment date</label>
-            <input id="collection-date" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
+          <div className="collections-form-actions">
+            <button type="submit" disabled={!(Number(payAmount) > 0) || submitting || loading}>
+              {submitting ? 'Recording payment…' : 'Record payment'}
+            </button>
+            <button type="button" className="secondary" onClick={() => void showStatement()}>View customer statement</button>
           </div>
-          <div className="billing-field collections-reference">
-            <label htmlFor="collection-reference">Reference (optional)</label>
-            <input id="collection-reference" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="UPI or bank reference" />
-          </div>
-        </div>
+        </>}
 
         {error && <p className="collections-error" role="alert">{error}</p>}
         {done && <p className="collections-success" role="status">{done}</p>}
-
-        <div className="collections-form-actions">
-          <button type="submit" disabled={!payCustomer || !(Number(payAmount) > 0) || submitting || loading}>
-            {submitting ? 'Recording payment…' : 'Record payment'}
-          </button>
-          <button type="button" className="secondary" disabled={!payCustomer} onClick={() => void showStatement()}>View customer statement</button>
-        </div>
       </form>
 
       {statement && <section className="collections-statement" aria-label="Customer statement">
