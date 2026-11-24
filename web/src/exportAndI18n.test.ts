@@ -29,7 +29,7 @@ describe('i18n catalogue parity (G4)', () => {
     for (const lang of ['en', 'hi'] as const) {
       setLanguage(lang)
       expect(t('rem.orders', { n: 3 })).toContain('3')
-      expect(t('rem.dayClosing', { n: 2 })).toContain('2')
+      expect(t('rem.dayClosingMany', { n: 2 })).toContain('2')
       expect(t('rem.orders', { n: 3 })).not.toContain('{n}')
     }
   })
