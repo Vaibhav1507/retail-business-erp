@@ -162,7 +162,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
     await openSellRoute(desktopPage, route)
     await capture(desktopPage, 'route-' + route.replace('/', '-'), [desktopViewport])
   }
-  await desktopContext.close()
+  // Keep this desktop context alive for nested history, collection, return and print states below.
 
   await page.goto('/')
   await unlockApp(page)
