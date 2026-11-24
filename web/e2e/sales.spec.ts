@@ -14,6 +14,11 @@ async function pick(page: Page, region: string, label: string, optionText: strin
 
 test('shopkeeper sells for cash, on credit with part payment, and reviews history', async ({ page }) => {
   await signUp(page, { email: owner, businessName: 'E2E Sales ' + run })
+  await page.goto('/#/sell/bill')
+  await expect(page.locator('.shell')).toHaveClass(/invoice-focus/)
+  await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Scan tag' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add product' })).toHaveCount(1)
   await page.goto('/#/stock/products')
   await expect(page.getByRole('region', { name: 'Products' })).toBeVisible()
 
