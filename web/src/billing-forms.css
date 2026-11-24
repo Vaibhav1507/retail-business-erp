@@ -20,11 +20,17 @@
 .billing-menu li:hover { background: #eef6f2; }
 .billing-menu li span { color: var(--muted, #5b6770); }
 .billing-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+.billing-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }
+.billing-table-wrap .billing-table { min-width: 800px; margin-top: 0; }
+.billing-table-wrap td input { box-sizing: border-box; min-width: 64px; min-height: 44px; }
+.billing-table-wrap td:first-child input { min-width: 160px; }
+.billing-table-wrap td:nth-child(6) input { min-width: 100px; }
+.billing-table-wrap:focus-visible { outline: 3px solid var(--brand-dark, #0b5e3b); outline-offset: 2px; }
 .billing-table th, .billing-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line, #e3e7e5); }
 .billing-table th:nth-child(n+2), .billing-table td:nth-child(n+2) { text-align: right; }
 .billing-foot { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
 .billing-gst { display: flex; align-items: center; gap: 12px; }
-.billing-gst select { width: 90px; min-height: 40px; }
+.billing-gst select { width: 90px; min-height: 44px; }
 .billing-check { display: flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 600; flex: none; }
 .billing-check input { width: 20px; min-height: 0; }
 .billing-total { font-size: 16px; margin-left: auto; }
