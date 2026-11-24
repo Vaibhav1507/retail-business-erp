@@ -1,40 +1,48 @@
 # Billing & Sales handoff
 
 **Repository:** Vaibhav1507/retail-business-erp  
-**Active branch:** ux/billing-sales-mobile-polish  
-**PR:** [#76 — UX polish Billing & Sales mobile workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/76)  
-**Status:** Draft / open / not merged / not deployed.
+**Previous baseline PR:** [#76 — UX polish Billing & Sales mobile workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/76) — merged to main at \`96c8ed9930d4495a0bc032c6d4d2a0e161afe58d\`.  
+**Current follow-up branch:** \`ux/invoice-form-compact-electronics-fields\`  
+**Current follow-up design note:** [invoice-form-mobile-compact-followup.md](./invoice-form-mobile-compact-followup.md)  
+**Current follow-up PR:** to be created after focused validation.
 
-## Authoritative design contract
+## Scope
 
-Read [billing-sales-mobile-polish.md](./billing-sales-mobile-polish.md) before changing the scoped screens.
+The previous five-screen Billing & Sales redesign remains the merged baseline. This follow-up is limited to **Create Invoice** (\`#/sell/bill\`) and the data path required to show electronics-specific fields based on the saved business category.
 
-- The three user-supplied MagicPath screenshots are the exact visual reference for **Create Invoice only**.
-- Sales History, Collections, Customer Returns and the Sell landing are RBOS-specific, research-led designs documented in §4.
-- MagicPath agent/API quota is exhausted. Do not retry the integration to obtain screens that were not supplied. Figma is optional.
-- Keep changes within the five Billing & Sales routes and the shared Assistant launcher.
+## Current user feedback
 
-## Current implementation state
+The four Android screenshots supplied after previewing PR #76 identified:
+- The invoice form is too zoomed-in / oversized for phone use.
+- Mobile, customer name and one free-text address field should be together in the Customer card.
+- Item description should be wide, with a text-labelled **Import tag** action on its right.
+- For electronics/mobile shops, Model and Quantity should share a row and Serial should be visible below.
 
-- Create Invoice was restructured to the MagicPath New Sale hierarchy: header/Draft, 01 Customer, 02 Items, dashed Import bill callout, model number, quantity/price, optional item details, separate GST/discount/amount summary and sticky item-count/Review bill footer.
-- Existing invoice state handlers, calculations, customer lookup, tag scan, handwritten invoice extraction, held/offline queues, review/post/print flow were retained.
-- The generic Sell back link is suppressed on Create Invoice because the MagicPath-style invoice header provides its own back action.
-- Sales History, Collections and Customer Returns retain page-specific mobile layouts and interaction patterns. They must not inherit the invoice sticky footer.
-- Frontend test corrections address portal-based Assistant querying, controlled SearchableSelect test usage and waiting for asynchronous customer loading in Collections.
+## Current implementation
+
+On \`ux/invoice-form-compact-electronics-fields\`:
+- Compact mobile geometry for the invoice header, cards, text, inputs, vertical spacing and sticky footer.
+- One optional Customer Address field after the required mobile and name fields. Legacy customer address/city/state/PIN and held-bill values are combined into the free-text field. The legacy note serialization shape is preserved; no backend/schema change.
+- Item description remains the flexible field; the adjacent action is labelled **Import tag** and continues using the existing camera/gallery source picker.
+- \`businessCategory === "electronics_mobile"\` shows Model + Quantity on one row and optional Serial below. Other categories keep Model/Serial inside collapsed More item details.
+- Business category flows from the existing \`/me\` result through App → SellPage → GenerateInvoice; no new profile property or API.
+- Existing business logic and handlers for customer validation, item add, manual/ad-hoc products, duplicate identifiers, scan/extraction, GST/totals, hold/offline bills, posting, print and WhatsApp remain unchanged.
+
+## Authoritative design notes
+
+1. [Billing & Sales baseline design/research](./billing-sales-mobile-polish.md) — original five-screen group and preserved business rules.
+2. [Create Invoice compact mobile/electronics follow-up](./invoice-form-mobile-compact-followup.md) — latest screenshot evidence, decisions, acceptance and validation for this follow-up.
+
+The user-supplied MagicPath screenshots remain the invoice hierarchy reference; the latest Android screenshots add this follow-up's sizing and electronics-entry requirements.
 
 ## Validation / acceptance
 
-1. Check the newest PR #76 rbos-ci run after the final commits. TypeScript, frontend tests/lint/build, backend tests/build and PostgreSQL integration must pass.
-2. User will provide Android screenshots. Compare the Create Invoice screen against the exact three MagicPath captures. Review other pages against §4 of the design contract.
-3. Do not spend time on an exhaustive Playwright screenshot matrix for this polish pass. Run proportionate route smoke coverage only if needed.
-4. Real-device acceptance remains necessary for camera/gallery permissions, keyboard/fixed footer interaction, print/share behaviour and TalkBack.
-5. CI passing is not visual acceptance. User screenshot review is not merge approval.
-6. Do not merge or deploy without explicit authorisation.
+- Focused tests cover Create Invoice and ItemTagCapture behaviour; current PR CI must still pass frontend typecheck/tests/lint/build/dependency audit, backend build/unit tests and PostgreSQL integration.
+- Do not run an exhaustive Playwright screenshot matrix for this narrow follow-up. The user will provide Android screenshots for visual review.
+- Real-device acceptance remains necessary for camera/gallery chooser, keyboard + sticky-footer behaviour and TalkBack.
+- Automated CI is not visual acceptance.
+- Merge only after user screenshot acceptance and explicit authorisation. Production deployment remains a separate action requiring separate approval.
 
 ## Preserved business rules
 
-Customer name/mobile required; zero stock does not block billing; ad-hoc invoice lines allowed; optional serial/barcode/IMEI with warnings; duplicate identifier validation; server-authoritative invoice/GST calculations; single optional collection bill allocation or on-account payment; idempotent payment write; returns tied to original sale lines; server-authoritative refund/stock/cancellation accounting; WhatsApp consent/retry/duplicate protection; held and offline sale semantics; invoice-only print.
-
-## Research sources
-
-The implementation rationale and source list are maintained in [billing-sales-mobile-polish.md §8](./billing-sales-mobile-polish.md#8-free-public-research-sources-and-how-they-informed-the-design). It includes Shopify POS, Square, Zoho Books India, W3C APG, GOV.UK Design System, NN/g, Android Developers and WCAG 2.2.
+Customer name/mobile required; zero-stock billing and ad-hoc lines; optional serial/IMEI/barcode with non-blocking missing-serial warning and duplicate detection; server-authoritative invoice/GST calculations; collection and return semantics in other screens unchanged; WhatsApp consent/retry/duplicate protection; held and offline sale semantics; invoice-only print; tenant boundaries and existing routes.
