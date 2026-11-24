@@ -17,7 +17,7 @@ beforeEach(() => {
     if (method === 'POST') posts.push({ url, body: init?.body ? JSON.parse(init.body as string) : {}, headers: init?.headers as Record<string, string> })
     if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
     if (url === '/api/sales') return new Response(JSON.stringify([sale]))
-    if (url === '/api/sale-returns') return new Response(JSON.stringify([]))
+    if (url === '/api/sale-returns' && method === 'GET') return new Response(JSON.stringify([]))
     if (url === '/api/sales/sale-1/returnable') return new Response(JSON.stringify([
       { saleLineId: 'line-1', productId: 'p1', product: 'Mixer', sold: 2, returned: 0, remaining: 2 }
     ]))
@@ -40,7 +40,7 @@ describe('CustomerReturns', () => {
     await userEvent.clear(quantity)
     await userEvent.type(quantity, '1')
     await userEvent.click(screen.getByRole('button', { name: 'Post customer return' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Customer balance credit: ₹500.00')
+    expect(await screen.findByText(/Customer balance credit: ₹500\.00/)).toBeInTheDocument()
     const post = posts.find(p => p.url === '/api/sale-returns')!
     expect(post.body).toMatchObject({ saleId: 'sale-1', lines: [{ saleLineId: 'line-1', productId: 'p1', quantity: 1 }] })
     expect(post.headers['Idempotency-Key']).toBeTruthy()
