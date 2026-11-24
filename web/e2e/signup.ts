@@ -129,6 +129,10 @@ export async function chooseCategory(form: Locator, name: string) {
 /** Posts a sale through the Generate invoice screen (/#/sell/bill). Leaves the page on the "Saved as INV-..." status. */
 export async function postInvoice(page: Page, o: { product: string; qty: string; price: string; discount?: string; mode?: 'Cash' | 'UPI' | 'Credit'; paid?: string; name?: string; phone?: string }) {
   await page.goto('/#/sell/bill')
+  // A same-hash navigation does not remount GenerateInvoice after a successful sale.
+  // Reopen the form explicitly when this helper is used for consecutive invoices.
+  const newInvoice = page.getByRole('button', { name: 'New invoice', exact: true })
+  if (await newInvoice.isVisible().catch(() => false)) await newInvoice.click()
   const bill = page.getByRole('region', { name: 'Generate invoice' })
   if (o.phone) await bill.locator('#billing-phone').fill(o.phone)
   if (o.name) await bill.locator('#billing-name').fill(o.name)
