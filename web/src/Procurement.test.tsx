@@ -172,6 +172,24 @@ describe('Procurement Buy screens', () => {
     expect(posts).toHaveLength(0)
   })
 
+  it('offers camera and multi-page upload actions with inline required markers', async () => {
+    mockProcurement()
+    render(<Procurement products={[product]} locations={[location]} reload={vi.fn()} show="receive" />)
+
+    expect(await screen.findByRole('button', { name: 'Camera' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled()
+    expect(screen.getByLabelText('Take supplier bill photo')).toHaveAttribute('capture', 'environment')
+    expect(screen.getByLabelText('Upload supplier bill files')).toHaveAttribute('multiple')
+    for (const label of ['Supplier', 'Stock location', 'Receipt date', 'Product', 'Quantity', 'Unit cost (INR, before GST)']) {
+      const field = screen.getByText(label, { exact: true })
+      expect(field).toHaveClass('buy-field-label')
+      expect(field.querySelector('.buy-required')).toBeInTheDocument()
+    }
+    expect(screen.getByText('0 items')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Review purchase/ })).toBeDisabled()
+    expect(screen.getByText('Add products to continue')).toBeInTheDocument()
+  })
+
   it('keeps the selected invoice filename visible while OCR is running', async () => {
       const user = userEvent.setup()
       let finishExtraction!: (response: Response) => void
@@ -179,12 +197,13 @@ describe('Procurement Buy screens', () => {
       mockProcurement([], () => extraction)
       render(<Procurement products={[]} locations={[]} reload={vi.fn()} show="receive" />)
   
-      const fileInput = await screen.findByLabelText(/Upload a supplier bill photo or PDF/)
+      const fileInput = await screen.findByLabelText('Upload supplier bill files')
       const file = new File(['%PDF-1.4 test invoice'], 'supplier-invoice.pdf', { type: 'application/pdf' })
       await user.upload(fileInput, file)
   
       expect(await screen.findByRole('status')).toHaveTextContent('Reading invoice')
       expect((fileInput as HTMLInputElement).files?.[0]?.name).toBe('supplier-invoice.pdf')
+      expect(screen.getByText('supplier-invoice.pdf')).toBeInTheDocument()
       expect(fileInput).toBeDisabled()
   
       finishExtraction(new Response(JSON.stringify({
