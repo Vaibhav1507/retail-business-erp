@@ -229,6 +229,7 @@ Minimum capture matrix for this billing group:
 - **390 × 844 CSS px** — common modern mobile viewport and the existing Playwright mobile project.
 - **412 × 915 CSS px** — larger Android viewport.
 - **768 × 1024 CSS px** — tablet / narrow desktop transition.
+- **1280 × 900 CSS px** — desktop layout and document/table readability.
 - **Landscape / short height** — check fixed controls, action access and virtual keyboard interactions.
 - **Real Android device** — verify actual browser viewport, safe-area/system bars, print behaviour, camera permission, share sheet and TalkBack.
 
