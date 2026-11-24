@@ -48,3 +48,31 @@
 .topbar .assistant-launcher { position: relative; top: auto; right: auto; bottom: auto; z-index: 6; flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; margin-left: 0; padding: 0; border-radius: 50%; box-shadow: none; }
 .topbar .assistant-launcher:focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
 .navigation-assistant { z-index: 40; }
+
+
+/* Compact floating assistant action; clear of navigation and invoice review footer. */
+.assistant-launcher {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+  z-index: 45;
+  width: 52px;
+  height: 52px;
+  min-height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  font-size: 23px;
+}
+.assistant-launcher span:first-child { font-size: 23px; }
+.navigation-assistant { bottom: calc(var(--nav-h) + 78px + env(safe-area-inset-bottom)); z-index: 46; }
+.invoice-focus .assistant-launcher { bottom: calc(104px + env(safe-area-inset-bottom)); }
+.invoice-focus .navigation-assistant { bottom: calc(166px + env(safe-area-inset-bottom)); }
+@media (min-width: 900px) {
+  .assistant-launcher { right: 20px; bottom: 20px; }
+  .navigation-assistant { right: 20px; bottom: 82px; }
+  .invoice-focus .assistant-launcher { bottom: 20px; }
+  .invoice-focus .navigation-assistant { bottom: 82px; }
+}
