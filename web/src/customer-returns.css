@@ -121,11 +121,7 @@
   text-underline-offset: 3px;
 }
 .customer-return-history[open] .customer-return-history-toggle {
-  font-size: 0;
-}
-.customer-return-history[open] .customer-return-history-toggle::after {
-  content: "Hide history";
-  font-size: 14px;
+  text-decoration: none;
 }
 .customer-return-history-content {
   display: grid;
