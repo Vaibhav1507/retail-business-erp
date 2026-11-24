@@ -33,7 +33,8 @@ describe('SearchableSelect', () => {
     await user.keyboard('{ArrowDown}{Enter}')
     expect(onChange).toHaveBeenLastCalledWith('c2')
     expect(input).toHaveValue('Ravi Kumar')
-    expect(screen.getByRole('listbox', { name: 'Customer options' })).not.toBeVisible()
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('listbox', { hidden: true, name: 'Customer options' })).not.toBeVisible()
   })
 
   it('starts keyboard navigation on the first result and does not wrap past the last', async () => {
