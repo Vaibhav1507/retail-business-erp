@@ -4,13 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "Choose one audit stage. Start with Home."
+        description: "Choose a visual audit stage."
         required: true
         type: choice
         default: home
         options:
           - home
           - billing-sales
+          - buy
+  pull_request:
+    paths:
+      - "web/src/Procurement.tsx"
+      - "web/src/InvoiceUpload.tsx"
+      - "web/src/AfterSales.tsx"
+      - "web/src/Pages.tsx"
+      - "web/src/buy-*.css"
+      - "web/src/invoice-upload.css"
+      - "web/e2e/buy-visual.spec.ts"
+      - "docs/ux/BUY-DESIGN-HANDOFF.md"
+      - "docs/ux/buy-*-design.md"
+      - ".github/workflows/visual-audit.yml"
 
 permissions:
   contents: read
@@ -21,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      UI_AUDIT_SCOPE: ${{ github.event.inputs.scope || 'billing-sales' }}
+      UI_AUDIT_SCOPE: ${{ github.event_name == 'pull_request' && 'buy' || github.event.inputs.scope || 'billing-sales' }}
       Rbos__Database: test
       ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
       ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
@@ -90,14 +103,20 @@ jobs:
         working-directory: web
         run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
 
+      - name: Run Buy visual audit
+        if: env.UI_AUDIT_SCOPE == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
       - name: Upload selected screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rbos-visual-audit-${{ github.event.inputs.scope || 'billing-sales' }}
           path: |
-            web/test-results/ui-audit/${{ github.event.inputs.scope || 'billing-sales' }}/
+            web/test-results/ui-audit/${{ github.event.inputs.scope || (github.event_name == 'pull_request' && 'buy') || 'billing-sales' }}/
             web/test-results/billing-sales-visual-*/
+            web/test-results/ui-audit/buy/
             web/test-results/.last-run.json
           if-no-files-found: warn
           retention-days: 7
