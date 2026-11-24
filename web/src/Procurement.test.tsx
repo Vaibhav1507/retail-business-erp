@@ -185,7 +185,7 @@ describe('Procurement Buy screens', () => {
       expect(field).toHaveClass('buy-field-label')
       expect(field.querySelector('.buy-required')).toBeInTheDocument()
     }
-    expect(screen.getByText('0 items')).toBeInTheDocument()
+    expect(screen.getAllByText('0 items')).toHaveLength(2)
     expect(screen.getByRole('button', { name: /Review purchase/ })).toBeDisabled()
     expect(screen.getByText('Add products to continue')).toBeInTheDocument()
   })
