@@ -25,6 +25,7 @@ test(`UI audit: ${scope} (synthetic data, report only)`, async ({ page }) => {
     await page.setViewportSize({ width: vp.w, height: vp.h })
     await page.goto('/#/' + route)
     await page.waitForLoadState('networkidle')
+    await expect(page.locator('.assistant-launcher')).toHaveCSS('position', 'fixed')
     await page.screenshot({ path: `${outDir}/${vp.name}-${route.replace('/', '-')}.png`, fullPage: true })
     const found = await page.evaluate(() => {
       const vis = (el: Element) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' }
