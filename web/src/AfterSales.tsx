@@ -232,13 +232,13 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
           <label>{tr('buy.searchReturns')}<input value={prSearch} onChange={e => setPrSearch(e.target.value)} placeholder={tr('buy.returnSearchPlaceholder')} /></label>
           <Paged rows={purchaseReturns} empty={tr('buy.noReturns')}>{page => <div className="buy-history-list">{page.map(r => <article className="buy-history-card" key={r.id}>
             <div className="buy-history-top"><strong>{tr('buy.returnNumberLabel', { number: r.number })} · {r.supplier}</strong><strong>₹{r.total.toFixed(2)}</strong></div>
-            <dl><dt>Date</dt><dd>{r.date}</dd><dt>{tr('buy.originalReceipt')}</dt><dd>#{r.receiptNumber}</dd><dt>{tr('buy.reason')}</dt><dd>{r.reason || '—'}</dd></dl>
+            <dl><dt>{tr('buy.date')}</dt><dd>{r.date}</dd><dt>{tr('buy.originalReceipt')}</dt><dd>#{r.receiptNumber}</dd><dt>{tr('buy.reason')}</dt><dd>{r.reason || '—'}</dd></dl>
             <button type="button" className="secondary" onClick={async () => { try { setPrDetail(await api<ReturnDetail<PurchaseReturn>>('GET', '/purchase-returns/' + r.id)) } catch (e) { setError(msg(e)) } }}>{tr('buy.viewDetails')}</button>
           </article>)}</div>}</Paged>
           {prDetail && <div className="buy-return-detail" role="region" aria-label={tr('buy.returnDetails')}>
             <h3>{tr('buy.returnNumberLabel', { number: prDetail.return.number })} · {tr('buy.receiptNo')} #{prDetail.return.receiptNumber}</h3>
             <p>{prDetail.return.supplier} · {prDetail.return.date}</p>
-            <p>{prDetail.return.reason || tr('buy.noReason')}</p>
+            <p>{tr('buy.reason')}: {prDetail.return.reason || tr('buy.noReason')}</p>
             <ul>{prDetail.lines.map(l => <li key={l.sku}>{l.product} · {l.quantity} × ₹{l.amount.toFixed(2)}</li>)}</ul>
             <button type="button" className="secondary" onClick={() => setPrDetail(null)}>{tr('buy.closeDetails')}</button>
           </div>}
