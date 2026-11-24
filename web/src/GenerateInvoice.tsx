@@ -711,7 +711,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       </details>
 
 
-tails>
 
       <footer className="invoice-sticky-review" aria-label="Bill total and review">
         <div className="invoice-sticky-amount">
