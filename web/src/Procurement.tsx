@@ -127,7 +127,11 @@ export function Procurement({ products, locations, reload, show }: { products: (
       <Paged rows={suppliers} empty={tr('sup.none')}>{page => (
       <table>
         <thead><tr><th>Supplier</th><th>Phone</th><th>Notes</th><th>You owe</th><th>Actions</th></tr></thead>
-        <tbody>{page.map(s => <tr key={s.id}><td>{s.name}</td><td>{s.phone}</td><td>{s.notes}</td><td>{s.owed.toFixed(2)}</td><td><button type="button" className="secondary" onClick={() => { setSupEditId(s.id); setNam      {v('receive') && <div className="buy-receive">
+        <tbody>{page.map(s => <tr key={s.id}><td>{s.name}</td><td>{s.phone}</td><td>{s.notes}</td><td>{s.owed.toFixed(2)}</td><td><button type="button" className="secondary" onClick={() => { setSupEditId(s.id); setName(s.name); setPhone(s.phone ?? ''); setSupNotes(s.notes ?? ''); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Edit</button></td></tr>)}</tbody>
+      </table>
+      )}</Paged>
+      </>}
+            {v('receive') && <div className="buy-receive">
         <header className="buy-screen-heading"><h2>{tr('buy.addTitle')}</h2><p>{tr('buy.addIntro')}</p></header>
         <section className="buy-section buy-upload-section" aria-label={tr('buy.bill')}>
           <div><h3>{tr('buy.bill')} <span>{tr('buy.optional')}</span></h3><p>{tr('buy.billHelp')}</p></div>
