@@ -32,6 +32,7 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
   const [linesLoading, setLinesLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [historyError, setHistoryError] = useState('')
   const [done, setDone] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const returnDialogRef = useRef<HTMLDivElement>(null)
@@ -41,15 +42,14 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
     setLoading(true)
     setError('')
     try {
-      const [s, r] = await Promise.all([
+      const [salesResult, historyResult] = await Promise.allSettled([
         api<Sale[]>('GET', '/sales'),
         api<SaleReturn[]>('GET', '/sale-returns' + (historyQuery ? '?q=' + encodeURIComponent(historyQuery) : ''))
       ])
-      setSales(s)
-      setSaleReturns(r)
-    } catch (e) {
-      setError(msg(e))
-      throw e
+      if (salesResult.status === 'fulfilled') setSales(salesResult.value)
+      else setError(msg(salesResult.reason))
+      if (historyResult.status === 'fulfilled') { setSaleReturns(historyResult.value); setHistoryError('') }
+      else setHistoryError(msg(historyResult.reason))
     } finally {
       setLoading(false)
     }
@@ -284,7 +284,8 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
           <input id="customer-return-search" type="search" value={returnSearch} onChange={e => setReturnSearch(e.target.value)} placeholder="Customer or return number" />
         </div>
         {loading && <p className="customer-returns-muted" role="status">Loading return history…</p>}
-        {!loading && saleReturns.length === 0 && <p className="customer-returns-muted">{historyQuery ? 'No returns match this search.' : 'No customer returns recorded yet.'}</p>}
+        {historyError && <p className="customer-returns-error" role="alert">{historyError} <button type="button" className="secondary" onClick={() => void loadData().catch(() => undefined)}>Retry</button></p>}
+        {!loading && !historyError && saleReturns.length === 0 && <p className="customer-returns-muted">{historyQuery ? 'No returns match this search.' : 'No customer returns recorded yet.'}</p>}
         <Paged rows={saleReturns} label="returns">{page => (
           <>
             <div className="customer-return-history-desktop"><table aria-label="Customer returns">
