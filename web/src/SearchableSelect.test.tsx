@@ -39,7 +39,7 @@ describe('SearchableSelect', () => {
   it('starts keyboard navigation on the first result and does not wrap past the last', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    render(<SearchableSelect id="customer" label="Customer" value="" options={options}
+    render(<ControlledSelect id="customer" label="Customer" options={options}
       onChange={onChange} placeholder="Search by customer name" />)
 
     const input = screen.getByRole('combobox', { name: 'Customer' })
