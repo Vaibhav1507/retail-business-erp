@@ -89,11 +89,12 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Scan product' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByText('Optional product details'))
     expect(screen.getByLabelText('Brand')).toBeInTheDocument()
     expect(screen.getByLabelText('Model')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
-    const photoInputs = container.querySelectorAll('input[type="file"]')
+    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[1], { target: { files: [file] } })
 
@@ -140,9 +141,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     }))
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
     expect(screen.getByRole('dialog', { name: 'Add product tag photo' })).toBeInTheDocument()
-    const photoInputs = container.querySelectorAll('input[type="file"]')
+    const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'washing-machine.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
@@ -176,8 +177,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
     }))
 
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Add tag photo' }))
-    const photoInputs = container.querySelectorAll('input[type="file"]')
+    await userEvent.click(screen.getByRole('button', { name: 'Scan tag' }))
+    const photoInputs = container.querySelectorAll('.invoice-product-entry input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'model-only.jpg', { type: 'image/jpeg' })
     fireEvent.change(photoInputs[0], { target: { files: [file] } })
 
