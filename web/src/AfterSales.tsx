@@ -2,6 +2,7 @@ import { Paged } from './Paged'
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from './api'
 import './billing-forms.css'
+import './buy-procurement.css'
 
 type Customer = { id: string; name: string; owed: number }
 type SaleRow = { id: string; number: number; customer: string; total: number; cancelled: boolean }
@@ -10,7 +11,7 @@ type Payment = { id: string; number: number; date: string; customer: string; amo
 type Entry = { type: string; number: number; date: string; debit: number; credit: number; balance: number; id: string }
 type Statement = { customer: string; outstanding: number; entries: Entry[] }
 type Returnable = { saleLineId: string; productId: string | null; product: string; sold: number; returned: number; remaining: number }
-type PurchaseDetail = { receipt: { number: number }; lines: { productId: string; product: string; quantity: number; returned: number; remaining: number }[] }
+type PurchaseDetail = { receipt: { id: string; number: number; date: string; supplier: string; supplierRef: string | null; total: number; location: string }; lines: { productId: string; product: string; sku: string; quantity: number; unitCost: number; lineTotal: number; returned: number; remaining: number }[] }
 type SaleReturn = { id: string; number: number; date: string; saleNumber: number; customer: string; total: number; balanceCredit: number; cashRefund: number; reason: string | null }
 type PurchaseReturn = { id: string; number: number; date: string; supplier: string; receiptNumber: number; total: number; reason: string | null }
 type ReturnDetail<T> = { return: T; lines: { product: string; sku: string; quantity: number; amount: number }[] }
@@ -60,6 +61,14 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
   const [recKey, setRecKey] = useState(newKey)
 
   const loadAll = useCallback(async () => {
+    if (show === 'preturn') {
+      const [r, pr] = await Promise.all([
+        api<Receipt[]>('GET', '/purchases'),
+        api<PurchaseReturn[]>('GET', '/purchase-returns' + (prSearch.trim() ? '?q=' + encodeURIComponent(prSearch.trim()) : '')),
+      ])
+      setReceipts(r); setPurchaseReturns(pr)
+      return
+    }
     const [c, s, r, p, sr, pr] = await Promise.all([
       api<Customer[]>('GET', '/customers'), api<SaleRow[]>('GET', '/sales'), api<Receipt[]>('GET', '/purchases'),
       api<Payment[]>('GET', '/customer-payments'),
@@ -67,7 +76,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
       api<PurchaseReturn[]>('GET', '/purchase-returns' + (prSearch.trim() ? '?q=' + encodeURIComponent(prSearch.trim()) : '')),
     ])
     setCustomers(c); setSales(s); setReceipts(r); setPayments(p); setSaleReturns(sr); setPurchaseReturns(pr)
-  }, [srSearch, prSearch])
+  }, [srSearch, prSearch, show])
   useEffect(() => { loadAll().catch(e => setError(msg(e))) }, [loadAll])
 
   const run = async (fn: () => Promise<string>) => {
@@ -118,7 +127,7 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
   return (
     <section aria-label="Collections and returns" className="billing-screen">
       {!show && <h2>Collections and returns</h2>}
-      <button type="button" onClick={() => { setError(''); loadAll().catch(e => setError(msg(e))) }}>Refresh</button>
+      {show !== 'preturn' && <button type="button" onClick={() => { setError(''); loadAll().catch(e => setError(msg(e))) }}>Refresh</button>}
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
 
@@ -177,30 +186,56 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
       </div>}
 
       </>}
-      {v('preturn') && <>
-      <h3>Supplier return</h3>
-      <label>Return against purchase <select value={retReceipt} onChange={e => pickReceipt(e.target.value)}><option value="">Select</option>{receipts.map(r => <option key={r.id} value={r.id}>{r.date} {r.supplier} {r.total.toFixed(2)}</option>)}</select></label>
-      {recLines.map(l => <label key={l.productId}>Supplier return qty: {l.product} (remaining {l.remaining})
-        <input inputMode="decimal" value={recQty[l.productId] ?? ''} onChange={e => setRecQty({ ...recQty, [l.productId]: e.target.value })} /></label>)}
-      {recLines.length > 0 && <button type="button" onClick={() => setRecQty(Object.fromEntries(recLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>Return whole receipt</button>}
-      <label>Supplier return reason <input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
-      <button type="button" onClick={returnPurchase} disabled={!retReceipt || toLines(recQty).length === 0}>Post supplier return</button>
-
-      <h3>Supplier returns</h3>
-      <label>Search supplier returns <input value={prSearch} onChange={e => setPrSearch(e.target.value)} /></label>
-      <Paged rows={purchaseReturns} regionLabel="Supplier return history results">{page => (
-      <table aria-label="Supplier returns"><thead><tr><th>No.</th><th>Date</th><th>Supplier</th><th>Receipt</th><th>Total (INR)</th><th></th></tr></thead>
-        <tbody>{page.map(r => <tr key={r.id}><td>{r.number}</td><td>{r.date}</td><td>{r.supplier}</td><td>{r.receiptNumber}</td><td>{r.total.toFixed(2)}</td>
-          <td><button type="button" onClick={async () => setPrDetail(await api<ReturnDetail<PurchaseReturn>>('GET', '/purchase-returns/' + r.id))}>View supplier return</button></td></tr>)}</tbody></table>
-      )}</Paged>
-      {prDetail && <div role="region" aria-label="Supplier return detail">
-        <h4>Supplier return #{prDetail.return.number} against receipt #{prDetail.return.receiptNumber}</h4>
-        <p>{prDetail.return.date} - {prDetail.return.supplier}. {prDetail.return.reason}</p>
-        <ul>{prDetail.lines.map(l => <li key={l.sku}>{l.product}: {l.quantity} = {l.amount.toFixed(2)}</li>)}</ul>
-        <button type="button" onClick={() => setPrDetail(null)}>Close supplier return</button>
+      {v('preturn') && <div className="buy-return">
+        <header className="buy-screen-heading"><h2>Return to supplier</h2><p>Choose the purchase bill these goods came from.</p></header>
+        <section className="buy-return-entry">
+          <label>Original purchase
+            <select value={retReceipt} onChange={e => { void pickReceipt(e.target.value); setError(''); setDone('') }}>
+              <option value="">Select a purchase bill</option>
+              {receipts.map(r => <option key={r.id} value={r.id}>{r.date} · {r.supplier}{r.supplierRef ? ' · ' + r.supplierRef : ''} · ₹{r.total.toFixed(2)}</option>)}
+            </select>
+          </label>
+          {retReceipt && <p className="buy-return-loading" role="status">Purchase receipt selected. Loading its items…</p>}
+          {retReceipt && recLines.length > 0 && <>
+            <div className="buy-return-receipt">
+              <div><span>Supplier</span><strong>{receipts.find(r => r.id === retReceipt)?.supplier}</strong></div>
+              <div><span>Receipt no.</span><strong>#{(recLines as any).receiptNumber ?? '—'}</strong></div>
+              <div><span>Receipt date</span><strong>{receipts.find(r => r.id === retReceipt)?.date}</strong></div>
+              <div><span>Supplier invoice</span><strong>{receipts.find(r => r.id === retReceipt)?.supplierRef || '—'}</strong></div>
+              <div><span>Receipt total</span><strong>₹{receipts.find(r => r.id === retReceipt)?.total.toFixed(2)}</strong></div>
+            </div>
+            <section className="buy-return-lines">
+              <div className="buy-return-section-head"><h3>Items on this purchase</h3><button type="button" className="secondary" onClick={() => setRecQty(Object.fromEntries(recLines.filter(l => l.remaining > 0).map(l => [l.productId, String(l.remaining)])))}>Fill remaining quantities</button></div>
+              {recLines.map(l => <article className="buy-return-line" key={l.productId}>
+                <strong>{l.product}</strong><small>{l.sku}</small>
+                <dl><dt>Purchased</dt><dd>{l.quantity}</dd><dt>Already returned</dt><dd>{l.returned}</dd><dt>Remaining on receipt</dt><dd>{l.remaining}</dd></dl>
+                {l.remaining > 0 ? <label>Quantity to return<input type="number" min="0" max={l.remaining} step="0.001" inputMode="decimal" value={recQty[l.productId] ?? ''} aria-label={`Quantity to return for ${l.product}`} onChange={e => setRecQty({ ...recQty, [l.productId]: e.target.value })} /></label> : <p className="buy-return-complete">Fully returned</p>}
+                {Number(recQty[l.productId] ?? 0) > l.remaining && <p className="buy-field-error" role="alert}>Cannot exceed the remaining quantity of {l.remaining}.</p>}
+              </article>)}
+              <p className="buy-return-hint">The system also checks current stock at this location when you post the return.</p>
+            </section>
+            <label>Return reason (optional)<input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
+            <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining)}>Post supplier return</button>
+          </>}
+          {retReceipt && recLines.length === 0 && !error && <p className="buy-return-hint">Loading purchase details or no items are available.</p>}
+        </section>
+        <section className="buy-return-history">
+          <h3>Previous supplier returns</h3>
+          <label>Search supplier returns<input value={prSearch} onChange={e => setPrSearch(e.target.value)} placeholder="Supplier, return number or receipt number" /></label>
+          <Paged rows={purchaseReturns} empty="No supplier returns have been recorded.">{page => <div className="buy-history-list">{page.map(r => <article className="buy-history-card" key={r.id}>
+            <div className="buy-history-top"><strong>Return #{r.number} · {r.supplier}</strong><strong>₹{r.total.toFixed(2)}</strong></div>
+            <dl><dt>Date</dt><dd>{r.date}</dd><dt>Original receipt</dt><dd>#{r.receiptNumber}</dd><dt>Reason</dt><dd>{r.reason || '—'}</dd></dl>
+            <button type="button" className="secondary" onClick={async () => { try { setPrDetail(await api<ReturnDetail<PurchaseReturn>>('GET', '/purchase-returns/' + r.id)) } catch (e) { setError(msg(e)) } }}>View details</button>
+          </article>)}</div>}</Paged>
+          {prDetail && <div className="buy-return-detail" role="region" aria-label="Supplier return details">
+            <h3>Return #{prDetail.return.number} · Receipt #{prDetail.return.receiptNumber}</h3>
+            <p>{prDetail.return.supplier} · {prDetail.return.date}</p>
+            <p>{prDetail.return.reason || 'No reason provided'}</p>
+            <ul>{prDetail.lines.map(l => <li key={l.sku}>{l.product} · {l.quantity} × ₹{l.amount.toFixed(2)}</li>)}</ul>
+            <button type="button" className="secondary" onClick={() => setPrDetail(null)}>Close details</button>
+          </div>}
+        </section>
       </div>}
-      </>}
-
       {v('print') && <>
       <h3>Print documents</h3>
       <ul aria-label="Print sale invoices">{sales.slice(0, 10).map(s => <li key={s.id}>Sale invoice #{s.number} {printLink('sale', s.id)}</li>)}</ul>
