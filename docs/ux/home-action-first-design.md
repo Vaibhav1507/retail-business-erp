@@ -47,7 +47,7 @@ Use an action-first Home page for the day-to-day shopkeeper workflow. The first 
 - [ ] Verify real dashboard values and empty/zero values render correctly.
 - [ ] Simulate dashboard failure and confirm Retry works.
 - [x] Verify actionable reminders still render; singular/plural copy has been corrected.
-- [ ] Verify the Assistant launcher cannot cover metric cards during scrolling.
+- [x] The Home Assistant launcher is moved into document flow; verify the new mobile capture confirms no overlap.
 - [ ] Check English and Hindi layouts for wrapping and horizontal overflow, including the shortened supplier label.
 - [ ] Run web lint, unit tests, build and the Home visual audit.
 - [ ] Review the page with real shopkeeper tasks before starting Billing & Sales UX.
