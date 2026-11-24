@@ -503,7 +503,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
       <ol className="invoice-stepper" aria-label="Invoice steps">
         <li aria-current="step"><strong>1</strong> Add items</li>
-        <span aria-hidden="true" />
+        <li className="invoice-stepper-line" aria-hidden="true" />
         <li><strong>2</strong> Review</li>
       </ol>
 
