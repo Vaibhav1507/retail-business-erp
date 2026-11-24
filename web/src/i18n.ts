@@ -429,6 +429,14 @@ const en = {
   'buy.invoiceReadError': "Could not read the invoice.",
   'buy.invoiceAddProductError': "Could not add the product.",
   'buy.invoiceAddSupplierError': "Could not add the supplier.",
+  'buy.quantityFor': "Quantity to return for {product}",
+  'buy.invoicePhotoOrPdf': "Choose a photo or a PDF.",
+  'buy.invoiceOriginalPhotoSize': "The original invoice photo must be 24 MB or smaller.",
+  'buy.invoicePhotoType': "Choose a JPEG, PNG, WebP photo or a PDF.",
+  'buy.invoicePreparePhoto': "Could not prepare the photo.",
+  'buy.invoicePreparedPhotoSize': "Prepared invoice photo must be 8 MB or smaller.",
+  'buy.invoicePdfSize': "PDF must be between 1 byte and 8 MB.",
+  'buy.invoiceTotalSize': "The selected invoice pages together exceed 12 MB.",
 } as const
 
 export type MessageKey = keyof typeof en
@@ -858,6 +866,15 @@ const hi: Record<MessageKey, string> = {
   'buy.invoiceReadError': "इनवॉइस पढ़ा नहीं जा सका।",
   'buy.invoiceAddProductError': "प्रोडक्ट नहीं जोड़ा जा सका।",
   'buy.invoiceAddSupplierError': "सप्लायर नहीं जोड़ा जा सका।",
+  'buy.quantityFor': "{product} के लिए लौटाने की मात्रा",
+  'buy.invoicePhotoOrPdf': "फोटो या PDF चुनें।",
+  'buy.invoiceOriginalPhotoSize': "मूल इनवॉइस फोटो 24 MB या उससे छोटी होनी चाहिए।",
+  'buy.invoicePhotoType': "JPEG, PNG, WebP फोटो या PDF चुनें।",
+  'buy.invoicePreparePhoto': "फोटो तैयार नहीं हो सकी।",
+  'buy.invoicePreparedPhotoSize': "तैयार की गई इनवॉइस फोटो 8 MB या उससे छोटी होनी चाहिए।",
+  'buy.invoicePdfSize': "PDF 1 बाइट से 8 MB के बीच होनी चाहिए।",
+  'buy.invoiceTotalSize': "चुने गए इनवॉइस पेज कुल 12 MB से बड़े हैं।",
+  'ca.preparing': 'तैयार हो रहा है...',
 }
 
 const catalogues: Record<Lang, Record<MessageKey, string>> = { en, hi }
