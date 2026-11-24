@@ -579,7 +579,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </div>
           <div className="billing-field billing-col-6">
             <label htmlFor="billing-price">Selling price (₹) *</label>
-            <input id="billing-price" inputMode="decimal" placeholder="0.00" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />
+            <input id="billing-price" inputMode="decimal" placeholder="0.00" aria-invalid={Boolean(fieldErrors.price)} className={fieldErrors.price ? 'field-invalid' : ''} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={price} onChange={e => { setPrice(e.target.value); setFieldErrors(current => ({ ...current, price: '' })) }} />
             {fieldErrors.price && <small className="field-error">{fieldErrors.price}</small>}
           </div>
         </div>
