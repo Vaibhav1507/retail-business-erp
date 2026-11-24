@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from './api'
 import { Paged } from './Paged'
 import './billing-forms.css'
@@ -34,6 +34,8 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const returnDialogRef = useRef<HTMLDivElement>(null)
+  const cancelDialogRef = useRef<HTMLDivElement>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -54,6 +56,32 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
   }, [historyQuery])
 
   useEffect(() => { void loadData().catch(() => undefined) }, [loadData])
+
+  useEffect(() => {
+    const dialog = cancelConfirm ? cancelDialogRef.current : returnDetail ? returnDialogRef.current : null
+    if (!dialog) return
+    const previous = document.activeElement as HTMLElement | null
+    dialog.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        if (cancelConfirm) setCancelConfirm(false)
+        else setReturnDetail(null)
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null)
+      if (!focusable.length) { event.preventDefault(); dialog.focus(); return }
+      const first = focusable[0], last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (previous?.isConnected) previous.focus()
+    }
+  }, [cancelConfirm, returnDetail])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setHistoryQuery(returnSearch.trim()), 250)
@@ -276,7 +304,7 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
       </section>
 
       {returnDetail && <div className="customer-return-detail-overlay" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setReturnDetail(null) }}>
-        <div className="customer-return-detail" role="dialog" aria-modal="true" aria-labelledby="customer-return-detail-title" tabIndex={-1}>
+        <div ref={returnDialogRef} className="customer-return-detail" role="dialog" aria-modal="true" aria-labelledby="customer-return-detail-title" tabIndex={-1}>
           <div className="customer-returns-section-title"><div><h3 id="customer-return-detail-title">Return #{returnDetail.return.number}</h3><p>Against bill #{returnDetail.return.saleNumber} · {returnDetail.return.date} · {returnDetail.return.customer}</p></div><button type="button" className="secondary" onClick={() => setReturnDetail(null)}>Close</button></div>
           <p>{returnDetail.return.reason || 'No reason recorded.'}</p>
           <ul>{returnDetail.lines.map((line, index) => <li key={line.sku + index}>{line.product}: {line.quantity} · ₹{money(line.amount)}</li>)}</ul>
@@ -287,7 +315,7 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
       </div>}
 
       {cancelConfirm && selectedSale && <div className="customer-return-detail-overlay" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setCancelConfirm(false) }}>
-        <div className="customer-return-confirm" role="dialog" aria-modal="true" aria-labelledby="cancel-sale-title">
+        <div ref={cancelDialogRef} className="customer-return-confirm" role="dialog" aria-modal="true" aria-labelledby="cancel-sale-title" tabIndex={-1}>
           <h3 id="cancel-sale-title">Cancel entire sale?</h3>
           <p><strong>{selectedSale.invoiceNo ?? 'Bill ' + selectedSale.number}</strong> for {selectedSale.customer}</p>
           <p>This reverses the whole sale, restores stock and reverses the books. Use this only if the entire bill must be cancelled. For selected items, use Post customer return instead.</p>
