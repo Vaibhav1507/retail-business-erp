@@ -66,7 +66,7 @@ describe('InvoiceUpload GST handling', () => {
     const boxes = screen.getAllByLabelText('GST amount') as HTMLInputElement[]
     expect(boxes.map(b => b.value)).toEqual(['2410.17', '2166.10', '2196.61', '4498.48'])
     expect(boxes.reduce((a, b) => a + Number(b.value), 0).toFixed(2)).toBe('11271.36')
-    expect(screen.getByText(/3 line\(s\) are skipped.*GST 8861\.19 will NOT be recorded/)).toBeTruthy()
+    expect(screen.getByText(/3 line\(s\) are skipped.*GST ₹8861\.19 will NOT be recorded/)).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: /Use 1 line/ }))
     expect(used.picked).toEqual([{ productId: 'p1', quantity: 1, unitCost: 13389.83, gstAmount: 2410.17 }])
   })
@@ -110,8 +110,11 @@ describe('Procurement manual GST', () => {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: /^Product/ }), 'p1')
     await userEvent.type(screen.getByLabelText(/^Quantity/), '10')
     await userEvent.type(screen.getByLabelText(/Unit cost/), cost)
-    if (gst) await userEvent.type(screen.getByLabelText(/GST on this line/), gst)
-    await userEvent.click(screen.getByRole('button', { name: 'Add line' }))
+    if (gst) {
+      await userEvent.click(screen.getByRole('button', { name: 'Add GST details (optional)' }))
+      await userEvent.type(screen.getByLabelText('GST on this line (INR)'), gst)
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Add item' }))
   }
 
   it('sends the entered GST amount with the purchase line', async () => {
@@ -136,6 +139,6 @@ describe('Procurement manual GST', () => {
     mock(routes(() => ({ body: { total: 1000 } })))
     await addLine('100', '')
     expect(screen.queryByText(/\+ GST/)).toBeNull()
-    expect(screen.getByText(/10 × ₹100\\.00/)).toBeTruthy()
+    expect(screen.getByText(/10 × ₹100\.00/)).toBeTruthy()
   })
 })
