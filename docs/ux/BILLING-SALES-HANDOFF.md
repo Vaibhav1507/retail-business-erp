@@ -22,8 +22,8 @@
 | Order | Route | Screen | Design | Implementation |
 |---|---|---|---|---|
 | 1 | #/sell/bill | Create Invoice, review and completion | **Completed:** [Create Invoice design specification](./billing-sales-create-invoice-design.md); PR #74 compared | Candidate in PR #74; focused CI passed; group visual acceptance pending |
-| 2 | #/sell/menu | Sell landing/action hub | Not started | Not started |
-| 3 | #/sell/bills | Sales History and historical invoice detail | Not started | Existing baseline only |
+| 2 | #/sell/menu | Sell landing/action hub | **Completed:** [Sell landing design specification](./billing-sales-sell-landing-design.md) | Not started |
+| 3 | #/sell/bills | Sales History and historical invoice detail | **Completed:** [Sales History design specification](./billing-sales-sales-history-design.md) | Existing baseline only |
 | 4 | #/sell/collect | Payment collection/customer dues | Not started | Existing baseline only |
 | 5 | #/sell/return | Customer returns/cancellation | Not started | Existing baseline only |
 
@@ -75,10 +75,10 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 | Invoice interaction prototype | Done, prototype only | MagicPath link above |
 | Invoice repository design spec | **Done** | [billing-sales-create-invoice-design.md](./billing-sales-create-invoice-design.md); compared with PR #74 |
 | PR #74 invoice implementation | Candidate implemented | Draft PR; CI passed known head; final group verification pending |
-| Sell landing | Not started | Second route |
-| Sales History | Not started | Third route |
-| Collections | Not started | Fourth route |
-| Returns | Not started | Fifth route |
+| Sell landing | Design done; implementation next | Second route |
+| Sales History | Design done; implementation not started | Third route |
+| Collections | Design done; implementation not started | Fourth route |
+| Returns | Design done; implementation not started | Fifth route |
 | Full 5-route Playwright/screenshot/Axe | Deferred by agreed cadence | Run after all five redesigned and implemented |
 | Native Android/shopkeeper acceptance | Not started | After group browser verification |
 | Merge/production deployment | Not authorised | Separate explicit approval |
@@ -98,3 +98,15 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 - **PR #72:** open/draft, head `fc974e4e16ca80a14bb71156f482f333372b4600`; preserve existing audit infrastructure.
 - **Next:** Sell landing `#/sell/menu` source audit and design specification. Then Sales History, Collections and Returns in the agreed order.
 - **No merge/deployment:** neither is authorised. Native Android and shopkeeper acceptance remain pending.
+
+
+## 9. Execution update — 2026-11-24: all five design specifications complete
+
+- Repository design contracts are complete for Create Invoice, Sell landing, Sales History, Collections and Customer Returns. See the five linked route notes in section 2 and the living programme.
+- Create Invoice was compared against PR #74. PR #74 remains open/draft and its exact-head CI #45340114617 passed. Visual acceptance is deferred to the group gate.
+- Implementation begins with Sell landing `#/sell/menu`, then proceeds Sales History, Collections and Customer Returns in order.
+- The shared component/data dependencies and existing business invariants are documented in each route specification. No API or accounting change is included in the design contracts.
+- PR #75 is merged. PR #67 remains open/draft; refresh its current head and CI after this documentation update.
+- PR #72 remains open/draft; preserve its audit infrastructure and the existing 178-screenshot baseline artifact. Do not recreate the baseline.
+- Full integrated Playwright, responsive screenshot review and Axe are deferred until all five routes are implemented. Focused checks are required during each implementation slice.
+- No merge or deployment is authorised. Native Android and representative shopkeeper acceptance remain pending.
