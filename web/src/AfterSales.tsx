@@ -215,13 +215,14 @@ export function AfterSales({ reload, show }: { reload: () => void; show?: AfterP
               {recLines.map(l => <article className="buy-return-line" key={l.productId}>
                 <strong>{l.product}</strong><small>{l.sku}</small>
                 <dl><dt>Purchased</dt><dd>{l.quantity}</dd><dt>Already returned</dt><dd>{l.returned}</dd><dt>Remaining on receipt</dt><dd>{l.remaining}</dd></dl>
-                {l.remaining > 0 ? <label>Quantity to return<input type="number" min="0" max={l.remaining} step="0.001" inputMode="decimal" value={recQty[l.productId] ?? ''} aria-label={`Quantity to return for ${l.product}`} onChange={e => setRecQty({ ...recQty, [l.productId]: e.target.value })} /></label> : <p className="buy-return-complete">Fully returned</p>}
-                {Number(recQty[l.productId] ?? 0) > l.remaining && <p className="buy-field-error" role="alert}>Cannot exceed the remaining quantity of {l.remaining}.</p>}
+                {l.remaining > 0 ? <label>Quantity to return<input type="number" min="0" max={l.remaining} step="0.001" inputMode="decimal" value={recQty[l.productId] ?? ''} aria-invalid={Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0} aria-label={`Quantity to return for ${l.product}`} onChange={e => setRecQty({ ...recQty, [l.productId]: e.target.value })} /></label> : <p className="buy-return-complete">Fully returned</p>}
+                {Number(recQty[l.productId] ?? 0) > l.remaining && <p className="buy-field-error" role="alert">Cannot exceed the remaining quantity of {l.remaining}.</p>}
+                {Number(recQty[l.productId] ?? 0) < 0 && <p className="buy-field-error" role="alert">Enter zero or a positive quantity.</p>}
               </article>)}
               <p className="buy-return-hint">The system also checks current stock at this location when you post the return.</p>
             </section>
             <label>Return reason (optional)<input value={recReason} onChange={e => setRecReason(e.target.value)} /></label>
-            <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining)}>Post supplier return</button>
+            <button type="button" className="buy-return-primary" onClick={returnPurchase} disabled={toLines(recQty).length === 0 || recLines.some(l => Number(recQty[l.productId] ?? 0) > l.remaining || Number(recQty[l.productId] ?? 0) < 0)}>Post supplier return</button>
           </>}
           {retReceipt && receiptLoading && <p className="buy-return-loading" role="status">Loading purchase details…</p>}{retReceipt && recDetail && recLines.length === 0 && <p className="buy-return-hint">No purchase items are available to return on this receipt.</p>}
         </section>
