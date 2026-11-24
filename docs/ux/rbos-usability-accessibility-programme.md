@@ -1,6 +1,6 @@
 # RBOS Usability & Accessibility Programme
 
-- **Status:** BILLING & SALES REDESIGN IN PROGRESS — pre-redesign baseline audit and PR #74 exact-head CI are verified; Create Invoice implementation candidate exists; complete design specifications for the five routes and final grouped verification remain pending. Figma is optional and not a blocker.
+- **Status:** BILLING & SALES REDESIGN IN PROGRESS — Create Invoice repository design specification completed and compared with PR #74; Sell landing is next. PR #74 exact-head CI and PR #67 documentation CI are verified. Full five-route verification remains deferred until all five routes are implemented. Figma is optional and not a blocker.
 - **Repository baseline:** `main` at `17428b20c1974a0a57d00b60774d893831304e64` (24 November 2026; refresh before implementation)
 - **Scope:** Screen-by-screen usability, accessibility, responsive-layout and interaction improvements
 - **Release boundary:** This document does not authorise application-code changes, production deployment, schema changes or feature expansion.
@@ -498,7 +498,20 @@ Fix issues from the group pass and rerun affected coverage and necessary regress
 
 ### 10.9 Outstanding items
 
-- Not complete: repository design spec for Create Invoice; design specs and implementation for the other four routes; final combined five-route Playwright/screenshot/Axe verification; native Android checks; shopkeeper acceptance; merge; production deployment.
+- Completed: Create Invoice repository design specification and comparison against PR #74. Not complete: design specifications and implementation for the other four routes; final combined five-route Playwright/screenshot/Axe verification; native Android checks; shopkeeper acceptance; merge; production deployment.
 - Optional/not required: editable Figma. Existing file remains untouched.
 - Tool limitation, not a project blocker: MagicPath connected agent/API quota was exhausted at last check. Use normal editor only if available; otherwise continue code-first.
 - No known product decision blocks continuation.
+
+
+### 10.10 Execution update — 2026-11-24 (Create Invoice design gate)
+
+- **Create Invoice design specification:** completed at [billing-sales-create-invoice-design.md](./billing-sales-create-invoice-design.md). It defines task/persona, scope/non-goals, current component/API dependencies, findings, selected Concept A hierarchy, interactions, existing token/component reuse, responsive rules, key states, business invariants, acceptance criteria, focused checks and open risks.
+- **PR #74 comparison:** completed against refreshed source on branch `ux/invoice-entry-action-first`, head `72cfe96dd8b361d77123d136f1f6f12ad6ac4768`. The direction is aligned: invoice-focus workspace, contextual Scan tag, one Add product action, separate handwritten import, optional identifier disclosure and sticky summary. The customer mobile required marker/error association needs a focused check/fix; responsive, print, keyboard, Android and visual acceptance remain pending.
+- **PR #74 current status:** open/draft, not merged. Exact-head standard CI [#45340114617](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45340114617) is completed/success. This is focused automated evidence, not group-level visual acceptance.
+- **PR #75:** merged. Its Figma-optional/grouped-verification playbook is now on `main`; current main copy was fetched and read.
+- **PR #67:** remains open/draft. Documentation branch head advanced to `10574650173f7fa6ae94bcd1d93bba61a2ef4934` after adding the Create Invoice specification. Exact-head CI [#45343697012](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45343697012) completed/success on the prior head `fe6f8ca835e94c7404dfbdb51c0e5c51e2cc4902`; rerun/refresh CI after this documentation update before treating the new head as CI-verified.
+- **PR #72:** remains open/draft, head `fc974e4e16ca80a14bb71156f482f333372b4600`; retain its audit infrastructure. Do not recreate the 178-screenshot pre-redesign baseline.
+- **Next route:** Sell landing `#/sell/menu`. Inspect `SellPage` in `web/src/Pages.tsx`, route entry/exit, existing translation keys and shell behaviour. Complete its design specification before implementation.
+- **Verification cadence:** focused checks only during route implementation; full integrated Playwright journeys, responsive screenshots, visual review and Axe WCAG 2 A/AA remain deferred until all five routes are implemented.
+- **Release boundary:** no merge or deployment authorised. Native Android and shopkeeper acceptance remain separate later gates.
