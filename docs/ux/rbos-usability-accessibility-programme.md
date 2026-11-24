@@ -203,6 +203,18 @@ Capture the following using synthetic data only:
 - Long historical invoice; toolbar after scrolling; close/backdrop/Escape behaviour.
 - Browser print preview for A4 and 80 mm; verify that mobile cards, app navigation, assistant and action buttons do not print.
 
+### 4.8 Expanded-audit harness attempts — 24 November 2026
+
+| Run | Head | Result | Evidence / correction |
+|---|---|---|---|
+| [45301760436](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45301760436) | `4e87e2b` | FAILED — harness | The test installed a second dialog handler while `signup.ts` already owned one. The helper attempted to accept a dialog already handled by the other listener. The test stopped during the first invoice; no visual artifact was uploaded. |
+| [45302085474](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302085474) | `b69b669` | FAILED — harness | Same dialog-ownership failure. Removing listeners from the test did not reliably replace the helper's active handler. |
+| [45302508735](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302508735) | `7d3feac` | IN_PROGRESS at last check | Introduced a tracked dialog-handler replacement; verify result before relying on it. |
+| [45302584156](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302584156) | `84d7643` | IN_PROGRESS at last check | Switched to the documented listener-removal API; superseded by the single-listener design below. |
+| [45302914826](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45302914826) | `db9f0b5` | IN_PROGRESS at last check | Current implementation keeps exactly one dialog listener per page and changes only its active policy. This is the run to inspect first. |
+
+The failure was in the test harness, not evidence of an application invoice defect. Do not treat the two failed attempts as application test failures. The visual audit remains NOT_VERIFIED until a complete artifact is uploaded and reviewed.
+
 ### 4.7 First route-audit artifact review — 24 November 2026
 
 **Run:** [RBOS Visual Audit #2](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45299902320)  
@@ -273,7 +285,7 @@ Do not use a tool simply to satisfy a checklist. Record the contribution and the
 | Sequence | Tool | Status for this programme | Initial assessment |
 |---|---|---|---|
 | 1 | ChatGPT / repository source analysis | **Used** | Useful for establishing the current implementation and evidence-backed billing questions. Must be followed by live visual/user evidence. |
-| 2 | RBOS Visual Audit + Playwright | **IN_PROGRESS** | Run #2 (45299902320) route artifact reviewed: 10 screenshots, five routes × two viewports. The first suite exposed a data-readiness defect (Sales History mobile captured `Loading…`; tablet showed an unseeded empty list). PR #72 adds deterministic data, nested-state capture and enforced checks; its new run/artifact must be reviewed before this stage is accepted. |
+| 2 | RBOS Visual Audit + Playwright | **IN_PROGRESS** | Run #2 (45299902320) route artifact reviewed: 10 screenshots, five routes × two viewports. It exposed a data-readiness defect (Sales History mobile captured `Loading…`; tablet showed an unseeded empty list). PR #72 adds deterministic data, nested-state capture and enforced checks. Two early runs (45301760436 and 45302085474) stopped at invoice posting because the signup helper and visual test competed to handle the same browser dialog; the helper now uses one mutable dialog policy/listener per page. Latest visual run 45302914826 is in progress and is not yet accepted. |
 | 3 | MagicPath | **NOT_STARTED** | Wait for the expanded RBOS Visual Audit findings and confirmed design brief. Do not use the Product Design plugin; MagicPath and Figma remain in the workflow. |
 | 4 | Figma | **Not started** | Wait until a design direction is selected; then formalise the approved direction. |
 | 5 | GitHub implementation | **NOT_STARTED** | PR #72 is audit-test/workflow infrastructure only. No Billing & Sales application redesign or production deployment has been started or authorised by this programme document. |
@@ -379,10 +391,10 @@ A screen phase is not documentation-complete until its decision log, deferral li
 - **Verified finding:** the mobile Sales History screenshot captured `Loading…`, while the tablet screenshot showed `No bills found` because the test did not seed a sale. Therefore the green run did not prove a loaded history screen.
 - **Verified capture limitation:** the first audit captured only initial route states; it did not exercise bill review/post, dialogs, extraction, payment, return or print flows. Full-page screenshots also place fixed navigation at its viewport coordinate, so scroll-position captures are needed to review overlays accurately.
 - **Decided:** retain the existing Home audit as a separate scope; add a dedicated deterministic Billing & Sales suite, seed synthetic data, mock AI extraction and make accessibility/layout checks fail CI. No Product Design plugin; MagicPath and Figma remain the next design stages after audit acceptance.
-- **IN_PROGRESS:** PR #72 (`test/billing-sales-visual-audit-coverage`) adds the interaction suite and PR-triggered workflow. Its CI and visual artifact are not yet accepted.
+- **IN_PROGRESS:** PR #72 (`test/billing-sales-visual-audit-coverage`) adds the interaction suite and PR-triggered workflow. The early failures were harness dialog-ownership defects; the current single-listener correction is running in visual audit #45302914826. Its CI and complete visual artifact are not yet accepted.
 - **Not started:** MagicPath exploration, editable Figma design and Billing & Sales application implementation.
 - **Out of scope:** unrelated Home redesign, Stock, Purchasing, global navigation and backend/business-rule changes unless verified as a dependency.
 - **Uncovered until evidence is added/reviewed:** WhatsApp delivery/status variants beyond the seeded state; collection allocation to a specific bill; extraction failure/recovery; real Android camera permission, printer/share sheet and TalkBack; browser-native confirmation is asserted by dialog text but cannot be captured as a page screenshot.
 - **Existing findings:** BILL-01…BILL-12 remain source-based findings awaiting current-state visual verification and re-prioritisation; do not silently close them based on code inspection alone.
-- **Next action:** review PR #72's run `45301760436`, inspect the full screenshot/report artifact, resolve failures and close the remaining coverage gaps before MagicPath.
+- **Next action:** review PR #72's latest visual run `45302914826` (and CI run `45302914622`); inspect the complete screenshot/report artifact, resolve harness or UI findings and close the remaining coverage gaps before MagicPath.
 - **Documentation branch:** docs/rbos-usability-accessibility-programme (PR #67). Keep related UX programme documentation updates on this existing branch/PR; PR #72 is a separate, justified test/workflow implementation PR.
