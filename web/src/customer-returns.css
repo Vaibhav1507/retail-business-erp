@@ -56,3 +56,28 @@
   .customer-return-confirm-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
   .customer-return-confirm-actions button { width: 100%; }
 }
+
+
+/* Mobile returns: keep the entry task primary and history collapsed until requested. */
+.customer-returns-screen.billing-screen { max-width: 980px; display: grid; grid-template-columns: minmax(0,1fr); align-items: stretch; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.customer-returns-heading h2 { margin: 0 0 4px; font-size: 21px; }
+.customer-return-history { display: grid; gap: 12px; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow-1); }
+.customer-return-history-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 14px 16px; cursor: pointer; list-style: none; }
+.customer-return-history-summary::-webkit-details-marker { display: none; }
+.customer-return-history-summary > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.customer-return-history-summary strong { color: var(--ink); font-size: 17px; }
+.customer-return-history-summary small { color: var(--muted); font-size: 13px; }
+.customer-return-history-toggle { flex: 0 0 auto; color: var(--brand-dark); font-size: 13px; font-weight: 700; }
+.customer-return-history[open] .customer-return-history-toggle { font-size: 0; }
+.customer-return-history[open] .customer-return-history-toggle::after { content: 'Hide history'; font-size: 13px; }
+.customer-return-history-content { display: grid; gap: 12px; padding: 0 16px 16px; }
+.customer-return-history-content .customer-returns-section-title > button { width: auto; min-width: 104px; justify-self: end; }
+.customer-return-history-content .billing-field { min-width: 0; }
+@media (max-width: 700px) {
+  .customer-returns-screen.billing-screen { gap: 12px; }
+  .customer-return-form { padding: 14px; }
+  .customer-return-history-summary { min-height: 60px; padding: 12px 14px; }
+  .customer-return-history-content { padding: 0 14px 14px; }
+  .customer-return-history-content .customer-returns-section-title { align-items: center; }
+  .customer-return-history-content .customer-returns-section-title > button { width: auto; min-width: 104px; justify-self: end; }
+}

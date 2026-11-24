@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from './api'
 import { Paged } from './Paged'
+import { SearchableSelect } from './SearchableSelect'
 import './billing-forms.css'
 import './customer-returns.css'
 
@@ -208,18 +209,26 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
   return (
     <section className="billing-screen customer-returns-screen" aria-label="Customer returns">
       <div className="customer-returns-heading">
-        <h3>Customer returns</h3>
+        <h2>Customer returns</h2>
         <p>Return items from an earlier bill.</p>
       </div>
 
       <form className="customer-return-form billing-card" aria-label="Return items from a sale" onSubmit={postReturn}>
-        <div className="billing-field">
-          <label htmlFor="return-sale">Choose the original bill</label>
-          <select id="return-sale" value={retSale} onChange={e => { void pickSale(e.target.value) }}>
-            <option value="">Select a sale</option>
-            {eligibleSales.map(s => <option key={s.id} value={s.id}>{s.invoiceNo ?? 'Bill ' + s.number} · {s.date ?? ''} · {s.customer} · ₹{money(s.total)}</option>)}
-          </select>
-        </div>
+        <SearchableSelect
+          id="return-sale"
+          label="Choose the original bill"
+          value={retSale}
+          options={eligibleSales.map(s => ({
+            value: s.id,
+            label: s.invoiceNo ?? 'Bill ' + s.number,
+            description: [s.date, s.customer, '₹' + money(s.total)].filter(Boolean).join(' · '),
+            searchText: [s.invoiceNo, s.number, s.date, s.customer].filter(Boolean).join(' ')
+          }))}
+          onChange={value => { void pickSale(value) }}
+          placeholder="Search by bill number or customer"
+          emptyMessage="No matching eligible bills."
+          disabled={loading || eligibleSales.length === 0}
+        />
 
         {loading && <p className="customer-returns-muted" role="status">Loading sales and return history…</p>}
         {!loading && eligibleSales.length === 0 && <p className="customer-returns-muted">No eligible sales found. A return must be linked to an earlier sale that has not been cancelled.</p>}
@@ -278,11 +287,16 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
         <button type="button" className="customer-return-danger" disabled={submitting} onClick={() => setCancelConfirm(true)}>Cancel entire sale</button>
       </section>}
 
-      <section className="customer-return-history" aria-label="Customer return history">
-        <div className="customer-returns-section-title">
-          <div><h3>Customer return history</h3><p>Find a return already recorded.</p></div>
-          <button type="button" className="secondary" disabled={loading} onClick={() => void loadData().catch(() => undefined)}>Refresh</button>
-        </div>
+      <details className="customer-return-history" aria-label="Customer return history">
+        <summary className="customer-return-history-summary">
+          <span><strong>Customer return history</strong><small>Find a return already recorded.</small></span>
+          <span className="customer-return-history-toggle">Show history</span>
+        </summary>
+        <div className="customer-return-history-content" role="region" aria-label="Customer return history records">
+          <div className="customer-returns-section-title">
+            <span><small>Previously recorded returns</small></span>
+            <button type="button" className="secondary" disabled={loading} onClick={() => void loadData().catch(() => undefined)}>Refresh</button>
+          </div>
         <div className="billing-field">
           <label htmlFor="customer-return-search">Search customer returns</label>
           <input id="customer-return-search" type="search" value={returnSearch} onChange={e => setReturnSearch(e.target.value)} placeholder="Customer or return number" />
@@ -306,7 +320,8 @@ export function CustomerReturns({ reload }: { reload: () => void }) {
             </ul>
           </>
         )}</Paged>
-      </section>
+        </div>
+      </details>
 
       {returnDetail && <div className="customer-return-detail-overlay" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setReturnDetail(null) }}>
         <div ref={returnDialogRef} className="customer-return-detail" role="dialog" aria-modal="true" aria-labelledby="customer-return-detail-title" tabIndex={-1}>
