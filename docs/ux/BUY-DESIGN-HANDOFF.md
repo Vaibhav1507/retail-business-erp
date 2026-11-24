@@ -225,14 +225,16 @@ No backend changes are planned.
 | Competitor and accessibility research | Complete |
 | Four screen design specifications | Complete |
 | Canonical branch | Created — `ux/buy-four-screen-redesign` |
-| Implementation | First pass present on all four screens; focused verification pending |
-| Focused frontend tests/build/lint | Pending — not run from this GitHub-only editing session |
-| Playwright | Explicitly not required for this task |
-| Updated Android screenshot review | Pending |
-| Real-device acceptance | Pending |
-| User acceptance | Pending |
-| PR | Draft #81 opened; checks pending |
-| Merge / production | Not authorised |
+| Implementation | Complete first implementation pass across all four existing Buy routes |
+| Frontend verification | Passed on PR head: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
+| Backend verification | Passed: .NET solution build, backend unit tests, deployment Docker image build |
+| PostgreSQL integration | Passed: disposable database bootstrap, migrations and integration tests |
+| Playwright | Explicitly not run, per user instruction |
+| Updated Android screenshot review | Pending — user will verify after production deployment and provide feedback |
+| Real-device acceptance | Pending user verification |
+| User acceptance | Pending user verification |
+| PR | #81 ready for review; all required CI checks green |
+| Merge / production | Not performed here; awaiting the user's merge/deployment step |
 
 ## 11. Research findings
 
