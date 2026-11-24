@@ -110,3 +110,25 @@ Keep scope to these five routes and necessary shared interactions. Home is alrea
 - PR #72 remains open/draft; preserve its audit infrastructure and the existing 178-screenshot baseline artifact. Do not recreate the baseline.
 - Full integrated Playwright, responsive screenshot review and Axe are deferred until all five routes are implemented. Focused checks are required during each implementation slice.
 - No merge or deployment is authorised. Native Android and representative shopkeeper acceptance remain pending.
+
+
+## 2026-11-24 handoff checkpoint
+
+### Scope and implementation
+- Five routes are implemented in PR #74: Create Invoice, Sell landing, Sales History, Collections and Customer Returns.
+- Current PR #74 head: `b5d4236a8c45c552fbb034d328d1b7dd20a8c5a8` on `ux/invoice-entry-action-first`.
+- PR #72 was merged to main as `87b1c6892e7a1ad2251d207ab463a20c72f8067f`; the visual-audit workflow and shared accessibility improvements are integrated into the PR #74 branch through merge commit `50185a1a7bfc65a78ca3b626fb5efa0de9ba25d5`.
+- The audit journey was updated to use the redesigned Sell hub, invoice tag-photo source picker, mobile/desktop Sales History cards/table, Collections form, Customer Returns flow and in-app whole-sale cancellation confirmation.
+
+### Verification status at this checkpoint
+- Frontend: TypeScript, **207 tests / 22 files**, lint, build and dependency audit passed on [CI run #45359742851](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45359742851).
+- Backend build/unit tests and PostgreSQL integration were still running when this checkpoint was written.
+- Full five-route Playwright/Axe run: [#45359742608](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45359742608), still running.
+- PR #72's 178-screenshot pre-redesign run #45316812990 remains the historical baseline; do not repeat it. Only the current post-redesign run can support group visual acceptance.
+- PR #74 remains draft/open and has not been merged. No deployment has been performed.
+
+### Immediate next actions
+1. Finish the exact-head standard CI and integrated visual/Axe run.
+2. Download and inspect the current audit report/contact sheets; fix any functional, responsive, overflow, touch-target or Axe failures and rerun affected coverage.
+3. If all gates pass, mark PR #74 ready and merge it; do not deploy without separate approval.
+4. Keep native Android camera/gallery permissions, printer/share sheet, TalkBack and shopkeeper acceptance as separate post-merge checks.
