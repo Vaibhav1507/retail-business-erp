@@ -128,6 +128,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   })
   const desktopPage = await desktopContext.newPage()
   desktopPage.on('pageerror', e => pageErrors.push('desktop: ' + e.message))
+  desktopPage.on('dialog', async d => { dialogs.push({ type: d.type(), message: d.message(), dismissed: false }); await d.accept() })
   for (const route of routes) {
     await desktopPage.goto('/#/' + route)
     await ready(desktopPage, route)
