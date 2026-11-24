@@ -1,11 +1,11 @@
 # RBOS Buy section — design handoff
 
-**Status:** Four screen design specifications finalized; implementation changes are present for all four screens; focused checks and screenshot acceptance remain pending.  
+**Status:** Four screen design specifications finalized; first implementation pass is present for all four screens; focused checks and screenshot acceptance remain pending.  
 **Last reviewed:** 2026-11-24  
 **Repository:** Vaibhav1507/retail-business-erp  
 **Design baseline:** main at b180f59793f265024650731a1f2bd89ead29b342  
 **Canonical branch:** ux/buy-four-screen-redesign  
-**PR:** Not opened yet; one PR will be opened after implementation and focused checks.  
+**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) (draft).  
 **Visual acceptance:** Pending updated Android screenshots from the user.  
 **Merge / production:** Not authorised.
 
@@ -145,7 +145,10 @@ Detailed contract: docs/ux/buy-return-to-supplier-design.md.
 - Pay Supplier: added explicit searchable supplier selection, prominent balance/amount, method radio choices, optional bill allocation and statement disclosure. Corrected the frontend request to send the existing backend `allocations` contract; allocation is capped to `min(payment amount, bill open amount)`, with excess left unallocated. Backend DTO/service and accounting logic unchanged.
 - Past Purchases: replaced dense purchase/payment tables with separate mobile cards; retained bill-copy links and supplier statement access.
 - Return to Supplier: implemented receipt-first selection, receipt context, purchased/returned/remaining quantities, quantity bounds, secondary fill-remaining action, optional reason, primary post action and separate searchable history/detail. `show=preturn` now loads only purchases and supplier returns rather than customer/sales datasets.
-- Remaining: add focused tests, run frontend build/lint/unit tests, inspect code for regressions, update Hindi copy for the new Pay/History/Return labels, and review updated Android screenshots. Playwright remains excluded per user instruction.
+- Added English and Hindi copy for the new Buy labels and validation messages.
+- Pay Supplier and Past Purchases now require an explicit supplier selection for supplier-specific views; statement state is retained after data refresh.
+- Remaining: run focused frontend tests, TypeScript, lint and build; inspect all resulting failures; review updated Android screenshots. Playwright remains excluded per user instruction.
+- The draft PR currently has no reported status checks/workflow runs in the GitHub response; this is not a passing CI result.
 
 ## 7. Functional findings, separately tracked
 
@@ -220,14 +223,14 @@ No backend changes are planned.
 | Six baseline Android screenshots reviewed | Complete |
 | Competitor and accessibility research | Complete |
 | Four screen design specifications | Complete |
-| Canonical branch | Created |
-| Implementation | In progress — code changes present on all four screens; not yet build/test verified |
+| Canonical branch | Created — `ux/buy-four-screen-redesign` |
+| Implementation | First pass present on all four screens; focused verification pending |
 | Focused frontend tests/build/lint | Pending — not run from this GitHub-only editing session |
 | Playwright | Explicitly not required for this task |
 | Updated Android screenshot review | Pending |
 | Real-device acceptance | Pending |
 | User acceptance | Pending |
-| PR | Not opened — pending focused checks |
+| PR | Draft #81 opened; checks pending |
 | Merge / production | Not authorised |
 
 ## 11. Research findings
