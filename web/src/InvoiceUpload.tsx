@@ -1,5 +1,6 @@
 import './invoice-upload.css'
 import { useState } from 'react'
+import { t as tr } from './i18n'
 import { api, apiForm } from './api'
 
 type Opt = { id: string; name: string }
@@ -98,7 +99,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
 
   const pick = async (files: File[]) => {
     if (files.length === 0) return
-    if (files.length > 6) { setError('Choose at most 6 pages of one invoice.'); return }
+    if (files.length > 6) { setError(tr('buy.invoiceMaxPages')); return }
     setBusy(true); setError(''); setDraft(null)
     try {
       const pages = await Promise.all(files.map(prepareMultipartPage))
@@ -111,7 +112,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
       setRows(withSpreadTax(d.lines.map(l => ({ description: l.description, productId: l.productId ?? '', qty: l.quantity?.toString() ?? '',
         cost: l.unitCost?.toString() ?? '', gst: l.gst?.toString() ?? '', category: l.category ?? undefined, brand: l.brand ?? undefined })), d.taxAmount ?? 0))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not read the invoice.')
+      setError(e instanceof Error ? e.message : tr('buy.invoiceReadError'))
     } finally {
       setBusy(false)
     }
@@ -132,7 +133,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
       }
       onProductAdded?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not add the product.')
+      setError(e instanceof Error ? e.message : tr('buy.invoiceAddProductError'))
     }
     return made
   }
@@ -150,7 +151,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
       const s = await api<{ id: string }>('POST', '/suppliers', { name })
       setExtraSup(x => [...x, { id: s.id, name }]); setSupplierId(s.id); onSupplierAdded?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not add the supplier.')
+      setError(e instanceof Error ? e.message : tr('buy.invoiceAddSupplierError'))
     }
   }
   const unmatched = rows.filter(r => !r.productId)
@@ -177,57 +178,57 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
   }
 
   return (
-    <div role="region" aria-label="Read invoice" className="invoice-upload">
+    <div role="region" aria-label={tr('buy.invoiceRead')} className="invoice-upload">
       <label className="invoice-upload-pick">
-        Upload invoice photo or PDF (optional). Select all pages of one invoice together.
+        {tr('buy.invoiceUpload')}
         <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple disabled={busy} onChange={e => { void pick(Array.from(e.target.files ?? [])); e.target.value = '' }} />
       </label>
-      {busy && <p role="status">Reading invoice...</p>}
+      {busy && <p role="status">{tr('buy.invoiceReading')}</p>}
       {error && <p role="alert">{error}</p>}
       {draft && (
         <div className="invoice-upload-review">
           <p className="invoice-upload-meta">
-            {draft.supplierName ? `Supplier: ${draft.supplierName}` : 'Supplier not found'}
-            {draft.invoiceNumber ? ` | Invoice ${draft.invoiceNumber}` : ''}
-            {draft.date ? ` | ${draft.date}` : ''}
-            {draft.taxAmount != null ? ` | GST ${draft.taxAmount.toFixed(2)}` : ''}
-            {draft.total != null ? ` | Total ${draft.total.toFixed(2)}` : ''}
+            {draft.supplierName ? `${tr('buy.invoiceSupplier')}: ${draft.supplierName}` : tr('buy.invoiceNotFound')}
+            {draft.invoiceNumber ? ` | ${tr('buy.invoiceMetadataNumber')} ${draft.invoiceNumber}` : ''}
+            {draft.date ? ` | ${tr('buy.invoiceDate')} ${draft.date}` : ''}
+            {draft.taxAmount != null ? ` | ${tr('buy.invoiceGst')} ${draft.taxAmount.toFixed(2)}` : ''}
+            {draft.total != null ? ` | ${tr('buy.invoiceTotal')} ${draft.total.toFixed(2)}` : ''}
           </p>
-          <label>Supplier
-            <select aria-label="Supplier for this invoice" value={supplierId} onChange={e => { void chooseSupplier(e.target.value) }}>
-              <option value="">{draft.supplierName ? 'Choose supplier' : 'No supplier'}</option>
+          <label>{tr('buy.invoiceSupplier')}
+            <select aria-label={tr('buy.invoiceSupplierFor')} value={supplierId} onChange={e => { void chooseSupplier(e.target.value) }}>
+              <option value="">{draft.supplierName ? tr('buy.invoiceChooseSupplier') : tr('buy.invoiceNoSupplier')}</option>
               {draft.supplierName && <option value={NEW}>+ Add "{draft.supplierName}" as new supplier</option>}
               {supOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
           {draft.warnings.length > 0 && <ul className="invoice-upload-warn">{draft.warnings.map(w => <li key={w}>{w}</li>)}</ul>}
-          {skipped.length > 0 && <p role="status" className="invoice-upload-warn">{skipped.length} line(s) are skipped: cost {skippedNet.toFixed(2)} and GST {skippedGst.toFixed(2)} will NOT be recorded. Choose a product for each line to record the full invoice.</p>}
+          {skipped.length > 0 && <p role="status" className="invoice-upload-warn">{tr('buy.invoiceSkipped', { count: skipped.length, cost: skippedNet.toFixed(2), gst: skippedGst.toFixed(2) })}</p>}
           <div className="table-scroll">
             <table>
-              <thead><tr><th>On invoice</th><th>Product</th><th>Quantity</th><th>Unit cost</th><th>GST amount</th></tr></thead>
+              <thead><tr><th>{tr('buy.invoiceOnInvoice')}</th><th>{tr('buy.invoiceProduct')}</th><th>{tr('buy.invoiceQuantity')}</th><th>{tr('buy.invoiceUnitCost')}</th><th>{tr('buy.invoiceGstAmount')}</th></tr></thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={i}>
-                    <td data-label="On invoice">{r.description}</td>
+                    <td data-label={tr('buy.invoiceOnInvoice')}>{r.description}</td>
                     <td>
-                      <select aria-label={`Product for ${r.description}`} value={r.productId} onChange={e => { void choose(i, e.target.value) }}>
-                        <option value="">Skip this line</option>
+                      <select aria-label={`${tr('buy.invoiceProduct')} · ${r.description}`} value={r.productId} onChange={e => { void choose(i, e.target.value) }}>
+                        <option value="">{tr('buy.invoiceSkipLine')}</option>
                         <option value={NEW}>+ Add "{r.description}" as new product</option>
                         {options.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     </td>
-                    <td data-label="Quantity"><input aria-label="Quantity" inputMode="decimal" value={r.qty} onChange={e => edit(i, { qty: e.target.value })} /></td>
-                    <td data-label="Unit cost"><input aria-label="Unit cost" inputMode="decimal" value={r.cost} onChange={e => edit(i, { cost: e.target.value })} /></td>
-                    <td data-label="GST amount"><input aria-label="GST amount" inputMode="decimal" value={r.gst} onChange={e => edit(i, { gst: e.target.value })} /></td>
+                    <td data-label={tr('buy.invoiceQuantity')}><input aria-label={tr("buy.invoiceQuantity")} inputMode="decimal" value={r.qty} onChange={e => edit(i, { qty: e.target.value })} /></td>
+                    <td data-label={tr('buy.invoiceUnitCost')}><input aria-label={tr("buy.invoiceUnitCost")} inputMode="decimal" value={r.cost} onChange={e => edit(i, { cost: e.target.value })} /></td>
+                    <td data-label={tr('buy.invoiceGstAmount')}><input aria-label={tr("buy.invoiceGstAmount")} inputMode="decimal" value={r.gst} onChange={e => edit(i, { gst: e.target.value })} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="invoice-upload-actions">
-            {unmatched.length > 0 && <button type="button" className="secondary" onClick={() => { void addAll() }}>Add {unmatched.length} unmatched as new products</button>}
-            <button type="button" onClick={apply} disabled={valid.length === 0}>Use {valid.length} line{valid.length === 1 ? '' : 's'}</button>
-            <button type="button" className="secondary" onClick={() => { setDraft(null); setRows([]) }}>Discard</button>
+            {unmatched.length > 0 && <button type="button" className="secondary" onClick={() => { void addAll() }} >{tr('buy.invoiceAddUnmatched', { count: unmatched.length })}</button>}
+            <button type="button" onClick={apply} disabled={valid.length === 0}>{valid.length === 1 ? tr('buy.invoiceUseOne') : tr('buy.invoiceUseMany', { count: valid.length })}</button>
+            <button type="button" className="secondary" onClick={() => { setDraft(null); setRows([]) }}>{tr('buy.invoiceDiscard')}</button>
           </div>
         </div>
       )}
