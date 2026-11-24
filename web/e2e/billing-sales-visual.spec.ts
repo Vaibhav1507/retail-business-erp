@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { signUp, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
+import { signUp, setDialogHandler, randomMobile, openAddProduct, chooseCategory, createProductAndVerify, postInvoice, expectInvoiceSaved } from './signup'
 
 const stamp = Date.now().toString(36)
 const owner = 'e2e-audit-' + stamp + '@example.test'
@@ -87,8 +87,7 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   // signUp installs its own navigation-confirm handler. Replace it after signup so only one
   // listener handles each dialog during the rest of this audit.
   await signUp(page, { email: owner, businessName: business })
-  page.removeAllListeners('dialog')
-  page.on('dialog', async d => {
+  setDialogHandler(page, async d => {
     dialogs.push({ type: d.type(), message: d.message(), dismissed: false })
     await d.accept()
   })
@@ -364,9 +363,8 @@ test('Billing & Sales: exhaustive route and interaction-state visual audit', asy
   await page.getByRole('button', { name: 'Close return' }).click()
 
   // Browser-native confirm cannot be screenshotted; verify its exact wording and dismiss it.
-  page.removeAllListeners('dialog')
   let cancelMessage = ''
-  page.once('dialog', async d => { cancelMessage = d.message(); dialogs.push({ type: d.type(), message: d.message(), dismissed: true }); await d.dismiss() })
+  setDialogHandler(page, async d => { cancelMessage = d.message(); dialogs.push({ type: d.type(), message: d.message(), dismissed: true }); await d.dismiss() })
   await returns.getByRole('button', { name: 'Cancel entire sale' }).click()
   expect(cancelMessage).toContain('Cancel this whole sale?')
 
