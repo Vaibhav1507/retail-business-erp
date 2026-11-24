@@ -596,7 +596,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <input id="billing-model" autoComplete="off" placeholder="Enter model if available" value={modelText} onChange={e => setModelText(e.target.value)} />
           </div>
           <div className="billing-field billing-col-6">
-            <label htmlFor="billing-qty">{tr('bill.qty')} *</label>
+            <label htmlFor="billing-qty">Quantity *</label>
             <input id="billing-qty" aria-invalid={Boolean(fieldErrors.quantity)} className={fieldErrors.quantity ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => { setQty(e.target.value); setFieldErrors(current => ({ ...current, quantity: '' })) }} />
             {fieldErrors.quantity && <small className="field-error">{fieldErrors.quantity}</small>}
           </div>
