@@ -109,7 +109,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   const selectedBill = openBills.find(b => b.id === billId)
   const allocationAmount = selectedBill ? Math.min(Number(amount) || 0, selectedBill.open) : 0
   const payOwed = suppliers.find(s => s.id === paySup)?.owed ?? 0
-  const amountError = amount.trim() === '' ? tr('buy.amountRequired') : !(Number(amount) > 0) ? tr('buy.amountPositive') : !/^\\d+(?:\\.\\d{1,2})?$/.test(amount) ? tr('buy.amountDecimals') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''
+  const amountError = amount.trim() === '' ? tr('buy.amountRequired') : !(Number(amount) > 0) ? tr('buy.amountPositive') : !/ ^\d+(?:\.\d{1,2})?$/.test(amount) ? tr('buy.amountDecimals') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''.test(amount) ? tr('buy.amountDecimals') : Number(amount) > payOwed ? tr('buy.amountBalance') : ''
   useEffect(() => { setBillId(''); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
   const showStatement = () => run(async () => { const id = v('pay') ? paySup : historySupplierId; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   const owed = suppliers.find(s => s.id === sup)?.owed ?? 0
