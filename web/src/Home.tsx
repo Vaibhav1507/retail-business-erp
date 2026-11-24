@@ -18,10 +18,10 @@ type Reminder = { kind: string; count: number | null }
 type QuickAction = { icon: string; label: MessageKey; hint: MessageKey; href: string }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { icon: '＋', label: 'area.buy', hint: 'area.buyHint', href: '#/buy/receive' },
-  { icon: '▦', label: 'home.checkStock', hint: 'area.stockHint', href: '#/stock' },
-  { icon: '₹', label: 'home.collectPayment', hint: 'home.customerDues', href: '#/sell/collect' },
-  { icon: '＋', label: 'home.addCustomer', hint: 'area.customersHint', href: '#/parties/customers' },
+  { icon: '＋', label: 'area.buy', hint: 'home.purchaseHint', href: '#/buy/receive' },
+  { icon: '▦', label: 'home.checkStock', hint: 'home.checkStockHint', href: '#/stock' },
+  { icon: '₹', label: 'home.collectPayment', hint: 'home.collectPaymentHint', href: '#/sell/collect' },
+  { icon: '＋', label: 'home.addCustomer', hint: 'home.addCustomerHint', href: '#/parties/customers' },
 ]
 
 function MetricCard({ label, value, note, href }: { label: string; value: string; note?: string; href: string }) {
@@ -129,7 +129,7 @@ export function HomePage({ businessName }: { businessName?: string }) {
             <p key={item.kind}>{t('rem.orders', { n: item.count ?? 0 })}</p>
           ))}
           {visibleReminders.filter((item) => item.kind === 'dayClosing').map((item) => (
-            <p key={item.kind}>{t('rem.dayClosing', { n: item.count ?? 0 })}</p>
+            <p key={item.kind}>{item.count === 1 ? t('rem.dayClosingOne') : t('rem.dayClosingMany', { n: item.count ?? 0 })}</p>
           ))}
         </section>
       )}
