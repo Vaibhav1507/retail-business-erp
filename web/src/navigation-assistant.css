@@ -41,3 +41,13 @@
 .assistant-status .navigation-voice-note{font-size:11px;margin:0}
 .assistant-status .voice-progress{gap:2px;font-size:10px}
 @media(max-height:620px){.navigation-assistant{height:calc(100dvh - var(--nav-h) - env(safe-area-inset-top) - 84px);min-height:0;grid-template-rows:auto auto minmax(0,1fr) auto 62px}.assistant-status{height:62px;min-height:62px;max-height:62px}}
+
+
+/* The Home launcher is part of page flow; its expanded panel remains an overlay. */
+.shell:has(.home-dashboard) .assistant-launcher {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  align-self: flex-end;
+  margin: 0 16px calc(var(--nav-h) + 12px + env(safe-area-inset-bottom));
+}
