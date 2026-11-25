@@ -33,14 +33,14 @@ beforeEach(() => {
   mocks.passkeyEnabled.mockResolvedValue(false)
 })
 
-describe('RBOS authentication screens', () => {
+describe('Dhandha Mitra authentication screens', () => {
   it('renders the action-first sign-in and uses the existing email/password endpoint', async () => {
     const user = userEvent.setup()
     const onDone = vi.fn()
     render(<AccountAccess onDone={onDone} />)
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-    expect(screen.getByText('Retail Business OS')).toBeInTheDocument()
+    expect(screen.getByText('Dhandha Mitra')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sign in with passkey' })).not.toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Email address'), 'owner@example.test')

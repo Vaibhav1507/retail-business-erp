@@ -33,7 +33,7 @@ public static class AuthPasskeyEndpoints
             var passwordCheck = await signIn.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
             if (!passwordCheck.Succeeded) return Results.Unauthorized();
             var userId = await users.GetUserIdAsync(user);
-            var name = user.UserName ?? user.Email ?? "RBOS user";
+            var name = user.UserName ?? user.Email ?? "Dhandha Mitra user";
             var options = await signIn.MakePasskeyCreationOptionsAsync(new PasskeyUserEntity
             {
                 Id = userId,

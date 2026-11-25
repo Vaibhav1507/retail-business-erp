@@ -470,7 +470,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     <section className="invoice-wrap" aria-label="Pending offline invoice">
       <h2>Bill saved on this device</h2>
       <p role="status"><strong>Pending sync</strong> — this is a draft, not a posted invoice. It has no official invoice number yet.</p>
-      <p>When the connection returns, RBOS will submit it using the same idempotency key. The server will recheck stock, tax, prices, permissions and accounting rules before assigning an invoice number.</p>
+      <p>When the connection returns, Dhandha Mitra will submit it using the same idempotency key. The server will recheck stock, tax, prices, permissions and accounting rules before assigning an invoice number.</p>
       <button type="button" onClick={() => setStep('form')}>Back to billing</button>
     </section>
   )
@@ -624,7 +624,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
         {salesInvoiceDraft && <div className="invoice-extraction-review" role="region" aria-label="Review extracted sales invoice">
           <h3>Review extracted invoice before adding it to the bill</h3>
-          {salesInvoiceDraft.invoiceNumber && <p>Source invoice reference: <strong>{salesInvoiceDraft.invoiceNumber}</strong> (not the RBOS invoice number)</p>}
+          {salesInvoiceDraft.invoiceNumber && <p>Source invoice reference: <strong>{salesInvoiceDraft.invoiceNumber}</strong> (not the Dhandha Mitra invoice number)</p>}
           {salesInvoiceDraft.total != null && <p>Handwritten total detected: {money(salesInvoiceDraft.total)} INR — verify it against the line values.</p>}
           {salesInvoiceWarnings.length > 0 && <ul className="billing-hint">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
           {salesInvoiceDraft.lines.length === 0 && <p>No usable lines were detected. You can still enter the bill manually.</p>}

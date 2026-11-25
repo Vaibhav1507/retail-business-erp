@@ -2,11 +2,11 @@ import './auth-access.css'
 
 export function AuthBrand() {
   return (
-    <header className="auth-brand" aria-label="RBOS Retail Business OS">
-      <span className="auth-brand-mark" aria-hidden="true">R</span>
+    <header className="auth-brand" aria-label="Dhandha Mitra">
+      <img className="auth-brand-mark" src="/favicon.svg" alt="" width="44" height="44" />
       <span className="auth-brand-copy">
-        <strong>RBOS</strong>
-        <span>Retail Business OS</span>
+        <strong>Dhandha Mitra</strong>
+        <span>Your business. Better managed.</span>
       </span>
     </header>
   )
