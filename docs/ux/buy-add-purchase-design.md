@@ -52,7 +52,7 @@ Problems seen in source and screenshots:
 
 ## 4. Selected design direction
 
-Use a focused receipt-entry workspace with four distinct stages:
+Use the selected MagicPath mobile composition: one rounded white Add Purchase task card, with clear section dividers and softly tinted inset panels for bill upload and item entry. Keep four distinct stages:
 
 1. **Upload a supplier bill (optional).** A compact outlined upload action explains that a PDF or clear photos can be selected. It remains an optional shortcut, not the first required step.
 2. **Supplier and receipt.** Keep supplier, location, receipt date and supplier invoice number together.
@@ -71,7 +71,7 @@ The main screen CTA is **Review purchase** in a persistent mobile action bar abo
 
 ### Invoice upload
 
-- Show a compact section with the label “Supplier bill (optional)” and two equally clear source actions: **Camera** and **Upload**. Camera opens the rear-facing native capture input for one supported photo; Upload opens the existing multi-file picker for up to six pages or a PDF.
+- Show “Supplier bill (optional)” as a section heading, followed by a pale dashed upload panel. The panel has a receipt icon, “Add supplier bill” copy, a short “Photo, multiple pages or PDF” hint, and two equally weighted large source actions: **Camera** and **Upload**. Camera opens the rear-facing native capture input for one supported photo; Upload opens the existing multi-file picker for up to six pages or a PDF.
 - Keep supported PDF/image and multiple-page behaviour unchanged.
 - Show the selected filename(s) while OCR is running, upload progress, extraction errors, warning summary and review state inline. Keep the filename visible until extraction settles, then reset the native input so the same file can be selected again for retry.
 - On extraction success, show supplier, invoice date/reference and extracted line review. Use mobile line cards instead of a horizontally clipped table; retain all current editable mappings and quantities/cost/GST inputs.
@@ -91,11 +91,11 @@ Use two columns for related metadata at tablet/desktop. At phone widths of 400px
 ### Purchased items
 
 - Product selector is the first field and spans the section.
-- Quantity and unit cost sit together on wider viewports; stack on phones.
-- Unit cost label remains explicit: “Unit cost (INR, before GST)”.
-- GST remains a separate optional amount, not a tax rate. Put it under a small disclosure when not already populated; preserve any OCR-extracted GST value.
-- “Scan barcode” is an outlined/secondary action adjacent to the line-entry controls. Do not rewrite scanning or barcode resolution.
-- “Add item” is a compact secondary action. It must not look like the screen's final posting action.
+- Keep Quantity and Unit cost together in two columns on normal phone widths; stack only on exceptionally narrow viewports.
+- Match the compact visual label “Unit cost (₹)”. A nearby helper line must clarify that the entered unit cost is before GST and GST is entered separately only when shown on the bill.
+- GST remains a separate optional amount, not a tax rate. Use a full-width disclosure labelled “GST details”, with the support copy “Optional · Add only when shown on the bill” and a chevron. Expand it to reveal the amount input when requested; preserve any OCR-extracted GST value.
+- Place the product selector on the first full-width row inside a lightly tinted, bordered item-entry panel. Keep Quantity and Unit cost side-by-side, then align **Scan barcode** and **Add item** as two equal-width actions on one row. Do not rewrite scanning or barcode resolution.
+- “Scan barcode” is outlined; “Add item” uses the RBOS green primary treatment for this local step, but remains visually subordinate to the persistent Review purchase action.
 - Preserve current duplicate-product handling so a product cannot be submitted twice in the same receipt.
 - Show each added item in a compact card: product name, quantity × unit cost, GST amount when present, line value, and a 44px remove action. Avoid a mobile table.
 
@@ -111,7 +111,7 @@ Use two columns for related metadata at tablet/desktop. At phone widths of 400px
 
 - Use the existing shared tokens and form controls from styles.css.
 - Add scoped Buy classes in a dedicated Buy stylesheet. Do not globally restyle labels, inputs, buttons, .billing-screen or shell navigation.
-- Keep the page visually flat: one working surface with clear section separators; do not wrap every group in another card.
+- Match the MagicPath composition without over-carding: one outer task card; a dashed supplier-bill upload panel; one softly tinted product-entry panel; simple separated supplier/receipt and GST sections. Added product lines remain compact individual rows/cards.
 - Reuse existing file-upload and Scanner components. Markup and CSS may be improved, but OCR extraction, matching, barcode decoding and manual fallback logic are not being redesigned.
 - Use 44px minimum touch targets for Camera, Upload, Add item, Scan barcode, Remove, Review and Post. Required markers are inline with the visible field label; never render an asterisk on a separate line.
 - English/Hindi strings must be added to both dictionaries in i18n.ts.
@@ -158,7 +158,7 @@ Do not introduce a Save draft endpoint or a direct “Post OCR result” shortcu
 
 ## 10. Responsive behaviour
 
-- 360 phone: single-column metadata; compact Camera/Upload actions; line cards. 390 / 412 phone: supplier and invoice reference full-width, stock location and receipt date side-by-side; quantity and cost share a row.
+- 360 phone: compact outer card and Camera/Upload actions; supplier metadata stacks; product, quantity/cost and action rows remain contained without horizontal overflow. 390 / 412 phone: supplier and invoice reference full-width, stock location and receipt date side-by-side; quantity and cost share a row.
 - 768 tablet: metadata can use two columns; line cards remain single-column for clarity.
 - 844 × 390 landscape: single-column task flow, no forced dense three-column editor.
 - 1280 desktop: bounded working width; metadata can use two columns and item editor can place quantity/cost side-by-side.
@@ -233,3 +233,20 @@ The user selected the supplied MagicPath Add Purchase prototype as the visual di
 - Existing OCR extraction, editable mapping, barcode scan, review-before-post, idempotency, server validation, stock/WAC and payable/accounting semantics remain unchanged.
 
 Prototype-specific visual quirks (including broken asterisk alignment) are not reproduced. The repository design contract and rendered React implementation take precedence over the MagicPath preview.
+
+
+## 17. MagicPath visual-fidelity pass — 2026-11-25
+
+The user's Android screenshots confirm the selected MagicPath composition. The design contract is refined to match its visual hierarchy rather than only its interaction list:
+
+- A single white, rounded Add Purchase task card contains the step label, heading, supplier bill, receipt metadata, purchased items, GST disclosure and short posting guidance.
+- Supplier bill is an inner pale dashed panel with a receipt icon, a concise file-support hint, and equal Camera / Upload buttons.
+- Supplier remains full-width; stock location and receipt date share a row on 390px and 412px devices; invoice reference remains full-width.
+- Purchased items uses a pale bordered editor panel. Product is full-width, quantity and unit cost share a row, and Scan barcode / Add item share a row. Required markers stay inline with their labels.
+- Unit cost uses the compact “Unit cost (₹)” label, with nearby guidance that the value is before GST.
+- GST is a full-width accordion with a short optionality hint and chevron. It remains a separate amount, never a tax-rate selector.
+- The persistent Review purchase bar remains above the existing bottom navigation and outside the task card.
+
+The current implementation reuses the existing InvoiceUpload and BarcodeScanner components, OCR draft mapping, /purchases POST payload, idempotency key, stock/WAC and supplier payable logic. This is a visual hierarchy refinement only; direct free-text product creation has not been added to the standard product selector because the existing receipt API requires catalogue product IDs.
+
+**Design-phase validation choice:** The user asked to focus on visual matching and not spend this pass on Playwright. No new Playwright/Axe run is being used as a design approval gate in this pass. The prior audit attempt was interrupted by the app's local lock screen; it is not visual acceptance evidence. Review of the rendered RBOS Android screenshots remains pending, and automated verification remains a separate later stage.
