@@ -1,0 +1,18 @@
+/* Keep the mobile app navigation fully visible above the Android gesture area.
+   The Buy review bar uses the same nav height + safe-area offset, so the two
+   fixed surfaces remain stacked rather than covering one another. */
+@media (max-width: 899px) {
+  .nav {
+    box-sizing: border-box;
+    height: calc(var(--nav-h, 64px) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .content {
+    padding-bottom: calc(var(--nav-h, 64px) + 16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .buy-review-bar {
+    bottom: calc(var(--nav-h, 64px) + env(safe-area-inset-bottom, 0px));
+  }
+}
