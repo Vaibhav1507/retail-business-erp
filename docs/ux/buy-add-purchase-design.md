@@ -276,3 +276,8 @@ Acceptance checks for the corrected footer:
 - The action stays within its grid column and does not inherit the generic full-width billing-button layout.
 - The bar sits directly above the bottom navigation and gesture area, without covering the last form content.
 - Desktop sticky behaviour, purchase review flow and all existing purchase business/API behaviour remain unchanged.
+
+
+### Outer-card correction — 2026-11-25
+
+The Add Purchase route must render one white task card, not a generic billing card nested around the task card. The receive-only `buy-receive-shell` removes the generic outer section border, padding, background and shadow so `.buy-purchase-card` can align to the available content width like the MagicPath reference. Other Buy routes are not affected.
