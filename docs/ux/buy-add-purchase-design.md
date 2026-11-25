@@ -95,7 +95,7 @@ Use two columns for related metadata at tablet/desktop. At phone widths of 400px
 - Match the compact visual label “Unit cost (₹)”. A nearby helper line must clarify that the entered unit cost is before GST and GST is entered separately only when shown on the bill.
 - GST remains a separate optional amount, not a tax rate. Use a full-width disclosure labelled “GST details”, with the support copy “Optional · Add only when shown on the bill” and a chevron. Expand it to reveal the amount input when requested; preserve any OCR-extracted GST value.
 - Place the product selector on the first full-width row inside a lightly tinted, bordered item-entry panel. Keep Quantity and Unit cost side-by-side, then align **Scan barcode** and **Add item** as two equal-width actions on one row. Do not rewrite scanning or barcode resolution.
-- “Scan barcode” is outlined; “Add item” uses the RBOS green primary treatment for this local step, but remains visually subordinate to the persistent Review purchase action.
+- Keep both “Scan barcode” and “Add item” as equal outlined actions in the item-entry panel. The persistent Review purchase action remains the only dominant filled green CTA.
 - Preserve current duplicate-product handling so a product cannot be submitted twice in the same receipt.
 - Show each added item in a compact card: product name, quantity × unit cost, GST amount when present, line value, and a 44px remove action. Avoid a mobile table.
 
