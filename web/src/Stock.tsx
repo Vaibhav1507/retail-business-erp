@@ -73,6 +73,11 @@ function Inventory({ rows, products }: { rows: StockRow[]; products: Product[] }
                   ? 'Generic'
                   : [product?.brand, product?.model].filter(Boolean).join(' / ') || '—'
                 const attributes = Object.entries({ ...(product?.attributes ?? {}), ...(product?.specs ?? {}) })
+                const details = [
+                  ...attributes.map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`),
+                  row.location ? `Location: ${row.location}` : ''
+                ].filter(Boolean).join(' · ') || '—'
+                const supplier = (row.suppliers ?? []).join(', ') || '—'
                 const mark = (product?.brand || row.name).trim().charAt(0).toUpperCase() || 'P'
                 return (
                   <article className="stock-product-card" key={row.productId + row.location}>
@@ -87,18 +92,12 @@ function Inventory({ rows, products }: { rows: StockRow[]; products: Product[] }
                     <div className="stock-product-facts">
                       <div><span>Brand / model</span><strong>{brandModel}</strong></div>
                       <div><span>Unit</span><strong>{product?.unit ?? 'pcs'}</strong></div>
+                      <div><span>Details</span><strong>{details}</strong></div>
+                      <div><span>Source</span><strong>{supplier}</strong></div>
                       <div><span>Available</span><strong>{row.quantity}</strong></div>
-                      <div><span>Status</span><strong><span className={'badge ' + (row.quantity > 0 ? 'ok' : 'out')}>{row.quantity > 0 ? 'In stock' : 'Out of stock'}</span></strong></div>
                       <div className="stock-product-value"><span>Stock value</span><strong>{inr(row.value)}</strong></div>
+                      <div className="stock-product-status"><span>Status</span><strong><span className={'badge ' + (row.quantity > 0 ? 'ok' : 'out')}>{row.quantity > 0 ? 'In stock' : 'Out of stock'}</span></strong></div>
                     </div>
-                    <details className="stock-product-more">
-                      <summary>More details</summary>
-                      <div className="stock-product-extra">
-                        <div><span>Supplier</span><strong>{(row.suppliers ?? []).join(', ') || '—'}</strong></div>
-                        <div><span>Stock location</span><strong>{row.location || '—'}</strong></div>
-                        {attributes.length > 0 && <div className="stock-product-attributes"><span>Product details</span><strong>{attributes.map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`).join(' · ')}</strong></div>}
-                      </div>
-                    </details>
                   </article>
                 )
               })}

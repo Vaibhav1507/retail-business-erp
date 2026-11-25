@@ -153,3 +153,75 @@
 @media(max-width:720px){
  .content:has(.stock-page){padding:16px 16px calc(var(--nav-h) + env(safe-area-inset-bottom) + 20px)}
 }
+
+
+/* Stock density pass: match the compact, horizontal MagicPath reference. */
+.stock-page>.page-title{margin-bottom:8px}
+.stock-page>.page-title h2{font-size:27px;line-height:1.15;margin-bottom:3px}
+.stock-page>.page-title p{font-size:15px;line-height:1.35}
+.stock-page .stock-actions{gap:8px;margin-bottom:10px}
+.stock-page .stock-actions .stock-action{min-height:92px;padding:10px 12px;border-radius:14px}
+.stock-page .stock-action-copy{gap:5px}
+.stock-page .stock-action-heading{gap:6px}
+.stock-page .stock-action-icon{flex-basis:24px;width:24px;height:24px;font-size:14px;border-radius:7px}
+.stock-page .stock-action-heading strong{font-size:14px;line-height:1.2;white-space:normal}
+.stock-page .stock-action-copy small{font-size:12px;line-height:1.3}
+.stock-page .stock-summary{gap:8px;margin-bottom:10px}
+.stock-page .stock-summary>div{min-height:78px;padding:9px 11px;border-radius:12px}
+.stock-page .stock-summary span{font-size:12px;line-height:1.25}
+.stock-page .stock-summary strong{font-size:19px;line-height:1.2}
+.stock-page .stock-summary>div:last-child strong{font-size:16px}
+.stock-page .stock-inventory{padding:14px;border-radius:15px}
+.stock-page .stock-inventory-header{margin-bottom:10px;gap:8px}
+.stock-page .stock-inventory-header h3{font-size:19px;line-height:1.25}
+.stock-page .stock-inventory-header p{font-size:13px;line-height:1.3}
+.stock-page .stock-clear-filters{min-height:36px;font-size:13px}
+.stock-page .stock-inventory-filters[role="search"]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;margin-bottom:10px;align-items:end}
+.stock-page .stock-inventory-filters[role="search"] .stock-filter-search,
+.stock-page .stock-inventory-filters[role="search"] .stock-filter-availability{grid-column:1/-1}
+.stock-page .stock-inventory-filters[role="search"] .stock-filter-category,
+.stock-page .stock-inventory-filters[role="search"] .stock-filter-supplier{grid-column:auto;min-width:0}
+.stock-page .stock-inventory-filters[role="search"] label{gap:4px;font-size:12px;line-height:1.25}
+.stock-page .stock-inventory-filters[role="search"] input,
+.stock-page .stock-inventory-filters[role="search"] select{min-height:42px;padding:8px 11px;border-radius:10px;font-size:14px}
+.stock-page .stock-inventory-note{margin-bottom:9px;font-size:12px;line-height:1.35}
+.stock-page .stock-product-list{gap:8px}
+.stock-page .stock-product-card{padding:10px 11px 8px;border-radius:14px}
+.stock-page .stock-product-heading{grid-template-columns:34px minmax(0,1fr) auto;gap:8px;padding-bottom:8px}
+.stock-page .stock-product-mark{width:34px;height:34px;border-radius:10px;font-size:14px}
+.stock-page .stock-product-identity{gap:2px}
+.stock-page .stock-product-identity strong{font-size:15px;line-height:1.2}
+.stock-page .stock-product-identity>span{font-size:11px;line-height:1.3}
+.stock-page .stock-product-edit{min-height:36px;min-width:40px;font-size:15px}
+.stock-page .stock-product-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;padding:8px 0 2px}
+.stock-page .stock-product-facts>div{gap:2px;min-width:0}
+.stock-page .stock-product-facts>div>span{font-size:11px;line-height:1.2}
+.stock-page .stock-product-facts>div>strong{font-size:13px;line-height:1.25}
+.stock-page .stock-product-facts .stock-product-value{grid-column:auto;padding-top:0}
+.stock-page .stock-product-facts .stock-product-value strong{font-size:14px}
+.stock-page .stock-product-facts .badge{min-height:21px;padding:2px 8px;font-size:11px}
+.stock-page .stock-product-facts .stock-product-status{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px solid #edf0ee}
+.stock-page .stock-product-facts .stock-product-status>strong{display:flex;align-items:center}
+@media(min-width:760px){
+ .stock-page .stock-product-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+ .content:has(.stock-page){padding-left:12px;padding-right:12px}
+ .stock-page .stock-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .stock-page .stock-inventory-filters[role="search"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-search,
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-availability{grid-column:1/-1}
+}
+@media(max-width:380px){
+ .stock-page .stock-inventory{padding:11px}
+ .stock-page .stock-product-facts{column-gap:9px;row-gap:7px}
+ .stock-page .stock-action-heading strong{font-size:13px}
+}
+
+
+/* Keep Stock's outer page gutter aligned with the MagicPath content frame. */
+@media(max-width:720px){
+ .content:has(.stock-page){padding-left:16px;padding-right:16px}
+ .stock-page .stock-actions .stock-action{min-height:100px}
+ .stock-page .stock-summary>div{min-height:72px}
+}
