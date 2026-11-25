@@ -200,7 +200,7 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
 
   if (loading) return <main className="access auth-access app-lock-screen"><AuthBrand /><p className="app-lock-loading">Preparing this device…</p></main>
   if (!verifier || locked) return (
-    <main className="access auth-access app-lock-screen">
+    <main className={`access auth-access app-lock-screen ${verifier && !changingPin ? 'app-lock-screen-compact' : ''}`}>
       <AuthBrand />
       <section className="app-lock-card">
         <div className="app-lock-hero">
@@ -258,6 +258,8 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
           {busy ? 'Please wait…' : changingPin ? 'Save new PIN' : verifier ? 'Unlock' : 'Save PIN'}
         </button>
 
+        <button type="button" className="auth-signout-link" onClick={() => { void signOut() }}>Sign out</button>
+
         {changingPin && (
           <button type="button" className="auth-secondary" onClick={() => { setChangingPin(false); setLocked(false); setPin(''); setNewPin(''); setConfirm(''); setError('') }}>
             Cancel
@@ -265,9 +267,8 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
         )}
 
         <p className="app-lock-note">
-          This is a local privacy lock, not a second authentication factor. Your server session and API permissions remain the actual security boundary. Do not use this PIN as a password.
+          This is a local privacy lock only. Your server session and API permissions remain the real security boundary. Do not reuse this PIN as a password.
         </p>
-        <button type="button" className="auth-signout-link" onClick={() => { void signOut() }}>Sign out</button>
       </section>
     </main>
   )
