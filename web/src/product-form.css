@@ -223,3 +223,8 @@ form.product-form > .form-actions + .product-form-note { margin: 0; color: #7b85
 .catalogue-screen .pager > button:nth-of-type(1) { grid-column: 1; grid-row: 2; justify-self: start; min-height: 40px; padding: 5px 12px; }
 .catalogue-screen .pager > span:nth-of-type(2) { grid-column: 2; grid-row: 2; justify-self: center; font-size: 12px; white-space: nowrap; }
 .catalogue-screen .pager > button:nth-of-type(2) { grid-column: 3; grid-row: 2; justify-self: end; min-height: 40px; padding: 5px 12px; }
+
+/* Preserve the form shell and back-link spacing over shared nested-section resets. */
+.stock-page .product-form-shell { box-shadow: 0 1px 2px rgba(27,36,48,.04) !important; }
+.stock-page .product-form-shell .product-form-back { margin: 0 0 18px; }
+form.product-form > .product-form-disclosure > fieldset > legend { display: none; }
