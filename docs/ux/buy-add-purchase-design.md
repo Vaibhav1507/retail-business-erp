@@ -264,3 +264,15 @@ The user clarified that the first supplied screenshot is the current RBOS implem
 - Preserve the existing fixed Review purchase bar above bottom navigation.
 
 No OCR, barcode, API, inventory, WAC, payable, GST calculation, idempotency or accounting behaviour is changed. Automated tests and Playwright are intentionally not run in this visual-only pass, per the user's instruction. Review the rendered Android screen against the supplied reference before visual acceptance.
+
+
+## 18. Android review-bar correction — 2026-11-25
+
+The current RBOS Android screenshots exposed a footer width/position regression. The shared mobile `.billing-screen button { width: 100% }` rule also matched the persistent Review purchase action, causing it to overflow beside the summary. The scoped Buy correction uses a fixed two-column mobile bar, constrains the action to its own column and anchors the bar above the existing fixed navigation plus Android bottom safe-area inset. The asterisk alignment quirk remains intentionally ignored per user direction.
+
+Acceptance checks for the corrected footer:
+- While scrolling the entire Add Purchase form, the Review purchase bar remains fixed to the viewport and does not move with the form.
+- The bar spans the viewport without horizontal overflow; summary and action remain fully visible at 360px, 390px and 412px widths.
+- The action stays within its grid column and does not inherit the generic full-width billing-button layout.
+- The bar sits directly above the bottom navigation and gesture area, without covering the last form content.
+- Desktop sticky behaviour, purchase review flow and all existing purchase business/API behaviour remain unchanged.
