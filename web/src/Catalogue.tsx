@@ -356,26 +356,49 @@ export function Catalogue({ reload, businessCategory, stockRows = [] }: { reload
 	  )}
 	  {view === 'master' && (
         <>
-          <div className="catalogue-privacy" role="note"><span aria-hidden="true">🔒</span><p><strong>Shared product information</strong><br />Products are shared within your business category. Adding one creates a product in your shop. Your SKU, barcode, stock, buying cost and selling price stay private.</p></div>
-          <label>Search shared products <input type="search" placeholder="Product name, brand or model..." value={q} onChange={e => setQ(e.target.value)} /></label>
-          <Paged rows={masterItems}>{page => (
-            <div className="table-scroll">
-              <table aria-label="Shared product catalogue">
-                <thead><tr><th>Name</th><th>Category</th><th>Brand / model</th><th>Details</th><th>Action</th></tr></thead>
-                <tbody>
-                  {page.map(p => (
-                    <tr key={p.id}>
-                      <td data-label="Name">{p.name}</td><td data-label="Category">{p.categoryName}</td>
-                      <td data-label="Brand / model">{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
-                      <td data-label="Details">{Object.entries({ ...p.attributes, ...p.specs }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ') || '-'}</td>
-                      <td data-label="Action"><button type="button" className="secondary" disabled={p.alreadyInBusiness} onClick={() => addFromMaster(p.id)}>{p.alreadyInBusiness ? 'Already added' : 'Add to my products'}</button></td>
-                    </tr>
-                  ))}
-                  {masterItems.length === 0 && <tr><td colSpan={5}>No shared products match. Importing or adding a verified product adds it to this shared catalogue.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          )}</Paged>
+          <div className="catalogue-privacy" role="note">
+            <span aria-hidden="true">🔒</span>
+            <p><strong>Shared product information</strong>Catalogue entries are shared within the same business category. Adding one creates your shop's product. Your SKU, barcode, stock, buying cost and selling price remain private.</p>
+          </div>
+          <label className="catalogue-shared-search">
+            <span>Search shared products</span>
+            <input type="search" placeholder="Product name, brand or model..." value={q} onChange={e => setQ(e.target.value)} />
+          </label>
+          <Paged rows={masterItems} label="rows" showPagination>
+            {page => (
+              <div className="catalogue-shared-list" aria-label="Shared product catalogue">
+                {page.map(p => {
+                  const brandModel = p.isGeneric ? 'Generic' : [p.brand, p.model].filter(Boolean).join(' ')
+                  const details = Object.entries({ ...p.attributes, ...p.specs })
+                    .filter(([, value]) => Boolean(value))
+                    .map(([key, value]) => `${key.replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase())}: ${value}`)
+                  return (
+                    <article className="catalogue-shared-card" key={p.id}>
+                      <header className="catalogue-shared-card-head">
+                        <span className="catalogue-shared-mark" aria-hidden="true">{p.name.trim().charAt(0).toUpperCase() || 'P'}</span>
+                        <div className="catalogue-shared-identity">
+                          <strong>{p.name}</strong>
+                          <span>{p.categoryName}{brandModel ? ` · ${brandModel}` : ''}</span>
+                        </div>
+                      </header>
+                      {details.length > 0 && <p className="catalogue-shared-details">{details.join('; ')}</p>}
+                      <button
+                        type="button"
+                        className={`catalogue-shared-action${p.alreadyInBusiness ? ' is-added' : ''}`}
+                        disabled={p.alreadyInBusiness}
+                        onClick={() => addFromMaster(p.id)}
+                      >
+                        {p.alreadyInBusiness ? '✓ Already added' : 'Add to my products'}
+                      </button>
+                    </article>
+                  )
+                })}
+                {masterItems.length === 0 && (
+                  <p className="catalogue-shared-empty">No shared products match. Importing or adding a verified product adds it to this shared catalogue.</p>
+                )}
+              </div>
+            )}
+          </Paged>
         </>
       )}
 	  {view === 'categories' && (
