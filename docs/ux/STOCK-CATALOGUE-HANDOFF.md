@@ -206,3 +206,10 @@ Implemented in the same PR #93 branch:
 - Frontend TypeScript/build CI is being run on the updated PR head.
 - No full Playwright visual audit has been run. Exact visual acceptance remains pending updated Android screenshots after PR deployment.
 - Header differences in the user's current app screenshots are intentionally not changed in this follow-up; the user noted PR #93's heading changes have not yet been deployed.
+
+
+## Final action-card height correction — 2026-11-25
+
+The latest Android screenshot showed excessive blank vertical space under the Stock action descriptions. The cause was the `min-height:184px` rule added to all four mobile action cards in the previous correction. Replaced only that value with `min-height:0` so each grid row is sized by its actual content and existing padding.
+
+No grid columns, card copy, icon/title alignment, gaps, padding, colours, filters, navigation, routes or behaviour were changed. The cards remain in the existing two-column arrangement. No unit tests or Playwright run per the user's instruction; screenshot confirmation is pending.

@@ -231,7 +231,7 @@
 @media(max-width:720px){
  .stock-page .stock-actions .stock-action{
   grid-column:auto;
-  min-height:184px;
+  min-height:0;
   align-items:flex-start;
  }
  .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-copy{
