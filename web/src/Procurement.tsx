@@ -131,32 +131,48 @@ export function Procurement({ products, locations, reload, show }: { products: (
       )}</Paged>
       </>}
             {v('receive') && <div className="buy-receive">
-        <header className="buy-screen-heading"><h2>{tr('buy.addTitle')}</h2><p>{tr('buy.addIntro')}</p></header>
+        <div className="buy-purchase-card">
+        <header className="buy-screen-heading">
+          <div className="buy-step-heading"><span>{tr('buy.newStockEntry')}</span><span className="buy-step-count">{reviewReceipt ? tr('buy.stepTwoOfTwo') : tr('buy.stepOneOfTwo')}</span></div>
+          <h2>{tr('buy.addTitle')}</h2><p>{tr('buy.addIntro')}</p>
+        </header>
         <section className="buy-section buy-upload-section" aria-label={tr('buy.bill')}>
           <div><h3>{tr('buy.bill')} <span>{tr('buy.optional')}</span></h3><p>{tr('buy.billHelp')}</p></div>
           <InvoiceUpload products={products} suppliers={suppliers.filter(s => s.isActive)} onSupplierAdded={() => { load().catch(() => undefined) }} onProductAdded={reload} onUse={(d: InvoiceDraft, picked) => { if (d.supplierId) setSupplierId(d.supplierId); if (d.date) setDate(d.date); if (d.invoiceNumber) setRef(d.invoiceNumber); setLines(picked); setInvoiceFileId(d.fileId); setReviewReceipt(false) }} />
         </section>
         {suppliers.filter(s => s.isActive).length === 0 && <p className="buy-notice">{tr('buy.noSupplier')} <a href="#/parties/suppliers">{tr('buy.addSupplier')}</a>.</p>}
-        <section className="buy-section">
+        <section className="buy-section buy-receipt-section">
           <h3>{tr('buy.supplierReceipt')}</h3>
           <div className="buy-fields">
-            <label>{tr('buy.supplier')} <select value={sup} onChange={e => { setSupplierId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectSupplier')}</option>{suppliers.filter(s => s.isActive).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-            <label>{tr('buy.location')} <select value={loc} onChange={e => { setLocationId(e.target.value); setReviewReceipt(false) }}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-            <label>{tr('buy.receiptDate')} <input type="date" value={date} onChange={e => { setDate(e.target.value); setReviewReceipt(false) }} /></label>
-            <label>{tr('buy.invoiceNo')} <input value={ref} onChange={e => { setRef(e.target.value); setReviewReceipt(false) }} /></label>
+            <label><span className="buy-field-label">{tr('buy.supplier')} <span className="buy-required" aria-hidden="true">*</span></span><select required aria-required="true" value={sup} onChange={e => { setSupplierId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectSupplier')}</option>{suppliers.filter(s => s.isActive).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+            <label><span className="buy-field-label">{tr('buy.location')} <span className="buy-required" aria-hidden="true">*</span></span><select required aria-required="true" value={loc} onChange={e => { setLocationId(e.target.value); setReviewReceipt(false) }}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+            <label><span className="buy-field-label">{tr('buy.receiptDate')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" type="date" value={date} onChange={e => { setDate(e.target.value); setReviewReceipt(false) }} /></label>
+            <label><span className="buy-field-label">{tr('buy.invoiceNo')}</span><input value={ref} onChange={e => { setRef(e.target.value); setReviewReceipt(false) }} /></label>
           </div>
         </section>
-        <section className="buy-section">
+        <section className="buy-section buy-items-section">
           <div className="buy-section-heading"><div><h3>{tr('buy.items')}</h3><p>{tr('buy.itemsHelp')}</p></div><span className="buy-count">{lines.length} {lines.length === 1 ? tr('buy.item') : tr('buy.itemsPlural')}</span></div>
           <div className="buy-item-entry">
-            <label className="buy-product-field">{tr('buy.product')} <select value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectProduct')}</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            <label>{tr('buy.quantity')} <input inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
-            <label>{tr('buy.unitCost')} <input inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
-            <button type="button" className="secondary buy-scan" onClick={() => setScanning(true)}>{tr('buy.scan')}</button>
-            <button type="button" className="secondary buy-add-line" onClick={addLine}>{tr('buy.addItem')}</button>
+            <label className="buy-product-field"><span className="buy-field-label">{tr('buy.product')} <span className="buy-required" aria-hidden="true">*</span></span><select required aria-required="true" value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectProduct')}</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <label><span className="buy-field-label">{tr('buy.quantity')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
+            <label><span className="buy-field-label">{tr('buy.unitCostShort')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" aria-label={tr('buy.unitCost')} inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
+            <button type="button" className="secondary buy-scan" onClick={() => setScanning(true)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v14M7 5v14M10 5v14M13 5v14M17 5v14M20 5v14" /></svg>
+              {tr('buy.scan')}
+            </button>
+            <button type="button" className="secondary buy-add-line" onClick={addLine}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              {tr('buy.addItem')}
+            </button>
           </div>
-          <button type="button" className="buy-gst-toggle" aria-expanded={showGst || Number(gst) > 0} onClick={() => setShowGst(x => !x)}>{showGst || Number(gst) > 0 ? tr('buy.hideGst') : tr('buy.gstDetails')}</button>
-          {(showGst || Number(gst) > 0) && <label className="buy-gst-field">{tr('buy.gstAmount')} <input inputMode="decimal" value={gst} onChange={e => { setGst(e.target.value); setReviewReceipt(false) }} /></label>}
+          <p className="buy-item-entry-help">{tr('buy.productEntryHelp')}</p>
+          <div className="buy-gst-disclosure">
+            <button type="button" className="buy-gst-toggle" aria-expanded={showGst || Number(gst) > 0} onClick={() => setShowGst(x => !x)}>
+              <span className="buy-gst-copy"><strong>{tr('buy.gstHeading')}</strong><small>{tr('buy.gstOptionalHelp')}</small></span>
+              <span className="buy-gst-chevron" aria-hidden="true">⌄</span>
+            </button>
+            {(showGst || Number(gst) > 0) && <label className="buy-gst-field">{tr('buy.gstAmount')} <input inputMode="decimal" value={gst} onChange={e => { setGst(e.target.value); setReviewReceipt(false) }} /></label>}
+          </div>
           {scanning && <BarcodeScanner title={tr('buy.scan')} onScan={onScan} onClose={() => setScanning(false)} />}
           {unknownCode && <p role="status" className="buy-notice">{tr('buy.barcodeNew')} <strong>{unknownCode.code}</strong> <button type="button" className="secondary" onClick={linkUnknown}>{tr('buy.linkBarcode')}</button> {tr('buy.missingProduct')}</p>}
           {lines.length > 0 && <div className="buy-line-list" aria-label={tr('buy.items')}>{lines.map(l => <article className="buy-line-card" key={l.productId}>
@@ -166,7 +182,11 @@ export function Procurement({ products, locations, reload, show }: { products: (
           {lines.length > 0 && <div className="buy-estimate"><span>{tr('buy.estimatedTotal')}</span><strong>₹{estimatedTotal.toFixed(2)}</strong><small>{tr('buy.estimateNote')}</small></div>}
         </section>
         <p className="buy-guidance">{tr('onboarding.purchaseGuidance')}</p>
-        <button type="button" className="buy-primary" onClick={() => setReviewReceipt(true)} disabled={lines.length === 0 || !sup || !loc}>{tr('buy.review')}</button>
+        </div>
+        {!reviewReceipt && <div className="buy-review-bar">
+          <div className="buy-review-bar-summary"><strong>{lines.length} {lines.length === 1 ? tr('buy.item') : tr('buy.itemsPlural')}</strong><span>{lines.length ? tr('buy.reviewBarTotal', { amount: estimatedTotal.toFixed(2) }) : tr('buy.addProductsToContinue')}</span></div>
+          <button type="button" className="buy-review-bar-action" onClick={() => { setReviewReceipt(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }} disabled={lines.length === 0 || !sup || !loc}>{tr('buy.review')} <span aria-hidden="true">›</span></button>
+        </div>}
         {reviewReceipt && <section className="buy-review" role="region" aria-label={tr('buy.review')}>
           <h3>{tr('buy.review')}</h3><p>{tr('onboarding.purchaseReviewNote')}</p>
           <dl><dt>{tr('buy.supplier')}</dt><dd>{suppliers.find(s => s.id === sup)?.name ?? tr('buy.notSelected')}</dd><dt>{tr('buy.location')}</dt><dd>{locations.find(l => l.id === loc)?.name ?? tr('buy.notSelected')}</dd><dt>{tr('buy.receiptDate')}</dt><dd>{date}</dd><dt>{tr('buy.invoiceNo')}</dt><dd>{ref || tr('buy.notEntered')}</dd></dl>

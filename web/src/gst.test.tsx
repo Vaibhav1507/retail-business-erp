@@ -32,7 +32,7 @@ async function readInvoice(d: InvoiceDraft) {
   mock({ ...csrf, '/api/purchases/extract': () => ({ body: d }) })
   render(<InvoiceUpload products={products} suppliers={[]} onUse={(_d, picked) => { used.picked = picked }} />)
   const file = new File(['x'], 'bill.pdf', { type: 'application/pdf' })
-  await userEvent.upload(screen.getByLabelText(/Upload a supplier bill photo or PDF/), file)
+  await userEvent.upload(screen.getByLabelText('Upload supplier bill files'), file)
   await screen.findByLabelText('Supplier for this invoice')
   return used
 }
@@ -111,7 +111,7 @@ describe('Procurement manual GST', () => {
     await userEvent.type(screen.getByLabelText(/^Quantity/), '10')
     await userEvent.type(screen.getByLabelText(/Unit cost/), cost)
     if (gst) {
-      await userEvent.click(screen.getByRole('button', { name: 'Add GST details (optional)' }))
+      await userEvent.click(screen.getByRole('button', { name: /GST details/ }))
       await userEvent.type(screen.getByLabelText('GST on this line (INR)'), gst)
     }
     await userEvent.click(screen.getByRole('button', { name: 'Add item' }))

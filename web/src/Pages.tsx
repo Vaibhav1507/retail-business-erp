@@ -39,9 +39,9 @@ export const NAV = [
 
 const inr = (n: number) => '\u20B9 ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export function Tabs({ page, tab, items }: { page: string; tab: string; items: [string, string][] }) {
+export function Tabs({ page, tab, items, className }: { page: string; tab: string; items: [string, string][]; className?: string }) {
   return (
-    <nav className="tabs" aria-label="Sections">
+    <nav className={['tabs', className].filter(Boolean).join(' ')} aria-label="Sections">
       {items.map(([k, n]) => <a key={k} href={`#/${page}/${k}`} aria-current={tab === k ? 'true' : undefined}>{n}</a>)}
     </nav>
   )
@@ -129,7 +129,7 @@ export function BuyPage({ tab, c }: { tab: string; c: Common }) {
   return (
     <div className="stock-page">
       <Title title={tr('nav.buy')} hint={tr('buy.hint')} />
-      <Tabs page="buy" tab={tab} items={[['receive', tr('buy.add')], ['pay', tr('buy.pay')], ['history', tr('buy.history')], ['return', tr('buy.return')]]} />
+      <Tabs page="buy" tab={tab} className="buy-tabs" items={[['receive', tr('buy.add')], ['pay', tr('buy.pay')], ['history', tr('buy.history')], ['return', tr('buy.return')]]} />
       {tab === 'receive' && <Procurement {...c} show="receive" />}
       {tab === 'pay' && <Procurement {...c} show="pay" />}
       {tab === 'history' && <Procurement {...c} show="history" />}

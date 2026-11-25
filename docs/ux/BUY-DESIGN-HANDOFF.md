@@ -1,13 +1,14 @@
 # RBOS Buy section — design handoff
 
-**Status:** Four screen design specifications finalized; first implementation pass is present for all four screens; focused checks and screenshot acceptance remain pending.  
+**Status:** Four-screen Buy redesign is merged in PR #81. Screenshot-driven fixes and the approved MagicPath Add Purchase interaction polish are implemented on the PR #82 follow-up branch; automated CI and the integrated Playwright/Axe visual audit are pending.  
 **Last reviewed:** 2026-11-24  
 **Repository:** Vaibhav1507/retail-business-erp  
-**Design baseline:** main at b180f59793f265024650731a1f2bd89ead29b342  
-**Canonical branch:** ux/buy-four-screen-redesign  
-**PR:** [#81 — ux(buy): redesign four Buy workflows for mobile](https://github.com/Vaibhav1507/retail-business-erp/pull/81) (draft; latest head `f18b109b66e1ec9d845d23a08784062f67bea849`).  
-**Visual acceptance:** Pending updated Android screenshots from the user.  
-**Merge / production:** Not authorised.
+**Merged baseline:** main at `004071617aa41bb8a2846f840f33d44f7ff10d5c` (PR #81 merge commit).  
+**Original implementation branch:** `ux/buy-four-screen-redesign`  
+**Follow-up branch:** `fix/buy-mobile-tabs-invoice-upload-feedback`  
+**PRs:** [#81 — four Buy workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/81) merged 2026-11-24; [#82 — Buy mobile and Add Purchase polish](https://github.com/Vaibhav1507/retail-business-erp/pull/82) open.  
+**Visual acceptance:** Original four-screen screenshots reviewed. The MagicPath Add Purchase reference has been translated into repository implementation; Playwright screenshots/Axe and fresh Android acceptance remain pending.  
+**Merge / production:** PR #81 is merged. PR #82 is not merged or deployed; deployment of PR #81's exact merge commit is not independently verified here.
 
 ## 1. Objective and strict scope
 
@@ -63,6 +64,16 @@ The six user-provided Android screenshots are the current visual baseline. They 
 - Global Assistant and bottom navigation are part of the existing shell and must remain unchanged. Buy content must leave sufficient scroll room around them.
 
 Screenshots are baseline evidence only. Updated screenshots are required for visual acceptance.
+
+### Post-implementation Android screenshot review — 2026-11-24
+
+The user supplied updated phone screenshots for all four Buy destinations. Review confirms the main layouts render, with two acceptance misses:
+
+- **P0 / mobile navigation:** the four Buy tabs still inherit the generic horizontal-scrolling `.tabs` rule, leaving “Return to Supplier” partly clipped. This contradicts the design contract's two-column/two-row phone grid and the acceptance criterion that all four destinations remain visible without horizontal scrolling.
+- **P1 / invoice OCR feedback:** the file input is reset immediately in its change handler while the asynchronous extraction is still running. The native picker therefore reports “No file chosen” beside “Reading invoice…”. Keep the selected filename visible until extraction settles, then reset the input to allow retrying the same file.
+
+Pay Supplier's no-selection state, Past Purchases cards and Return to Supplier's initial receipt selector appear structurally consistent with the intended flows in the supplied screenshots. No unrelated feature or accounting changes are inferred from the screenshots.
+
 
 ## 4. Research synthesis
 
@@ -148,7 +159,7 @@ Detailed contract: docs/ux/buy-return-to-supplier-design.md.
 - Added English and Hindi copy for the new Buy labels and validation messages.
 - OCR review now switches to compact, labelled item cards on phone widths while preserving the same editable fields and extraction/apply logic.
 - Pay Supplier and Past Purchases now require an explicit supplier selection for supplier-specific views; statement state is retained after data refresh.
-- Remaining: run focused frontend tests, TypeScript, lint and build; finish the Hindi-language sweep for secondary history/return helper copy; inspect all resulting failures; review updated Android screenshots. Playwright remains excluded per user instruction.
+- Remaining: finish the Hindi-language sweep for secondary history/return helper copy; resolve any focused frontend/CI failures; complete the Buy Playwright/Axe visual audit; inspect responsive screenshots and review the updated Android Add Purchase flow.
 - The draft PR currently has no reported status checks/workflow runs in the GitHub response; this is not a passing CI result.
 
 ## 7. Functional findings, separately tracked
@@ -200,7 +211,7 @@ No backend changes are planned.
 4. Implement Return to Supplier and scoped BF-04 loading.
 5. Add/update focused frontend tests for the four flows, supplier-required behaviour, allocation request mapping, OCR handoff, history states, quantity bounds and return detail.
 6. Run frontend build, lint and unit tests; run relevant .NET integration tests if backend/shared contracts change.
-7. **Do not run Playwright for this scope.** User will supply Android screenshots. Review updated screenshots at agreed viewport sizes before visual acceptance.
+7. Run the RBOS Visual Audit workflow for the complete Buy group after the four routes are implemented. Review responsive screenshots and Axe WCAG 2 A/AA results; separately track native Android camera and real-device acceptance.
 
 ### Acceptance criteria
 
@@ -221,20 +232,21 @@ No backend changes are planned.
 |---|---|
 | Current-main workflow and handoff review | Complete |
 | Routes, source files, dependencies and backend contract audit | Complete |
-| Six baseline Android screenshots reviewed | Complete |
+| Four baseline Buy screenshots reviewed | Complete |
 | Competitor and accessibility research | Complete |
 | Four screen design specifications | Complete |
-| Canonical branch | Created — `ux/buy-four-screen-redesign` |
-| Implementation | Complete first implementation pass across all four existing Buy routes |
-| Frontend verification | Passed on PR head: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
-| Backend verification | Passed: .NET solution build, backend unit tests, deployment Docker image build |
-| PostgreSQL integration | Passed: disposable database bootstrap, migrations and integration tests |
-| Playwright | Explicitly not run, per user instruction |
-| Updated Android screenshot review | Pending — user will verify after production deployment and provide feedback |
-| Real-device acceptance | Pending user verification |
+| Four-screen implementation | Merged in PR #81 on 2026-11-24 (merge commit `004071617aa41bb8a2846f840f33d44f7ff10d5c`) |
+| Frontend verification on PR #81 | Passed: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
+| Backend verification on PR #81 | Passed: .NET solution build, backend unit tests, deployment Docker image build |
+| PostgreSQL integration on PR #81 | Passed: disposable database bootstrap, migrations and integration tests |
+| Playwright / Axe | Deferred during this user-directed visual-matching pass. The previous attempt was interrupted by the local app-lock screen and is not visual acceptance evidence. |
+| Updated Android screenshot review | MagicPath reference reviewed and selected. RBOS implementation screenshot after the 2026-11-25 visual pass is still pending. |
+| Follow-up implementation | In progress on `fix/buy-mobile-tabs-invoice-upload-feedback`; 2026-11-25 Add Purchase outer card, dashed invoice upload panel, product-entry panel, GST accordion and compact unit-cost label implemented. |
+| Follow-up tests / CI | Earlier frontend failure was corrected on the branch. No new test result is claimed for the 2026-11-25 visual-only styling/copy changes. |
+| Visual comparison / real-device acceptance | Pending: compare the updated RBOS Android render with the selected MagicPath reference. |
 | User acceptance | Pending user verification |
-| PR | #81 ready for review; all required CI checks green |
-| Merge / production | Not performed here; awaiting the user's merge/deployment step |
+| Production revision | Not independently verified from this repository review |
+| Merge / deployment of follow-up | Not performed; awaiting the user's review/authorization |
 
 ## 11. Research findings
 
@@ -261,3 +273,33 @@ No backend changes are planned.
 - [NN/G: progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
 - [W3C: WCAG 2.2](https://www.w3.org/TR/WCAG22/)
 - [W3C: error identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification)
+
+
+### Latest Add Purchase polish — 2026-11-24
+
+The user selected the supplied MagicPath Add Purchase prototype as the visual direction. PR #82 now carries the following scoped implementation:
+
+- Separate Camera (rear capture) and Upload (multi-page/PDF) actions, reusing the existing invoice OCR endpoint and image preparation.
+- Selected filename feedback remains visible while OCR is active; input reset happens after extraction settles.
+- Inline required markers wrapped with their label copy to prevent the prototype's broken asterisk wrapping.
+- A 1-of-2 / 2-of-2 step indicator and a persistent mobile Review purchase summary/action above the existing bottom navigation. It is hidden while the review step is open and becomes in-flow sticky on desktop.
+- Supplier and invoice reference stay full-width on phones; location and receipt date share a row at widths >=400px and stack below that.
+- Added focused component coverage and a dedicated Playwright/Axe audit for all four Buy routes, OCR loading, responsive profiles, fixed-bar clearance, touch targets, accessible names, browser errors and network failures.
+
+The implementation does not change purchase extraction, barcode resolution, purchase POST payloads, idempotency, server validation, stock, WAC, payable or accounting rules. The camera picker is a native browser/device surface and still requires physical Android verification.
+
+
+### Add Purchase visual implementation — 2026-11-25
+
+User direction: focus on visual matching against the selected MagicPath Add Purchase prototype; do not spend this phase repeatedly running Playwright. Automated verification remains separate and is not presented as visual approval.
+
+Implementation updates on the existing PR #82 branch:
+- `Procurement.tsx`: one outer task card, clear receipt/item section structure, a compact GST disclosure with optionality hint and chevron, and the short Unit cost label.
+- `InvoiceUpload.tsx`: dashed supplier-bill panel with receipt icon/copy and equal Camera / Upload actions. Existing OCR, multiple-page/PDF selection and editable review flow are retained.
+- `buy-procurement.css`: scoped card/panel treatment, product field/quantity/cost/action rows, responsive metadata grid, aligned labels, inline required markers, line summaries and fixed Review purchase summary.
+- `i18n.ts`: English and Hindi copy for bill upload, GST hint, product cost helper and compact unit-cost label.
+- `buy-add-purchase-design.md`: repository design specification now reflects the MagicPath visual hierarchy, with responsive rules and API/business invariants retained.
+
+Not changed: backend/API payloads, OCR extraction/mapping, barcode scanner/resolution, purchase idempotency, posting, stock/WAC, supplier payable or accounting behaviour. Direct free-text product creation is not part of this visual pass; the existing purchase contract still references catalogue product IDs.
+
+Remaining design work: inspect the actual rendered RBOS Android screenshot against MagicPath, correct any remaining spacing/overlay/field-width differences, then request user visual acceptance. PR #82 remains open and unmerged; no deployment is performed.
