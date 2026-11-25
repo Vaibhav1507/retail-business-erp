@@ -189,6 +189,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
   return (
     <div role="region" aria-label={tr('buy.invoiceRead')} className="invoice-upload">
       <div className="invoice-upload-dropzone">
+        <div className="invoice-upload-inner">
         <div className="invoice-upload-intro">
           <span className="invoice-upload-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -209,6 +210,7 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
           </button>
           <input ref={cameraInput} className="invoice-upload-source-input" type="file" hidden accept="image/jpeg,image/png,image/webp" capture="environment" aria-label={tr('buy.cameraBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
           <input ref={uploadInput} className="invoice-upload-source-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple aria-label={tr('buy.uploadBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+        </div>
         </div>
       </div>
       {selectedFileNames.length > 0 && <p className="invoice-upload-selected" aria-live="polite">{selectedFileNames.join(', ')}</p>}
