@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { AuthBrand } from './AuthBrand'
 import './app-lock.css'
 
@@ -171,7 +171,7 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
     }
   }
 
-  function handlePinKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handlePinKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       e.preventDefault()
       if (changingPin) void changePin()
@@ -180,7 +180,6 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
     }
   }
 
-  const selectedValue = valueFor(activeField)
   const field = (name: PinField, label: string) => (
     <label className={`app-lock-pin-field ${activeField === name ? 'is-active' : ''}`}>
       <span>{label}</span>
