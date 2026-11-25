@@ -113,7 +113,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
   useEffect(() => { setBillId(''); if (!paySup) { setOpenBills([]); return } api<typeof openBills>('GET', '/suppliers/' + paySup + '/open-bills').then(setOpenBills).catch(() => setOpenBills([])) }, [paySup, payments])
   const showStatement = () => run(async () => { const id = v('pay') ? paySup : historySupplierId; setStatement(await api<NonNullable<typeof statement>>('GET', '/suppliers/' + id + '/statement')); return '' })
   return (
-    <section aria-label="Purchasing" className="billing-screen">
+    <section aria-label="Purchasing" className={show === 'receive' ? "billing-screen buy-receive-shell" : "billing-screen"}>
       {!show && <h2>Suppliers and purchasing</h2>}
       {v('suppliers') && <>
       <div>
