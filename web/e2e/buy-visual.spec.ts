@@ -101,7 +101,14 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
     const bar = rect('.buy-review-bar'), nav = rect('.nav')
     return {
       tabsDisplay: getComputedStyle(document.querySelector('.buy-tabs')!).display,
-      tabsWrap: getComputedStyle(document.querySelector('.buy-tabs')!).flexWrap,
+      tabsOverflow: document.querySelector('.buy-tabs')!.scrollWidth > document.querySelector('.buy-tabs')!.clientWidth,
+      tabBounds: (() => { const r = document.querySelector('.buy-tabs')!.getBoundingClientRect(); return { left: r.left, right: r.right } })(),
+      purchaseCard: rect('.buy-purchase-card'),
+      uploadSection: rect('.buy-upload-section'),
+      uploadRegion: rect('.invoice-upload[role=region]'),
+      uploadDropzone: rect('.invoice-upload-dropzone'),
+      productField: rect('.buy-product-field'),
+      itemEntry: rect('.buy-item-entry'),
       shellBorder: getComputedStyle(document.querySelector('.buy-receive-shell')!).borderTopWidth,
       shellPadding: getComputedStyle(document.querySelector('.buy-receive-shell')!).paddingLeft,
       uploadBorder: getComputedStyle(document.querySelector('.invoice-upload-dropzone')!).borderTopStyle,
@@ -122,8 +129,10 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
       scrollWidth: document.documentElement.scrollWidth,
     }
   })
-  expect(layout.tabsDisplay).toBe('flex')
-  expect(layout.tabsWrap).toBe('nowrap')
+  expect(layout.tabsDisplay).toBe('grid')
+  expect(layout.tabsOverflow).toBe(false)
+  expect(layout.tabBounds.left).toBeGreaterThanOrEqual(0)
+  expect(layout.tabBounds.right).toBeLessThanOrEqual(390)
   expect(layout.shellBorder).toBe('0px')
   expect(layout.shellPadding).toBe('0px')
   expect(layout.uploadBorder).toBe('dashed')
@@ -134,6 +143,12 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
   expect(layout.uploadIntroDirection).toBe('row')
   expect(layout.supplierGridColumn).toBe('1 / -1')
   expect(layout.invoiceGridColumn).toBe('1 / -1')
+  expect(layout.purchaseCard.left).toBeGreaterThanOrEqual(0)
+  expect(layout.purchaseCard.right).toBeLessThanOrEqual(390)
+  expect(layout.uploadSection.width).toBeGreaterThan(layout.purchaseCard.width * 0.9)
+  expect(layout.uploadRegion.width).toBeGreaterThan(layout.purchaseCard.width * 0.9)
+  expect(layout.uploadDropzone.width).toBeGreaterThan(layout.purchaseCard.width * 0.85)
+  expect(layout.productField.width).toBeGreaterThan(layout.itemEntry.width * 0.85)
   expect(layout.supplierFields[0]!.width).toBeGreaterThan(layout.supplierFields[1]!.width)
   expect(Math.abs(layout.supplierFields[1]!.y - layout.supplierFields[2]!.y)).toBeLessThan(2)
   expect(layout.itemLabels[0]!.width).toBeGreaterThan(layout.itemLabels[1]!.width * 1.7)
