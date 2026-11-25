@@ -226,3 +226,36 @@
 .invoice-upload-sources{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .invoice-upload-sources button{min-height:50px}
 @media(max-width:399px){.buy-purchase-card .buy-receipt-section .buy-fields{grid-template-columns:minmax(0,1fr)}.buy-purchase-card .buy-receipt-section .buy-fields label{grid-column:1/-1}.buy-item-entry{grid-template-columns:repeat(2,minmax(0,1fr))}.invoice-upload-dropzone{padding:10px}.invoice-upload-inner{padding:12px}}
+
+
+/* Add Purchase mobile review bar: isolate it from the generic billing button rule.
+   The global mobile .billing-screen button width:100% must not make this sibling
+   action wider than its grid column. Keep the bar viewport-fixed above the nav. */
+@media (max-width: 899px) {
+  .billing-screen > .buy-receive .buy-review-bar {
+    position: fixed !important;
+    inset-inline: 0;
+    bottom: calc(var(--nav-h, 68px) + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 42%);
+    align-items: center;
+    gap: 12px;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 11px max(16px, env(safe-area-inset-right, 0px)) 11px max(16px, env(safe-area-inset-left, 0px));
+    box-sizing: border-box;
+  }
+
+  .billing-screen > .buy-receive .buy-review-bar-summary {
+    min-width: 0;
+  }
+
+  .billing-screen > .buy-receive .buy-review-bar-action {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+}
