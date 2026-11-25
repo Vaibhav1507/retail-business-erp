@@ -111,7 +111,7 @@ describe('Procurement manual GST', () => {
     await userEvent.type(screen.getByLabelText(/^Quantity/), '10')
     await userEvent.type(screen.getByLabelText(/Unit cost/), cost)
     if (gst) {
-      await userEvent.click(screen.getByRole('button', { name: 'Add GST details (optional)' }))
+      await userEvent.click(screen.getByRole('button', { name: /GST details/ }))
       await userEvent.type(screen.getByLabelText('GST on this line (INR)'), gst)
     }
     await userEvent.click(screen.getByRole('button', { name: 'Add item' }))
