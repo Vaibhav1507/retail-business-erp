@@ -1,6 +1,6 @@
 # Buy screen design — Add Purchase
 
-**Status:** Initial implementation merged in PR #81; screenshot-driven mobile polish and MagicPath-reference alignment are implemented in PR #82; automated visual acceptance pending.  
+**Status:** PR #81 and PR #82 are merged. A focused visual-refinement follow-up is in progress on ux/add-purchase-magicpath-visual-refinement; design approval remains based on comparison with the user's supplied MagicPath screenshots.  
 **Last reviewed:** 2026-11-24  
 **Baseline:** main 004071617aa41bb8a2846f840f33d44f7ff10d5c  
 **Route:** #/buy/receive  
@@ -250,3 +250,17 @@ The user's Android screenshots confirm the selected MagicPath composition. The d
 The current implementation reuses the existing InvoiceUpload and BarcodeScanner components, OCR draft mapping, /purchases POST payload, idempotency key, stock/WAC and supplier payable logic. This is a visual hierarchy refinement only; direct free-text product creation has not been added to the standard product selector because the existing receipt API requires catalogue product IDs.
 
 **Design-phase validation choice:** The user asked to focus on visual matching and not spend this pass on Playwright. No new Playwright/Axe run is being used as a design approval gate in this pass. The prior audit attempt was interrupted by the app's local lock screen; it is not visual acceptance evidence. Review of the rendered RBOS Android screenshots remains pending, and automated verification remains a separate later stage.
+
+
+## 17. Latest screenshot-driven refinement — 2026-11-25
+
+The user clarified that the first supplied screenshot is the current RBOS implementation and the remaining screenshots are the MagicPath reference. This follow-up is deliberately visual-only:
+
+- Keep the purchase item helper copy inside the softly tinted item-entry panel, aligned beneath the two action buttons.
+- Give the supplier-bill upload area a light outer container with an inset dashed content panel, matching the latest reference hierarchy.
+- Enforce inline, non-wrapping required markers and labels.
+- Keep supplier and invoice reference full-width, with stock location and receipt date paired on supported phone widths; stack on narrow phones.
+- Keep product full-width, quantity and unit cost paired, and Scan barcode / Add item as equal-width actions.
+- Preserve the existing fixed Review purchase bar above bottom navigation.
+
+No OCR, barcode, API, inventory, WAC, payable, GST calculation, idempotency or accounting behaviour is changed. Automated tests and Playwright are intentionally not run in this visual-only pass, per the user's instruction. Review the rendered Android screen against the supplied reference before visual acceptance.
