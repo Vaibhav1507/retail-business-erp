@@ -205,3 +205,27 @@ Acceptance:
 - [x] Existing rename API, category relationships and tenant boundaries are preserved.
 - [ ] Fresh Android screenshot comparison and user visual acceptance.
 - [ ] Build confirmation on the implementation PR.
+
+
+## 13. Add Opening Stock — confirmed screen-level extension (2026-11-25)
+
+The user supplied the MagicPath Add Opening Stock screen and the corresponding current RBOS Android screen, explicitly extending the prior handoff-only boundary to include this screen's presentation. The implementation is a visual/form-layout alignment only.
+
+- Use a focused form card with Initial inventory eyebrow, Opening stock title, concise helper copy and step marker.
+- Full-width Stock location and Stock counted as of controls.
+- Full-width Product selector followed by a two-column Quantity / Cost for one item row on mobile.
+- Full-width outlined Add item action.
+- Added lines are compact cards/rows with item details and remove action; do not use a wide table on phones.
+- A persistent item-count / estimated-value summary and Review starting stock action sits above the fixed bottom navigation on mobile.
+- Keep the review-before-post step and all existing validation, idempotency, API payload, server-calculated posted total and accounting behaviour.
+- Preserve the RBOS font stack, existing green palette, page shell, navigation and shared controls.
+
+Acceptance:
+- [ ] Form hierarchy, vertical rhythm, control heights, field alignment and gaps match the supplied reference at 360–390px.
+- [ ] Quantity and cost share a row without horizontal overflow.
+- [ ] Added-item rows remain readable with long product names.
+- [ ] Sticky summary remains fully visible above bottom navigation and Android safe area.
+- [ ] Review is disabled with zero lines and enabled after a valid line is added.
+- [ ] Review/cancel/edit/remove and confirmation/post flows retain existing behaviour.
+- [ ] Production build passes.
+- [ ] Full grouped Playwright/Axe and visual screenshot review remain deferred to the Stock & Catalogue group completion gate.
