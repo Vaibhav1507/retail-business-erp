@@ -111,6 +111,9 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
       uploadIntroDisplay: getComputedStyle(document.querySelector('.invoice-upload-intro')!).display,
       uploadIntroDirection: getComputedStyle(document.querySelector('.invoice-upload-intro')!).flexDirection,
       supplierFields: labels,
+      supplierGridColumn: getComputedStyle(document.querySelector('.buy-fields label:first-child')!).gridColumn,
+      invoiceGridColumn: getComputedStyle(document.querySelector('.buy-fields label:last-child')!).gridColumn,
+      receiptGridColumns: getComputedStyle(document.querySelector('.buy-fields')!).gridTemplateColumns,
       itemLabels,
       itemActions,
       footerPosition: getComputedStyle(document.querySelector('.buy-review-bar')!).position,
@@ -129,8 +132,10 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
   expect(layout.uploadInnerBorder).toBe('0px')
   expect(layout.uploadIntroDisplay).toBe('flex')
   expect(layout.uploadIntroDirection).toBe('row')
+  expect(layout.supplierGridColumn).toBe('1 / -1')
+  expect(layout.invoiceGridColumn).toBe('1 / -1')
+  expect(layout.supplierFields[0]!.width).toBeGreaterThan(layout.supplierFields[1]!.width)
   expect(Math.abs(layout.supplierFields[1]!.y - layout.supplierFields[2]!.y)).toBeLessThan(2)
-  expect(layout.supplierFields[0]!.width).toBeGreaterThan(layout.supplierFields[1]!.width * 1.7)
   expect(layout.itemLabels[0]!.width).toBeGreaterThan(layout.itemLabels[1]!.width * 1.7)
   expect(Math.abs(layout.itemLabels[1]!.y - layout.itemLabels[2]!.y)).toBeLessThan(2)
   expect(Math.abs(layout.itemActions[0]!.y - layout.itemActions[1]!.y)).toBeLessThan(2)
