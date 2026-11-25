@@ -111,3 +111,98 @@
  .buy-review-bar{position:sticky;left:auto;right:auto;bottom:0;max-width:980px;margin:0 auto;border:1px solid var(--line,#e3e7e5);border-radius:14px;box-shadow:0 4px 14px rgba(30,60,90,.06)}
  .buy-receive{padding-bottom:0}
 }
+
+
+
+/* Add Purchase visual direction selected from the MagicPath prototype. Keep all
+   styling scoped to the receipt task; global shell/navigation tokens stay intact. */
+.buy-receive{max-width:780px;gap:14px}
+.buy-purchase-card{display:grid;gap:0;width:100%;min-width:0;padding:18px;background:var(--card,#fff);border:1px solid var(--line,#dfe5e2);border-radius:20px;box-shadow:0 5px 22px rgba(30,60,90,.055)}
+.buy-purchase-card>.buy-screen-heading{display:grid;gap:0;padding:0 0 17px}
+.buy-purchase-card .buy-screen-heading h2{font-size:27px;line-height:1.2;letter-spacing:-.55px;margin:0 0 6px;color:var(--ink,#202832)}
+.buy-purchase-card .buy-screen-heading p{font-size:14px;line-height:1.5;margin:0;color:var(--muted,#5b6770)}
+.buy-purchase-card>.buy-section{display:grid;gap:13px;min-width:0;padding:18px 0;border:0;border-top:1px solid var(--line,#e3e7e5);border-radius:0;background:transparent;box-shadow:none}
+.buy-purchase-card>.buy-section h3{margin:0;color:var(--brand-dark,#0b6b47);font-size:16px;line-height:1.3;font-weight:750}
+.buy-purchase-card>.buy-section p{margin:0;color:var(--muted,#5b6770);font-size:13px;line-height:1.5}
+.buy-upload-section{gap:12px}
+.buy-upload-section>div:first-child{display:grid;gap:7px}
+.buy-upload-section .invoice-upload{display:grid;gap:12px;min-width:0}
+.invoice-upload-dropzone{display:grid;gap:13px;min-width:0;padding:13px;border:1px dashed #bdd4c8;border-radius:15px;background:#f7faf8}
+.invoice-upload-intro{display:flex;align-items:center;gap:11px;min-width:0}
+.invoice-upload-icon{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;background:#e5f2ea;color:var(--brand-dark,#0b6b47)}
+.invoice-upload-icon svg{width:22px;height:22px}
+.invoice-upload-intro-copy{display:grid;gap:2px;min-width:0}
+.invoice-upload-intro-copy strong{color:var(--ink,#202832);font-size:14px;line-height:1.35}
+.invoice-upload-intro-copy small{color:var(--muted,#66717d);font-size:12px;line-height:1.4}
+.invoice-upload-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;min-width:0}
+.invoice-upload-sources button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-width:0;min-height:48px;padding:9px 10px;border:1px solid #d9e3de;border-radius:12px;background:#fff;color:var(--brand-dark,#0b6b47);font-size:14px;font-weight:650;white-space:nowrap}
+.invoice-upload-sources button:hover:not(:disabled){background:#edf6f1;color:var(--brand-dark,#0b6b47);border-color:#b8d4c4}
+.invoice-upload-sources button svg{width:19px;height:19px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.invoice-upload-sources button:focus-visible{outline:3px solid rgba(15,122,77,.3);outline-offset:2px}
+.invoice-upload-selected{overflow-wrap:anywhere;padding:8px 10px;border-radius:9px;background:#edf6f1;color:var(--brand-dark,#0b6b47);font-size:12px}
+.buy-purchase-card .buy-receipt-section .buy-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 11px}
+.buy-purchase-card .buy-receipt-section .buy-fields label:first-child,
+.buy-purchase-card .buy-receipt-section .buy-fields label:last-child{grid-column:1/-1}
+.buy-receive .buy-field-label{display:inline-flex;flex-direction:row;align-items:baseline;align-self:flex-start;gap:4px;width:auto;min-width:0;line-height:1.35}
+.buy-required{display:inline-block;flex:none;color:var(--danger,#b42318);font-size:15px;line-height:1}
+.buy-purchase-card .buy-items-section{gap:13px}
+.buy-items-section .buy-section-heading{align-items:center}
+.buy-items-section .buy-section-heading>div{display:grid;gap:5px;min-width:0}
+.buy-items-section .buy-count{padding:6px 10px;border-radius:999px;background:var(--brand-soft,#e4f3ec);color:var(--brand-dark,#0b6b47);font-size:12px;font-weight:700}
+.buy-item-entry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:12px 10px;padding:13px;border:1px solid #e2e9e5;border-radius:15px;background:#f8fbf9;min-width:0}
+.buy-item-entry .buy-product-field{grid-column:1/-1}
+.buy-item-entry label{min-width:0}
+.buy-item-entry input,.buy-item-entry select{min-width:0;min-height:48px;background:#fff}
+.buy-item-entry button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-width:0;min-height:48px;padding:9px 10px;white-space:normal;font-size:14px}
+.buy-item-entry .buy-scan{border:1px solid #b9d4c5;background:#fff;color:var(--brand-dark,#0b6b47)}
+.buy-item-entry .buy-add-line{border:1px solid var(--brand,#0f7a4d);background:var(--brand,#0f7a4d);color:#fff}
+.buy-item-entry .buy-scan:hover:not(:disabled){background:#edf6f1;color:var(--brand-dark,#0b6b47)}
+.buy-item-entry .buy-add-line:hover:not(:disabled){background:var(--brand-dark,#0b6845);color:#fff}
+.buy-item-entry-help{grid-column:1/-1;margin:0;color:var(--muted,#66717d);font-size:12px;line-height:1.45}
+.buy-line-list{gap:8px}
+.buy-line-card{padding:12px;border-radius:12px;background:#fff;border-color:#e2e9e5}
+.buy-line-card>div:first-child{min-width:0}
+.buy-line-card>div:first-child strong{font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+.buy-line-card p{font-size:12px;line-height:1.4}
+.buy-line-end>strong{font-size:13px;white-space:nowrap}
+.buy-line-end button{min-height:40px!important;padding:7px 9px}
+.buy-gst-disclosure{display:grid;gap:10px;padding-top:4px;border-top:1px solid #edf1ee}
+.buy-gst-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;min-height:52px;padding:7px 0!important;border:0!important;background:transparent!important;color:var(--brand-dark,#0b6b47)!important;text-align:left;text-decoration:none!important}
+.buy-gst-toggle:hover:not(:disabled){background:transparent!important;color:var(--brand-dark,#0b6b47)!important}
+.buy-gst-copy{display:grid;gap:3px;min-width:0}
+.buy-gst-copy strong{font-size:14px;line-height:1.3}
+.buy-gst-copy small{color:var(--muted,#66717d);font-size:12px;line-height:1.4;font-weight:450}
+.buy-gst-chevron{display:grid;place-items:center;flex:none;width:30px;height:30px;font-size:24px;line-height:1;transition:transform .16s ease}
+.buy-gst-toggle[aria-expanded="true"] .buy-gst-chevron{transform:rotate(180deg)}
+.buy-gst-field{max-width:none;padding:12px;border:1px solid #e2e9e5;border-radius:12px;background:#f8fbf9}
+.buy-estimate{border:1px solid #dce9e1;background:#f5faf7}
+.buy-guidance{padding:0 0 2px;font-size:12px!important;line-height:1.5!important}
+.buy-review-bar{bottom:calc(var(--nav-h,64px) + env(safe-area-inset-bottom));z-index:7;padding:11px max(16px,calc((100vw - 780px)/2));background:rgba(255,255,255,.98);border-top:1px solid #e3e9e5;box-shadow:0 -5px 18px rgba(30,60,90,.07)}
+.buy-review-bar-summary strong{font-size:15px}
+.buy-review-bar-summary span{font-size:12px}
+.buy-review-bar-action{min-height:48px;min-width:42%;border-radius:12px;padding:10px 15px;font-size:14px}
+.buy-receive{padding-bottom:112px}
+@media(max-width:399px){
+ .buy-purchase-card{padding:15px 13px;border-radius:17px}
+ .buy-purchase-card>.buy-section{padding:16px 0}
+ .buy-purchase-card .buy-receipt-section .buy-fields{grid-template-columns:1fr}
+ .buy-purchase-card .buy-receipt-section .buy-fields label{grid-column:1/-1}
+ .buy-item-entry{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 8px;padding:11px}
+ .buy-item-entry .buy-product-field,.buy-item-entry-help{grid-column:1/-1}
+ .buy-item-entry button{font-size:13px;padding:8px 6px}
+ .buy-line-card{align-items:flex-start}
+ .buy-line-end{flex-direction:row;align-items:center;gap:5px}
+ .buy-review-bar{gap:9px;padding-left:12px;padding-right:12px}
+ .buy-review-bar-action{min-width:44%;padding:9px 11px}
+}
+@media(min-width:700px){
+ .buy-purchase-card{padding:22px 24px}
+ .buy-purchase-card>.buy-section{padding:20px 0}
+}
+@media(min-width:960px){
+ .buy-review-bar{position:sticky;left:auto;right:auto;bottom:0;max-width:780px;margin:0 auto;padding:11px 16px;border:1px solid var(--line,#dfe5e2);border-radius:14px;box-shadow:0 4px 14px rgba(30,60,90,.06)}
+ .buy-receive{padding-bottom:0}
+}
+@media(prefers-reduced-motion:reduce){
+ .buy-gst-chevron{transition:none}
+}
