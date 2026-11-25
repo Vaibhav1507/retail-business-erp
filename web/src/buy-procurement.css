@@ -244,7 +244,7 @@
 
 
 /* Match the MagicPath Add Purchase composition at the target Android width. */
-.buy-upload-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.buy-purchase-card .buy-upload-section > .buy-upload-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
 .buy-upload-heading>div{display:grid;gap:7px;min-width:0}
 .buy-optional-badge{flex:none;padding:6px 11px;border-radius:999px;background:#f0f5f1;color:#87958d;font-size:11px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
 
@@ -252,6 +252,7 @@
    Only genuinely narrow devices stack the related metadata fields. */
 @media (min-width:360px) and (max-width:899px){
   .buy-purchase-card .buy-receipt-section .buy-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .buy-purchase-card .buy-receipt-section .buy-fields label{grid-column:auto}
   .buy-purchase-card .buy-receipt-section .buy-fields label:first-child,
   .buy-purchase-card .buy-receipt-section .buy-fields label:last-child{grid-column:1/-1}
 }
