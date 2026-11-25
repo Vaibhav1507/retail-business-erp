@@ -260,13 +260,23 @@
   font-size:11px;
   line-height:1.25;
  }
- .stock-page .stock-inventory-filters[role="search"] .stock-filter-category,
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-search{
+  grid-column:1/-1;
+  grid-row:1;
+ }
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-category{
+  grid-column:1;
+  grid-row:2;
+  min-width:0;
+ }
  .stock-page .stock-inventory-filters[role="search"] .stock-filter-availability{
-  grid-column:auto;
+  grid-column:2;
+  grid-row:2;
   min-width:0;
  }
  .stock-page .stock-inventory-filters[role="search"] .stock-filter-supplier{
   grid-column:1/-1;
+  grid-row:3;
   min-width:0;
  }
 }
