@@ -216,12 +216,15 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
             <dt>GST</dt><dd>{GST.find(g => g[0] === p.gstStatus)?.[1]}{needsGstin(p.gstStatus) ? `, ${p.gstin}` : ''}</dd>
             <dt>Financial year</dt><dd>Starts in {MONTHS[p.financialYearStartMonth - 1]}</dd><dt>Language and currency</dt><dd>English, INR</dd>
           </dl>
-          <aside className="billing-card setup-invoice-preview" aria-label="Sample invoice preview"><strong>{t('onboarding.sampleInvoiceTitle')}</strong>
-            <p>{p.businessName || 'Your shop name'} · {p.city || 'Your city'}</p>
-            <div className="table-scroll"><table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody><tr><td>Sample product</td><td>1</td><td>₹100.00</td></tr></tbody></table></div>
-            <p><strong>Total: ₹100.00</strong></p>
-            <p className="hint">{p.gstStatus === 'Regular' || p.gstStatus === 'Composition' ? t('onboarding.sampleInvoiceRegistered') : p.gstStatus === 'NotRegistered' ? t('onboarding.sampleInvoiceNotRegistered') : t('onboarding.sampleInvoicePending')}</p>
-          </aside>
+          <details className="setup-invoice-disclosure">
+            <summary>See what a sample invoice could look like</summary>
+            <aside className="billing-card setup-invoice-preview" aria-label="Sample invoice preview"><strong>{t('onboarding.sampleInvoiceTitle')}</strong>
+              <p>{p.businessName || 'Your shop name'} · {p.city || 'Your city'}</p>
+              <div className="table-scroll"><table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody><tr><td>Sample product</td><td>1</td><td>₹100.00</td></tr></tbody></table></div>
+              <p><strong>Total: ₹100.00</strong></p>
+              <p className="hint">{p.gstStatus === 'Regular' || p.gstStatus === 'Composition' ? t('onboarding.sampleInvoiceRegistered') : p.gstStatus === 'NotRegistered' ? t('onboarding.sampleInvoiceNotRegistered') : t('onboarding.sampleInvoicePending')}</p>
+            </aside>
+          </details>
         </>}
         {error && <p role="alert" className="wide">{error}</p>}
         <div className="step-actions">
