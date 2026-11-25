@@ -164,8 +164,8 @@ export function Procurement({ products, locations, reload, show }: { products: (
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
               {tr('buy.addItem')}
             </button>
+            <p className="buy-item-entry-help">{tr('buy.productEntryHelp')}</p>
           </div>
-          <p className="buy-item-entry-help">{tr('buy.productEntryHelp')}</p>
           <div className="buy-gst-disclosure">
             <button type="button" className="buy-gst-toggle" aria-expanded={showGst || Number(gst) > 0} onClick={() => setShowGst(x => !x)}>
               <span className="buy-gst-copy"><strong>{tr('buy.gstHeading')}</strong><small>{tr('buy.gstOptionalHelp')}</small></span>
