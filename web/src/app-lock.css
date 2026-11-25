@@ -199,3 +199,127 @@
   font-size: 14px;
   line-height: 20px;
 }
+
+
+/* Compact default unlock state: keep Unlock and Sign out together in the first viewport. */
+.app-lock-screen-compact {
+  min-height: 100svh;
+  padding-top: 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.app-lock-screen-compact .auth-brand {
+  margin-bottom: 12px;
+}
+
+.app-lock-screen-compact .app-lock-card {
+  gap: 10px;
+}
+
+.app-lock-screen-compact .app-lock-hero {
+  gap: 6px;
+}
+
+.app-lock-screen-compact .app-lock-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 26px;
+}
+
+.app-lock-screen-compact .app-lock-hero h1 {
+  font-size: 23px;
+  line-height: 29px;
+}
+
+.app-lock-screen-compact .app-lock-hero p {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-lock-screen-compact .app-lock-pin-indicators {
+  min-height: 16px;
+}
+
+.app-lock-screen-compact .app-lock-pin-indicators span {
+  width: 14px;
+  height: 14px;
+}
+
+.app-lock-screen-compact .app-lock-pin-fields {
+  gap: 8px;
+}
+
+.app-lock-screen-compact .app-lock-pin-field {
+  gap: 6px;
+}
+
+.app-lock-screen-compact .app-lock-pin-field input {
+  min-height: 52px;
+  height: 52px;
+  font-size: 22px;
+  line-height: 28px;
+}
+
+.app-lock-screen-compact .app-lock-keypad {
+  gap: 8px;
+}
+
+.app-lock-screen-compact .app-lock-keypad button {
+  min-height: 44px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-radius: 14px;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.app-lock-screen-compact .app-lock-keypad button.app-lock-keypad-action {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.app-lock-screen-compact .app-lock-unlock {
+  min-height: 48px;
+}
+
+.app-lock-screen-compact .auth-signout-link {
+  min-height: 40px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.app-lock-screen-compact .app-lock-note {
+  font-size: 12px;
+  line-height: 17px;
+}
+
+@media (max-height: 760px) {
+  .app-lock-screen-compact {
+    padding-top: 8px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .app-lock-screen-compact .auth-brand {
+    margin-bottom: 8px;
+  }
+
+  .app-lock-screen-compact .app-lock-card {
+    gap: 8px;
+  }
+
+  .app-lock-screen-compact .app-lock-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  .app-lock-screen-compact .app-lock-pin-field input {
+    min-height: 48px;
+    height: 48px;
+  }
+
+  .app-lock-screen-compact .app-lock-keypad {
+    gap: 6px;
+  }
+}

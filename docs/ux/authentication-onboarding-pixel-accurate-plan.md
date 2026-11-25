@@ -1,6 +1,6 @@
 # RBOS Authentication & Onboarding — Pixel-Accurate Implementation Plan
 
-**Status:** Design specification / implementation plan; implementation not started  
+**Status:** Authentication/onboarding implementation merged in PR #102; device PIN single-viewport follow-up in progress  
 **Repository:** \`Vaibhav1507/retail-business-erp\`  
 **Base inspected:** current \`main\` (HEAD \`a97f156ce00cffb0df815560e4c3384e4d625f91\`)  
 **Working branch:** \`ux/authentication-onboarding-pixel-accurate\`  
@@ -292,3 +292,35 @@ The post-implementation Android screenshots were reviewed as the current RBOS ap
 **Screenshot acceptance:** at 360, 390 and 412 px widths, the password label must remain on one line; helper text must remain readable; the review page must show the business summary and create-account actions without an expanded sample card; opening the disclosure must reveal the complete example and the correct GST explanation. Form controls and buttons remain at least 48 px high.
 
 The first two permitted RBOS Visual Audit attempts for PR #101 failed during Playwright discovery with “No tests found”; per the agreed retry limit, no further attempts are required. This follow-up should use regular CI and focused tests. Do not claim browser screenshot or Axe verification unless those checks actually execute.
+
+
+## 13. Android screenshot follow-up — compact device unlock
+
+The latest Android screenshots show that the default **Unlock your shop** state still requires vertical scrolling to reach Sign out. The visual direction is accepted; this is a narrow layout correction, not a redesign.
+
+### Scope and decision
+
+- Apply compact spacing only to the existing-PIN, normal unlock state. Keep PIN setup and change-PIN states on their existing flexible layout.
+- Preserve the brand row, lock icon, heading, PIN indicators, PIN input, 3-column keypad, Unlock action, local privacy-lock explanation and Sign out action.
+- Reduce vertical whitespace and modestly compact the lock tile, PIN input and keypad rows. Keep keypad controls at least 44 px high and Unlock at least 48 px high.
+- Move **Sign out immediately after Unlock** in the visual and DOM order.
+- Keep the privacy explanation after Sign out, shortened without changing its security meaning.
+- Keep the page content naturally sized so an error or very short viewport can still scroll rather than clipping feedback.
+
+### Acceptance criteria
+
+1. At the standard Android phone viewport, the default unlock state shows the complete brand, PIN entry, keypad, Unlock and Sign out without vertical scrolling.
+2. Sign out is the next action directly below Unlock.
+3. The privacy explanation remains readable below Sign out.
+4. Keypad targets remain at least 44 × 44 CSS px; Unlock remains at least 48 px high.
+5. PIN entry, clear, backspace, keyboard entry, lockout, verifier, inactivity lock and server-backed sign-out behaviour remain unchanged.
+6. Setup/change-PIN states are not forced into the compact unlock geometry.
+
+### Implementation / validation ledger
+
+- Changed: `web/src/AppLock.tsx`, `web/src/app-lock.css`, and focused coverage in `web/src/AuthScreens.test.tsx`.
+- Branch: `ux/app-lock-single-screen-layout`.
+- Focused test asserts the compact unlock state and that Sign out follows Unlock in document order.
+- Pending: frontend CI and user review of a fresh Android screenshot.
+- The earlier two permitted RBOS Visual Audit attempts for PR #101 failed at Playwright discovery with “No tests found”; no further Visual Audit retry is planned for this isolated CSS/layout correction.
+- No authentication/PIN security logic, API, backend, database, merge or deployment changes are included.
