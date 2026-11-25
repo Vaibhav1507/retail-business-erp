@@ -46,6 +46,7 @@ function stepError(step: number, p: Profile): string {
 }
 
 const STEPS = ['Business', 'Address and tax', 'Preferences']
+const SIGNUP_STEP_TITLES = ['Your account', 'Your shop', 'Shop address', 'Preferences', 'Review']
 const MOBILE_RE = /^[6-9][0-9]{9}$/
 
 function MobileVerify({ signup, mobile, setMobile, verified, onVerified }: { signup: boolean; mobile: string; setMobile: (m: string) => void; verified: boolean; onVerified: (m: string, proof?: string) => void }) {
@@ -106,6 +107,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
   const set = (patch: Partial<Profile>) => setP(prev => ({ ...prev, ...patch }))
   const review = step === 3 + off
   const passwordError = password.length < 12 ? 'Password must be at least 12 characters.' : !/\d/.test(password) ? 'Password must include at least one number.' : ''
+  const signupProgress = Math.round(((step + 1) / 5) * 100)
 
   function next() {
     let e = ''
@@ -132,18 +134,46 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
   }
 
   return (
-    <div className="setup">
+    <div className={signup ? 'setup auth-signup-flow' : 'setup'}>
+      {signup && step > 0 && onCancel && (
+        <button type="button" className="auth-back-link" onClick={onCancel}>← Back to sign in</button>
+      )}
       <h2>{editing ? 'Business profile' : signup ? 'Create your account' : 'Set up your business'}</h2>
       {!editing && <p className="hint">This takes about a minute and is asked only once. Fields marked * are required.</p>}
       {locked && <p className="hint">Business name, category and owner cannot be changed after setup. The mobile number can be changed after verifying the new number with a code.</p>}
-      <ol className="progress" aria-label="Progress">
-        {[...(signup ? ['Account'] : []), ...STEPS, 'Review'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : ''}><span>{i + 1}</span>{s}</li>)}
-      </ol>
-      <form onSubmit={e => { e.preventDefault(); review ? save() : next() }} aria-label="Business profile">
+
+      {signup ? (
+        <section className="auth-signup-progress" aria-label="Signup progress">
+          <div className="auth-signup-progress-head">
+            <span>STEP {step + 1} OF 5</span>
+            <span>{signupProgress}% complete</span>
+          </div>
+          <div
+            className="auth-signup-progress-track"
+            role="progressbar"
+            aria-label="Account setup progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={signupProgress}
+            aria-valuetext={`Step ${step + 1} of 5`}
+          >
+            <div className="auth-signup-progress-fill" style={{ width: `${signupProgress}%` }} />
+          </div>
+          <p className="auth-signup-step-title">{SIGNUP_STEP_TITLES[step]}</p>
+        </section>
+      ) : (
+        <ol className="progress" aria-label="Progress">
+          {STEPS.concat('Review').map((s, i) => (
+            <li key={s} aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : ''}><span>{i + 1}</span>{s}</li>
+          ))}
+        </ol>
+      )}
+
+      <form className={signup ? 'auth-signup-form' : undefined} onSubmit={e => { e.preventDefault(); review ? save() : next() }} aria-label="Business profile">
         {signup && step === 0 && <>
           <label className="wide">Email *<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
           <label className="wide">Password * (at least 12 characters, including a number)<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" aria-invalid={!!password && !!passwordError} /></label>
-                    {password && passwordError && <p className="error" role="alert">{passwordError}</p>}
+          {password && passwordError && <p className="error" role="alert">{passwordError}</p>}
           {otp ? <MobileVerify signup mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={(m, pr) => { setVerifiedMobile(m); if (pr) setProof(pr) }} />
             : <label className="wide">Mobile number *<input inputMode="numeric" value={p.mobile} onChange={e => set({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit number" autoComplete="tel-national" /></label>}
         </>}
@@ -197,7 +227,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
         <div className="step-actions">
           {step > 0 && <button type="button" className="secondary" onClick={() => { setError(''); setStep(step - 1) }}>Back</button>}
           {step === 0 && onCancel && <button type="button" className="secondary" onClick={onCancel}>Cancel</button>}
-          <button type="submit" disabled={busy}>{review ? (busy ? 'Saving...' : editing ? 'Save changes' : signup ? 'Create account' : 'Finish setup') : step === 2 + off ? 'Review' : 'Next'}</button>
+          <button type="submit" disabled={busy}>{review ? (busy ? 'Saving...' : editing ? 'Save changes' : signup ? 'Create account' : 'Finish setup') : signup ? (step === 2 + off ? 'Review' : 'Continue') : step === 2 + off ? 'Review' : 'Next'}</button>
         </div>
       </form>
     </div>
