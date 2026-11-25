@@ -116,7 +116,7 @@
 
 /* Add Purchase visual direction selected from the MagicPath prototype. Keep all
    styling scoped to the receipt task; global shell/navigation tokens stay intact. */
-.buy-receive{max-width:780px;gap:14px}
+.buy-receive{width:100%;max-width:none;min-width:0;gap:14px}
 .buy-purchase-card{display:grid;gap:0;width:100%;min-width:0;padding:18px;background:var(--card,#fff);border:1px solid var(--line,#dfe5e2);border-radius:20px;box-shadow:0 5px 22px rgba(30,60,90,.055)}
 .buy-purchase-card>.buy-screen-heading{display:grid;gap:0;padding:0 0 17px}
 .buy-purchase-card .buy-screen-heading h2{font-size:27px;line-height:1.2;letter-spacing:-.55px;margin:0 0 6px;color:var(--ink,#202832)}
@@ -212,7 +212,7 @@
 
 /* Final Add Purchase visual refinements from the latest supplied MagicPath screens. */
 .buy-receive,.buy-purchase-card,.buy-purchase-card *{box-sizing:border-box}
-.buy-receive{width:100%;max-width:780px;margin-inline:auto}
+.buy-receive{width:100%;max-width:none;min-width:0;margin-inline:0}
 .buy-purchase-card{overflow:visible}
 .buy-receive .buy-field-label{display:inline-flex;flex-direction:row;align-items:baseline;gap:4px;width:fit-content;max-width:100%;white-space:nowrap}
 .buy-receive .buy-required{flex:0 0 auto;white-space:nowrap}
@@ -292,8 +292,10 @@
 
 /* The MagicPath reference keeps Buy actions in a single horizontal tab row.
    Preserve all four destinations; the last one remains reachable by scrolling. */
-.stock-page .buy-tabs{display:flex;flex-wrap:nowrap;gap:8px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:4px}
-.stock-page .buy-tabs a{flex:0 0 auto;width:auto;min-width:max-content;white-space:nowrap}
+.stock-page:has(.buy-tabs){width:100%;max-width:100%;min-width:0}
+.stock-page .buy-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;max-width:100%;min-width:0;overflow:visible;padding:0 0 4px}
+.stock-page .buy-tabs a{display:flex;flex:initial;align-items:center;justify-content:center;width:100%;min-width:0;max-width:100%;min-height:48px;padding:8px 10px;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.2}
+@media(min-width:700px){.stock-page .buy-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}}
 
 @media(max-width:899px){
   .billing-screen.buy-receive-shell > .buy-receive .buy-review-bar{
@@ -313,3 +315,11 @@
    Supplier bill is a region for accessibility, not a second visual card. */
 .buy-upload-section .invoice-upload[role="region"]{display:grid;gap:12px;min-width:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 .buy-purchase-card .buy-upload-section .invoice-upload-intro{display:flex!important;flex-direction:row!important;align-items:center;gap:11px;min-width:0}
+
+
+/* Full-width Add Purchase sections: prevent intrinsic sizing from squeezing upload and supplier controls. */
+.buy-purchase-card>.buy-upload-section,.buy-purchase-card>.buy-receipt-section,.buy-purchase-card>.buy-items-section{width:100%;max-width:100%;min-width:0}
+.buy-purchase-card .buy-upload-section .invoice-upload,.buy-purchase-card .buy-upload-section .invoice-upload-dropzone,.buy-purchase-card .buy-upload-section .invoice-upload-inner,.buy-purchase-card .buy-upload-section .invoice-upload-sources{width:100%;max-width:100%;min-width:0}
+.buy-purchase-card .buy-receipt-section .buy-fields>label:first-child,.buy-purchase-card .buy-receipt-section .buy-fields>label:last-child{grid-column:1/-1;width:100%;min-width:0}
+.buy-purchase-card .buy-items-section .buy-item-entry{width:100%;max-width:100%;min-width:0}
+.buy-purchase-card .buy-items-section .buy-item-entry>label.buy-product-field{grid-column:1/-1;width:100%;max-width:100%;min-width:0}

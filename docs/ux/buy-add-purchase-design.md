@@ -302,3 +302,18 @@ No route, API, OCR extraction/mapping, barcode resolution, purchase payload/idem
 ### Supplier bill region styling correction — 2026-11-25
 
 The InvoiceUpload component retains its accessible `role="region"`, but on Add Purchase that semantic wrapper must not receive the generic billing-region card styling. Reset its border, padding, background and shadow so only the dashed dropzone is visible. Keep `.invoice-upload-intro` explicitly horizontal (icon + copy); keep Camera and Upload equal-width in one row. The Playwright audit asserts these computed styles.
+
+
+## 18. Android width containment and no-horizontal-scroll correction — 2026-11-25
+
+The latest Android screenshots show the Buy content horizontally displaced and the supplier-bill and supplier controls narrower than the available task-card width. This is a visual/layout defect only.
+
+- The four Buy destinations fit in a two-column grid on phone widths and a four-column row on wider screens. Do not use a horizontally scrollable tab strip.
+- Add Purchase uses the full width available inside the app content region rather than an arbitrary 780px cap on phones or tablets.
+- Supplier bill heading, upload region, dashed panel, Camera/Upload row and Supplier selector use the full available task-card width. Invoice reference remains full-width.
+- Stock location and receipt date remain paired on normal phone widths; stack only below the narrow-phone breakpoint.
+- The Product selector row spans the full item editor width; Quantity/Unit cost and Scan barcode/Add item remain paired rows.
+- No page-level or in-surface horizontal scrolling is allowed on Add Purchase. Long labels and values wrap within their own controls; native camera/file-picker surfaces retain their platform behaviour.
+- The fixed Review purchase bar and bottom navigation remain unchanged and must stay within viewport bounds.
+
+Acceptance: at 360×800, 390×844 and 412×915, document scroll width equals viewport width; Buy tabs have no horizontal overflow; all Add Purchase sections and controls stay within the task card; upload and Supplier are full-width; Product spans the item editor; footer stays fixed above navigation. Existing purchase/OCR/barcode/GST/stock/WAC/payable/idempotency/accounting contracts remain unchanged.
