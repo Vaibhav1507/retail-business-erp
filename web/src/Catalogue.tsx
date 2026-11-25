@@ -127,7 +127,12 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   )
 }
 
-export function Catalogue({ reload, businessCategory }: { reload: () => void; businessCategory?: string | null }) {
+export function Catalogue({ reload, businessCategory, stockRows = [] }: { reload: () => void; businessCategory?: string | null; stockRows?: { productId: string; quantity: number }[] }) {
+  const stockByProduct = useMemo(() => {
+    const totals = new Map<string, number>()
+    stockRows.forEach(row => totals.set(row.productId, (totals.get(row.productId) ?? 0) + row.quantity))
+    return totals
+  }, [stockRows])
   const [q, setQ] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -212,7 +217,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
     try { await api('PUT', `/categories/${renaming.id}`, { name: renaming.name }); setRenaming(null); load().catch(() => undefined); reload() } catch (err) { setError(msg(err)) }
   }
 
-  const [view, setView] = useState<'list' | 'form' | 'categories' | 'master'>('list')
+  const [view, setView] = useState<'list' | 'form' | 'import' | 'categories' | 'master'>('list')
   useEffect(() => {
     if (view !== 'master') return
     const t = setTimeout(() => { loadMaster().catch(e => setError(msg(e))) }, 150)
@@ -242,6 +247,12 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   const closeForm = () => { setEditing(null); setScanned(null); setView('list') }
 
   return (
+    <div className="catalogue-page">
+      {view !== 'form' && view !== 'import' && <div className="page-title catalogue-page-title">
+        <span className="catalogue-stock-badge">STOCK</span>
+        <h2>{view === 'master' ? 'Shared catalogue' : view === 'categories' ? 'Categories' : 'My products'}</h2>
+        <p>{view === 'master' ? 'Find products from the shared catalogue.' : view === 'categories' ? 'Organise the products you sell.' : 'Find, add and update products you sell.'}</p>
+      </div>}
 	<section aria-label="Products" className="catalogue-screen">
 	  <nav className="tabs" aria-label="Product sections">
 		{tabs.map(([k, n]) => <a key={k} href="#/stock/products" aria-current={(view === k || (view === 'form' && k === 'list')) ? 'true' : undefined} onClick={e => { e.preventDefault(); setEditing(null); setView(k) }}>{n}</a>)}
@@ -281,9 +292,21 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
           : <ProductForm key={scanned?.code ?? 'new'} initial={blank} categories={categories} editingId={null} businessCategory={businessCategory} barcode={scanned} onSaved={saved} onCancel={closeForm} />}
       </section>
     </div>
-  )}  {view === 'list' && (
+  )}  {view === 'import' && (
+    <div className="catalogue-import-page">
+      <p className="catalogue-back"><a href="#/stock/products" onClick={e => { e.preventDefault(); setView('list') }}>← Back to products</a></p>
+      <div className="catalogue-section-heading"><h3>Import product list</h3><p>Add many products from a file or photo. Review every item before importing.</p></div>
+      <div className="import-block"><SetupAssistant reload={() => { load().catch(() => undefined); reload() }} /></div>
+      <ManufacturerRegistry />
+    </div>
+  )}
+  {view === 'list' && (
 		<>
-		  <div className="stock-actions"><button type="button" onClick={startAdd}>Add product</button> <button type="button" className="secondary" onClick={() => setScanning(true)}>Scan barcode</button></div>
+		  <div className="catalogue-actions">
+            <button type="button" onClick={startAdd}>＋ Add product</button>
+            <button type="button" className="secondary" onClick={() => setScanning(true)}>▥ Scan barcode</button>
+            <button type="button" className="secondary catalogue-import-button" onClick={() => setView('import')}>⇧ Import list</button>
+          </div>
 		  {scanning && <BarcodeScanner onScan={onScan} onClose={() => setScanning(false)} />}
 		  <div role="search">
 			<label>Search <input type="search" placeholder="Name, brand, model, SKU, colour..." value={q} onChange={e => setQ(e.target.value)} /></label>
@@ -295,26 +318,40 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 			</label>
 			<label><input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} /> Show inactive</label>
 		  </div>
-		  <Paged rows={items}>{page => (
-			<div className="table-scroll">
-			  <table aria-label="My products">
-				<thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / model</th><th>Details</th><th>Source</th><th>Actions</th></tr></thead>
-				<tbody>
-				  {page.map(p => (
-					<tr key={p.id} style={p.isActive ? undefined : { opacity: 0.55 }}>
-					  <td data-label="SKU">{p.sku}</td><td data-label="Name">{p.name}{p.isActive ? '' : ' (inactive)'}</td><td data-label="Category">{p.category}</td><td data-label="Unit">{p.unit}</td>
-					  <td data-label="Brand / model">{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
-					  <td data-label="Details">{Object.entries(p.attributes).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(', ')}{p.specs && Object.keys(p.specs).length > 0 && <div className="hint-line">{Object.entries(p.specs).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ')}</div>}{p.possibleDuplicate && <div className="hint-line" role="status">Possible duplicate: same brand and model number as another product. Review before merging.</div>}</td>
-					  <td data-label="Source">{(p.sources ?? []).length === 0 ? '-' : <ul className="plain-list">{p.sources!.map((s, i) => <li key={i}>{sourceLabel(s)}</li>)}</ul>}</td>
-					  <td data-label="Actions"><button type="button" className="secondary" onClick={() => { setEditing(p); setView('form') }} aria-label={`Edit ${p.name}`}>Edit</button></td>
-					</tr>
-				  ))}
-				  {items.length === 0 && <tr><td colSpan={8}>No products match.</td></tr>}
-				</tbody>
-			  </table>
-			</div>
-		  )}</Paged>
-		</>
+		  <Paged rows={items} label="products" showPagination>
+            {page => (
+              <div className="catalogue-product-list">
+                {page.map(p => {
+                  const available = stockByProduct.get(p.id) ?? 0
+                  const brandModel = p.isGeneric ? 'Generic' : [p.brand, p.model].filter(Boolean).join(' / ') || '—'
+                  const details = Object.entries({ ...(p.attributes ?? {}), ...(p.specs ?? {}) }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join('; ') || '—'
+                  const source = (p.sources ?? []).map(sourceLabel).join(', ') || '—'
+                  return (
+                    <article className="catalogue-product-card" key={p.id} style={p.isActive ? undefined : { opacity: 0.62 }}>
+                      <header className="catalogue-product-card-head">
+                        <span className="catalogue-product-mark" aria-hidden="true">{(p.brand || p.name).trim().charAt(0).toUpperCase() || 'P'}</span>
+                        <div className="catalogue-product-identity">
+                          <strong>{p.name}{p.isActive ? '' : ' (inactive)'}</strong>
+                          <span>{p.sku} · {p.category}</span>
+                        </div>
+                        <button type="button" className="catalogue-product-edit" onClick={() => { setEditing(p); setView('form') }} aria-label={`Edit ${p.name}`}>Edit</button>
+                      </header>
+                      <div className="catalogue-product-facts">
+                        <div><span>Brand / model</span><strong>{brandModel}</strong></div>
+                        <div><span>Unit</span><strong>{p.unit}</strong></div>
+                        <div><span>Available</span><strong>{available}</strong></div>
+                        <div><span>Status</span><strong><span className={'badge ' + (available > 0 ? 'ok' : 'out')}>{available > 0 ? 'In stock' : 'Out of stock'}</span></strong></div>
+                      </div>
+                      <details className="catalogue-product-more">
+                        <summary>More details</summary>
+                        <div className="catalogue-product-extra"><div><span>Details</span><strong>{details}</strong></div><div><span>Source</span><strong>{source}</strong></div></div>
+                      </details>
+                    </article>
+                  )
+                })}
+                {items.length === 0 && <p className="empty">No products match.</p>}
+              </div>
+            )}</Paged>		</>
 	  )}
 	  {view === 'master' && (
         <>
@@ -367,5 +404,6 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 		</>
 	  )}
 	</section>
+    </div>
   )
 }
