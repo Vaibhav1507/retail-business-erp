@@ -87,6 +87,9 @@ describe('RBOS authentication screens', () => {
     await user.click(screen.getByRole('button', { name: 'Review' }))
 
     expect(screen.getByText('STEP 5 OF 5')).toBeInTheDocument()
+    const invoiceDisclosure = screen.getByText('See what a sample invoice could look like').closest('details')
+    expect(invoiceDisclosure).toBeInTheDocument()
+    expect(invoiceDisclosure).not.toHaveAttribute('open')
     expect(document.querySelector('.setup-invoice-preview')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
