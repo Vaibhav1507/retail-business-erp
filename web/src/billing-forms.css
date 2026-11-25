@@ -352,3 +352,43 @@
 .opening-stock-screen>.opening-stock-footer{display:flex}
 
 .opening-stock-field>label{flex:none}
+
+
+/* Adjust Stock — MagicPath-aligned presentation; all rules are screen-scoped. */
+.stock-adjustment-container { width: 100%; }
+.stock-adjustment-screen { width: 100%; }
+.stock-adjustment-panel { width: 100%; max-width: 760px; margin: 0 auto; padding: 24px; background: #fff; border: 1px solid var(--line, #dfe5e2); border-radius: 20px; box-shadow: 0 4px 14px rgba(30, 60, 50, .045); }
+.stock-adjustment-intro { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 8px 12px; padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid var(--line, #e3e7e5); }
+.stock-adjustment-eyebrow { color: var(--brand, #107c52); font-size: 12px; line-height: 1.3; font-weight: 700; letter-spacing: .11em; }
+.stock-adjustment-step { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--brand-soft, #e8f5ee); color: var(--brand-dark, #075d3f); font-size: 15px; font-weight: 700; }
+.stock-adjustment-intro h2 { grid-column: 1; margin: 0; color: var(--ink, #20272d); font-size: 25px; line-height: 1.2; font-weight: 500; }
+.stock-adjustment-intro p { grid-column: 1 / -1; margin: 0; color: var(--muted, #68727a); font-size: 15px; line-height: 1.45; }
+.stock-adjustment-form { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.stock-adjustment-form label { display: flex; flex-direction: column; gap: 7px; min-width: 0; color: var(--muted, #5b6770); font-size: 14px; line-height: 1.3; font-weight: 600; }
+.stock-adjustment-form input, .stock-adjustment-form select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 52px; padding: 11px 14px; border: 1px solid #d2d9d6; border-radius: 13px; background: #fff; color: var(--ink, #20272d); font: inherit; font-size: 16px; font-weight: 400; }
+.stock-adjustment-form input:focus, .stock-adjustment-form select:focus { outline: 2px solid color-mix(in srgb, var(--brand, #107c52) 30%, transparent); outline-offset: 1px; border-color: var(--brand, #107c52); }
+.stock-adjustment-direction { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; padding: 10px 14px; border: 1px solid #e0e8e4; border-radius: 13px; background: #f7faf8; color: var(--ink, #20272d); font-size: 14px; }
+.stock-adjustment-direction strong { font-size: 14px; font-weight: 700; }
+.stock-adjustment-direction .is-decrease { color: #a34c48; }
+.stock-adjustment-direction .is-increase { color: #13734f; }
+.stock-adjustment-warning { margin: 0; padding: 13px 15px; border-radius: 13px; background: #fff7e8; color: #78613a; font-size: 13px; line-height: 1.5; }
+.stock-adjustment-form > button { justify-self: start; min-width: 190px; min-height: 50px; padding: 11px 20px; border: 1px solid var(--brand, #107c52); border-radius: 12px; background: var(--brand, #107c52); color: #fff; font-size: 16px; font-weight: 700; }
+.stock-adjustment-form > button:disabled { opacity: .55; cursor: not-allowed; }
+.stock-adjustment-history { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line, #e3e7e5); }
+.stock-adjustment-history h3 { margin: 0 0 14px; color: var(--ink, #20272d); font-size: 19px; line-height: 1.3; }
+.stock-adjustment-history > p { margin: 0; color: var(--muted, #68727a); font-size: 15px; }
+.stock-adjustment-list { display: grid; gap: 9px; }
+.stock-adjustment-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 13px 14px; border: 1px solid var(--line, #e3e7e5); border-radius: 13px; background: #fff; }
+.stock-adjustment-row > div:first-child, .stock-adjustment-amount { display: grid; gap: 4px; min-width: 0; }
+.stock-adjustment-row strong { overflow-wrap: anywhere; color: var(--ink, #20272d); font-size: 14px; line-height: 1.35; }
+.stock-adjustment-row span { color: var(--muted, #68727a); font-size: 12px; line-height: 1.4; }
+.stock-adjustment-amount { flex: 0 0 auto; text-align: right; }
+@media (max-width: 700px) {
+  .stock-adjustment-panel { padding: 18px 16px; border-radius: 18px; box-shadow: none; }
+  .stock-adjustment-intro { padding-bottom: 18px; margin-bottom: 18px; }
+  .stock-adjustment-intro h2 { font-size: 24px; }
+  .stock-adjustment-form { gap: 16px; }
+  .stock-adjustment-form input, .stock-adjustment-form select { min-height: 50px; }
+  .stock-adjustment-form > button { width: 100%; min-height: 50px; }
+  .stock-adjustment-history { margin-top: 24px; padding-top: 20px; }
+}
