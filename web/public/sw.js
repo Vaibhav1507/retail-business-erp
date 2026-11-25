@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'rbos-shell-'
 const CACHE_NAME = CACHE_PREFIX + 'v1'
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/logo-mark.svg']
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/logo-mark.svg', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png']
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {

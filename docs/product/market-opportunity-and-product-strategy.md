@@ -1,4 +1,4 @@
-# Retail Business OS — Market Opportunity, Product Strategy & Segment Readiness
+# Dhandha Mitra — Market Opportunity, Product Strategy & Segment Readiness
 
 **Status:** Product strategy assessment — proposed direction for validation  
 **Last reviewed:** 2026-11-17  

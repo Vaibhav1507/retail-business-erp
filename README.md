@@ -1,6 +1,6 @@
-# Retail Business OS
+# Dhandha Mitra
 
-India-first, multilingual, multitenant retail operating system for small shops in towns and villages. Personal learning project; free-first, local-first and synthetic-data-first.
+Dhandha Mitra is an India-first, multilingual, multitenant retail operating system for small shops in towns and villages. Engineering codename: RBOS. Personal learning project; free-first, local-first and synthetic-data-first.
 
 ## Current status
 

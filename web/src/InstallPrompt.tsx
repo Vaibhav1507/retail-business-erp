@@ -40,7 +40,7 @@ export function InstallPrompt() {
     <div className="install-prompt" role="region" aria-label="Install app">
       <p>
         {event
-          ? 'Add Retail Business OS to your home screen to open it like an app.'
+          ? 'Add Dhandha Mitra to your home screen to open it like an app.'
           : 'To add this app to your home screen: tap the Share button, then "Add to Home Screen".'}
       </p>
       <div className="install-actions">

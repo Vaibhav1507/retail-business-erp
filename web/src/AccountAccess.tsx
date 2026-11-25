@@ -212,7 +212,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
         </form>
 
         <div className="auth-account-switch">
-          <p>New to RBOS?</p>
+          <p>New to Dhandha Mitra?</p>
           <button type="button" onClick={() => { setRegister(true); setError('') }}>
             Create your shop account
           </button>
