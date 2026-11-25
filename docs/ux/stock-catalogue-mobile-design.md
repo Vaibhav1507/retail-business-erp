@@ -36,7 +36,7 @@ The supplied screenshots show:
 
 ### Prototype review and final refinement
 
-The MagicPath component source was inspected screen by screen for Stock, My Products, Shared Catalogue, Categories, Add/Edit Product, Bulk Import, Opening Stock, Adjust Stock, barcode capture and the Add Purchase handoff. The final refinement build completed successfully and its rendered Stock landing preview was inspected. The supplied Android screenshots remain the visual baseline for the other screens; the generated preview is not represented as proof of every responsive state.
+The initial MagicPath component source and the supplied Android screenshots were inspected for Stock, My Products, Shared Catalogue, Categories, Add/Edit Product, Bulk Import, Opening Stock, Adjust Stock, barcode capture and the Add Purchase handoff. A later attempt to re-fetch the revised MagicPath revision was blocked by the account's external-agent API quota (50/50 used), so the latest revised revision and its render could not be independently verified. The repository design specification is therefore the approved design contract and records the final decisions. Do not claim the revised MagicPath revision itself is visually verified.
 
 Final refinements:
 - Category rows use compact Rename actions, accurate singular/plural count copy and a warning for likely singular/plural duplicate names (for example, Air Cooler / Air Coolers). The prototype does not merge categories automatically.
@@ -45,7 +45,7 @@ Final refinements:
 - The persistent summary/action is contextual: Stock offers Manage products; Opening Stock offers Review starting stock; unrelated catalogue screens do not carry a redundant Stock overview footer.
 - The existing RBOS business-category-aware product attributes remain the implementation reference; do not hard-code electronics-only attributes for every business vertical.
 
-MagicPath build status: completed. The prototype remains a seeded interactive design reference: its local demo actions do not post to RBOS APIs, update live inventory, import files, link barcodes or create accounting entries.
+MagicPath revised-artifact verification: pending/unavailable due external-agent API quota. The prototype source available before quota exhaustion is a seeded interactive design reference; its local demo actions do not post to RBOS APIs, update live inventory, import files, link barcodes or create accounting entries. The design direction is frozen in this repository specification; no further MagicPath or Figma iteration is planned.
 
 ## 3. Prioritised findings
 
@@ -149,7 +149,7 @@ Opening Stock, Adjust Stock and Recent Purchase are included only as entry-point
 
 ## 11. Final design decision — 2026-11-25
 
-**Decision: approve the Stock & Catalogue visual direction for implementation.** The final MagicPath refinement is complete. No further prototype screenshots, Figma work or design iterations are required before engineering starts.
+**Decision: approve the Stock & Catalogue design specification for implementation.** The design direction is frozen from the supplied screenshots, inspected initial MagicPath source and documented final refinements. The revised MagicPath artifact could not be re-fetched for independent verification because its external-agent API quota was exhausted. No further prototype screenshots, Figma work or design iteration is planned; implement against this repository specification.
 
 ### Implementation boundaries
 - Implement Stock overview, Manage Products (My products / Shared Catalogue / Categories), Add/Edit Product and Bulk Product Import using the existing RBOS routes and components.
@@ -178,10 +178,10 @@ Opening Stock, Adjust Stock and Recent Purchase are included only as entry-point
 | Existing Stock, Catalogue and stock API dependencies inspected | Complete |
 | Supplied Android screenshots reviewed | Complete |
 | MagicPath source reviewed screen by screen | Complete |
-| Final MagicPath refinement build | Complete |
-| Rendered Stock landing preview inspected | Complete |
+| Revised MagicPath artifact re-fetch / independent verification | Blocked by external-agent API quota |
+| Revised MagicPath render visual acceptance | Not verified |
 | Repository design contract updated | Complete |
-| Design direction | Approved for implementation |
+| Repository design specification | Approved for implementation |
 | Focused implementation branch / PR | Next |
 | Focused checks during implementation | Pending |
 | Full grouped Playwright, responsive screenshot review and Axe WCAG 2 A/AA | Pending until all in-scope screens are implemented |
