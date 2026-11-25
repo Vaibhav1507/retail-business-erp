@@ -51,12 +51,13 @@ export function Finance({ only }: { only?: Tab[] }) {
   }
 
   const tabs: [Tab, string][] = ([['money', 'Cash & bank'], ['expenses', 'Expenses'], ['owner', 'Capital & drawings'], ['adjust', 'Stock adjustment'], ['reports', 'Reports'], ['lock', 'Period lock']] as [Tab, string][]).filter(([k]) => !only || only.includes(k))
+  const adjustmentOnly = only?.length === 1 && only[0] === 'adjust'
   return (
-    <section aria-labelledby="fin-h">
-      <h2 id="fin-h">Accounts &amp; reports</h2>
-      <div className="tabs" role="tablist" hidden={tabs.length < 2}>
+    <section aria-labelledby={adjustmentOnly ? undefined : "fin-h"} aria-label={adjustmentOnly ? "Stock adjustment" : undefined} className={adjustmentOnly ? 'stock-adjustment-container' : undefined}>
+      {!adjustmentOnly && <h2 id="fin-h">Accounts &amp; reports</h2>}
+      {tabs.length > 1 && <div className="tabs" role="tablist">
         {tabs.map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} style={{ fontWeight: tab === k ? 700 : 400 }}>{n}</button>)}
-      </div>
+      </div>}
       {error && <p role="alert" className="error">{error}</p>}
       {done && <p role="status">{done}</p>}
       {tab === 'money' && <MoneyTab money={money} submit={submit} />}
@@ -131,22 +132,60 @@ function OwnerTab({ money, rows, submit }: { money: Money[]; rows: any[]; submit
 function AdjustTab({ products, locations, rows, submit }: { products: Opt[]; locations: Opt[]; rows: any[]; submit: Submit }) {
   const [p, setP] = useState(''); const [l, setL] = useState(''); const [date, setDate] = useState(today()); const [qty, setQty] = useState(''); const [reason, setReason] = useState('Damage'); const [note, setNote] = useState('')
   const direction = reason === 'FoundOnCount' ? 'Increase' : 'Decrease'
-  return <div>
-    <form className="form" onSubmit={e => { e.preventDefault(); if (!window.confirm('Post this stock adjustment? It changes stock and the books.')) return; void submit(async () => { await api('POST', '/stock-adjustments', { productId: p || products[0]?.id, locationId: l || locations[0]?.id, date, quantity: Number(qty), direction, reason, note }, crypto.randomUUID()); setQty(''); setNote('') }, 'Stock adjusted.') }}>
-      <label>Product <select value={p || products[0]?.id || ''} onChange={e => setP(e.target.value)}>{products.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-      <label>Location <select value={l || locations[0]?.id || ''} onChange={e => setL(e.target.value)}>{locations.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-      <label>Date <input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} required /></label>
-      <label>Reason (required) <select value={reason} onChange={e => setReason(e.target.value)}>
-        <option value="Damage">Damage</option><option value="Theft">Theft</option><option value="Shortage">Shortage</option><option value="WriteOff">Write-off</option>
-        <option value="Expiry">Expiry</option><option value="FoundOnCount">Found on count (increase)</option><option value="OwnerConsumption">Owner consumption</option><option value="Other">Other (note required)</option></select></label>
-      <label>Quantity ({direction.toLowerCase()}) <input type="number" step="0.001" min="0.001" value={qty} onChange={e => setQty(e.target.value)} required /></label>
-      <label>Note <input value={note} maxLength={200} onChange={e => setNote(e.target.value)} required={reason === 'Other'} /></label>
-      <button type="submit">Apply adjustment</button>
-    </form>
-    <h3>Recent adjustments</h3>
-    {rows.length === 0 && <p>No adjustments yet.</p>}
-    {rows.map(r => <Row key={r.id} l={<>#{r.number} Â· {r.date} Â· {r.product}<br /><small>{r.reason}{r.note ? ' Â· ' + r.note : ''}</small></>} r={<>{r.quantity > 0 ? '+' : ''}{r.quantity} <small>(â‚¹ {inr(r.value)})</small></>} />)}
-  </div>
+  const selectedProduct = p || products[0]?.id || ''
+  const selectedLocation = l || locations[0]?.id || ''
+  return <section className="stock-adjustment-screen" aria-labelledby="stock-adjustment-title">
+    <div className="stock-adjustment-panel">
+      <div className="stock-adjustment-intro">
+        <span className="stock-adjustment-eyebrow">STOCK CORRECTION</span>
+        <span className="stock-adjustment-step" aria-hidden="true">01</span>
+        <h2 id="stock-adjustment-title">Adjust stock</h2>
+        <p>Correct the recorded quantity after a physical check.</p>
+      </div>
+      <form className="stock-adjustment-form" onSubmit={e => { e.preventDefault(); if (!window.confirm('Post this stock adjustment? It changes stock and the books.')) return; void submit(async () => { await api('POST', '/stock-adjustments', { productId: selectedProduct, locationId: selectedLocation, date, quantity: Number(qty), direction, reason, note }, crypto.randomUUID()); setQty(''); setNote('') }, 'Stock adjusted.') }}>
+        <label>Product
+          <select value={selectedProduct} onChange={e => setP(e.target.value)} required>
+            {products.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </label>
+        <label>Location
+          <select value={selectedLocation} onChange={e => setL(e.target.value)} required>
+            {locations.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </label>
+        <label>Date
+          <input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} required />
+        </label>
+        <label>Reason (required)
+          <select value={reason} onChange={e => setReason(e.target.value)} required>
+            <option value="Damage">Damage</option><option value="Theft">Theft</option><option value="Shortage">Shortage</option><option value="WriteOff">Write-off</option>
+            <option value="Expiry">Expiry</option><option value="FoundOnCount">Found on count (increase)</option><option value="OwnerConsumption">Owner consumption</option><option value="Other">Other (note required)</option>
+          </select>
+        </label>
+        <div className="stock-adjustment-direction" aria-live="polite">
+          <span>Adjustment direction</span>
+          <strong className={direction === 'Increase' ? 'is-increase' : 'is-decrease'}>{direction === 'Increase' ? '+ Increase' : '− Decrease'}</strong>
+        </div>
+        <label>Quantity ({direction.toLowerCase()})
+          <input type="number" step="0.001" min="0.001" inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} placeholder="Enter quantity" required />
+        </label>
+        <label>Note {reason === 'Other' ? '(required)' : '(optional)'}
+          <input value={note} maxLength={200} onChange={e => setNote(e.target.value)} placeholder="Add context" required={reason === 'Other'} />
+        </label>
+        <p className="stock-adjustment-warning">Stock adjustments change inventory value and accounting entries. Confirm the reason and quantity carefully.</p>
+        <button type="submit" disabled={!products.length || !locations.length || !(Number(qty) > 0) || (reason === 'Other' && !note.trim())}>Review adjustment</button>
+      </form>
+      <section className="stock-adjustment-history" aria-labelledby="stock-adjustment-history-title">
+        <h3 id="stock-adjustment-history-title">Recent adjustments</h3>
+        {rows.length === 0 ? <p>No adjustments yet.</p> : <div className="stock-adjustment-list">
+          {rows.map(r => <article className="stock-adjustment-row" key={r.id}>
+            <div><strong>{r.product}</strong><span>{r.date} · {r.reason}{r.note ? ' · ' + r.note : ''}</span></div>
+            <div className="stock-adjustment-amount"><strong>{r.quantity > 0 ? '+' : ''}{r.quantity}</strong><span>₹ {inr(r.value)}</span></div>
+          </article>)}
+        </div>}
+      </section>
+    </div>
+  </section>
 }
 
 function LockTab({ lock, submit }: { lock: { lockedThrough: string | null; history: any[] } | null; submit: Submit }) {

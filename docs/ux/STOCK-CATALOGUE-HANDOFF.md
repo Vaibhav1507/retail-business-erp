@@ -268,3 +268,39 @@ No API, database, stock valuation, Opening Balance Equity, inventory posting, id
 - Focused source implementation committed to this branch.
 - Production build is the requested validation gate; full tests and grouped Playwright/Axe visual audit remain deferred until the complete Stock & Catalogue screen group is ready.
 - Android visual acceptance, merge and deployment are separate and not claimed complete.
+
+
+## Adjust Stock — MagicPath screenshot implementation (2026-11-25)
+
+**Implementation branch:** `ux/adjust-stock-magicpath-alignment`
+
+The user supplied the MagicPath Adjust Stock screen followed by two screenshots of the current RBOS screen. This extends the prior Stock & Catalogue scope to include the existing Adjust Stock form presentation.
+
+### Design and implementation
+- Keep the existing Stock page heading, subtitle, Back to Stock navigation and shared application shell.
+- Remove the redundant Accounts & reports heading and single Stock adjustment tab pill from this dedicated route.
+- Present one focused white panel with STOCK CORRECTION eyebrow, Adjust stock title, short helper copy and step marker.
+- Keep Product, Location, Date and Reason as full-width controls in the same order as the reference.
+- Show the derived Increase / Decrease direction immediately after Reason so the effect is clear before quantity entry.
+- Keep Quantity and Note full-width; Note remains optional except for the existing Other reason rule.
+- Use a compact amber warning explaining the inventory-value and accounting impact.
+- Rename the primary action to Review adjustment while retaining the existing confirmation-before-post behaviour and existing POST /stock-adjustments payload.
+- Present Recent adjustments as compact cards with product, date/reason/note, quantity and value.
+
+### Preserved
+- Existing reason codes and direction mapping: Found on count increases; the other current reasons decrease.
+- Existing POST /stock-adjustments API, request shape, idempotency key, server-side stock/accounting handling, permissions and audit history.
+- No API, database, valuation, accounting, tenant/security, route or global typography changes.
+- Existing app shell, RBOS font stack, green palette and navigation remain unchanged.
+
+### Acceptance criteria
+- Mobile layout follows the supplied hierarchy with consistent page gutter, panel radius, control heights and vertical rhythm.
+- Direction is visible and updates when Reason changes.
+- Empty history has clear copy; populated history is readable without a wide table.
+- Primary action remains disabled until product, location and a positive quantity are available; Other requires a note.
+- No changes to stock-adjustment business semantics.
+
+### Validation and release
+- Implementation is build-gated as requested; no broad test suite or Playwright visual audit is included in this focused pass.
+- Fresh Android screenshot comparison and user visual acceptance remain pending.
+- Merge and production deployment are separate and not included.
