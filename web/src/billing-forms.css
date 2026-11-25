@@ -227,21 +227,23 @@
 }
 
 
-/* Final Stock landing/filter alignment from Android review. */
+/* Stock action cards: balanced two-column tiles with readable stacked copy. */
 @media(max-width:720px){
- .stock-page .stock-actions .stock-action:nth-child(2){
+ .stock-page .stock-actions .stock-action{
   grid-column:auto;
-  min-height:64px;
-  align-items:center;
+  min-height:184px;
+  align-items:flex-start;
  }
  .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-copy{
-  flex-direction:row;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+  gap:8px;
+  width:100%;
  }
  .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-heading{
   flex:0 0 auto;
+  min-width:0;
   gap:6px;
  }
  .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-heading strong{
@@ -249,16 +251,20 @@
   font-size:13px;
  }
  .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-icon{
-  flex-basis:22px;
+  flex:0 0 22px;
   width:22px;
   height:22px;
  }
  .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-copy small{
-  flex:1 1 auto;
+  display:block;
+  flex:0 1 auto;
+  width:100%;
   min-width:0;
-  text-align:right;
-  font-size:11px;
-  line-height:1.25;
+  text-align:left;
+  white-space:normal;
+  overflow-wrap:normal;
+  font-size:12px;
+  line-height:1.35;
  }
  .stock-page .stock-inventory-filters[role="search"] .stock-filter-category,
  .stock-page .stock-inventory-filters[role="search"] .stock-filter-availability{
