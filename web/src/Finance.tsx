@@ -53,7 +53,7 @@ export function Finance({ only }: { only?: Tab[] }) {
   const tabs: [Tab, string][] = ([['money', 'Cash & bank'], ['expenses', 'Expenses'], ['owner', 'Capital & drawings'], ['adjust', 'Stock adjustment'], ['reports', 'Reports'], ['lock', 'Period lock']] as [Tab, string][]).filter(([k]) => !only || only.includes(k))
   const adjustmentOnly = only?.length === 1 && only[0] === 'adjust'
   return (
-    <section aria-labelledby="fin-h" className={adjustmentOnly ? 'stock-adjustment-container' : undefined}>
+    <section aria-labelledby={adjustmentOnly ? undefined : "fin-h"} aria-label={adjustmentOnly ? "Stock adjustment" : undefined} className={adjustmentOnly ? 'stock-adjustment-container' : undefined}>
       {!adjustmentOnly && <h2 id="fin-h">Accounts &amp; reports</h2>}
       {tabs.length > 1 && <div className="tabs" role="tablist">
         {tabs.map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} style={{ fontWeight: tab === k ? 700 : 400 }}>{n}</button>)}
@@ -169,7 +169,7 @@ function AdjustTab({ products, locations, rows, submit }: { products: Opt[]; loc
         <label>Quantity ({direction.toLowerCase()})
           <input type="number" step="0.001" min="0.001" inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} placeholder="Enter quantity" required />
         </label>
-        <label>Note (optional)
+        <label>Note {reason === 'Other' ? '(required)' : '(optional)'}
           <input value={note} maxLength={200} onChange={e => setNote(e.target.value)} placeholder="Add context" required={reason === 'Other'} />
         </label>
         <p className="stock-adjustment-warning">Stock adjustments change inventory value and accounting entries. Confirm the reason and quantity carefully.</p>
