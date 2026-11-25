@@ -137,7 +137,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
           <h2>{tr('buy.addTitle')}</h2><p>{tr('buy.addIntro')}</p>
         </header>
         <section className="buy-section buy-upload-section" aria-label={tr('buy.bill')}>
-          <div><h3>{tr('buy.bill')} <span>{tr('buy.optional')}</span></h3><p>{tr('buy.billHelp')}</p></div>
+          <div className="buy-upload-heading"><div><h3>{tr('buy.bill')} <span>{tr('buy.optional')}</span></h3><p>{tr('buy.billHelp')}</p></div><span className="buy-optional-badge" aria-hidden="true">{tr('buy.optional')}</span></div>
           <InvoiceUpload products={products} suppliers={suppliers.filter(s => s.isActive)} onSupplierAdded={() => { load().catch(() => undefined) }} onProductAdded={reload} onUse={(d: InvoiceDraft, picked) => { if (d.supplierId) setSupplierId(d.supplierId); if (d.date) setDate(d.date); if (d.invoiceNumber) setRef(d.invoiceNumber); setLines(picked); setInvoiceFileId(d.fileId); setReviewReceipt(false) }} />
         </section>
         {suppliers.filter(s => s.isActive).length === 0 && <p className="buy-notice">{tr('buy.noSupplier')} <a href="#/parties/suppliers">{tr('buy.addSupplier')}</a>.</p>}
