@@ -39,61 +39,117 @@ function OpeningStock({ products, locations, reload }: { products: Product[]; lo
   const productOf = (id: string) => products.find(p => p.id === id)
   const nameOf = (id: string) => productOf(id)?.name ?? id
   const lineValue = (line: { quantity: number; unitCost: number }) => Math.round(line.quantity * line.unitCost * 100) / 100
+  const totalValue = lines.reduce((sum, line) => sum + lineValue(line), 0)
+
   function addLine() {
-	setError('')
-	const quantity = Number(qty), unitCost = Number(cost)
-	if (!productId || !(quantity > 0) || !(unitCost > 0)) { setError('Choose a product, quantity > 0 and unit cost > 0.'); return }
-	if (lines.some(l => l.productId === productId)) { setError('Product already added. Remove the existing line before adding this product again.'); return }
-	setLines([...lines, { productId, quantity, unitCost }]); setQty(''); setCost(''); setReview(false)
+    setError('')
+    const quantity = Number(qty), unitCost = Number(cost)
+    if (!productId || !(quantity > 0) || !(unitCost > 0)) {
+      setError('Choose a product and enter a quantity and cost greater than zero.')
+      return
+    }
+    if (lines.some(line => line.productId === productId)) {
+      setError('This product is already in the list. Remove its existing entry before adding it again.')
+      return
+    }
+    setLines(current => [...current, { productId, quantity, unitCost }])
+    setProductId('')
+    setQty('')
+    setCost('')
+    setReview(false)
   }
+
   async function post() {
-	setError(''); setDone('')
-	try {
-	  const r = await api<{ total: number; replayed: boolean }>('POST', '/opening-stock', { locationId: loc, effectiveDate: date, lines }, key)
-	  setDone(`Posted. Inventory and Opening Balance Equity total: ${r.total.toFixed(2)} INR${r.replayed ? ' (already posted earlier)' : ''}`)
-	  setLines([]); setReview(false); setKey(newKey()); reload()
-	} catch (err) {
-	  setError(err instanceof ApiError && err.status >= 500 ? 'Server error. Retrying is safe.' : msg(err))
-	}
+    setError('')
+    setDone('')
+    try {
+      const r = await api<{ total: number; replayed: boolean }>('POST', '/opening-stock', { locationId: loc, effectiveDate: date, lines }, key)
+      setDone(`Posted. Inventory and Opening Balance Equity total: ${r.total.toFixed(2)} INR${r.replayed ? ' (already posted earlier)' : ''}`)
+      setLines([])
+      setReview(false)
+      setKey(newKey())
+      reload()
+    } catch (err) {
+      setError(err instanceof ApiError && err.status >= 500 ? 'Server error. Retrying is safe.' : msg(err))
+    }
   }
+
   return (
-	<section aria-label="Opening stock" className="billing-screen">
-	  <h2>Starting stock in your shop</h2>
-	  <p>{t('onboarding.stockIntro')}</p>
-	  <p className="hint-line">{t('onboarding.stockCostHelp')}</p>
-	  <label>Stock location
-		<select value={loc} onChange={e => setLocationId(e.target.value)}>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
-	  </label>
-	  <label>Stock counted as of <input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
-	  <div>
-		<label>Product
-		  <select value={productId} onChange={e => setProductId(e.target.value)}>
-			<option value="">Select a product</option>
-			{products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
-		  </select>
-		</label>
-		<label>Quantity <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
-		<label>Cost for one item (₹) <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} /></label>
-		<button type="button" onClick={addLine}>Add item</button>
-	  </div>
-	  <div className="table-scroll"><table aria-label="Starting stock entries">
-		<thead><tr><th>Product</th><th>Unit</th><th>Quantity</th><th>Unit cost</th><th>Stock value</th><th>Action</th></tr></thead>
-		<tbody>{lines.map(l => <tr key={l.productId}><td>{nameOf(l.productId)}</td><td>{productOf(l.productId)?.unit ?? '—'}</td><td>{l.quantity}</td><td>{l.unitCost.toFixed(2)}</td><td>{lineValue(l).toFixed(2)}</td>
-		<td><button type="button" className="secondary" onClick={() => { setLines(current => current.filter(x => x.productId !== l.productId)); setReview(false) }} aria-label={`Remove ${nameOf(l.productId)}`}>Remove</button></td></tr>)}</tbody>
-	  </table></div>
-	  <p data-testid="estimated-total">Estimated stock value (the server calculates the posted total): {lines.reduce((s, l) => s + lineValue(l), 0).toFixed(2)} INR</p>
-	  <button type="button" onClick={() => { setError(''); setReview(true) }} disabled={lines.length === 0 || !loc}>Review starting stock</button>
-	  {review && lines.length > 0 && <div className="billing-card" role="region" aria-label="Review opening stock">
-		<h3>Check before posting</h3><p>{t('onboarding.stockReviewNote')}</p>
-		<ul>{lines.map(l => <li key={l.productId}>{nameOf(l.productId)} — {l.quantity} {productOf(l.productId)?.unit ?? ''} × ₹{l.unitCost.toFixed(2)} = ₹{lineValue(l).toFixed(2)}</li>)}</ul>
-		<p><strong>Total stock value: ₹{lines.reduce((s, l) => s + lineValue(l), 0).toFixed(2)}</strong></p>
-		<div className="form-actions"><button type="button" className="secondary" onClick={() => setReview(false)}>Back to edit</button><button type="button" onClick={post}>Confirm &amp; post opening stock</button></div>
-	  </div>}
-	  {error && <p role="alert">{error}</p>}{done && <p role="status">{done}</p>}
-	</section>
+    <section aria-label="Opening stock" className="billing-screen opening-stock-screen">
+      <div className="opening-stock-heading">
+        <div className="opening-stock-step">01</div>
+        <p className="opening-stock-eyebrow">Initial inventory</p>
+        <h2>Opening stock</h2>
+        <p className="opening-stock-description">Record what is physically in the shop as of a date.</p>
+      </div>
+
+      <div className="opening-stock-field opening-stock-location">
+        <label htmlFor="opening-stock-location">Stock location</label>
+        <select id="opening-stock-location" value={loc} onChange={e => setLocationId(e.target.value)}>
+          {locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
+        </select>
+      </div>
+      <div className="opening-stock-field opening-stock-date">
+        <label htmlFor="opening-stock-date">Stock counted as of</label>
+        <input id="opening-stock-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+      </div>
+
+      <div className="opening-stock-add-section">
+        <h3>Add products to opening stock</h3>
+        <div className="opening-stock-field opening-stock-product">
+          <label htmlFor="opening-stock-product">Product</label>
+          <select id="opening-stock-product" value={productId} onChange={e => setProductId(e.target.value)}>
+            <option value="">Select a product</option>
+            {products.map(product => <option key={product.id} value={product.id}>{product.name} ({product.sku})</option>)}
+          </select>
+        </div>
+        <div className="opening-stock-entry-grid">
+          <div className="opening-stock-field">
+            <label htmlFor="opening-stock-quantity">Quantity</label>
+            <input id="opening-stock-quantity" inputMode="decimal" type="number" min="0" step="any" value={qty} onChange={e => setQty(e.target.value)} placeholder="0" />
+          </div>
+          <div className="opening-stock-field">
+            <label htmlFor="opening-stock-cost">Cost for one item (₹)</label>
+            <input id="opening-stock-cost" inputMode="decimal" type="number" min="0" step="any" value={cost} onChange={e => setCost(e.target.value)} placeholder="Enter cost" />
+          </div>
+        </div>
+        <p className="opening-stock-cost-help">Use the actual or owner-estimated cost. RBOS does not guess a zero cost.</p>
+        <button type="button" className="opening-stock-add-button" onClick={addLine}><span aria-hidden="true">＋ </span>Add item</button>
+      </div>
+
+      {lines.length > 0 && <div className="opening-stock-lines" aria-label="Opening stock items">
+        <h3>Added items ({lines.length})</h3>
+        {lines.map(line => <article className="opening-stock-line" key={line.productId}>
+          <div><strong>{nameOf(line.productId)}</strong><span>{line.quantity} × ₹{line.unitCost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
+          <strong>₹{lineValue(line).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong>
+          <button type="button" className="opening-stock-remove" onClick={() => { setLines(current => current.filter(item => item.productId !== line.productId)); setReview(false) }} aria-label={`Remove ${nameOf(line.productId)}`}>Remove</button>
+        </article>)}
+      </div>}
+
+      {error && <p className="opening-stock-message" role="alert">{error}</p>}
+      {done && <p className="opening-stock-message success" role="status">{done}</p>}
+
+      {review && lines.length > 0 && <div className="opening-stock-review" role="region" aria-label="Review opening stock">
+        <h3>Review starting stock</h3>
+        <p>{t('onboarding.stockReviewNote')}</p>
+        <ul>{lines.map(line => <li key={line.productId}>{nameOf(line.productId)} — {line.quantity} × ₹{line.unitCost.toFixed(2)} = ₹{lineValue(line).toFixed(2)}</li>)}</ul>
+        <p><strong>Total stock value: ₹{totalValue.toFixed(2)}</strong></p>
+        <div className="opening-stock-review-actions">
+          <button type="button" className="secondary" onClick={() => setReview(false)}>Back to edit</button>
+          <button type="button" onClick={post}>Confirm &amp; post opening stock</button>
+        </div>
+      </div>}
+
+      <div className="opening-stock-footer">
+        <div className="opening-stock-footer-summary">
+          <strong>{lines.length} opening {lines.length === 1 ? 'item' : 'items'}</strong>
+          <span>₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} estimated value</span>
+        </div>
+        <button type="button" disabled={lines.length === 0 || !loc} onClick={() => { setError(''); setReview(true) }}>Review starting stock</button>
+      </div>
+    </section>
   )
 }
-
 function parseRoute() {
   const m = /^#\/([a-z]+)(?:\/([a-z]+))?/.exec(window.location.hash)
   return { page: m?.[1] ?? 'home', tab: m?.[2] ?? '' }

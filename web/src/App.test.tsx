@@ -134,7 +134,7 @@ describe('Opening stock form', () => {
     await userEvent.type(within(s).getByLabelText('Quantity'), '5')
     await userEvent.type(within(s).getByLabelText('Cost for one item (₹)'), '0')
     await userEvent.click(within(s).getByRole('button', { name: 'Add item' }))
-    expect(await within(s).findByRole('alert')).toHaveTextContent('unit cost > 0')
+    expect(await within(s).findByRole('alert')).toHaveTextContent('quantity and cost greater than zero')
     expect(within(s).getByRole('button', { name: 'Review starting stock' })).toBeDisabled()
   })
 
