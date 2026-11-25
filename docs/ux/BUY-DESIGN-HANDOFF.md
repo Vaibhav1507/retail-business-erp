@@ -343,3 +343,18 @@ The footer is fixed at mobile widths with a bounded two-column grid, explicit vi
 ### Supplier bill upload container cascade correction — 2026-11-25
 
 The first integrated Playwright screenshot showed that the shared `.billing-screen div[role="region"]` rule was still painting the accessible InvoiceUpload region as a second solid card. The audit also measured the intro row as `display:grid`, contrary to the reference. The receive-only upload wrapper now explicitly resets the generic region card treatment (no border, padding, background or shadow), leaving the single dashed dropzone as the visible upload surface. The intro is explicitly a horizontal flex row with icon and copy together. Focused Playwright assertions now cover both computed styles.
+
+
+### Android horizontal overflow and squeezed sections — 2026-11-25
+
+The user's latest Android screenshots show the whole Buy view shifted/cropped horizontally and the Add Purchase upload/Supplier areas squeezed instead of using the available card width. The preceding PR #99 footer change is merged, but its Buy Visual Audit was not green: run #74 failed at the Product-field width assertion (162px measured against a 145px adjacent field), so the MagicPath field hierarchy was not verified.
+
+**Follow-up scope:** Add Purchase (route #/buy/receive) and its four-tab Buy navigation only.
+- Replace the phone-width horizontally scrolling Buy tab strip with a two-column grid; show all four destinations without horizontal scrolling. Use four columns at wider widths.
+- Remove the 780px cap from the receive form so the task card fills the available content width.
+- Explicitly keep the supplier-bill upload region/dropzone and Supplier/invoice-reference fields full-width.
+- Ensure Product spans the complete item editor width; keep quantity/cost and scan/add pairs unchanged.
+- Add Playwright assertions for viewport containment, no tab/document horizontal overflow, full-width upload/Supplier and Product span.
+- No API, OCR, barcode, purchase posting, GST, stock/WAC, payable, idempotency or accounting changes.
+
+**Validation note:** local clone/testing was unavailable because the execution environment could not resolve github.com; CI and the repository's Buy Visual Audit are the verification path. Do not treat the earlier #99 audit failure as passing. This follow-up is not visually accepted until its new Playwright screenshots are inspected and the user confirms the Android result.
