@@ -44,3 +44,20 @@
 3. Run Axe on important states and inspect actual screenshots, including scrolled/fixed-overlay states.
 4. Keep native-device checks separate from browser evidence.
 5. Update this handoff with exact CI/audit evidence before merge. Do not merge or deploy without the appropriate authorisation.
+
+
+## Screenshot comparison correction — Stock on hand
+
+The first implementation pass did **not** complete the MagicPath Stock on hand card. It retained the original table markup and relied on global mobile CSS to present each table row as a label/value stack. This explains the mismatch visible in the production screenshots; the earlier handoff overstated the completeness of this screen.
+
+A focused correction is now in branch `ux/stock-list-magicpath-alignment`:
+- Replace the table-derived row with an explicit product card.
+- Put product name, SKU and category in the card header; keep Edit reachable from the card.
+- Show Brand/model, Unit, Available, Status and Stock value as a compact two-column fact grid.
+- Move supplier, location and supported product attributes into a collapsed More details disclosure.
+- Keep Search and Availability full-width, with Category and Supplier side by side on mobile.
+- Add Stock on hand heading and Clear filters action.
+- Increase Stock page and section heading/type scale to match the supplied MagicPath reference more closely, without changing the global type scale for other modules.
+- Format stock values without unnecessary trailing zero decimals while preserving non-zero paise.
+
+This is a targeted implementation correction based on the side-by-side screenshots supplied on 2026-11-25. It does not change inventory data, stock valuation, APIs or posting rules. Build is the current validation gate; visual audit and unit tests are deferred per the current delivery instruction.
