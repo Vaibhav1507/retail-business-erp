@@ -41,7 +41,7 @@ Use the existing application font stack. Do not add a network font dependency fo
 
 - Always render the name as **Dhandha Mitra** (title case, with a space).
 - Use the tagline **“Your business. Better managed.”** in the shared sign-in/PIN brand header where there is enough room.
-- Use the storefront icon, not a single-letter “R” badge.
+- Use the Mitra Store storefront + friendly gesture icon consistently, not the plain Classic Shop mark or a single-letter “R” badge.
 - Keep the full name as the PWA `name`, `short_name`, browser title and installation label. Validate the actual Android launcher truncation/wrapping on the pilot device.
 - Hindi UI can retain the brand name in Latin script; do not translate or respell the registered product name inconsistently.
 - Keep business names, manufacturer brands, customer names and supplier names independent from the product brand.
