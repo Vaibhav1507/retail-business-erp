@@ -1,6 +1,6 @@
 # Stock & Catalogue — mobile UX design specification
 
-**Status:** Design review in progress; repository specification is the source of truth.  
+**Status:** Design direction approved after the final MagicPath refinement; repository specification is the source of truth.  
 **Scope:** Stock overview, Manage Products, Add/Edit Product, product list, Shared Catalogue, Categories and bulk product import.  
 **Pilot context:** Monika Electronics; design must remain reusable across RBOS retail verticals.  
 **Prototype:** https://designs.magicpath.ai/v1/richly-mountain-9553  
@@ -34,9 +34,18 @@ The supplied screenshots show:
 - Existing stock workflows and accounting/valuation rules must be preserved; the design must not create parallel product, stock or purchase paths.
 - The current repository playbook states that Figma is optional and repository design specifications are authoritative.
 
-### Prototype review limitation
+### Prototype review and final refinement
 
-The MagicPath component build completed, but its generated preview was not available for a full visual inspection in this review. A successful build is not visual acceptance. The user screenshots are therefore the verified visual baseline; the prototype is an exploration reference pending a full screen-by-screen review.
+The MagicPath component source was inspected screen by screen for Stock, My Products, Shared Catalogue, Categories, Add/Edit Product, Bulk Import, Opening Stock, Adjust Stock, barcode capture and the Add Purchase handoff. The final refinement build completed successfully and its rendered Stock landing preview was inspected. The supplied Android screenshots remain the visual baseline for the other screens; the generated preview is not represented as proof of every responsive state.
+
+Final refinements:
+- Category rows use compact Rename actions, accurate singular/plural count copy and a warning for likely singular/plural duplicate names (for example, Air Cooler / Air Coolers). The prototype does not merge categories automatically.
+- Product cards prioritise identity, available quantity and stock status; secondary product/source details are disclosed on demand.
+- Optional Brand and product identity fields start collapsed so the required product basics remain the first task.
+- The persistent summary/action is contextual: Stock offers Manage products; Opening Stock offers Review starting stock; unrelated catalogue screens do not carry a redundant Stock overview footer.
+- The existing RBOS business-category-aware product attributes remain the implementation reference; do not hard-code electronics-only attributes for every business vertical.
+
+MagicPath build status: completed. The prototype remains a seeded interactive design reference: its local demo actions do not post to RBOS APIs, update live inventory, import files, link barcodes or create accounting entries.
 
 ## 3. Prioritised findings
 
@@ -107,9 +116,9 @@ The MagicPath component build completed, but its generated preview was not avail
 | Navigation | Back navigation preserves useful search/filter context; bottom navigation and assistant do not cover actions. |
 | Accessibility | No horizontal overflow at target viewports; controls have accessible names; keyboard/focus works; touch targets meet 44px; Axe WCAG 2 A/AA passes on important states. |
 
-## 8. Screenshots still required before design approval
+## 8. States to verify during implementation (not a blocker to design approval)
 
-The current screenshot set does not fully evidence every state. Capture:
+The supplied screenshots are sufficient to freeze the visual direction. Do not start another screenshot-request loop before implementation. Cover the following states with the existing RBOS workflows and the grouped Playwright/Axe verification after implementation:
 - Stock overview at top and scrolled list, including filters expanded/selected and empty/no-results.
 - Manage Products tabs and product list at top and bottom.
 - Add product full form, validation errors, category selector, brand/model fields, save success and cancel.
@@ -129,10 +138,52 @@ Opening Stock, Adjust Stock and Recent Purchase are included only as entry-point
 
 ## 10. Delivery and validation plan
 
-1. Complete the MagicPath screen/state inventory against the screenshots and correct any prototype interaction gaps.
-2. Refine the selected mobile direction once; do not create multiple near-identical prototypes.
+1. Complete — MagicPath screen/source inventory reviewed against the supplied screenshots.
+2. Complete — one final refinement pass applied to the selected prototype; no further concept or polish cycle is planned.
 3. Implement in a focused branch/PR, preserving current routes, APIs and business rules.
 4. Run focused component/type/build checks as each screen is implemented.
 5. After the entire Stock & Catalogue screen group is implemented, run the integrated Playwright journeys, responsive viewport/full-page/scroll/keyboard screenshots, visual contact-sheet review and Axe WCAG 2 A/AA checks.
 6. Track native Android camera/gallery, keyboard, TalkBack and real-device touch behaviour separately.
 7. Report design approval, implementation, automated checks, visual acceptance, user acceptance, merge and deployment as separate statuses. No merge or deployment is implied by this design note.
+
+
+## 11. Final design decision — 2026-11-25
+
+**Decision: approve the Stock & Catalogue visual direction for implementation.** The final MagicPath refinement is complete. No further prototype screenshots, Figma work or design iterations are required before engineering starts.
+
+### Implementation boundaries
+- Implement Stock overview, Manage Products (My products / Shared Catalogue / Categories), Add/Edit Product and Bulk Product Import using the existing RBOS routes and components.
+- Keep Opening Stock, Adjust Stock and Add Recent Purchase as existing workflow handoffs/consistency checks; do not rebuild them as parallel posting flows in this screen group.
+- Reuse the existing product form's business-category-aware attributes, category/product APIs, shared catalogue, import preview and duplicate resolution.
+- Keep stock values and accounting results server-authoritative.
+- Preserve tenant isolation and shared-catalogue privacy; never expose another business's SKU, barcode, stock, buying cost or selling price.
+- Do not automatically merge similar category names. Show a review warning and preserve the existing category rename semantics.
+- The MagicPath prototype is not production code and its demo-only interactions must be replaced by existing RBOS API behaviour during implementation.
+
+### Final refinement acceptance
+- [x] Stock landing hierarchy retained with Manage Products as the primary action.
+- [x] Product cards prioritise name, SKU/category, available quantity and status.
+- [x] Secondary product details are progressively disclosed.
+- [x] Product identity fields are optional and collapsed initially.
+- [x] Category rows are compact, counts use correct singular/plural copy and likely duplicate names are flagged without merging.
+- [x] Sticky summary/action is shown only where it supports the current task.
+- [x] Shared catalogue privacy explanation and Already added state are retained.
+- [x] Bulk import remains a four-stage review-before-import journey.
+- [x] Opening Stock, Adjust Stock and Add Purchase are kept within their existing workflow boundaries.
+
+### Status ledger
+| Milestone | Status |
+|---|---|
+| Current-main workflow and relevant handoff reviewed | Complete |
+| Existing Stock, Catalogue and stock API dependencies inspected | Complete |
+| Supplied Android screenshots reviewed | Complete |
+| MagicPath source reviewed screen by screen | Complete |
+| Final MagicPath refinement build | Complete |
+| Rendered Stock landing preview inspected | Complete |
+| Repository design contract updated | Complete |
+| Design direction | Approved for implementation |
+| Focused implementation branch / PR | Next |
+| Focused checks during implementation | Pending |
+| Full grouped Playwright, responsive screenshot review and Axe WCAG 2 A/AA | Pending until all in-scope screens are implemented |
+| Native Android camera/barcode, keyboard and TalkBack acceptance | Pending real-device verification |
+| User acceptance, merge and deployment | Not yet performed |
