@@ -6,7 +6,7 @@
 **Merged baseline:** main at `004071617aa41bb8a2846f840f33d44f7ff10d5c` (PR #81 merge commit).  
 **Original implementation branch:** `ux/buy-four-screen-redesign`  
 **Merged follow-up branch:** `fix/buy-mobile-tabs-invoice-upload-feedback` (PR #82 merged)
-**Current visual-refinement branch:** `ux/add-purchase-magicpath-visual-refinement`  
+**Current visual-refinement branch:** `ux/add-purchase-magicpath-visual-refinement` (created from current main; screenshot-driven code and documentation updates in progress)  
 **PRs:** [#81 — four Buy workflows](https://github.com/Vaibhav1507/retail-business-erp/pull/81) merged 2026-11-24; [#82 — Buy mobile and Add Purchase polish](https://github.com/Vaibhav1507/retail-business-erp/pull/82) open.  
 **Visual acceptance:** Original four-screen screenshots reviewed. The MagicPath Add Purchase reference has been translated into repository implementation; Playwright screenshots/Axe and fresh Android acceptance remain pending.  
 **Merge / production:** PR #81 is merged. PR #82 is not merged or deployed; deployment of PR #81's exact merge commit is not independently verified here.
@@ -303,7 +303,7 @@ Implementation updates on the existing PR #82 branch:
 
 Not changed: backend/API payloads, OCR extraction/mapping, barcode scanner/resolution, purchase idempotency, posting, stock/WAC, supplier payable or accounting behaviour. Direct free-text product creation is not part of this visual pass; the existing purchase contract still references catalogue product IDs.
 
-Remaining design work: inspect the actual rendered RBOS Android screenshot against MagicPath, correct any remaining spacing/overlay/field-width differences, then request user visual acceptance. PR #82 remains open and unmerged; no deployment is performed.
+Remaining design work: inspect the actual rendered RBOS Android screenshot against MagicPath, correct any remaining spacing/overlay/field-width differences, then request user visual acceptance. PR #82 is merged; no production deployment is implied.
 
 
 ## 2026-11-25 — New Add Purchase visual-refinement branch
