@@ -215,6 +215,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
   }, [loadMaster, view])
   const tabs: [typeof view, string][] = [['list', 'My products'], ['master', 'Shared catalogue'], ['categories', 'Categories']]
   const [requestedEditId] = useState(() => new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('edit'))
+  const editRouteHandled = useRef(false)
   const similarCategoryGroups = useMemo(() => {
     const groups = new Map<string, string[]>()
     categories.forEach(category => {
@@ -224,9 +225,10 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
     return [...groups.values()].filter(group => group.length > 1)
   }, [categories])
   useEffect(() => {
-    if (!requestedEditId || items.length === 0) return
+    if (editRouteHandled.current || !requestedEditId || items.length === 0) return
     const product = items.find(item => item.id === requestedEditId)
     if (!product) return
+    editRouteHandled.current = true
     setEditing(product)
     setView('form')
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/stock/products`)
