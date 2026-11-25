@@ -29,7 +29,7 @@ export type Draft = { name: string; category: string; unit: string; generic: boo
 export const blank: Draft = { name: '', category: '', unit: 'pcs', generic: true, brand: '', model: '', attrs: {}, active: true, hsn: '', gst: '', mrp: '' }
 export const toDraft = (p: Product): Draft => ({ name: p.name, category: p.category, unit: p.unit, generic: p.isGeneric, brand: p.brand ?? '', model: p.model ?? '', attrs: { ...p.attributes }, active: p.isActive, hsn: p.hsnCode ?? '', gst: p.gstRate == null ? '' : String(p.gstRate), mrp: p.mrp == null ? '' : String(p.mrp) })
 
-const ELECTRONICS_ATTRS: [string, string][] = [['capacity', 'Screen size or capacity (e.g. 43 inch, 10000mAh)'], ['colour', 'Colour'], ['connector_type', 'Connector / resolution (e.g. USB-C, 4K)'], ['compatible_with', 'Compatible with']]
+const ELECTRONICS_ATTRS: [string, string][] = [['colour', 'Colour'], ['capacity', 'Capacity / size'], ['connector_type', 'Connector / resolution'], ['compatible_with', 'Compatible with']]
 
 const ELECTRONICS_CATEGORIES = ['LED TVs', 'Mobile Phones', 'Chargers', 'Cables', 'Earphones and Headphones', 'Power Banks', 'Smartwatches', 'Speakers and Soundbars', 'Cases and Guards', 'Memory and Storage', 'Home Appliances', 'Lighting and Bulbs', 'Batteries', 'Computer Accessories', 'Accessories', 'Other']
 
@@ -99,7 +99,7 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
         <label className="check"><input type="checkbox" checked={d.generic} onChange={e => set({ generic: e.target.checked })} /> Generic / unbranded</label>
         {!d.generic && <>
           <label>Brand <input list="brand-options" value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} placeholder="Pick or type a brand" /></label><datalist id="brand-options">{brandNames.map(n => <option key={n} value={n} />)}</datalist>
-          <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} placeholder="Enter exact model number" /></label>
+          <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} placeholder="Exact model / SKU" /></label>
         </>}
       </details>
       <details className="product-form-disclosure">
