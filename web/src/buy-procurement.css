@@ -312,4 +312,4 @@
 /* The shared billing form styles decorate every [role=region] with a card.
    Supplier bill is a region for accessibility, not a second visual card. */
 .buy-upload-section .invoice-upload[role="region"]{display:grid;gap:12px;min-width:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
-.buy-purchase-card .buy-upload-section .invoice-upload-intro{display:flex;flex-direction:row;align-items:center;gap:11px;min-width:0}
+.buy-purchase-card .buy-upload-section .invoice-upload-intro{display:flex!important;flex-direction:row!important;align-items:center;gap:11px;min-width:0}
