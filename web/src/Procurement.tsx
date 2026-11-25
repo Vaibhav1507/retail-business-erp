@@ -156,8 +156,14 @@ export function Procurement({ products, locations, reload, show }: { products: (
             <label className="buy-product-field"><span className="buy-field-label">{tr('buy.product')} <span className="buy-required" aria-hidden="true">*</span></span><select required aria-required="true" value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectProduct')}</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             <label><span className="buy-field-label">{tr('buy.quantity')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
             <label><span className="buy-field-label">{tr('buy.unitCostShort')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" aria-label={tr('buy.unitCost')} inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
-            <button type="button" className="secondary buy-scan" onClick={() => setScanning(true)}>{tr('buy.scan')}</button>
-            <button type="button" className="secondary buy-add-line" onClick={addLine}>{tr('buy.addItem')}</button>
+            <button type="button" className="secondary buy-scan" onClick={() => setScanning(true)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v14M7 5v14M10 5v14M13 5v14M17 5v14M20 5v14" /></svg>
+              {tr('buy.scan')}
+            </button>
+            <button type="button" className="secondary buy-add-line" onClick={addLine}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              {tr('buy.addItem')}
+            </button>
           </div>
           <p className="buy-item-entry-help">{tr('buy.productEntryHelp')}</p>
           <div className="buy-gst-disclosure">
