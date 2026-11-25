@@ -206,3 +206,5 @@
 @media(prefers-reduced-motion:reduce){
  .buy-gst-chevron{transition:none}
 }
+
+.buy-item-entry button svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
