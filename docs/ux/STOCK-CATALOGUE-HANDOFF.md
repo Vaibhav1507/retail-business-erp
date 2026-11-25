@@ -140,3 +140,12 @@ Correction on `fix/stock-opening-action-and-filter-layout`:
 - No markup, route, API, data, stock calculation or business behaviour changed.
 
 This fixes the CSS Grid placement logic rather than relying on DOM-order auto-placement. Automated tests and Playwright remain skipped per the user's current instruction; a fresh Android screenshot is still required for visual confirmation. PR #90 remains the delivery vehicle; not merged or deployed.
+
+
+## Reference clarification — action cards remain side by side — 2026-11-25
+
+The latest MagicPath screenshot clarifies the intended layout: **Manage products** and **Add opening stock** are two separate cards in the same first row, each occupying one column. Add opening stock must not span the full grid width. The earlier full-width interpretation was incorrect.
+
+Correction: removed the `grid-column:1/-1` override from the second action card and restored normal two-column grid placement. Its title remains on one line, with the helper copy aligned alongside it. The two cards share the row height naturally through CSS Grid stretching. The Category/Availability second-row and full-width Supplier third-row placement remains unchanged.
+
+No tests or Playwright were run, per the user's instruction. This is a source-level correction; Android visual confirmation remains pending. PR #90 remains open and is not merged or deployed.
