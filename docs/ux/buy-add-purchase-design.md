@@ -297,3 +297,8 @@ The supplied MagicPath screenshots are the visual acceptance reference for the e
 - Ignore only the required-asterisk alignment quirk as explicitly requested. Do not copy unrelated prototype/browser chrome.
 
 No route, API, OCR extraction/mapping, barcode resolution, purchase payload/idempotency, server validation, inventory/stock/WAC, supplier payable, GST calculation or accounting behaviour changes are included. Acceptance requires fresh rendered screenshots at 360px, 390px and 412px, full scroll review, fixed-footer/nav clearance and no horizontal overflow; automated TypeScript/tests/lint/build and Playwright/Axe remain separate checks.
+
+
+### Supplier bill region styling correction — 2026-11-25
+
+The InvoiceUpload component retains its accessible `role="region"`, but on Add Purchase that semantic wrapper must not receive the generic billing-region card styling. Reset its border, padding, background and shadow so only the dashed dropzone is visible. Keep `.invoice-upload-intro` explicitly horizontal (icon + copy); keep Camera and Upload equal-width in one row. The Playwright audit asserts these computed styles.
