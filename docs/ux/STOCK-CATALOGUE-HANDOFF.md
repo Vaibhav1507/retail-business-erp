@@ -126,3 +126,10 @@ Following the user's final Android review, made only these mobile layout adjustm
 - CSS remains scoped to the Stock page and mobile breakpoint; no API, database, stock calculation, tenant, or accounting behaviour changed.
 
 **Validation:** source-level change only. No unit tests or Playwright run requested for this visual-only adjustment. Android screenshot confirmation remains pending.
+
+
+## Follow-up correction — opening stock action card — 2026-11-25
+
+PR #90 was merged with the Add opening stock card spanning both columns. The approved MagicPath reference instead places Manage products and Add opening stock side by side in the first row. This follow-up removes the full-width grid span from the second action card while retaining its single-line title and inline helper copy. The filter layout remains Search full-width, Category + Availability side-by-side, and Supplier full-width.
+
+No markup, routes, APIs, data, stock calculations or business behaviour changed. No tests or Playwright were run per the user's instruction; Android visual confirmation remains pending.
