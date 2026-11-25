@@ -92,3 +92,25 @@ Correction on `ux/stock-list-magicpath-alignment`:
 - Keep all route targets, stock calculations, API calls and posting workflows unchanged.
 
 This is a screenshot-driven correction, not a claim of exact pixel identity. The next validation gate is the frontend production build; visual acceptance remains based on the user's next Android screenshot. Unit tests and the full visual audit remain deferred as previously requested.
+
+
+## Final screenshot-driven density correction — 2026-11-25
+
+The latest MagicPath references (Stock overview, Stock on hand filters, and product cards) were compared directly with the current RBOS Android screenshots. The mismatch was caused by both CSS cascade and component content hierarchy, not merely by font sizing.
+
+### Changes on `ux/stock-screen-density-alignment`
+
+- **Filters:** explicitly override the global mobile `div[role="search"]` one-column rule within Stock. Search and Availability stay full-width; Category and Supplier occupy the same two-column row. This fixes the actual cascade conflict that had stacked both selects vertically.
+- **Product card facts:** mirror the reference's information matrix: Brand/model + Unit; Details + Source; Available + Stock value; Status as a compact final row. Supplier is now visible as Source, and product attributes/location are shown under Details. Removed the separate More details disclosure row that unnecessarily increased card height.
+- **Product card density:** compact identity header, smaller card padding, tighter fact-row gaps, and tighter label/value line-height.
+- **Stock overview:** reduce action-card padding/gap, maintain balanced two-column mobile action tiles, and slightly compact the 2x2 metric tiles while retaining comfortable touch targets.
+- **Stock panel:** tighter header/filter/note spacing and shorter filter controls; preserve a 16px outer mobile gutter consistent with the MagicPath frame.
+- **Scope:** CSS is scoped to `.stock-page`; no app-wide font or typography changes, API changes, stock calculations, tenant rules or accounting behaviour.
+
+### User reference comparison
+The supplied MagicPath references show:
+1. A compact two-column action grid followed by a compact 2x2 metric grid.
+2. Category and Supplier side-by-side within Stock on hand.
+3. Product detail pairs laid out horizontally, rather than a vertically stacked detail disclosure.
+
+The implementation now follows that structure. It is screenshot-informed, not a pixel-perfect claim. Build is the validation gate; unit tests and visual audit remain deferred as instructed. User visual acceptance, merge and deployment are separate and still pending.
