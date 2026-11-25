@@ -281,3 +281,19 @@ Acceptance checks for the corrected footer:
 ### Outer-card correction — 2026-11-25
 
 The Add Purchase route must render one white task card, not a generic billing card nested around the task card. The receive-only `buy-receive-shell` removes the generic outer section border, padding, background and shadow so `.buy-purchase-card` can align to the available content width like the MagicPath reference. Other Buy routes are not affected.
+
+
+## 19. Full-screen screenshot acceptance — 2026-11-25
+
+The supplied MagicPath screenshots are the visual acceptance reference for the entire Add Purchase screen, not only the footer. Implement the following at the reference Android viewport:
+
+- One rounded white task card spans the available content width; do not nest it inside a second generic billing card.
+- The page-level Buy title and the existing four destinations remain outside the task card. Keep the destinations in one horizontal row with horizontal scrolling if needed; do not wrap them into a two-row grid. The first three visible tabs align with the supplied MagicPath screenshot, while Return to Supplier remains reachable as the fourth existing route.
+- Supplier bill has its heading/helper copy and a single pale dashed upload panel. The receipt icon and copy sit together horizontally; Camera and Upload are equal-width actions on one row. Do not show a second inset border/panel.
+- Supplier and invoice number occupy full rows. Stock location and Receipt date share a row at widths of 360px and above; stack only below 360px.
+- Purchased items heading, description and count retain their current hierarchy. The item editor has a full-width product selector, paired Quantity and Unit cost fields, paired Scan barcode and Add item actions, and helper text inside the pale item panel.
+- GST remains a secondary disclosure with its optionality hint and chevron; existing GST guidance remains below it.
+- Review purchase remains fixed to the viewport above the bottom navigation and Android safe-area inset while the form scrolls. Its summary occupies the flexible column and its action stays within the bounded right column. The final form content must remain scrollable above the bar.
+- Ignore only the required-asterisk alignment quirk as explicitly requested. Do not copy unrelated prototype/browser chrome.
+
+No route, API, OCR extraction/mapping, barcode resolution, purchase payload/idempotency, server validation, inventory/stock/WAC, supplier payable, GST calculation or accounting behaviour changes are included. Acceptance requires fresh rendered screenshots at 360px, 390px and 412px, full scroll review, fixed-footer/nav clearance and no horizontal overflow; automated TypeScript/tests/lint/build and Playwright/Axe remain separate checks.
