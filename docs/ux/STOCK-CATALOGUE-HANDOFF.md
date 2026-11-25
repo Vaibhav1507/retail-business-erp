@@ -1,6 +1,6 @@
 # RBOS Stock & Catalogue — implementation handoff
 
-**Status:** Implementation branch prepared; automated CI and grouped Playwright/Axe verification pending.  
+**Status:** Implementation branch prepared; build failure identified and being corrected. Revised MagicPath artifact could not be re-fetched because the external-agent API quota is exhausted. Implement against the approved repository design specification. Visual audit and unit tests are deferred by the current delivery instruction.  
 **Last updated:** 2026-11-25  
 **Design contract:** [Stock & Catalogue mobile UX specification](https://github.com/Vaibhav1507/retail-business-erp/blob/ux/stock-catalogue-mobile-design-spec/docs/ux/stock-catalogue-mobile-design.md)  
 **Final MagicPath reference:** https://designs.magicpath.ai/v1/richly-mountain-9553  
@@ -30,10 +30,10 @@
 |---|---|
 | Final MagicPath design direction | Complete |
 | Repository design specification | PR #83 open; CI success |
-| Focused TypeScript/build/lint/tests for implementation | Pending CI |
-| Full grouped Playwright journeys and responsive screenshots | Pending after all in-scope screens are implemented |
-| Visual contact-sheet review | Pending |
-| Axe WCAG 2 A/AA | Pending |
+| TypeScript check | Passed in initial CI run; rerun after build fix |\n| Frontend production build | Failed initially due missing `useMemo` import; fix committed, rerun pending |\n| Backend solution build | Passed |\n| Unit tests / visual audit | Deferred by current delivery instruction |
+| Full grouped Playwright journeys and responsive screenshots | Deferred by current delivery instruction |
+| Visual contact-sheet review | Deferred by current delivery instruction |
+| Axe WCAG 2 A/AA | Deferred by current delivery instruction |
 | Native Android camera/barcode, keyboard and TalkBack | Pending real-device check |
 | User acceptance, merge and deployment | Not performed |
 
