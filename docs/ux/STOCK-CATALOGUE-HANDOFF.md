@@ -182,3 +182,27 @@ At implementation head `fd9da6c4bf02a1bfa566e62d4084acde63e416b0`, GitHub Action
 - Dependency audit
 
 The backend solution build also passed at that check. Backend unit tests and PostgreSQL integration were still running when this note was recorded. No full responsive screenshot comparison or real Android visual acceptance has yet been performed. Merge and deployment are not performed by this PR.
+
+
+## Shared Catalogue — MagicPath alignment follow-up (2026-11-25)
+
+### Screenshot comparison and implementation
+
+The user's MagicPath Shared Catalogue references and current RBOS Android screenshots were compared. The old RBOS shared-catalogue table rendered each field as stacked label/value rows and did not match the reference card hierarchy.
+
+Implemented in the same PR #93 branch:
+- Preserve the existing three catalogue tabs and selected Shared catalogue state.
+- Keep the shared-data privacy banner but align its copy with the MagicPath reference: shared catalogue entries are scoped to the same business category; SKU, barcode, stock, buying cost and selling price remain private.
+- Keep the lock icon, light-green banner, full-width Search shared products label/input and the reference placeholder.
+- Replace the responsive stacked table with compact shared-product cards.
+- Each card has a first-character product mark, product name, category + brand/model metadata, visible product attributes/specifications and a left-aligned outlined action.
+- Already-added products display a disabled `✓ Already added` action; not-yet-added products use the existing add-to-my-products API action.
+- Keep empty-state copy and the existing master catalogue search and add behaviour.
+- Show pagination for short result sets as well as larger catalogues.
+- Reuse the same three-tier pagination footer layout on My Products and Shared Catalogue: result count, per-page selector and Previous / page count / Next navigation.
+- CSS remains scoped to the catalogue screen. No API, shared-catalogue data, duplicate prevention, tenant boundary or product creation behaviour is changed.
+
+### Validation
+- Frontend TypeScript/build CI is being run on the updated PR head.
+- No full Playwright visual audit has been run. Exact visual acceptance remains pending updated Android screenshots after PR deployment.
+- Header differences in the user's current app screenshots are intentionally not changed in this follow-up; the user noted PR #93's heading changes have not yet been deployed.
