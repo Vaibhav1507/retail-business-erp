@@ -242,3 +242,29 @@ No grid columns, card copy, icon/title alignment, gaps, padding, colours, filter
 - Implementation and documentation are committed to this branch.
 - Build is the requested validation gate; no full Playwright/Axe audit was run for this visual-only category pass.
 - User Android screenshot acceptance, merge and deployment remain separate and pending.
+
+
+## Add Opening Stock — MagicPath screenshot implementation (2026-11-25)
+
+**Implementation branch:** `ux/opening-stock-magicpath-alignment`
+
+### User reference and implementation
+The user supplied two MagicPath Android screenshots followed by the current RBOS screen. The redesign is scoped to the existing Opening Stock route and form; it does not create a new posting workflow.
+
+- Replace the generic multi-column billing form presentation with a focused, full-width white form panel.
+- Add the small INITIAL INVENTORY eyebrow, Opening stock heading, explanatory line and step marker.
+- Keep Stock location and Stock counted as of as full-width controls.
+- Keep Product full-width; place Quantity and Cost for one item side by side on phone layouts.
+- Make Add item a full-width outlined action.
+- Render already-added items as compact readable rows with remove actions instead of a mobile table.
+- Keep the estimated value and item count in a persistent summary/action bar above bottom navigation on mobile.
+- Keep the Review starting stock action disabled until at least one valid item is added.
+- Preserve the existing review-before-post confirmation, idempotency key, API payload, server-authoritative posted total, reload and error/retry behaviour.
+
+### Explicitly preserved
+No API, database, stock valuation, Opening Balance Equity, inventory posting, idempotency, tenant/security or accounting behaviour changes. No changes to shared typography, app shell, global navigation or unrelated stock screens.
+
+### Validation
+- Focused source implementation committed to this branch.
+- Production build is the requested validation gate; full tests and grouped Playwright/Axe visual audit remain deferred until the complete Stock & Catalogue screen group is ready.
+- Android visual acceptance, merge and deployment are separate and not claimed complete.
