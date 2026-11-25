@@ -74,12 +74,17 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   }
   return (
     <form className="product-form" onSubmit={submit} aria-label={editingId ? 'Edit product' : 'Add product'}>
-      <h3>{editingId ? 'Edit product' : 'Add product'}</h3>
+      <header className="product-form-heading">
+        <span className="product-form-eyebrow">PRODUCT DETAILS</span>
+        <span className="product-form-step" aria-hidden="true">01</span>
+        <h3>{editingId ? 'Edit product' : 'Add product'}</h3>
+        <p>Start with the name and category. Add optional details when needed.</p>
+      </header>
       <section className="product-form-section" aria-labelledby="product-basics-heading">
         <h3 id="product-basics-heading">Product basics</h3>
-        <label>Name <span aria-hidden="true" className="required-mark">*</span><input list="product-name-options" value={d.name} onChange={e => set({ name: e.target.value })} required maxLength={160} placeholder="Enter the product name" /></label>
+        <label><span className="product-field-label">Name <span aria-hidden="true" className="required-mark">*</span></span><input list="product-name-options" value={d.name} onChange={e => set({ name: e.target.value })} required maxLength={160} placeholder="Enter the product name" /></label>
         <datalist id="product-name-options">{(electronics ? PRODUCT_NAMES : []).map(n => <option key={n} value={n} />)}</datalist>
-        <label>Category <span aria-hidden="true" className="required-mark">*</span>
+        <label><span className="product-field-label">Category <span aria-hidden="true" className="required-mark">*</span></span>
           <select value={otherCat ? '__other' : d.category} required={!otherCat} onChange={pickCategory}>
             <option value="">Select a category</option>
             {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
@@ -87,10 +92,10 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
           </select>
         </label>
         {otherCat && <label>New category <input value={d.category} onChange={e => set({ category: e.target.value })} required maxLength={80} placeholder="e.g. Screen Guards" /></label>}
-        <label>Unit <select value={d.unit} disabled={!!editingId} onChange={e => set({ unit: e.target.value })} required>{UNITS.map(u => <option key={u}>{u}</option>)}</select></label>
+        <label><span className="product-field-label">Unit</span><select value={d.unit} disabled={!!editingId} onChange={e => set({ unit: e.target.value })} required>{UNITS.map(u => <option key={u}>{u}</option>)}</select></label>
       </section>
       <details className="product-form-disclosure">
-        <summary><span>Brand and model</span><small>Optional · useful for identifying variants</small></summary>
+        <summary><span>Brand and product identity</span><small>Optional for generic products</small></summary>
         <label className="check"><input type="checkbox" checked={d.generic} onChange={e => set({ generic: e.target.checked })} /> Generic / unbranded</label>
         {!d.generic && <>
           <label>Brand <input list="brand-options" value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} placeholder="Pick or type a brand" /></label><datalist id="brand-options">{brandNames.map(n => <option key={n} value={n} />)}</datalist>
@@ -98,13 +103,13 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
         </>}
       </details>
       <details className="product-form-disclosure">
-        <summary><span>Tax and pricing references</span><small>Optional · reference only</small></summary>
+        <summary><span>Tax and pricing references</span><small>Optional</small></summary>
         <label>HSN code <input value={d.hsn} onChange={e => set({ hsn: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={8} placeholder="4, 6 or 8 digits" /></label>
-        <label>GST rate % <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
+        <label>GST rate <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
         <label>MRP <small>Reference only, not selling price</small><input value={d.mrp} onChange={e => set({ mrp: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" maxLength={12} placeholder="₹ 0.00" /></label>
       </details>
       <details className="product-form-disclosure">
-        <summary><span>Product details</span><small>Optional · specifications supported for this business type</small></summary>
+        <summary><span>Product details</span><small>Colour, capacity and compatibility</small></summary>
         <fieldset>
           <legend>Additional details</legend>
           {attrFields.map(([k, label]) => <label key={k}>{label} <input value={d.attrs[k] ?? ''} onChange={e => setAttr(k, e.target.value)} maxLength={100} /></label>)}
@@ -243,41 +248,40 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 	  </nav>
 	  {error && <p role="alert">{error}</p>}
 	  {view === 'form' && (
-		<>
-		  <p><a href="#/stock/products" onClick={e => { e.preventDefault(); closeForm() }}>&larr; Back to products</a></p>
-		  {!editing && scanned && suggestions.length > 0 && (
-		<div className="import-block" role="region" aria-label="Possible matches">
-		  <h3>Possible matches for {scanned.code}</h3>
-		  <p className="hint-line">Link this barcode to an existing product only after verification, or add a new one manually below.</p>
-		  <ul>{suggestions.map(s => <li key={s.id}>{s.name} ({s.brand ?? 'generic'} {s.model ?? ''}, {s.sku}, {s.match}) <button type="button" className="secondary" onClick={() => { api('POST', `/products/${s.id}/barcodes`, { code: scanned.code, symbology: scanned.symbology }).then(() => { setScanned(null); setSuggestions([]); setView('list'); load().catch(() => undefined) }).catch(err => setError(msg(err))) }}>Link barcode</button></li>)}</ul>
-		</div>
-	  )}
-	  {!editing && scanned && external.length > 0 && (
-		<div className="import-block" role="region" aria-label="External barcode suggestions">
-		  <h3>External references for {scanned.code}</h3>
-		  <p className="hint-line">Review only. This data never auto-creates or auto-updates products.</p>
-		  <ul>{external.map((x, i) => <li key={`${x.source}-${i}`}>{x.name ?? 'Unnamed'} ({x.brand ?? 'unknown brand'}) — {x.source}{x.model ? `, model ${x.model}` : ''}{x.attribution ? ` · ${x.attribution}` : ''}</li>)}</ul>
-		</div>
-	  )}
-	  {!editing && scanned && providerResults.length > 0 && (
-		<div className="import-block" role="region" aria-label="External provider status">
-		  <h3>External lookup status</h3>
-		  <ul>{providerResults.map((p, i) => <li key={`${p.provider}-${i}`}>{p.provider}: {p.status}{p.message ? ` (${p.message})` : ''}</li>)}</ul>
-		</div>
-	  )}
-	  {!editing && <div className="import-block"><SetupAssistant reload={() => { load().catch(() => undefined); reload() }} /></div>}
-	  {!editing && <ManufacturerRegistry />}
-
-		  {!editing && <h3>Or add one product by hand</h3>}
-
-		  {editing
-
-			? <ProductForm key={editing.id} initial={toDraft(editing)} categories={categories} editingId={editing.id} businessCategory={businessCategory} onSaved={saved} onCancel={closeForm} />
-
-			: <ProductForm key={scanned?.code ?? 'new'} initial={blank} categories={categories} editingId={null} businessCategory={businessCategory} barcode={scanned} onSaved={saved} onCancel={closeForm} />}
-		</>
-	  )}
-	  {view === 'list' && (
+    <div className="product-form-page">
+      <div className="page-title product-form-page-title">
+        <span className="catalogue-stock-badge">STOCK</span>
+        <h2>{editing ? 'Edit product' : 'Add product'}</h2>
+        <p>{editing ? 'Update the information for this product.' : 'Add the information needed to identify this product.'}</p>
+      </div>
+      <section className="product-form-shell">
+        <p className="product-form-back"><a href="#/stock/products" onClick={e => { e.preventDefault(); closeForm() }}>← Back to products</a></p>
+        {!editing && scanned && suggestions.length > 0 && (
+          <div className="import-block" role="region" aria-label="Possible matches">
+            <h3>Possible matches for {scanned.code}</h3>
+            <p className="hint-line">Link this barcode to an existing product only after verification, or add a new one manually below.</p>
+            <ul>{suggestions.map(s => <li key={s.id}>{s.name} ({s.brand ?? 'generic'} {s.model ?? ''}, {s.sku}, {s.match}) <button type="button" className="secondary" onClick={() => { api('POST', `/products/${s.id}/barcodes`, { code: scanned.code, symbology: scanned.symbology }).then(() => { setScanned(null); setSuggestions([]); setView('list'); load().catch(() => undefined) }).catch(err => setError(msg(err))) }}>Link barcode</button></li>)}</ul>
+          </div>
+        )}
+        {!editing && scanned && external.length > 0 && (
+          <div className="import-block" role="region" aria-label="External barcode suggestions">
+            <h3>External references for {scanned.code}</h3>
+            <p className="hint-line">Review only. This data never auto-creates or auto-updates products.</p>
+            <ul>{external.map((x, i) => <li key={`${x.source}-${i}`}>{x.name ?? 'Unnamed'} ({x.brand ?? 'unknown brand'}) — {x.source}{x.model ? `, model ${x.model}` : ''}{x.attribution ? ` · ${x.attribution}` : ''}</li>)}</ul>
+          </div>
+        )}
+        {!editing && scanned && providerResults.length > 0 && (
+          <div className="import-block" role="region" aria-label="External provider status">
+            <h3>External lookup status</h3>
+            <ul>{providerResults.map((p, i) => <li key={`${p.provider}-${i}`}>{p.provider}: {p.status}{p.message ? ` (${p.message})` : ''}</li>)}</ul>
+          </div>
+        )}
+        {editing
+          ? <ProductForm key={editing.id} initial={toDraft(editing)} categories={categories} editingId={editing.id} businessCategory={businessCategory} onSaved={saved} onCancel={closeForm} />
+          : <ProductForm key={scanned?.code ?? 'new'} initial={blank} categories={categories} editingId={null} businessCategory={businessCategory} barcode={scanned} onSaved={saved} onCancel={closeForm} />}
+      </section>
+    </div>
+  )}  {view === 'list' && (
 		<>
 		  <div className="stock-actions"><button type="button" onClick={startAdd}>Add product</button> <button type="button" className="secondary" onClick={() => setScanning(true)}>Scan barcode</button></div>
 		  {scanning && <BarcodeScanner onScan={onScan} onClose={() => setScanning(false)} />}
