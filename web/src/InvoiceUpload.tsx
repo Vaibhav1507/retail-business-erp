@@ -188,11 +188,28 @@ export function InvoiceUpload({ products, suppliers, onUse, onProductAdded, onSu
 
   return (
     <div role="region" aria-label={tr('buy.invoiceRead')} className="invoice-upload">
-      <div className="invoice-upload-sources" aria-label={tr('buy.invoiceSources')}>
-        <button type="button" className="secondary" onClick={() => cameraInput.current?.click()} disabled={busy}>{tr('buy.camera')}</button>
-        <button type="button" className="secondary" onClick={() => uploadInput.current?.click()} disabled={busy}>{tr('buy.upload')}</button>
-        <input ref={cameraInput} className="invoice-upload-source-input" type="file" hidden accept="image/jpeg,image/png,image/webp" capture="environment" aria-label={tr('buy.cameraBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
-        <input ref={uploadInput} className="invoice-upload-source-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple aria-label={tr('buy.uploadBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+      <div className="invoice-upload-dropzone">
+        <div className="invoice-upload-intro">
+          <span className="invoice-upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 3.75h8l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z" />
+              <path d="M14 3.75v4h4M8 12h8M8 16h8" />
+            </svg>
+          </span>
+          <span className="invoice-upload-intro-copy"><strong>{tr('buy.addSupplierBill')}</strong><small>{tr('buy.invoicePhotoPdfSupport')}</small></span>
+        </div>
+        <div className="invoice-upload-sources" aria-label={tr('buy.invoiceSources')}>
+          <button type="button" className="secondary" onClick={() => cameraInput.current?.click()} disabled={busy}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h3l1.5-2h7l1.5 2h3v11H4z" /><circle cx="12" cy="13" r="3" /></svg>
+            {tr('buy.camera')}
+          </button>
+          <button type="button" className="secondary" onClick={() => uploadInput.current?.click()} disabled={busy}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></svg>
+            {tr('buy.upload')}
+          </button>
+          <input ref={cameraInput} className="invoice-upload-source-input" type="file" hidden accept="image/jpeg,image/png,image/webp" capture="environment" aria-label={tr('buy.cameraBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+          <input ref={uploadInput} className="invoice-upload-source-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple aria-label={tr('buy.uploadBill')} disabled={busy} onChange={e => handleFiles(e.currentTarget)} />
+        </div>
       </div>
       {selectedFileNames.length > 0 && <p className="invoice-upload-selected" aria-live="polite">{selectedFileNames.join(', ')}</p>}
       {busy && <p role="status">{tr('buy.invoiceReading')}</p>}
