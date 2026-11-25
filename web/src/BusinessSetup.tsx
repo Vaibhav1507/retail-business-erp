@@ -172,7 +172,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
       <form className={signup ? 'auth-signup-form' : undefined} onSubmit={e => { e.preventDefault(); review ? save() : next() }} aria-label="Business profile">
         {signup && step === 0 && <>
           <label className="wide">Email *<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
-          <label className="wide">Password * (at least 12 characters, including a number)<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" aria-invalid={!!password && !!passwordError} /></label>
+          <label className="wide">Password *<span className="hint" id="signup-password-hint">Minimum 12 characters, including at least one number.</span><input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" aria-describedby="signup-password-hint" aria-invalid={!!password && !!passwordError} /></label>
           {password && passwordError && <p className="error" role="alert">{passwordError}</p>}
           {otp ? <MobileVerify signup mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={(m, pr) => { setVerifiedMobile(m); if (pr) setProof(pr) }} />
             : <label className="wide">Mobile number *<input inputMode="numeric" value={p.mobile} onChange={e => set({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit number" autoComplete="tel-national" /></label>}
@@ -216,12 +216,15 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
             <dt>GST</dt><dd>{GST.find(g => g[0] === p.gstStatus)?.[1]}{needsGstin(p.gstStatus) ? `, ${p.gstin}` : ''}</dd>
             <dt>Financial year</dt><dd>Starts in {MONTHS[p.financialYearStartMonth - 1]}</dd><dt>Language and currency</dt><dd>English, INR</dd>
           </dl>
-          <aside className="billing-card setup-invoice-preview" aria-label="Sample invoice preview"><strong>{t('onboarding.sampleInvoiceTitle')}</strong>
-            <p>{p.businessName || 'Your shop name'} · {p.city || 'Your city'}</p>
-            <div className="table-scroll"><table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody><tr><td>Sample product</td><td>1</td><td>₹100.00</td></tr></tbody></table></div>
-            <p><strong>Total: ₹100.00</strong></p>
-            <p className="hint">{p.gstStatus === 'Regular' || p.gstStatus === 'Composition' ? t('onboarding.sampleInvoiceRegistered') : p.gstStatus === 'NotRegistered' ? t('onboarding.sampleInvoiceNotRegistered') : t('onboarding.sampleInvoicePending')}</p>
-          </aside>
+          <details className="setup-invoice-disclosure">
+            <summary>See what a sample invoice could look like</summary>
+            <aside className="billing-card setup-invoice-preview" aria-label="Sample invoice preview"><strong>{t('onboarding.sampleInvoiceTitle')}</strong>
+              <p>{p.businessName || 'Your shop name'} · {p.city || 'Your city'}</p>
+              <div className="table-scroll"><table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody><tr><td>Sample product</td><td>1</td><td>₹100.00</td></tr></tbody></table></div>
+              <p><strong>Total: ₹100.00</strong></p>
+              <p className="hint">{p.gstStatus === 'Regular' || p.gstStatus === 'Composition' ? t('onboarding.sampleInvoiceRegistered') : p.gstStatus === 'NotRegistered' ? t('onboarding.sampleInvoiceNotRegistered') : t('onboarding.sampleInvoicePending')}</p>
+            </aside>
+          </details>
         </>}
         {error && <p role="alert" className="wide">{error}</p>}
         <div className="step-actions">

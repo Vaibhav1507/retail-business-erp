@@ -278,3 +278,17 @@ The following was inspected from the MagicPath component revision once and is st
 - Captured component metadata and viewport dimensions
 
 No further MagicPath source or screenshot request is required for this implementation. The supplied screenshots and the values above are the reference record for this task.
+
+## 12. Screenshot-driven mobile polish — 2026-11-25
+
+The post-implementation Android screenshots were reviewed as the current RBOS application (not the MagicPath reference). The five-stage signup flow and visual direction are accepted; this follow-up is limited to three small refinements:
+
+- **Password helper:** keep the field label to the single line “Password *” and move “Minimum 12 characters, including at least one number.” below it as muted helper text. Associate the helper with the input using `aria-describedby`; preserve the existing minimum-length and numeric validation.
+- **Vertical density:** reduce only onboarding page top/bottom padding, the signup section gap and form field gap. Keep 48 px inputs and action controls, the progress hierarchy, and horizontal insets/touch targets intact.
+- **Sample invoice:** this is a static, illustrative example shown on the final Review step. It uses a placeholder product, quantity 1 and ₹100; it does not create/post a sale, issue an invoice number, or calculate tax. Keep the GST-specific explanatory note, but place the example behind a collapsed native disclosure labelled “See what a sample invoice could look like” so it does not dominate the review screen.
+
+**Non-goals:** no change to authentication, registration, GST status semantics, tenant bootstrap, invoice generation or tax calculation. Do not remove or weaken password validation.
+
+**Screenshot acceptance:** at 360, 390 and 412 px widths, the password label must remain on one line; helper text must remain readable; the review page must show the business summary and create-account actions without an expanded sample card; opening the disclosure must reveal the complete example and the correct GST explanation. Form controls and buttons remain at least 48 px high.
+
+The first two permitted RBOS Visual Audit attempts for PR #101 failed during Playwright discovery with “No tests found”; per the agreed retry limit, no further attempts are required. This follow-up should use regular CI and focused tests. Do not claim browser screenshot or Axe verification unless those checks actually execute.
