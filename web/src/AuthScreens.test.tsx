@@ -146,4 +146,27 @@ describe('Dhandha Mitra authentication screens', () => {
     await user.click(screen.getByRole('button', { name: 'Clear PIN field' }))
     expect(pin).toHaveValue('')
   })
+  
+  it('keeps Sign out directly after Unlock on the compact single-screen privacy lock', async () => {
+    localStorage.setItem('rbos.local-pin.v1:owner@example.test', JSON.stringify({
+      salt: 'AA==',
+      hash: 'AA==',
+      failures: 0,
+      lockedUntil: 0,
+    }))
+    const { AppLockGate } = await vi.importActual<typeof import('./AppLock')>('./AppLock')
+
+    render(
+      <AppLockGate email="owner@example.test" onSignOut={vi.fn().mockResolvedValue(undefined)}>
+        <div>Shop workspace</div>
+      </AppLockGate>,
+    )
+
+    const unlock = await screen.findByRole('button', { name: 'Unlock' })
+    const signOut = screen.getByRole('button', { name: 'Sign out' })
+    expect(unlock.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.querySelector('main.app-lock-screen-compact')).toBeInTheDocument()
+    expect(screen.getByText(/local privacy lock only/)).toBeInTheDocument()
+  })
+
 })
