@@ -121,7 +121,7 @@ export function StockPage({ tab, c, rows, opening, businessCategory }: { tab: st
   const stockValue = rows.reduce((total, row) => total + row.value, 0)
   return (
     <div className="stock-page">
-      <div className="page-title"><h2>{t('stock.title')}</h2><p>{t('stock.subtitle')}</p></div>
+      {key !== 'products' && <div className="page-title"><h2>{t('stock.title')}</h2><p>{t('stock.subtitle')}</p></div>}
       {key === '' && <>
         <div className="stock-actions" aria-label="Stock actions">{ACTIONS.map(([k, name, description, icon], i) => <a key={k} className={`btn stock-action${i === 0 ? ' primary' : ' secondary'}`} href={`#/stock/${k}`}><span className="stock-action-copy"><span className="stock-action-heading"><span className="stock-action-icon" aria-hidden="true">{icon}</span><strong>{name}</strong></span><small>{description}</small></span></a>)}</div>
         <div className="stock-summary" role="group" aria-label="Stock summary">
@@ -132,7 +132,7 @@ export function StockPage({ tab, c, rows, opening, businessCategory }: { tab: st
         </div>
         <Inventory rows={rows} products={c.products} />
       </>}
-      {key === 'products' && <><Back /><Catalogue reload={c.reload} businessCategory={businessCategory} /></>}
+      {key === 'products' && <Catalogue reload={c.reload} businessCategory={businessCategory} stockRows={rows} />}
       {key === 'opening' && <><Back />{opening}</>}
       {key === 'purchase' && <><Back /><Procurement {...c} show="receive" /></>}
             {key === 'adjust' && <><Back /><Finance key="adjust" only={['adjust']} /></>}
