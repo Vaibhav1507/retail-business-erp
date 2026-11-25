@@ -336,3 +336,17 @@
 @media(min-width:721px){
  .opening-stock-footer{position:sticky;bottom:0;margin-top:18px;border:1px solid var(--line);border-radius:12px}
 }
+
+/* Neutralise the legacy billing grid rules for the redesigned Opening Stock panel. */
+.opening-stock-screen>.opening-stock-heading,
+.opening-stock-screen>.opening-stock-field,
+.opening-stock-screen>.opening-stock-add-section,
+.opening-stock-screen>.opening-stock-lines,
+.opening-stock-screen>.opening-stock-message,
+.opening-stock-screen>.opening-stock-footer{grid-column:1/-1}
+.opening-stock-screen>.opening-stock-heading,
+.opening-stock-screen>.opening-stock-add-section,
+.opening-stock-screen>.opening-stock-lines,
+.opening-stock-screen>.opening-stock-footer{display:block}
+.opening-stock-screen>.opening-stock-field{display:flex}
+.opening-stock-screen>.opening-stock-footer{display:flex}
