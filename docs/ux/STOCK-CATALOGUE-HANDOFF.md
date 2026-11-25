@@ -114,3 +114,15 @@ The supplied MagicPath references show:
 3. Product detail pairs laid out horizontally, rather than a vertically stacked detail disclosure.
 
 The implementation now follows that structure. It is screenshot-informed, not a pixel-perfect claim. Build is the validation gate; unit tests and visual audit remain deferred as instructed. User visual acceptance, merge and deployment are separate and still pending.
+
+
+## Final Stock layout polish — 2026-11-25
+
+Following the user's final Android review, made only these mobile layout adjustments:
+
+- **Add Opening Stock:** place the action across the full action-grid row and keep its title on one line. Its existing helper text remains visible alongside the title.
+- **Inventory filters:** Category and Availability share one row; Supplier occupies the full row. Search remains full-width.
+- All other Stock action cards, product cards, spacing, navigation, routes, data, and stock workflows remain unchanged.
+- CSS remains scoped to the Stock page and mobile breakpoint; no API, database, stock calculation, tenant, or accounting behaviour changed.
+
+**Validation:** source-level change only. No unit tests or Playwright run requested for this visual-only adjustment. Android screenshot confirmation remains pending.

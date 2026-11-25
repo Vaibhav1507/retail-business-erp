@@ -225,3 +225,48 @@
  .stock-page .stock-actions .stock-action{min-height:100px}
  .stock-page .stock-summary>div{min-height:72px}
 }
+
+
+/* Final Stock landing/filter alignment from Android review. */
+@media(max-width:720px){
+ .stock-page .stock-actions .stock-action:nth-child(2){
+  grid-column:1/-1;
+  min-height:64px;
+  align-items:center;
+ }
+ .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-copy{
+  flex-direction:row;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+ }
+ .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-heading{
+  flex:0 0 auto;
+  gap:6px;
+ }
+ .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-heading strong{
+  white-space:nowrap;
+  font-size:13px;
+ }
+ .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-icon{
+  flex-basis:22px;
+  width:22px;
+  height:22px;
+ }
+ .stock-page .stock-actions .stock-action:nth-child(2) .stock-action-copy small{
+  flex:1 1 auto;
+  min-width:0;
+  text-align:right;
+  font-size:11px;
+  line-height:1.25;
+ }
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-category,
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-availability{
+  grid-column:auto;
+  min-width:0;
+ }
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-supplier{
+  grid-column:1/-1;
+  min-width:0;
+ }
+}
