@@ -47,3 +47,53 @@ form.product-form button.secondary:hover:not(:disabled) { background: var(--bran
 .catalogue-screen .invoice-upload p { margin: 0; }
 .catalogue-screen form[aria-label='Rename category'] { margin-top: 16px; }
 @media (max-width: 800px) { .catalogue-screen div[role='search'] { grid-template-columns: 1fr; } }
+
+
+/* Stock & Catalogue: focused form sections and compact mobile catalogue cards */
+form.product-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;max-width:none}
+form.product-form>.product-form-section,form.product-form>.product-form-disclosure,form.product-form>.form-actions,form.product-form>p,form.product-form>.check{grid-column:1/-1}
+form.product-form>.product-form-section{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;min-width:0}
+form.product-form>.product-form-section>h3{grid-column:1/-1;margin:0 0 2px;padding:0;border:0;text-transform:none;letter-spacing:0;font-size:17px;color:var(--brand-dark,#0b5e3b)}
+form.product-form .required-mark{display:inline;color:var(--danger,#b42318);font-weight:700}
+form.product-form .product-form-disclosure{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;min-width:0;margin:0;padding:0;border:1px solid var(--line,#dfe5e2);border-radius:13px;background:#fff}
+form.product-form .product-form-disclosure>summary{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;min-height:54px;padding:12px 15px;cursor:pointer;list-style:none;font-weight:700;color:var(--brand-dark,#0b5e3b)}
+form.product-form .product-form-disclosure>summary::-webkit-details-marker{display:none}
+form.product-form .product-form-disclosure>summary::after{content:'＋';margin-left:auto;font-size:18px}
+form.product-form .product-form-disclosure[open]>summary::after{content:'−'}
+form.product-form .product-form-disclosure>summary small{font-weight:400}
+form.product-form .product-form-disclosure[open]{padding-bottom:14px}
+form.product-form .product-form-disclosure[open]>:not(summary){margin-left:14px;margin-right:14px}
+form.product-form .product-form-disclosure>label{min-width:0}
+form.product-form .product-form-disclosure>fieldset{grid-column:1/-1;margin:0 14px 0;padding:14px}
+.catalogue-screen .tabs{margin-bottom:14px}
+.catalogue-screen .stock-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.catalogue-screen .stock-actions button{min-height:44px}
+.catalogue-screen .table-scroll{max-width:100%;min-width:0}
+.catalogue-screen .table-scroll table{width:100%;min-width:0}
+.catalogue-screen .table-scroll td{overflow-wrap:anywhere}
+.catalogue-screen .category-rename{min-width:76px;min-height:40px;padding:7px 12px}
+.catalogue-privacy{display:flex;align-items:flex-start;gap:10px;margin:0 0 16px;padding:13px 14px;border:1px solid #d6e9df;border-radius:13px;background:#eff8f3;color:#285d45}
+.catalogue-privacy>span{flex:0 0 auto;font-size:19px}
+.catalogue-privacy p{margin:0;font-size:13px;line-height:1.5}
+.catalogue-privacy strong{display:inline-block;margin-bottom:2px}
+.category-similarity-warning{display:grid;gap:4px;margin:12px 0;padding:12px 14px;border:1px solid #ead9b7;border-radius:12px;background:#fff9ed;color:#704f1c}
+.category-similarity-warning strong{font-size:13px}
+.category-similarity-warning span{font-size:13px;font-weight:700;overflow-wrap:anywhere}
+.category-similarity-warning small{font-size:12px;line-height:1.4;color:#806c4a}
+.catalogue-screen form[aria-label='Rename category']{display:grid;gap:12px;padding:14px;border:1px solid var(--line,#dfe5e2);border-radius:12px;background:#f8faf9}
+.catalogue-screen form[aria-label='Rename category'] label{min-width:0}
+@media(max-width:720px){
+ form.product-form{grid-template-columns:minmax(0,1fr);gap:14px}
+ form.product-form>.product-form-section{grid-template-columns:minmax(0,1fr);gap:13px}
+ form.product-form .product-form-disclosure{grid-template-columns:minmax(0,1fr);gap:12px}
+ form.product-form .product-form-disclosure>summary{min-height:52px}
+ .catalogue-screen .table-scroll{overflow:visible}
+ .catalogue-screen .table-scroll table{display:block}
+ .catalogue-screen .table-scroll tbody{display:grid;gap:10px}
+ .catalogue-screen .table-scroll tr{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:var(--shadow-1)}
+ .catalogue-screen .table-scroll td{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:7px 0;text-align:right;border:0;border-bottom:1px solid #f0f2f1}
+ .catalogue-screen .table-scroll td:last-child{border-bottom:0;padding-top:10px}
+ .catalogue-screen .table-scroll td::before{flex:0 0 88px;max-width:38%;font-size:12px}
+ .catalogue-screen .table-scroll td[data-label='Details'],.catalogue-screen .table-scroll td[data-label='Source']{font-size:13px}
+ .catalogue-screen .table-scroll td[data-label='Actions'] button,.catalogue-screen .table-scroll td[data-label='Action'] button{width:auto;min-width:96px}
+}
