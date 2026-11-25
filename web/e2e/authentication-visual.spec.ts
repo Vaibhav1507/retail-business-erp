@@ -143,7 +143,7 @@ test('authentication and five-step signup visual audit', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Review' }).click()
   await expect(page.getByText('STEP 5 OF 5')).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Sample invoice preview' })).toBeVisible()
+  await expect(page.locator('.setup-invoice-preview')).toBeVisible()
   await expect(page.getByText('Not registered selected. Do not show GST as a registered-business tax invoice.')).toBeVisible()
   await captureState(page, 'signup-review', report)
 

@@ -135,11 +135,11 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
 
   return (
     <div className={signup ? 'setup auth-signup-flow' : 'setup'}>
-      {signup && step > 0 && onCancel && (
+      {signup && onCancel && (
         <button type="button" className="auth-back-link" onClick={onCancel}>← Back to sign in</button>
       )}
-      <h2>{editing ? 'Business profile' : signup ? 'Create your account' : 'Set up your business'}</h2>
-      {!editing && <p className="hint">This takes about a minute and is asked only once. Fields marked * are required.</p>}
+      <h2>{editing ? 'Business profile' : signup ? 'Set up your shop' : 'Set up your business'}</h2>
+      {!editing && <p className="hint">{signup ? 'A few details to get your business ready. You can review everything before creating your account.' : 'This takes about a minute and is asked only once. Fields marked * are required.'}</p>}
       {locked && <p className="hint">Business name, category and owner cannot be changed after setup. The mobile number can be changed after verifying the new number with a code.</p>}
 
       {signup ? (

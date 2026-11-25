@@ -541,3 +541,71 @@
     transition: none;
   }
 }
+
+
+/* Higher-specificity auth overrides keep the signed-in global form rules untouched. */
+main.auth-access {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+main.auth-access .auth-signup-flow {
+  display: grid;
+  gap: 24px;
+}
+
+main.auth-access .auth-signup-flow form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+}
+
+main.auth-access .auth-signup-flow form label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+main.auth-access .auth-signup-flow .hint {
+  margin: 0;
+}
+
+main.auth-access .auth-signup-flow .step-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+main.auth-access .auth-signup-flow .step-actions button {
+  min-width: 0;
+  min-height: 48px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+main.auth-access .auth-signup-flow .step-actions button:not(.secondary) {
+  border: 1px solid #065f46;
+  background: #065f46;
+  color: #fff;
+}
+
+main.auth-access .auth-signup-flow .step-actions button.secondary {
+  border: 1px solid #065f46;
+  background: #fff;
+  color: #064e3b;
+}
+
+main.auth-access .auth-signup-flow .step-actions button:only-child {
+  grid-column: 2;
+}

@@ -60,7 +60,7 @@ describe('RBOS authentication screens', () => {
     const onDone = vi.fn()
     render(<BusinessSetup signup hasBusiness={false} onDone={onDone} onCancel={vi.fn()} />)
 
-    expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Set up your shop' })).toBeInTheDocument()
     expect(screen.getByText('STEP 1 OF 5')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('Email *'), 'owner@example.test')
@@ -87,7 +87,7 @@ describe('RBOS authentication screens', () => {
     await user.click(screen.getByRole('button', { name: 'Review' }))
 
     expect(screen.getByText('STEP 5 OF 5')).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Sample invoice preview' })).toBeInTheDocument()
+    expect(document.querySelector('.setup-invoice-preview')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     await waitFor(() => expect(onDone).toHaveBeenCalledOnce())

@@ -210,7 +210,7 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
         </div>
 
         {verifier && !changingPin && (
-          <div className="app-lock-pin-indicators" aria-label={`${pin.length} of 4 PIN digits entered`}>
+          <div className="app-lock-pin-indicators" role="group" aria-label={`${pin.length} of 4 PIN digits entered`}>
             {[0, 1, 2, 3].map(i => (
               <span key={i} className={pin.length > i ? 'is-filled' : ''} aria-hidden="true" />
             ))}
