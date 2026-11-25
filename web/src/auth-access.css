@@ -4,7 +4,7 @@
   max-width: 430px;
   min-height: 100svh;
   margin: 0 auto;
-  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   background: #f8fafc;
@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 32px;
+  margin: 0 0 24px;
   color: #0f172a;
 }
 
@@ -268,7 +268,7 @@
 
 .auth-signup-flow {
   display: grid;
-  gap: 24px;
+  gap: 20px;
   min-width: 0;
 }
 
@@ -342,7 +342,7 @@
 .auth-signup-flow form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   align-items: start;
   width: 100%;
   margin: 0;
@@ -465,7 +465,7 @@
 }
 
 .auth-signup-flow .review dt {
-  margin-top: 8px;
+  margin-top: 6px;
   color: #64748b;
   font-size: 13px;
   line-height: 18px;
@@ -518,6 +518,28 @@
   white-space: normal;
 }
 
+.auth-signup-flow .setup-invoice-disclosure {
+  margin-top: 4px;
+}
+
+.auth-signup-flow .setup-invoice-disclosure summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 0;
+  color: #065f46;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-signup-flow .setup-invoice-disclosure summary:focus-visible {
+  outline: 3px solid rgba(16, 185, 129, 0.28);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 @media (min-width: 640px) {
   .auth-access {
     padding-right: 28px;
@@ -549,20 +571,20 @@ main.auth-access {
   max-width: 430px;
   min-height: 100svh;
   margin: 0 auto;
-  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
   background: #f8fafc;
   color: #0f172a;
 }
 
 main.auth-access .auth-signup-flow {
   display: grid;
-  gap: 24px;
+  gap: 20px;
 }
 
 main.auth-access .auth-signup-flow form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   align-items: start;
   width: 100%;
 }
