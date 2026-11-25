@@ -142,6 +142,8 @@ export function Catalogue({ reload, businessCategory, stockRows = [] }: { reload
   const [masterItems, setMasterItems] = useState<MasterProduct[]>([])
   const [editing, setEditing] = useState<Product | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
+  const [categoryPage, setCategoryPage] = useState(0)
+  const [categoryPageSize, setCategoryPageSize] = useState(10)
   const [error, setError] = useState('')
   // Prevent an older catalogue response from replacing results for a newer search/filter.
   const loadSequence = useRef(0)
@@ -402,31 +404,54 @@ export function Catalogue({ reload, businessCategory, stockRows = [] }: { reload
         </>
       )}
 	  {view === 'categories' && (
-		<>
-		  <p className="hint-line">Groups used to organise your products. Rename a group here and every product in it follows.</p>
-          {similarCategoryGroups.length > 0 && <div className="category-similarity-warning" role="note"><strong>Review similar category names</strong><span>{similarCategoryGroups.map(group => group.join(' / ')).join(' · ')}</span><small>These names may describe the same group. Review before renaming; products are not merged automatically.</small></div>}
-		  <div className="table-scroll">
-			<table aria-label="Product categories">
-			  <thead><tr><th>Category</th><th>Products</th><th>Actions</th></tr></thead>
-			  <tbody>
-				{categories.map(c => (
-				  <tr key={c.id}>
-					<td data-label="Category">{c.name}</td>
-					<td data-label="Products">{c.productCount}</td>
-					<td data-label="Actions"><button type="button" className="secondary category-rename" onClick={() => setRenaming({ id: c.id, name: c.name })} aria-label={`Rename ${c.name}`}>Rename</button></td>
-				  </tr>
-				))}
-			  </tbody>
-			</table>
-		  </div>
-		  {renaming && (
-			<form onSubmit={rename} aria-label="Rename category">
-			  <label>New name <input value={renaming.name} onChange={e => setRenaming({ ...renaming, name: e.target.value })} required maxLength={80} /></label>
-			  <button type="submit">Save</button> <button type="button" className="secondary" onClick={() => setRenaming(null)}>Cancel</button>
-			</form>
-		  )}
-		</>
-	  )}
+        <>
+          <div className="category-management-heading">
+            <div>
+              <h3>Product categories</h3>
+              <p>Rename a group and all products in it follow.</p>
+            </div>
+            <span className="category-group-count">{categories.length} {categories.length === 1 ? 'group' : 'groups'}</span>
+          </div>
+          {similarCategoryGroups.length > 0 && (
+            <div className="category-similarity-warning" role="note">
+              <strong>Similar category names</strong>
+              <span>{similarCategoryGroups.map(group => group.join(' / ')).join(' · ')}</span>
+              <small>Check whether these groups mean the same thing before renaming. Products are not merged automatically.</small>
+            </div>
+          )}
+          <div className="category-card-list" aria-label="Product categories">
+            {categories.slice(categoryPage * categoryPageSize, (categoryPage + 1) * categoryPageSize).map(c => (
+              <article className="category-card" key={c.id}>
+                <span className="category-card-icon" aria-hidden="true">▦</span>
+                <div className="category-card-copy">
+                  <strong>{c.name}</strong>
+                  <span>{c.productCount} {c.productCount === 1 ? 'product' : 'products'}</span>
+                </div>
+                <button type="button" className="secondary category-rename" onClick={() => setRenaming({ id: c.id, name: c.name })} aria-label={`Rename ${c.name}`}>Rename</button>
+              </article>
+            ))}
+            {categories.length === 0 && <p className="category-empty">No product categories yet.</p>}
+          </div>
+          {(categories.length > 0) && (
+            <nav className="pager no-print" aria-label="Category pagination">
+              <span>{categoryPage * categoryPageSize + 1}-{Math.min(categories.length, (categoryPage + 1) * categoryPageSize)} of {categories.length} {categories.length === 1 ? 'group' : 'groups'}</span>
+              <label>Per page <select value={categoryPageSize} onChange={e => { setCategoryPageSize(Number(e.target.value)); setCategoryPage(0) }}>{[10, 25, 50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+              <button type="button" className="secondary" disabled={categoryPage === 0} onClick={() => setCategoryPage(page => Math.max(0, page - 1))}>Previous</button>
+              <span>Page {categoryPage + 1} of {Math.max(1, Math.ceil(categories.length / categoryPageSize))}</span>
+              <button type="button" className="secondary" disabled={categoryPage >= Math.ceil(categories.length / categoryPageSize) - 1} onClick={() => setCategoryPage(page => page + 1)}>Next</button>
+            </nav>
+          )}
+          {renaming && (
+            <form className="category-rename-form" onSubmit={rename} aria-label="Rename category">
+              <label>New name <input value={renaming.name} onChange={e => setRenaming({ ...renaming, name: e.target.value })} required maxLength={80} /></label>
+              <div>
+                <button type="submit">Save</button>
+                <button type="button" className="secondary" onClick={() => setRenaming(null)}>Cancel</button>
+              </div>
+            </form>
+          )}
+        </>
+      )}
 	</section>
     </div>
   )
