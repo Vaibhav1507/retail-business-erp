@@ -126,3 +126,17 @@ Following the user's final Android review, made only these mobile layout adjustm
 - CSS remains scoped to the Stock page and mobile breakpoint; no API, database, stock calculation, tenant, or accounting behaviour changed.
 
 **Validation:** source-level change only. No unit tests or Playwright run requested for this visual-only adjustment. Android screenshot confirmation remains pending.
+
+
+## Corrective follow-up — mobile filter row placement — 2026-11-25
+
+The user's Android screenshot showed the previous CSS-only adjustment still rendered Category, Supplier and Availability on separate rows. Root cause: CSS Grid auto-placement followed the DOM order; making Supplier full-width caused Availability to flow onto a later row. Setting Category and Availability to `grid-column:auto` did not guarantee that they shared a row.
+
+Correction on `fix/stock-opening-action-and-filter-layout`:
+- Search is explicitly assigned row 1 and spans both columns.
+- Category is explicitly assigned row 2, column 1.
+- Availability is explicitly assigned row 2, column 2.
+- Supplier is explicitly assigned row 3 and spans both columns.
+- No markup, route, API, data, stock calculation or business behaviour changed.
+
+This fixes the CSS Grid placement logic rather than relying on DOM-order auto-placement. Automated tests and Playwright remain skipped per the user's current instruction; a fresh Android screenshot is still required for visual confirmation. PR #90 remains the delivery vehicle; not merged or deployed.
