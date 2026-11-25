@@ -133,3 +133,18 @@ Following the user's final Android review, made only these mobile layout adjustm
 PR #90 was merged with the Add opening stock card spanning both columns. The approved MagicPath reference instead places Manage products and Add opening stock side by side in the first row. This follow-up removes the full-width grid span from the second action card while retaining its single-line title and inline helper copy. The filter layout remains Search full-width, Category + Availability side-by-side, and Supplier full-width.
 
 No markup, routes, APIs, data, stock calculations or business behaviour changed. No tests or Playwright were run per the user's instruction; Android visual confirmation remains pending.
+
+
+
+## Android screenshot correction — opening stock action card — 2026-11-25
+
+The first PR #91 correction fixed the grid placement but introduced a content-layout regression: the second card used a horizontal flex row, with a non-shrinking title and helper text forced into the remaining width. At mobile half-card width, the helper collapsed to one character per line and stretched the entire first grid row.
+
+Corrected in `fix/stock-opening-action-card-content`:
+- Keep Manage products and Add opening stock in the same two-column row.
+- Stack the Add opening stock title and helper copy vertically inside its card; keep the title on one line.
+- Give all four mobile action tiles a consistent 184px minimum height to match the supplied MagicPath reference and prevent row-height distortion.
+- Keep card content left-aligned and helper text at full available card width.
+- No markup, routes, APIs, stock calculations, tenant rules or posting behaviour changed.
+
+**Validation:** CSS and handoff inspection only. Unit tests and Playwright remain intentionally skipped per the user's instruction. Android visual confirmation is still required after deployment.
