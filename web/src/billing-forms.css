@@ -350,3 +350,5 @@
 .opening-stock-screen>.opening-stock-footer{display:block}
 .opening-stock-screen>.opening-stock-field{display:flex}
 .opening-stock-screen>.opening-stock-footer{display:flex}
+
+.opening-stock-field>label{flex:none}
