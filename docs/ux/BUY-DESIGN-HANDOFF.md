@@ -239,11 +239,11 @@ No backend changes are planned.
 | Frontend verification on PR #81 | Passed: TypeScript, 222 tests across 25 files, lint, Vite production build, dependency audit |
 | Backend verification on PR #81 | Passed: .NET solution build, backend unit tests, deployment Docker image build |
 | PostgreSQL integration on PR #81 | Passed: disposable database bootstrap, migrations and integration tests |
-| Playwright / Axe | Buy audit added in PR #82; latest run pending; inspect captured screenshots before visual acceptance |
-| Updated Android screenshot review | Initial screenshots reviewed — follow-up defects identified (Buy tab clipping, OCR filename feedback, and Add Purchase visual alignment); final implementation screenshots pending |
-| Follow-up implementation | In progress on `fix/buy-mobile-tabs-invoice-upload-feedback` |
-| Follow-up tests / CI | Frontend test failure identified and corrected in follow-up commits; rerun pending |
-| Real-device acceptance | Pending user verification after follow-up deployment |
+| Playwright / Axe | Deferred during this user-directed visual-matching pass. The previous attempt was interrupted by the local app-lock screen and is not visual acceptance evidence. |
+| Updated Android screenshot review | MagicPath reference reviewed and selected. RBOS implementation screenshot after the 2026-11-25 visual pass is still pending. |
+| Follow-up implementation | In progress on `fix/buy-mobile-tabs-invoice-upload-feedback`; 2026-11-25 Add Purchase outer card, dashed invoice upload panel, product-entry panel, GST accordion and compact unit-cost label implemented. |
+| Follow-up tests / CI | Earlier frontend failure was corrected on the branch. No new test result is claimed for the 2026-11-25 visual-only styling/copy changes. |
+| Visual comparison / real-device acceptance | Pending: compare the updated RBOS Android render with the selected MagicPath reference. |
 | User acceptance | Pending user verification |
 | Production revision | Not independently verified from this repository review |
 | Merge / deployment of follow-up | Not performed; awaiting the user's review/authorization |
@@ -287,3 +287,19 @@ The user selected the supplied MagicPath Add Purchase prototype as the visual di
 - Added focused component coverage and a dedicated Playwright/Axe audit for all four Buy routes, OCR loading, responsive profiles, fixed-bar clearance, touch targets, accessible names, browser errors and network failures.
 
 The implementation does not change purchase extraction, barcode resolution, purchase POST payloads, idempotency, server validation, stock, WAC, payable or accounting rules. The camera picker is a native browser/device surface and still requires physical Android verification.
+
+
+### Add Purchase visual implementation — 2026-11-25
+
+User direction: focus on visual matching against the selected MagicPath Add Purchase prototype; do not spend this phase repeatedly running Playwright. Automated verification remains separate and is not presented as visual approval.
+
+Implementation updates on the existing PR #82 branch:
+- `Procurement.tsx`: one outer task card, clear receipt/item section structure, a compact GST disclosure with optionality hint and chevron, and the short Unit cost label.
+- `InvoiceUpload.tsx`: dashed supplier-bill panel with receipt icon/copy and equal Camera / Upload actions. Existing OCR, multiple-page/PDF selection and editable review flow are retained.
+- `buy-procurement.css`: scoped card/panel treatment, product field/quantity/cost/action rows, responsive metadata grid, aligned labels, inline required markers, line summaries and fixed Review purchase summary.
+- `i18n.ts`: English and Hindi copy for bill upload, GST hint, product cost helper and compact unit-cost label.
+- `buy-add-purchase-design.md`: repository design specification now reflects the MagicPath visual hierarchy, with responsive rules and API/business invariants retained.
+
+Not changed: backend/API payloads, OCR extraction/mapping, barcode scanner/resolution, purchase idempotency, posting, stock/WAC, supplier payable or accounting behaviour. Direct free-text product creation is not part of this visual pass; the existing purchase contract still references catalogue product IDs.
+
+Remaining design work: inspect the actual rendered RBOS Android screenshot against MagicPath, correct any remaining spacing/overlay/field-width differences, then request user visual acceptance. PR #82 remains open and unmerged; no deployment is performed.
