@@ -105,8 +105,11 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
       shellBorder: getComputedStyle(document.querySelector('.buy-receive-shell')!).borderTopWidth,
       shellPadding: getComputedStyle(document.querySelector('.buy-receive-shell')!).paddingLeft,
       uploadBorder: getComputedStyle(document.querySelector('.invoice-upload-dropzone')!).borderTopStyle,
+      uploadRegionBorder: getComputedStyle(document.querySelector('.invoice-upload[role=region]')!).borderTopWidth,
+      uploadRegionPadding: getComputedStyle(document.querySelector('.invoice-upload[role=region]')!).paddingTop,
       uploadInnerBorder: getComputedStyle(document.querySelector('.invoice-upload-inner')!).borderTopWidth,
       uploadIntroDisplay: getComputedStyle(document.querySelector('.invoice-upload-intro')!).display,
+      uploadIntroDirection: getComputedStyle(document.querySelector('.invoice-upload-intro')!).flexDirection,
       supplierFields: labels,
       itemLabels,
       itemActions,
@@ -121,8 +124,11 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
   expect(layout.shellBorder).toBe('0px')
   expect(layout.shellPadding).toBe('0px')
   expect(layout.uploadBorder).toBe('dashed')
+  expect(layout.uploadRegionBorder).toBe('0px')
+  expect(layout.uploadRegionPadding).toBe('0px')
   expect(layout.uploadInnerBorder).toBe('0px')
   expect(layout.uploadIntroDisplay).toBe('flex')
+  expect(layout.uploadIntroDirection).toBe('row')
   expect(Math.abs(layout.supplierFields[1]!.y - layout.supplierFields[2]!.y)).toBeLessThan(2)
   expect(layout.supplierFields[0]!.width).toBeGreaterThan(layout.supplierFields[1]!.width * 1.7)
   expect(layout.itemLabels[0]!.width).toBeGreaterThan(layout.itemLabels[1]!.width * 1.7)
