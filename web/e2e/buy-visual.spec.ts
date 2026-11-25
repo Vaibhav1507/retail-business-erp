@@ -73,6 +73,9 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
 
   const buyTabs = page.locator('.buy-tabs a')
   await expect(buyTabs).toHaveCount(4)
+  await expect(page.locator('.buy-purchase-card')).toHaveCount(1)
+  await expect(page.locator('.buy-optional-badge')).toBeVisible()
+  await expect(page.locator('.buy-item-entry-help')).toBeVisible()
 
   // MagicPath composition checks at the reference Android viewport.
   await page.setViewportSize({ width: 390, height: 844 })
@@ -122,6 +125,7 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
   expect(layout.uploadIntroDisplay).toBe('flex')
   expect(Math.abs(layout.supplierFields[1]!.y - layout.supplierFields[2]!.y)).toBeLessThan(2)
   expect(layout.supplierFields[0]!.width).toBeGreaterThan(layout.supplierFields[1]!.width * 1.7)
+  expect(layout.itemLabels[0]!.width).toBeGreaterThan(layout.itemLabels[1]!.width * 1.7)
   expect(Math.abs(layout.itemLabels[1]!.y - layout.itemLabels[2]!.y)).toBeLessThan(2)
   expect(Math.abs(layout.itemActions[0]!.y - layout.itemActions[1]!.y)).toBeLessThan(2)
   expect(layout.footerPosition).toBe('fixed')
@@ -134,12 +138,12 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
   await expect(page.getByRole('button', { name: 'Camera' })).toBeFocused()
   await capture(page, 'add-purchase-default', viewports[1]!)
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-  const overlay = await page.evaluate(() => {
+  const overlay = await page.evaluate((footerTop) => {
     const bar = document.querySelector('.buy-review-bar')!.getBoundingClientRect()
     const nav = document.querySelector('.nav')!.getBoundingClientRect()
     const guidance = document.querySelector('.buy-receive .buy-guidance')!.getBoundingClientRect()
-    return { barNavOverlap: bar.bottom > nav.top + 1, contentHiddenByBar: guidance.bottom > bar.top + 1, barStayedFixed: Math.abs(bar.top - ${initialFooterTop}) < 2 }
-  })
+    return { barNavOverlap: bar.bottom > nav.top + 1, contentHiddenByBar: guidance.bottom > bar.top + 1, barStayedFixed: Math.abs(bar.top - footerTop) < 2 }
+  }, initialFooterTop)
   expect(overlay.barNavOverlap, 'Review bar must sit above the fixed bottom navigation').toBe(false)
   expect(overlay.contentHiddenByBar, 'The final form guidance must remain visible above the review bar').toBe(false)
   expect(overlay.barStayedFixed, 'Review bar must not scroll with the form').toBe(true)
