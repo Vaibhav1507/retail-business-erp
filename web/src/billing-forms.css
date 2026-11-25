@@ -392,3 +392,12 @@
   .stock-adjustment-form > button { width: 100%; min-height: 50px; }
   .stock-adjustment-history { margin-top: 24px; padding-top: 20px; }
 }
+
+
+/* Keep Category and Availability adjacent on the mobile Stock inventory filter grid. */
+@media(max-width:720px){
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-search{order:0}
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-category{order:1}
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-availability{order:2}
+ .stock-page .stock-inventory-filters[role="search"] .stock-filter-supplier{order:3}
+}
