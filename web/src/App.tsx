@@ -114,7 +114,7 @@ function OpeningStock({ products, locations, reload }: { products: Product[]; lo
           </div>
         </div>
         <p className="opening-stock-cost-help">Use the actual or owner-estimated cost. RBOS does not guess a zero cost.</p>
-        <button type="button" className="opening-stock-add-button" onClick={addLine}>＋ Add item</button>
+        <button type="button" className="opening-stock-add-button" onClick={addLine}><span aria-hidden="true">＋ </span>Add item</button>
       </div>
 
       {lines.length > 0 && <div className="opening-stock-lines" aria-label="Opening stock items">
