@@ -1,1 +1,201 @@
-.app-lock-screen{min-height:100dvh;padding:24px;display:grid;place-items:center}.app-lock-card{width:min(100%,420px);padding:24px;border:1px solid var(--line,#ddd);border-radius:16px;background:var(--surface,#fff);display:grid;gap:14px}.app-lock-card h1{margin:0}.app-lock-card label{display:grid;gap:6px}.app-lock-card input{font:inherit;padding:12px;border:1px solid var(--line,#bbb);border-radius:8px;letter-spacing:.35em}.app-lock-note{font-size:.82rem;opacity:.75;line-height:1.45}
+.app-lock-screen {
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.app-lock-loading {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-lock-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-lock-hero {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.app-lock-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: #d1fae5;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.app-lock-hero h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.app-lock-hero p {
+  max-width: 34rem;
+  margin: 0;
+  color: #475569;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.app-lock-pin-indicators {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  min-height: 24px;
+}
+
+.app-lock-pin-indicators span {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.app-lock-pin-indicators span.is-filled {
+  border-color: #065f46;
+  background: #065f46;
+}
+
+.app-lock-pin-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.app-lock-pin-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.app-lock-pin-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 60px;
+  height: 60px;
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: 0.7em;
+  text-align: center;
+  box-shadow: none;
+}
+
+.app-lock-pin-field.is-active input,
+.app-lock-pin-field input:focus {
+  border-color: #047857;
+  outline: 3px solid rgba(16, 185, 129, 0.18);
+  outline-offset: 1px;
+}
+
+.app-lock-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.app-lock-screen .app-lock-keypad button {
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  padding: 8px 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.app-lock-screen .app-lock-keypad button:hover:not(:disabled) {
+  background: #ecfdf5;
+  color: #064e3b;
+}
+
+.app-lock-screen .app-lock-keypad button:active:not(:disabled) {
+  background: #d1fae5;
+}
+
+.app-lock-screen .app-lock-keypad button.app-lock-keypad-action {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.app-lock-screen .app-lock-unlock {
+  min-height: 50px;
+}
+
+.app-lock-screen .auth-secondary {
+  min-height: 48px;
+}
+
+.app-lock-error {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-lock-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.app-lock-screen .auth-signout-link {
+  justify-self: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  color: #065f46;
+  font-size: 14px;
+  line-height: 20px;
+}
