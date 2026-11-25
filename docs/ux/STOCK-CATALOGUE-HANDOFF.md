@@ -61,3 +61,19 @@ A focused correction is now in branch `ux/stock-list-magicpath-alignment`:
 - Format stock values without unnecessary trailing zero decimals while preserving non-zero paise.
 
 This is a targeted implementation correction based on the side-by-side screenshots supplied on 2026-11-25. It does not change inventory data, stock valuation, APIs or posting rules. Build is the current validation gate; visual audit and unit tests are deferred per the current delivery instruction.
+
+
+## Focused Stock visual-alignment pass — 2026-11-25
+
+Compared the implementation against the user-supplied MagicPath Stock screenshots at the same mobile layout scale. MagicPath's revised project source/render could not be fetched because its external-agent API quota is exhausted; do not describe this as pixel-perfect or independently verified against the live revised artifact.
+
+Scoped adjustments committed in PR #86:
+- Mobile Stock content gutter: 16px on both sides (matching the reference's approximately 16px page inset).
+- Stock page title: 27px, 500 weight, 1.18 line-height; subtitle: 16px / 1.45.
+- Stock action title: 16px / 1.3; supporting copy: 13px / 1.4.
+- Stock-on-hand heading: 19px / 1.3, 600 weight.
+- Product card Edit action: 16px; product name 16px; SKU/category 12px; facts labels 12px and values 14px; stock value 16px.
+- Existing explicit card dimensions remain scoped: inventory padding 16px, product card padding 13px 12px 10px, 15px card radius, 38px identity mark, 2-column fact grid, and 10px card-list gap.
+- Stock value formatting suppresses unnecessary trailing zero decimals while preserving non-zero paise.
+
+These values are a screenshot-informed implementation pass, not a claim that MagicPath's original CSS values were extracted. The app retains the existing RBOS system font stack and global tokens; no new font download or global typography change was introduced. Visual audit remains deferred per the current scope. Build is the validation gate; user visual acceptance, merge and deployment remain pending.
