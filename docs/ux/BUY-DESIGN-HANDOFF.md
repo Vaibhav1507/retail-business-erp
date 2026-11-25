@@ -326,3 +326,8 @@ The user supplied current RBOS Android screenshots after the MagicPath reference
 **Scoped correction:** on mobile, make the review bar a viewport-fixed two-column grid (summary + 42% action column), constrain the action to its grid cell, and retain the existing navigation-height plus bottom-safe-area offset. No global button or navigation rules are changed. No purchase/OCR/barcode/GST/stock/WAC/payable/idempotency/accounting behaviour is changed.
 
 Visual acceptance remains pending a fresh Android screenshot after the PR build; the supplied screenshots are the pre-fix evidence.
+
+
+### Add Purchase outer-card alignment — 2026-11-25
+
+The supplied Android screenshots showed a second generic `.billing-screen` card around the intended Add Purchase task card. This added inset padding and border, making the task card narrower than the single-card MagicPath reference. The receive route now uses a dedicated `buy-receive-shell` class to remove only that generic wrapper treatment; Pay Supplier, Past Purchases and Return to Supplier retain their existing shell. The task card remains the sole visible white card for Add Purchase.
