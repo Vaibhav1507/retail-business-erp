@@ -124,7 +124,7 @@ export function StockPage({ tab, c, rows, opening, businessCategory }: { tab: st
     <div className="stock-page">
       <div className="page-title"><h2>{t('stock.title')}</h2><p>{t('stock.subtitle')}</p></div>
       {key === '' && <>
-        <div className="stock-actions" aria-label="Stock actions">{ACTIONS.map(([k, name, description, icon], i) => <a key={k} className={`btn stock-action${i === 0 ? ' primary' : ' secondary'}`} href={`#/stock/${k}`}><span className="stock-action-icon" aria-hidden="true">{icon}</span><span className="stock-action-copy"><strong>{name}</strong><small>{description}</small></span><span className="stock-action-arrow" aria-hidden="true">→</span></a>)}</div>
+        <div className="stock-actions" aria-label="Stock actions">{ACTIONS.map(([k, name, description, icon], i) => <a key={k} className={`btn stock-action${i === 0 ? ' primary' : ' secondary'}`} href={`#/stock/${k}`}><span className="stock-action-copy"><span className="stock-action-heading"><span className="stock-action-icon" aria-hidden="true">{icon}</span><strong>{name}</strong></span><small>{description}</small></span></a>)}</div>
         <div className="stock-summary" role="group" aria-label="Stock summary">
           <div><span>Active products</span><strong>{activeProducts.length}</strong></div>
           <div><span>In stock</span><strong>{inStock}</strong></div>
