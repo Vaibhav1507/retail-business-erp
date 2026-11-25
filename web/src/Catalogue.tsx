@@ -1,6 +1,6 @@
 import './product-form.css'
 import { Paged } from './Paged'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { SetupAssistant } from './SetupAssistant'
 import { ManufacturerRegistry } from './ManufacturerRegistry'
@@ -75,31 +75,41 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
   return (
     <form className="product-form" onSubmit={submit} aria-label={editingId ? 'Edit product' : 'Add product'}>
       <h3>{editingId ? 'Edit product' : 'Add product'}</h3>
-      <label>Name <input list="product-name-options" value={d.name} onChange={e => set({ name: e.target.value })} required maxLength={160} /></label>
-      <datalist id="product-name-options">{(electronics ? PRODUCT_NAMES : []).map(n => <option key={n} value={n} />)}</datalist>
-	  <label>Category
-		<select value={otherCat ? '__other' : d.category} required={!otherCat} onChange={pickCategory}>
-		  <option value="">Select a category</option>
-		  {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-		  <option value="__other">Other (type a new one)...</option>
-		</select>
-	  </label>
-	  {otherCat && <label>New category <input value={d.category} onChange={e => set({ category: e.target.value })} required maxLength={80} placeholder="e.g. Screen Guards" /></label>}
-      <label>Unit
-        <select value={d.unit} disabled={!!editingId} onChange={e => set({ unit: e.target.value })}>{UNITS.map(u => <option key={u}>{u}</option>)}</select>
-      </label>
-      <label>HSN code (optional) <input value={d.hsn} onChange={e => set({ hsn: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={8} placeholder="4, 6 or 8 digits" /></label>
-      <label>GST rate % (optional) <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
-      <label>MRP (optional, reference only) <input value={d.mrp} onChange={e => set({ mrp: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" maxLength={12} /></label>
-      <label className="check"><input type="checkbox" checked={d.generic} onChange={e => set({ generic: e.target.checked })} /> Generic / unbranded</label>
-      {!d.generic && <>
-        <label>Brand <input list="brand-options" value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} placeholder="Pick or type a brand" /></label><datalist id="brand-options">{brandNames.map(n => <option key={n} value={n} />)}</datalist>
-        <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} /></label>
-      </>}
-      <fieldset>
-        <legend>Details (optional)</legend>
-        {attrFields.map(([k, label]) => <label key={k}>{label} <input value={d.attrs[k] ?? ''} onChange={e => setAttr(k, e.target.value)} maxLength={100} /></label>)}
-      </fieldset>
+      <section className="product-form-section" aria-labelledby="product-basics-heading">
+        <h3 id="product-basics-heading">Product basics</h3>
+        <label>Name <span aria-hidden="true" className="required-mark">*</span><input list="product-name-options" value={d.name} onChange={e => set({ name: e.target.value })} required maxLength={160} placeholder="Enter the product name" /></label>
+        <datalist id="product-name-options">{(electronics ? PRODUCT_NAMES : []).map(n => <option key={n} value={n} />)}</datalist>
+        <label>Category <span aria-hidden="true" className="required-mark">*</span>
+          <select value={otherCat ? '__other' : d.category} required={!otherCat} onChange={pickCategory}>
+            <option value="">Select a category</option>
+            {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            <option value="__other">＋ Add a new category</option>
+          </select>
+        </label>
+        {otherCat && <label>New category <input value={d.category} onChange={e => set({ category: e.target.value })} required maxLength={80} placeholder="e.g. Screen Guards" /></label>}
+        <label>Unit <select value={d.unit} disabled={!!editingId} onChange={e => set({ unit: e.target.value })} required>{UNITS.map(u => <option key={u}>{u}</option>)}</select></label>
+      </section>
+      <details className="product-form-disclosure">
+        <summary><span>Brand and model</span><small>Optional · useful for identifying variants</small></summary>
+        <label className="check"><input type="checkbox" checked={d.generic} onChange={e => set({ generic: e.target.checked })} /> Generic / unbranded</label>
+        {!d.generic && <>
+          <label>Brand <input list="brand-options" value={d.brand} onChange={e => set({ brand: e.target.value })} maxLength={80} placeholder="Pick or type a brand" /></label><datalist id="brand-options">{brandNames.map(n => <option key={n} value={n} />)}</datalist>
+          <label>Model number <input value={d.model} onChange={e => set({ model: e.target.value })} maxLength={80} placeholder="Enter exact model number" /></label>
+        </>}
+      </details>
+      <details className="product-form-disclosure">
+        <summary><span>Tax and pricing references</span><small>Optional · reference only</small></summary>
+        <label>HSN code <input value={d.hsn} onChange={e => set({ hsn: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={8} placeholder="4, 6 or 8 digits" /></label>
+        <label>GST rate % <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
+        <label>MRP <small>Reference only, not selling price</small><input value={d.mrp} onChange={e => set({ mrp: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" maxLength={12} placeholder="₹ 0.00" /></label>
+      </details>
+      <details className="product-form-disclosure">
+        <summary><span>Product details</span><small>Optional · specifications supported for this business type</small></summary>
+        <fieldset>
+          <legend>Additional details</legend>
+          {attrFields.map(([k, label]) => <label key={k}>{label} <input value={d.attrs[k] ?? ''} onChange={e => setAttr(k, e.target.value)} maxLength={100} /></label>)}
+        </fieldset>
+      </details>
       {editingId && <label className="check"><input type="checkbox" checked={d.active} onChange={e => set({ active: e.target.checked })} /> Active (untick to hide from lists)</label>}
       {barcode && !editingId && <p className="hint-line">Barcode <strong>{barcode.code}</strong> will be linked to this product when you save.</p>}
       {editingId && <BarcodeManager productId={editingId} />}
@@ -204,6 +214,14 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
     return () => clearTimeout(t)
   }, [loadMaster, view])
   const tabs: [typeof view, string][] = [['list', 'My products'], ['master', 'Shared catalogue'], ['categories', 'Categories']]
+  const similarCategoryGroups = useMemo(() => {
+    const groups = new Map<string, string[]>()
+    categories.forEach(category => {
+      const key = category.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/s$/, '')
+      groups.set(key, [...(groups.get(key) ?? []), category.name])
+    })
+    return [...groups.values()].filter(group => group.length > 1)
+  }, [categories])
   const startAdd = () => { setEditing(null); setScanned(null); setView('form') }
   const closeForm = () => { setEditing(null); setScanned(null); setView('list') }
 
@@ -264,16 +282,16 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 		  </div>
 		  <Paged rows={items}>{page => (
 			<div className="table-scroll">
-			  <table>
+			  <table aria-label="My products">
 				<thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Unit</th><th>Brand / model</th><th>Details</th><th>Source</th><th>Actions</th></tr></thead>
 				<tbody>
 				  {page.map(p => (
 					<tr key={p.id} style={p.isActive ? undefined : { opacity: 0.55 }}>
-					  <td>{p.sku}</td><td>{p.name}{p.isActive ? '' : ' (inactive)'}</td><td>{p.category}</td><td>{p.unit}</td>
-					  <td>{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
-					  <td>{Object.entries(p.attributes).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(', ')}{p.specs && Object.keys(p.specs).length > 0 && <div className="hint-line">{Object.entries(p.specs).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ')}</div>}{p.possibleDuplicate && <div className="hint-line" role="status">Possible duplicate: same brand and model number as another product. Review before merging.</div>}</td>
+					  <td data-label="SKU">{p.sku}</td><td data-label="Name">{p.name}{p.isActive ? '' : ' (inactive)'}</td><td data-label="Category">{p.category}</td><td data-label="Unit">{p.unit}</td>
+					  <td data-label="Brand / model">{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
+					  <td data-label="Details">{Object.entries(p.attributes).map(([k, v]) => `${k.replace('_', ' ')}: ${v}`).join(', ')}{p.specs && Object.keys(p.specs).length > 0 && <div className="hint-line">{Object.entries(p.specs).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ')}</div>}{p.possibleDuplicate && <div className="hint-line" role="status">Possible duplicate: same brand and model number as another product. Review before merging.</div>}</td>
 					  <td data-label="Source">{(p.sources ?? []).length === 0 ? '-' : <ul className="plain-list">{p.sources!.map((s, i) => <li key={i}>{sourceLabel(s)}</li>)}</ul>}</td>
-					  <td><button type="button" className="secondary" onClick={() => { setEditing(p); setView('form') }} aria-label={`Edit ${p.name}`}>Edit</button></td>
+					  <td data-label="Actions"><button type="button" className="secondary" onClick={() => { setEditing(p); setView('form') }} aria-label={`Edit ${p.name}`}>Edit</button></td>
 					</tr>
 				  ))}
 				  {items.length === 0 && <tr><td colSpan={8}>No products match.</td></tr>}
@@ -285,7 +303,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 	  )}
 	  {view === 'master' && (
         <>
-          <p className="hint-line">Products in this catalogue are shared with businesses in the same business category. Adding one creates a product in your own business; your SKU, stock, buying cost and selling price remain private to you.</p>
+          <div className="catalogue-privacy" role="note"><span aria-hidden="true">🔒</span><p><strong>Shared product information</strong><br />Products are shared within your business category. Adding one creates a product in your shop. Your SKU, barcode, stock, buying cost and selling price stay private.</p></div>
           <label>Search shared products <input type="search" placeholder="Product name, brand or model..." value={q} onChange={e => setQ(e.target.value)} /></label>
           <Paged rows={masterItems}>{page => (
             <div className="table-scroll">
@@ -294,10 +312,10 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
                 <tbody>
                   {page.map(p => (
                     <tr key={p.id}>
-                      <td>{p.name}</td><td>{p.categoryName}</td>
-                      <td>{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
-                      <td>{Object.entries({ ...p.attributes, ...p.specs }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ') || '-'}</td>
-                      <td><button type="button" className="secondary" disabled={p.alreadyInBusiness} onClick={() => addFromMaster(p.id)}>{p.alreadyInBusiness ? 'Already added' : 'Add to my products'}</button></td>
+                      <td data-label="Name">{p.name}</td><td data-label="Category">{p.categoryName}</td>
+                      <td data-label="Brand / model">{p.isGeneric ? 'Generic' : `${p.brand ?? ''} ${p.model ?? ''}`}</td>
+                      <td data-label="Details">{Object.entries({ ...p.attributes, ...p.specs }).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', ') || '-'}</td>
+                      <td data-label="Action"><button type="button" className="secondary" disabled={p.alreadyInBusiness} onClick={() => addFromMaster(p.id)}>{p.alreadyInBusiness ? 'Already added' : 'Add to my products'}</button></td>
                     </tr>
                   ))}
                   {masterItems.length === 0 && <tr><td colSpan={5}>No shared products match. Importing or adding a verified product adds it to this shared catalogue.</td></tr>}
@@ -310,6 +328,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 	  {view === 'categories' && (
 		<>
 		  <p className="hint-line">Groups used to organise your products. Rename a group here and every product in it follows.</p>
+          {similarCategoryGroups.length > 0 && <div className="category-similarity-warning" role="note"><strong>Review similar category names</strong><span>{similarCategoryGroups.map(group => group.join(' / ')).join(' · ')}</span><small>These names may describe the same group. Review before renaming; products are not merged automatically.</small></div>}
 		  <div className="table-scroll">
 			<table aria-label="Product categories">
 			  <thead><tr><th>Category</th><th>Products</th><th>Actions</th></tr></thead>
@@ -318,7 +337,7 @@ export function Catalogue({ reload, businessCategory }: { reload: () => void; bu
 				  <tr key={c.id}>
 					<td data-label="Category">{c.name}</td>
 					<td data-label="Products">{c.productCount}</td>
-					<td data-label="Actions"><button type="button" className="secondary" onClick={() => setRenaming({ id: c.id, name: c.name })} aria-label={`Rename ${c.name}`}>Rename</button></td>
+					<td data-label="Actions"><button type="button" className="secondary category-rename" onClick={() => setRenaming({ id: c.id, name: c.name })} aria-label={`Rename ${c.name}`}>Rename</button></td>
 				  </tr>
 				))}
 			  </tbody>
