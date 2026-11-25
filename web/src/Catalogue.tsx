@@ -106,7 +106,7 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
         <summary><span>Tax and pricing references</span><small>Optional</small></summary>
         <label>HSN code <input value={d.hsn} onChange={e => set({ hsn: e.target.value.replace(/\D/g, '') })} inputMode="numeric" maxLength={8} placeholder="4, 6 or 8 digits" /></label>
         <label>GST rate <select value={d.gst} onChange={e => set({ gst: e.target.value })}><option value="">Not set</option>{[0, 0.25, 3, 5, 12, 18, 28].map(r => <option key={r} value={String(r)}>{r}%</option>)}</select></label>
-        <label>MRP <small>Reference only, not selling price</small><input value={d.mrp} onChange={e => set({ mrp: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" maxLength={12} placeholder="₹ 0.00" /></label>
+        <label className="product-form-mrp">MRP <small>Reference only, not selling price</small><input value={d.mrp} onChange={e => set({ mrp: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" maxLength={12} placeholder="₹ 0.00" /></label>
       </details>
       <details className="product-form-disclosure">
         <summary><span>Product details</span><small>Colour, capacity and compatibility</small></summary>
@@ -122,6 +122,7 @@ export function ProductForm({ initial, categories, editingId, onSaved, onCancel,
         <button type="submit">{editingId ? 'Save changes' : 'Add product'}</button>
         {onCancel && <button type="button" className="secondary" onClick={onCancel}>Cancel</button>}
       </div>
+      <p className="product-form-note">Stock quantity and purchase cost are recorded separately from the product catalogue.</p>
       {error && <p role="alert">{error}</p>}
     </form>
   )
@@ -253,7 +254,7 @@ export function Catalogue({ reload, businessCategory, stockRows = [] }: { reload
         <h2>{view === 'master' ? 'Shared catalogue' : view === 'categories' ? 'Categories' : 'My products'}</h2>
         <p>{view === 'master' ? 'Find products from the shared catalogue.' : view === 'categories' ? 'Organise the products you sell.' : 'Find, add and update products you sell.'}</p>
       </div>}
-	<section aria-label="Products" className="catalogue-screen">
+	<section aria-label="Products" className={`catalogue-screen${view === 'form' ? ' catalogue-screen-form' : ''}`}>
 	  <nav className="tabs" aria-label="Product sections">
 		{tabs.map(([k, n]) => <a key={k} href="#/stock/products" aria-current={(view === k || (view === 'form' && k === 'list')) ? 'true' : undefined} onClick={e => { e.preventDefault(); setEditing(null); setView(k) }}>{n}</a>)}
 	  </nav>
