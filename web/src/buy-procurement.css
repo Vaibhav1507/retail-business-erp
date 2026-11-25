@@ -221,8 +221,95 @@
 .buy-item-entry{grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}
 .buy-item-entry .buy-product-field,.buy-item-entry .buy-item-entry-help{grid-column:1/-1}
 .buy-item-entry-help{margin:0;padding-top:1px;color:var(--muted,#66717d);font-size:12px;line-height:1.45}
-.invoice-upload-dropzone{padding:14px;border:1px solid #e0e8e3;border-radius:16px;background:#f8fbf9}
-.invoice-upload-inner{display:grid;gap:14px;min-width:0;padding:16px;border:1px dashed #bdd4c8;border-radius:15px;background:#fbfdfc}
+.invoice-upload-dropzone{padding:14px;border:1px dashed #bdd4c8;border-radius:15px;background:#f7faf8}
+.invoice-upload-inner{display:grid;gap:14px;min-width:0;padding:0;border:0;border-radius:0;background:transparent}
 .invoice-upload-sources{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .invoice-upload-sources button{min-height:50px}
 @media(max-width:399px){.buy-purchase-card .buy-receipt-section .buy-fields{grid-template-columns:minmax(0,1fr)}.buy-purchase-card .buy-receipt-section .buy-fields label{grid-column:1/-1}.buy-item-entry{grid-template-columns:repeat(2,minmax(0,1fr))}.invoice-upload-dropzone{padding:10px}.invoice-upload-inner{padding:12px}}
+
+
+/* Add Purchase owns its single task card; remove the generic billing card wrapper
+   only for the receive route so the MagicPath card uses the full content width. */
+.billing-screen.buy-receive-shell {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+
+/* Match the MagicPath Add Purchase composition at the target Android width. */
+.buy-purchase-card .buy-upload-section > .buy-upload-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.buy-upload-heading>div{display:grid;gap:7px;min-width:0}
+.buy-optional-badge{flex:none;padding:6px 11px;border-radius:999px;background:#f0f5f1;color:#87958d;font-size:11px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
+
+/* At the reference phone width, Stock location and Receipt date share a row.
+   Only genuinely narrow devices stack the related metadata fields. */
+@media (min-width:360px) and (max-width:899px){
+  .buy-purchase-card .buy-receipt-section .buy-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .buy-purchase-card .buy-receipt-section .buy-fields label{grid-column:auto}
+  .buy-purchase-card .buy-receipt-section .buy-fields label:first-child,
+  .buy-purchase-card .buy-receipt-section .buy-fields label:last-child{grid-column:1/-1}
+}
+@media (max-width:359px){
+  .buy-purchase-card .buy-receipt-section .buy-fields{grid-template-columns:minmax(0,1fr)}
+  .buy-purchase-card .buy-receipt-section .buy-fields label{grid-column:1/-1}
+}
+
+/* Keep the review action pinned above the fixed app navigation while the form
+   itself scrolls. The action occupies only its grid track, never viewport width. */
+@media (max-width:899px){
+  .billing-screen.buy-receive-shell > .buy-receive .buy-review-bar{
+    position:fixed !important;
+    inset-inline:0;
+    bottom:calc(var(--nav-h,64px) + env(safe-area-inset-bottom,0px));
+    z-index:7;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,42%);
+    align-items:center;
+    gap:12px;
+    width:auto;
+    max-width:none;
+    margin:0;
+    padding:11px max(16px,env(safe-area-inset-right,0px)) 11px max(16px,env(safe-area-inset-left,0px));
+    box-sizing:border-box;
+  }
+  .billing-screen.buy-receive-shell > .buy-receive .buy-review-bar-summary{min-width:0}
+  .billing-screen.buy-receive-shell > .buy-receive .buy-review-bar-action{
+    width:100% !important;
+    min-width:0;
+    max-width:100%;
+    box-sizing:border-box;
+    justify-content:space-between;
+  }
+}
+
+
+/* The MagicPath reference keeps Buy actions in a single horizontal tab row.
+   Preserve all four destinations; the last one remains reachable by scrolling. */
+.stock-page .buy-tabs{display:flex;flex-wrap:nowrap;gap:8px;max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:4px}
+.stock-page .buy-tabs a{flex:0 0 auto;width:auto;min-width:max-content;white-space:nowrap}
+
+@media(max-width:899px){
+  .billing-screen.buy-receive-shell > .buy-receive .buy-review-bar{
+    grid-template-columns:minmax(0,1fr) minmax(0,44%);
+    gap:10px;
+    min-height:70px;
+  }
+  .billing-screen.buy-receive-shell > .buy-receive .buy-review-bar-action{
+    white-space:nowrap;
+    padding:9px 12px;
+    font-size:14px;
+  }
+}
+
+
+/* The shared billing form styles decorate every [role=region] with a card.
+   Supplier bill is a region for accessibility, not a second visual card. */
+.buy-upload-section .invoice-upload[role="region"]{display:grid;gap:12px;min-width:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.buy-purchase-card .buy-upload-section .invoice-upload-intro{display:flex!important;flex-direction:row!important;align-items:center;gap:11px;min-width:0}

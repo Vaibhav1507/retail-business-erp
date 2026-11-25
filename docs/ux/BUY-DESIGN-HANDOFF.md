@@ -314,3 +314,32 @@ Remaining design work: inspect the actual rendered RBOS Android screenshot again
 - Scope remains visual-only. No API, OCR, barcode, stock/WAC, GST calculation, payable, idempotency or accounting changes.
 - Per the user's direction, no Playwright or unit tests are run in this pass. Final visual acceptance requires a fresh RBOS Android screenshot compared against the supplied MagicPath screenshots.
 - Branch has implementation changes in progress; no PR, merge or deployment has been created/performed.
+
+
+### Android screenshot findings — 2026-11-25
+
+The user supplied current RBOS Android screenshots after the MagicPath reference. The Add Purchase content hierarchy is broadly aligned, but the persistent Review purchase bar has two defects:
+
+- The action extends beyond the right edge. Root cause verified in the cascade: the shared mobile rule in `billing-forms.css` sets `.billing-screen button { width: 100% }`, which also affects the review-bar button even though it sits beside the item summary. The flex row therefore overflows horizontally.
+- The bar's fixed positioning/stacking needs an explicit mobile screen-scoped rule so it remains anchored above the fixed navigation and Android gesture inset while the form scrolls.
+
+**Scoped correction:** on mobile, make the review bar a viewport-fixed two-column grid (summary + 42% action column), constrain the action to its grid cell, and retain the existing navigation-height plus bottom-safe-area offset. No global button or navigation rules are changed. No purchase/OCR/barcode/GST/stock/WAC/payable/idempotency/accounting behaviour is changed.
+
+Visual acceptance remains pending a fresh Android screenshot after the PR build; the supplied screenshots are the pre-fix evidence.
+
+
+### Add Purchase outer-card alignment — 2026-11-25
+
+The supplied Android screenshots showed a second generic `.billing-screen` card around the intended Add Purchase task card. This added inset padding and border, making the task card narrower than the single-card MagicPath reference. The receive route now uses a dedicated `buy-receive-shell` class to remove only that generic wrapper treatment; Pay Supplier, Past Purchases and Return to Supplier retain their existing shell. The task card remains the sole visible white card for Add Purchase.
+
+
+### Add Purchase full-screen MagicPath alignment — 2026-11-25
+
+The user clarified that PR #99 must not be considered ready after the footer fix alone. Acceptance is the complete Add Purchase composition shown in the supplied MagicPath Android screenshots. The current-app comparison identified these screen-level corrections: remove the generic outer `.billing-screen` card so the Add Purchase task card is the single white card; keep the Buy section tabs in one horizontal row (the fourth existing destination remains horizontally reachable rather than being wrapped into a second row); render the supplier-bill content as one pale dashed panel with the icon/copy and equal Camera / Upload actions inside it; keep Supplier and invoice reference full-width while Stock location and Receipt date share a row at the reference phone width; keep product full-width, quantity/unit cost paired and Scan barcode/Add item paired; and pin the Review purchase bar above the fixed navigation while the form scrolls. The optional badge beside Supplier bill is included to match the reference hierarchy. The required-asterisk alignment quirk remains intentionally ignored as requested.
+
+The footer is fixed at mobile widths with a bounded two-column grid, explicit viewport inset and navigation/safe-area offset. The receive-only shell styling is removed; other Buy routes, the four tab destinations, app navigation and all purchase/OCR/barcode/GST/stock/WAC/payable/idempotency/accounting contracts remain unchanged. Visual acceptance is still pending a fresh app render at the same Android viewport; a successful build or CI run alone does not establish screenshot fidelity.
+
+
+### Supplier bill upload container cascade correction — 2026-11-25
+
+The first integrated Playwright screenshot showed that the shared `.billing-screen div[role="region"]` rule was still painting the accessible InvoiceUpload region as a second solid card. The audit also measured the intro row as `display:grid`, contrary to the reference. The receive-only upload wrapper now explicitly resets the generic region card treatment (no border, padding, background or shadow), leaving the single dashed dropzone as the visible upload surface. The intro is explicitly a horizontal flex row with icon and copy together. Focused Playwright assertions now cover both computed styles.

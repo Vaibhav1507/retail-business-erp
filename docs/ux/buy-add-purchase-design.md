@@ -264,3 +264,41 @@ The user clarified that the first supplied screenshot is the current RBOS implem
 - Preserve the existing fixed Review purchase bar above bottom navigation.
 
 No OCR, barcode, API, inventory, WAC, payable, GST calculation, idempotency or accounting behaviour is changed. Automated tests and Playwright are intentionally not run in this visual-only pass, per the user's instruction. Review the rendered Android screen against the supplied reference before visual acceptance.
+
+
+## 18. Android review-bar correction — 2026-11-25
+
+The current RBOS Android screenshots exposed a footer width/position regression. The shared mobile `.billing-screen button { width: 100% }` rule also matched the persistent Review purchase action, causing it to overflow beside the summary. The scoped Buy correction uses a fixed two-column mobile bar, constrains the action to its own column and anchors the bar above the existing fixed navigation plus Android bottom safe-area inset. The asterisk alignment quirk remains intentionally ignored per user direction.
+
+Acceptance checks for the corrected footer:
+- While scrolling the entire Add Purchase form, the Review purchase bar remains fixed to the viewport and does not move with the form.
+- The bar spans the viewport without horizontal overflow; summary and action remain fully visible at 360px, 390px and 412px widths.
+- The action stays within its grid column and does not inherit the generic full-width billing-button layout.
+- The bar sits directly above the bottom navigation and gesture area, without covering the last form content.
+- Desktop sticky behaviour, purchase review flow and all existing purchase business/API behaviour remain unchanged.
+
+
+### Outer-card correction — 2026-11-25
+
+The Add Purchase route must render one white task card, not a generic billing card nested around the task card. The receive-only `buy-receive-shell` removes the generic outer section border, padding, background and shadow so `.buy-purchase-card` can align to the available content width like the MagicPath reference. Other Buy routes are not affected.
+
+
+## 19. Full-screen screenshot acceptance — 2026-11-25
+
+The supplied MagicPath screenshots are the visual acceptance reference for the entire Add Purchase screen, not only the footer. Implement the following at the reference Android viewport:
+
+- One rounded white task card spans the available content width; do not nest it inside a second generic billing card.
+- The page-level Buy title and the existing four destinations remain outside the task card. Keep the destinations in one horizontal row with horizontal scrolling if needed; do not wrap them into a two-row grid. The first three visible tabs align with the supplied MagicPath screenshot, while Return to Supplier remains reachable as the fourth existing route.
+- Supplier bill has its heading/helper copy and a single pale dashed upload panel. The receipt icon and copy sit together horizontally; Camera and Upload are equal-width actions on one row. Do not show a second inset border/panel.
+- Supplier and invoice number occupy full rows. Stock location and Receipt date share a row at widths of 360px and above; stack only below 360px.
+- Purchased items heading, description and count retain their current hierarchy. The item editor has a full-width product selector, paired Quantity and Unit cost fields, paired Scan barcode and Add item actions, and helper text inside the pale item panel.
+- GST remains a secondary disclosure with its optionality hint and chevron; existing GST guidance remains below it.
+- Review purchase remains fixed to the viewport above the bottom navigation and Android safe-area inset while the form scrolls. Its summary occupies the flexible column and its action stays within the bounded right column. The final form content must remain scrollable above the bar.
+- Ignore only the required-asterisk alignment quirk as explicitly requested. Do not copy unrelated prototype/browser chrome.
+
+No route, API, OCR extraction/mapping, barcode resolution, purchase payload/idempotency, server validation, inventory/stock/WAC, supplier payable, GST calculation or accounting behaviour changes are included. Acceptance requires fresh rendered screenshots at 360px, 390px and 412px, full scroll review, fixed-footer/nav clearance and no horizontal overflow; automated TypeScript/tests/lint/build and Playwright/Axe remain separate checks.
+
+
+### Supplier bill region styling correction — 2026-11-25
+
+The InvoiceUpload component retains its accessible `role="region"`, but on Add Purchase that semantic wrapper must not receive the generic billing-region card styling. Reset its border, padding, background and shadow so only the dashed dropzone is visible. Keep `.invoice-upload-intro` explicitly horizontal (icon + copy); keep Camera and Upload equal-width in one row. The Playwright audit asserts these computed styles.

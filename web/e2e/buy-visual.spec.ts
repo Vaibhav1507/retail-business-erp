@@ -73,18 +73,91 @@ test('Buy: responsive routes, Add Purchase interactions and WCAG 2 A/AA audit', 
 
   const buyTabs = page.locator('.buy-tabs a')
   await expect(buyTabs).toHaveCount(4)
+  await expect(page.locator('.buy-purchase-card')).toHaveCount(1)
+  await expect(page.locator('.buy-optional-badge')).toBeVisible()
+  await expect(page.locator('.buy-item-entry-help')).toBeVisible()
+
+  // MagicPath composition checks at the reference Android viewport.
+  await page.setViewportSize({ width: 390, height: 844 })
+  const layout = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const element = document.querySelector(selector)
+      if (!element) throw new Error(`Missing layout element: ${selector}`)
+      const r = element.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom }
+    }
+    const labels = [...document.querySelectorAll('.buy-receipt-section .buy-fields label')].map(el => {
+      const r = el.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, height: r.height }
+    })
+    const itemLabels = [...document.querySelectorAll('.buy-item-entry label')].map(el => {
+      const r = el.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, height: r.height }
+    })
+    const itemActions = [...document.querySelectorAll('.buy-item-entry button')].map(el => {
+      const r = el.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, height: r.height }
+    })
+    const bar = rect('.buy-review-bar'), nav = rect('.nav')
+    return {
+      tabsDisplay: getComputedStyle(document.querySelector('.buy-tabs')!).display,
+      tabsWrap: getComputedStyle(document.querySelector('.buy-tabs')!).flexWrap,
+      shellBorder: getComputedStyle(document.querySelector('.buy-receive-shell')!).borderTopWidth,
+      shellPadding: getComputedStyle(document.querySelector('.buy-receive-shell')!).paddingLeft,
+      uploadBorder: getComputedStyle(document.querySelector('.invoice-upload-dropzone')!).borderTopStyle,
+      uploadRegionBorder: getComputedStyle(document.querySelector('.invoice-upload[role=region]')!).borderTopWidth,
+      uploadRegionPadding: getComputedStyle(document.querySelector('.invoice-upload[role=region]')!).paddingTop,
+      uploadInnerBorder: getComputedStyle(document.querySelector('.invoice-upload-inner')!).borderTopWidth,
+      uploadIntroDisplay: getComputedStyle(document.querySelector('.invoice-upload-intro')!).display,
+      uploadIntroDirection: getComputedStyle(document.querySelector('.invoice-upload-intro')!).flexDirection,
+      supplierFields: labels,
+      supplierGridColumn: getComputedStyle(document.querySelector('.buy-fields label:first-child')!).gridColumn,
+      invoiceGridColumn: getComputedStyle(document.querySelector('.buy-fields label:last-child')!).gridColumn,
+      receiptGridColumns: getComputedStyle(document.querySelector('.buy-fields')!).gridTemplateColumns,
+      itemLabels,
+      itemActions,
+      footerPosition: getComputedStyle(document.querySelector('.buy-review-bar')!).position,
+      footer: bar,
+      nav,
+      scrollWidth: document.documentElement.scrollWidth,
+    }
+  })
+  expect(layout.tabsDisplay).toBe('flex')
+  expect(layout.tabsWrap).toBe('nowrap')
+  expect(layout.shellBorder).toBe('0px')
+  expect(layout.shellPadding).toBe('0px')
+  expect(layout.uploadBorder).toBe('dashed')
+  expect(layout.uploadRegionBorder).toBe('0px')
+  expect(layout.uploadRegionPadding).toBe('0px')
+  expect(layout.uploadInnerBorder).toBe('0px')
+  expect(layout.uploadIntroDisplay).toBe('flex')
+  expect(layout.uploadIntroDirection).toBe('row')
+  expect(layout.supplierGridColumn).toBe('1 / -1')
+  expect(layout.invoiceGridColumn).toBe('1 / -1')
+  expect(layout.supplierFields[0]!.width).toBeGreaterThan(layout.supplierFields[1]!.width)
+  expect(Math.abs(layout.supplierFields[1]!.y - layout.supplierFields[2]!.y)).toBeLessThan(2)
+  expect(layout.itemLabels[0]!.width).toBeGreaterThan(layout.itemLabels[1]!.width * 1.7)
+  expect(Math.abs(layout.itemLabels[1]!.y - layout.itemLabels[2]!.y)).toBeLessThan(2)
+  expect(Math.abs(layout.itemActions[0]!.y - layout.itemActions[1]!.y)).toBeLessThan(2)
+  expect(layout.footerPosition).toBe('fixed')
+  expect(layout.footer.x).toBeGreaterThanOrEqual(0)
+  expect(layout.footer.right).toBeLessThanOrEqual(391)
+  expect(layout.footer.bottom).toBeLessThanOrEqual(layout.nav.y + 1)
+  expect(layout.scrollWidth).toBeLessThanOrEqual(390)
+  const initialFooterTop = layout.footer.y
   await page.getByRole('button', { name: 'Camera' }).focus()
   await expect(page.getByRole('button', { name: 'Camera' })).toBeFocused()
   await capture(page, 'add-purchase-default', viewports[1]!)
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-  const overlay = await page.evaluate(() => {
+  const overlay = await page.evaluate((footerTop) => {
     const bar = document.querySelector('.buy-review-bar')!.getBoundingClientRect()
     const nav = document.querySelector('.nav')!.getBoundingClientRect()
     const guidance = document.querySelector('.buy-receive .buy-guidance')!.getBoundingClientRect()
-    return { barNavOverlap: bar.bottom > nav.top + 1, contentHiddenByBar: guidance.bottom > bar.top + 1 }
-  })
+    return { barNavOverlap: bar.bottom > nav.top + 1, contentHiddenByBar: guidance.bottom > bar.top + 1, barStayedFixed: Math.abs(bar.top - footerTop) < 2 }
+  }, initialFooterTop)
   expect(overlay.barNavOverlap, 'Review bar must sit above the fixed bottom navigation').toBe(false)
   expect(overlay.contentHiddenByBar, 'The final form guidance must remain visible above the review bar').toBe(false)
+  expect(overlay.barStayedFixed, 'Review bar must not scroll with the form').toBe(true)
 
   // Exercise the real OCR loading/review path with a deterministic synthetic PDF response.
   await page.evaluate(() => window.scrollTo(0, 0))
