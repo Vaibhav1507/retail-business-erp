@@ -259,3 +259,18 @@
     box-sizing: border-box;
   }
 }
+
+
+/* Add Purchase owns its single task card; remove the generic billing card wrapper
+   only for the receive route so the MagicPath card uses the full content width. */
+.billing-screen.buy-receive-shell {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
