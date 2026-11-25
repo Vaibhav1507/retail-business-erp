@@ -12,6 +12,7 @@ on:
           - home
           - billing-sales
           - buy
+          - auth
   pull_request:
     paths:
       - "web/src/Procurement.tsx"
@@ -23,6 +24,14 @@ on:
       - "web/e2e/buy-visual.spec.ts"
       - "docs/ux/BUY-DESIGN-HANDOFF.md"
       - "docs/ux/buy-*-design.md"
+      - "web/src/AuthBrand.tsx"
+      - "web/src/AccountAccess.tsx"
+      - "web/src/BusinessSetup.tsx"
+      - "web/src/AppLock.tsx"
+      - "web/src/auth-access.css"
+      - "web/src/app-lock.css"
+      - "web/e2e/authentication-visual.spec.ts"
+      - "docs/ux/authentication-onboarding-pixel-accurate-plan.md"
       - ".github/workflows/visual-audit.yml"
 
 permissions:
@@ -30,11 +39,10 @@ permissions:
 
 jobs:
   scoped-screen-audit:
-    name: Audit ${{ github.event.inputs.scope || 'billing-sales' }}
+    name: RBOS grouped visual audit
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      UI_AUDIT_SCOPE: ${{ github.event_name == 'pull_request' && 'buy' || github.event.inputs.scope || 'billing-sales' }}
       Rbos__Database: test
       ConnectionStrings__RbosTestMigrator: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_migrator;Password=ci_migrator_only_2026
       ConnectionStrings__RbosTestApp: Host=localhost;Port=5432;Database=rbos_test;Username=rbos_app;Password=ci_app_only_2026
@@ -54,6 +62,26 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve visual audit scope
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            scope="${{ github.event.inputs.scope }}"
+          else
+            git fetch origin "$GITHUB_BASE_REF" --depth=1
+            changed_files="$(git diff --name-only FETCH_HEAD...HEAD)"
+            if printf '%s\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\.tsx|web/src/AccountAccess\.tsx|web/src/BusinessSetup\.tsx|web/src/AppLock\.tsx|web/src/auth-access\.css|web/src/app-lock\.css|web/e2e/authentication-visual\.spec\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\.md)$'; then
+              scope="auth"
+            else
+              scope="buy"
+            fi
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -94,30 +122,35 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Home visual audit
-        if: env.UI_AUDIT_SCOPE == 'home'
+        if: steps.resolve.outputs.scope == 'home'
         working-directory: web
         run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
 
       - name: Run Billing & Sales visual audit
-        if: env.UI_AUDIT_SCOPE == 'billing-sales'
+        if: steps.resolve.outputs.scope == 'billing-sales'
         working-directory: web
         run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
 
       - name: Run Buy visual audit
-        if: env.UI_AUDIT_SCOPE == 'buy'
+        if: steps.resolve.outputs.scope == 'buy'
         working-directory: web
         run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
 
       - name: Upload selected screenshots and report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rbos-visual-audit-${{ github.event.inputs.scope || 'billing-sales' }}
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
           path: |
-            web/test-results/ui-audit/${{ github.event.inputs.scope || (github.event_name == 'pull_request' && 'buy') || 'billing-sales' }}/
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
             web/test-results/billing-sales-visual-*/
             web/test-results/buy-visual-*/
-            web/test-results/ui-audit/buy/
             web/test-results/.last-run.json
           if-no-files-found: warn
           retention-days: 7
