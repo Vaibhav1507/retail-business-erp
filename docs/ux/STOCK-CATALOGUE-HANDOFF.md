@@ -77,3 +77,18 @@ Scoped adjustments committed in PR #86:
 - Stock value formatting suppresses unnecessary trailing zero decimals while preserving non-zero paise.
 
 These values are a screenshot-informed implementation pass, not a claim that MagicPath's original CSS values were extracted. The app retains the existing RBOS system font stack and global tokens; no new font download or global typography change was introduced. Visual audit remains deferred per the current scope. Build is the validation gate; user visual acceptance, merge and deployment remain pending.
+
+
+## Follow-up — compact Stock overview action cards — 2026-11-25
+
+The user's latest Android screenshots showed that the Stock landing action tiles remained much taller than the MagicPath reference. The cause was the previous three-column flex layout: the icon and arrow consumed horizontal space, forcing action titles and descriptions into narrow stacked lines.
+
+Correction on `ux/stock-list-magicpath-alignment`:
+- Put the icon inline with the action title, as in the reference.
+- Let the supporting description use the full card width.
+- Remove the redundant arrow from each tile; the whole tile remains the navigation target.
+- Keep a balanced two-column mobile grid and a compact 104px minimum tile height; use four columns on wider screens.
+- Slightly reduce metric-card padding and label/value scale while preserving the two-column mobile layout.
+- Keep all route targets, stock calculations, API calls and posting workflows unchanged.
+
+This is a screenshot-driven correction, not a claim of exact pixel identity. The next validation gate is the frontend production build; visual acceptance remains based on the user's next Android screenshot. Unit tests and the full visual audit remain deferred as previously requested.
