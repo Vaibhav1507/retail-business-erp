@@ -148,3 +148,37 @@ Corrected in `fix/stock-opening-action-card-content`:
 - No markup, routes, APIs, stock calculations, tenant rules or posting behaviour changed.
 
 **Validation:** CSS and handoff inspection only. Unit tests and Playwright remain intentionally skipped per the user's instruction. Android visual confirmation is still required after deployment.
+
+
+## Manage Products + Add/Edit Product — MagicPath implementation pass (2026-11-25)
+
+**Implementation PR:** [#93](https://github.com/Vaibhav1507/retail-business-erp/pull/93)  
+**Branch:** `ux/manage-products-magicpath-pixel-match`
+
+### Implemented
+
+- The Manage Products route now has its own `My products` heading, helper text and STOCK badge; the redundant Stock heading/back-link is removed from this route.
+- My products, Shared catalogue and Categories remain together in one horizontal row.
+- Add product and Scan barcode occupy the first action row; Import list is a separate second-row action and opens the existing import assistant in its own view.
+- My products now renders compact product cards with identity/SKU/category, Edit, Brand/model + Unit, Available + Status, and a collapsed More details section.
+- Available quantities are displayed from the existing stock rows passed into the catalogue; no new stock API or derived valuation is introduced.
+- Add/Edit Product now has a dedicated page heading and form panel with a back link, product-details header, required basics, collapsed optional sections, two-column optional fields, equal-width save/cancel actions and the existing catalogue-only note.
+- Required asterisks are grouped inline with their field labels so they cannot wrap to a separate line.
+- Styling is scoped to Manage Products and Add/Edit Product. The existing global font stack, app shell and shared navigation are retained; no external font dependency is added.
+- Pagination is displayed for short non-empty product lists to match the MagicPath reference.
+
+### Preserved
+
+- Existing product CRUD, shared catalogue, category rename, barcode scanning/linking, bulk import and manufacturer-source APIs.
+- Product identity, tenant boundaries, stock movements, stock valuation, accounting and purchase posting behaviour.
+
+### Validation
+
+At implementation head `fd9da6c4bf02a1bfa566e62d4084acde63e416b0`, GitHub Actions frontend job passed:
+- TypeScript check
+- Frontend unit tests
+- Lint
+- Production build
+- Dependency audit
+
+The backend solution build also passed at that check. Backend unit tests and PostgreSQL integration were still running when this note was recorded. No full responsive screenshot comparison or real Android visual acceptance has yet been performed. Merge and deployment are not performed by this PR.
