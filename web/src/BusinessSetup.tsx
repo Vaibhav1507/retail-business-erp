@@ -172,7 +172,7 @@ export function BusinessSetup({ initial, hasBusiness, onDone, onCancel, editing,
       <form className={signup ? 'auth-signup-form' : undefined} onSubmit={e => { e.preventDefault(); review ? save() : next() }} aria-label="Business profile">
         {signup && step === 0 && <>
           <label className="wide">Email *<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
-          <label className="wide">Password * (at least 12 characters, including a number)<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" aria-invalid={!!password && !!passwordError} /></label>
+          <label className="wide">Password *<span className="hint" id="signup-password-hint">Minimum 12 characters, including at least one number.</span><input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} autoComplete="new-password" aria-describedby="signup-password-hint" aria-invalid={!!password && !!passwordError} /></label>
           {password && passwordError && <p className="error" role="alert">{passwordError}</p>}
           {otp ? <MobileVerify signup mobile={p.mobile} setMobile={m => set({ mobile: m })} verified={mobileOk} onVerified={(m, pr) => { setVerifiedMobile(m); if (pr) setProof(pr) }} />
             : <label className="wide">Mobile number *<input inputMode="numeric" value={p.mobile} onChange={e => set({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="10-digit number" autoComplete="tel-national" /></label>}
