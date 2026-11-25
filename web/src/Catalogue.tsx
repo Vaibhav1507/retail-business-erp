@@ -254,7 +254,7 @@ export function Catalogue({ reload, businessCategory, stockRows = [] }: { reload
         <h2>{view === 'master' ? 'Shared catalogue' : view === 'categories' ? 'Categories' : 'My products'}</h2>
         <p>{view === 'master' ? 'Find products from the shared catalogue.' : view === 'categories' ? 'Organise the products you sell.' : 'Find, add and update products you sell.'}</p>
       </div>}
-	<section aria-label="Products" className={`catalogue-screen${view === 'form' ? ' catalogue-screen-form' : ''}`}>
+	<section aria-label="Products" className={`catalogue-screen${view === 'form' ? ' catalogue-screen-form' : view === 'import' ? ' catalogue-screen-import' : ''}`}>
 	  <nav className="tabs" aria-label="Product sections">
 		{tabs.map(([k, n]) => <a key={k} href="#/stock/products" aria-current={(view === k || (view === 'form' && k === 'list')) ? 'true' : undefined} onClick={e => { e.preventDefault(); setEditing(null); setView(k) }}>{n}</a>)}
 	  </nav>
