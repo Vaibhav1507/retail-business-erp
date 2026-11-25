@@ -13,7 +13,12 @@ type Common = { products: Product[]; locations: { id: string; name: string }[]; 
 
 const inr = (n: number) => '₹ ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-const ACTIONS: [string, string][] = [['products', 'Manage Products'], ['opening', 'Add Opening Stock'], ['purchase', 'Add Recent Purchase'], ['adjust', 'Adjust Stock']]
+const ACTIONS: [string, string, string, string][] = [
+  ['products', 'Manage Products', 'Products, catalogue and categories', '▦'],
+  ['opening', 'Add Opening Stock', 'Set the starting quantity in your shop', '＋'],
+  ['purchase', 'Add Recent Purchase', 'Record goods received from a supplier', '📦'],
+  ['adjust', 'Adjust Stock', 'Correct a counted quantity', '⇄'],
+]
 
 function Back() { return <p><a className="back-link" href="#/stock">← Back to Stock</a></p> }
 
@@ -63,11 +68,26 @@ function Inventory({ rows, products }: { rows: StockRow[]; products: Product[] }
 
 export function StockPage({ tab, c, rows, opening, businessCategory }: { tab: string; c: Common; rows: StockRow[]; opening: React.ReactNode; businessCategory: string | null }) {
   const key = tab === 'current' ? '' : tab
+  const quantities = useMemo(() => {
+    const totals = new Map<string, number>()
+    rows.forEach(row => totals.set(row.productId, (totals.get(row.productId) ?? 0) + row.quantity))
+    return totals
+  }, [rows])
+  const activeProducts = c.products.filter(product => product.isActive)
+  const inStock = activeProducts.filter(product => (quantities.get(product.id) ?? 0) > 0).length
+  const outOfStock = activeProducts.length - inStock
+  const stockValue = rows.reduce((total, row) => total + row.value, 0)
   return (
     <div className="stock-page">
       <div className="page-title"><h2>{t('stock.title')}</h2><p>{t('stock.subtitle')}</p></div>
       {key === '' && <>
-        <div className="stock-actions">{ACTIONS.map(([k, n], i) => <a key={k} className={'btn' + (i === 0 ? '' : ' secondary')} href={`#/stock/${k}`}>{n}</a>)}</div>
+        <div className="stock-actions" aria-label="Stock actions">{ACTIONS.map(([k, name, description, icon], i) => <a key={k} className={`btn stock-action${i === 0 ? ' primary' : ' secondary'}`} href={`#/stock/${k}`}><span className="stock-action-icon" aria-hidden="true">{icon}</span><span className="stock-action-copy"><strong>{name}</strong><small>{description}</small></span><span className="stock-action-arrow" aria-hidden="true">→</span></a>)}</div>
+        <section className="stock-summary" aria-label="Stock summary">
+          <div><span>Active products</span><strong>{activeProducts.length}</strong></div>
+          <div><span>In stock</span><strong>{inStock}</strong></div>
+          <div><span>Out of stock</span><strong>{outOfStock}</strong></div>
+          <div><span>Stock value</span><strong>{inr(stockValue)}</strong></div>
+        </section>
         <Inventory rows={rows} products={c.products} />
       </>}
       {key === 'products' && <><Back /><Catalogue reload={c.reload} businessCategory={businessCategory} /></>}
