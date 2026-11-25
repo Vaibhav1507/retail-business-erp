@@ -217,3 +217,11 @@
  .stock-page .stock-product-facts{column-gap:9px;row-gap:7px}
  .stock-page .stock-action-heading strong{font-size:13px}
 }
+
+
+/* Keep Stock's outer page gutter aligned with the MagicPath content frame. */
+@media(max-width:720px){
+ .content:has(.stock-page){padding-left:16px;padding-right:16px}
+ .stock-page .stock-actions .stock-action{min-height:100px}
+ .stock-page .stock-summary>div{min-height:72px}
+}
