@@ -304,3 +304,14 @@ The user supplied the MagicPath Adjust Stock screen followed by two screenshots 
 - Implementation is build-gated as requested; no broad test suite or Playwright visual audit is included in this focused pass.
 - Fresh Android screenshot comparison and user visual acceptance remain pending.
 - Merge and production deployment are separate and not included.
+
+
+## Follow-up — Category + Availability filter row (2026-11-25)
+
+The latest Android screenshot showed the filter controls in DOM order (Category, Supplier, Availability), which left Availability on a separate row even though the intended mobile layout is Category + Availability together.
+
+- Reorder only the mobile Stock inventory filter grid to show Search full-width, Category + Availability side-by-side, then Supplier full-width.
+- Use CSS grid item ordering scoped to `.stock-page` and the existing mobile breakpoint; do not change markup, filter state/logic, product cards, page content, routes, APIs or stock behaviour.
+- Desktop layout and every other Product/Stock page element remain unchanged.
+
+**Validation:** focused CSS/documentation change. CI and screenshot verification are pending; no deployment is included.
