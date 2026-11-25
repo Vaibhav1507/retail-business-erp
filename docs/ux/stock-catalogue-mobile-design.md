@@ -187,3 +187,21 @@ Opening Stock, Adjust Stock and Recent Purchase are included only as entry-point
 | Full grouped Playwright, responsive screenshot review and Axe WCAG 2 A/AA | Pending until all in-scope screens are implemented |
 | Native Android camera/barcode, keyboard and TalkBack acceptance | Pending real-device verification |
 | User acceptance, merge and deployment | Not yet performed |
+
+
+## 12. Categories screen implementation detail — 2026-11-25
+
+The Categories view follows the MagicPath reference with a compact **Product categories** heading, a live group-count pill, concise helper copy, a compact similar-name warning, and horizontal category cards. Each card contains a pale-green category mark, category name, singular/plural product count and a right-aligned Rename action. The category footer uses the same three-tier pagination arrangement as the catalogue product list.
+
+The implementation retains the existing RBOS font stack, green palette and page shell. Typography and spacing are scoped to the category view; no external font or global CSS change is introduced. The existing category rename endpoint and relationship semantics remain unchanged. Similar names are warnings only; categories are never merged automatically.
+
+Acceptance:
+- [x] Three catalogue tabs remain in one horizontal row.
+- [x] Category heading and group count are visible together.
+- [x] Similar-name warning uses compact amber treatment and preserves the no-auto-merge explanation.
+- [x] Category rows are horizontal cards with icon, name, product count and Rename action.
+- [x] Product count copy handles singular and plural correctly.
+- [x] Category pagination uses the catalogue footer layout and paginates the rendered cards.
+- [x] Existing rename API, category relationships and tenant boundaries are preserved.
+- [ ] Fresh Android screenshot comparison and user visual acceptance.
+- [ ] Build confirmation on the implementation PR.
