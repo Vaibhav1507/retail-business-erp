@@ -1,6 +1,6 @@
 import './product-form.css'
 import { Paged } from './Paged'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { SetupAssistant } from './SetupAssistant'
 import { ManufacturerRegistry } from './ManufacturerRegistry'
