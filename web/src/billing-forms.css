@@ -230,7 +230,7 @@
 /* Final Stock landing/filter alignment from Android review. */
 @media(max-width:720px){
  .stock-page .stock-actions .stock-action:nth-child(2){
-  grid-column:1/-1;
+  grid-column:auto;
   min-height:64px;
   align-items:center;
  }
