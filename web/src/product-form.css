@@ -211,3 +211,15 @@ form.product-form > .form-actions + .product-form-note { margin: 0; color: #7b85
   .catalogue-product-mark { width: 34px; height: 34px; }
   .catalogue-product-facts { gap: 10px 9px; }
 }
+
+
+/* Match the catalogue pagination grouping and keep the three tabs on one line. */
+.catalogue-screen-form > .tabs,
+.catalogue-screen-import > .tabs { display: none; }
+.catalogue-screen .pager { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; margin: 12px 0 0; padding: 0; overflow: visible; font-size: 13px; white-space: normal; }
+.catalogue-screen .pager > span:first-child { grid-column: 1; grid-row: 1; flex: initial; }
+.catalogue-screen .pager > label { grid-column: 2; grid-row: 1; display: inline-flex; flex: initial; flex-direction: row; align-items: center; gap: 6px; width: auto; min-height: 36px; font-size: 13px; white-space: nowrap; }
+.catalogue-screen .pager > label select { width: 58px; min-height: 36px; padding: 4px 7px; }
+.catalogue-screen .pager > button:nth-of-type(1) { grid-column: 1; grid-row: 2; justify-self: start; min-height: 40px; padding: 5px 12px; }
+.catalogue-screen .pager > span:nth-of-type(2) { grid-column: 2; grid-row: 2; justify-self: center; font-size: 12px; white-space: nowrap; }
+.catalogue-screen .pager > button:nth-of-type(2) { grid-column: 3; grid-row: 2; justify-self: end; min-height: 40px; padding: 5px 12px; }
