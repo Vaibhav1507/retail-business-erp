@@ -117,8 +117,8 @@ describe('Procurement Buy screens', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'Supplier' }), 'sup-1')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Product' }), 'prod-1')
     await user.type(screen.getByRole('textbox', { name: 'Quantity' }), '2')
-    await user.type(screen.getByRole('textbox', { name: 'Unit cost (INR, before GST)' }), '100')
-    await user.click(screen.getByRole('button', { name: 'Add GST details (optional)' }))
+    await user.type(screen.getByRole('textbox', { name: 'Unit cost (₹)' }), '100')
+    await user.click(screen.getByRole('button', { name: /GST details/ }))
     await user.type(screen.getByLabelText('GST on this line (INR)'), '20')
     await user.click(screen.getByRole('button', { name: 'Add item' }))
 
@@ -180,7 +180,7 @@ describe('Procurement Buy screens', () => {
     expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled()
     expect(screen.getByLabelText('Take supplier bill photo')).toHaveAttribute('capture', 'environment')
     expect(screen.getByLabelText('Upload supplier bill files')).toHaveAttribute('multiple')
-    for (const label of ['Supplier', 'Stock location', 'Receipt date', 'Product', 'Quantity', 'Unit cost (INR, before GST)']) {
+    for (const label of ['Supplier', 'Stock location', 'Receipt date', 'Product', 'Quantity', 'Unit cost (₹)']) {
       const field = screen.getByText(label, { exact: true })
       expect(field).toHaveClass('buy-field-label')
       expect(field.querySelector('.buy-required')).toBeInTheDocument()
