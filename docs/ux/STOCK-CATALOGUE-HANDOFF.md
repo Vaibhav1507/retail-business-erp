@@ -213,3 +213,32 @@ Implemented in the same PR #93 branch:
 The latest Android screenshot showed excessive blank vertical space under the Stock action descriptions. The cause was the `min-height:184px` rule added to all four mobile action cards in the previous correction. Replaced only that value with `min-height:0` so each grid row is sized by its actual content and existing padding.
 
 No grid columns, card copy, icon/title alignment, gaps, padding, colours, filters, navigation, routes or behaviour were changed. The cards remain in the existing two-column arrangement. No unit tests or Playwright run per the user's instruction; screenshot confirmation is pending.
+
+
+## Categories — MagicPath screenshot alignment (2026-11-25)
+
+**Implementation branch:** `ux/categories-magicpath-alignment`
+
+### Implemented
+
+- Retain the existing My products / Shared catalogue / Categories tabs and the existing page header/shell.
+- Add the in-panel **Product categories** heading, explanatory line and live group-count pill.
+- Restyle the similar-name notice as a compact amber warning, using the MagicPath wording and preserving the important rule that categories are not merged automatically.
+- Replace the mobile table-like category rows with compact horizontal cards: pale-green category mark, category name, singular/plural product count and right-aligned Rename action.
+- Add a category pagination footer matching the existing catalogue pagination layout (range, per-page selector, Previous / page count / Next). Pagination applies to the rendered category cards.
+- Preserve the existing category rename API and behaviour. No category merging, product reassignment, API, schema, tenant, stock or accounting changes.
+
+### Design details
+
+- Use the existing RBOS system font stack and catalogue palette; do not add a font dependency or change global typography.
+- Card list gap: 8px; card radius: 15px; card border: `#dfe5e2`; card padding: 12px 13px.
+- Category mark: 40px square, pale green background, 11px radius.
+- Category name: 15px / 1.3 / 600; count: 12px / 1.35.
+- Rename action: 94px minimum width, 42px minimum height, outlined green.
+- Responsive narrow-phone adjustments remain scoped to the category components.
+
+### Validation / release
+
+- Implementation and documentation are committed to this branch.
+- Build is the requested validation gate; no full Playwright/Axe audit was run for this visual-only category pass.
+- User Android screenshot acceptance, merge and deployment remain separate and pending.
