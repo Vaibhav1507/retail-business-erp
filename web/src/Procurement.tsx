@@ -155,7 +155,7 @@ export function Procurement({ products, locations, reload, show }: { products: (
           <div className="buy-item-entry">
             <label className="buy-product-field"><span className="buy-field-label">{tr('buy.product')} <span className="buy-required" aria-hidden="true">*</span></span><select required aria-required="true" value={productId} onChange={e => { setProductId(e.target.value); setReviewReceipt(false) }}><option value="">{tr('buy.selectProduct')}</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             <label><span className="buy-field-label">{tr('buy.quantity')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setReviewReceipt(false) }} /></label>
-            <label><span className="buy-field-label">{tr('buy.unitCost')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
+            <label><span className="buy-field-label">{tr('buy.unitCostShort')} <span className="buy-required" aria-hidden="true">*</span></span><input required aria-required="true" inputMode="decimal" value={cost} onChange={e => { setCost(e.target.value); setReviewReceipt(false) }} /></label>
             <button type="button" className="secondary buy-scan" onClick={() => setScanning(true)}>{tr('buy.scan')}</button>
             <button type="button" className="secondary buy-add-line" onClick={addLine}>{tr('buy.addItem')}</button>
           </div>
