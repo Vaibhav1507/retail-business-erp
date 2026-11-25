@@ -314,3 +314,15 @@ Remaining design work: inspect the actual rendered RBOS Android screenshot again
 - Scope remains visual-only. No API, OCR, barcode, stock/WAC, GST calculation, payable, idempotency or accounting changes.
 - Per the user's direction, no Playwright or unit tests are run in this pass. Final visual acceptance requires a fresh RBOS Android screenshot compared against the supplied MagicPath screenshots.
 - Branch has implementation changes in progress; no PR, merge or deployment has been created/performed.
+
+
+### Android screenshot findings — 2026-11-25
+
+The user supplied current RBOS Android screenshots after the MagicPath reference. The Add Purchase content hierarchy is broadly aligned, but the persistent Review purchase bar has two defects:
+
+- The action extends beyond the right edge. Root cause verified in the cascade: the shared mobile rule in `billing-forms.css` sets `.billing-screen button { width: 100% }`, which also affects the review-bar button even though it sits beside the item summary. The flex row therefore overflows horizontally.
+- The bar's fixed positioning/stacking needs an explicit mobile screen-scoped rule so it remains anchored above the fixed navigation and Android gesture inset while the form scrolls.
+
+**Scoped correction:** on mobile, make the review bar a viewport-fixed two-column grid (summary + 42% action column), constrain the action to its grid cell, and retain the existing navigation-height plus bottom-safe-area offset. No global button or navigation rules are changed. No purchase/OCR/barcode/GST/stock/WAC/payable/idempotency/accounting behaviour is changed.
+
+Visual acceptance remains pending a fresh Android screenshot after the PR build; the supplied screenshots are the pre-fix evidence.
