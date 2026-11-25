@@ -125,12 +125,12 @@ export function StockPage({ tab, c, rows, opening, businessCategory }: { tab: st
       <div className="page-title"><h2>{t('stock.title')}</h2><p>{t('stock.subtitle')}</p></div>
       {key === '' && <>
         <div className="stock-actions" aria-label="Stock actions">{ACTIONS.map(([k, name, description, icon], i) => <a key={k} className={`btn stock-action${i === 0 ? ' primary' : ' secondary'}`} href={`#/stock/${k}`}><span className="stock-action-icon" aria-hidden="true">{icon}</span><span className="stock-action-copy"><strong>{name}</strong><small>{description}</small></span><span className="stock-action-arrow" aria-hidden="true">→</span></a>)}</div>
-        <section className="stock-summary" aria-label="Stock summary">
+        <div className="stock-summary" role="group" aria-label="Stock summary">
           <div><span>Active products</span><strong>{activeProducts.length}</strong></div>
           <div><span>In stock</span><strong>{inStock}</strong></div>
           <div><span>Out of stock</span><strong>{outOfStock}</strong></div>
           <div><span>Stock value</span><strong>{inr(stockValue)}</strong></div>
-        </section>
+        </div>
         <Inventory rows={rows} products={c.products} />
       </>}
       {key === 'products' && <><Back /><Catalogue reload={c.reload} businessCategory={businessCategory} /></>}
