@@ -155,9 +155,9 @@
 .buy-item-entry input,.buy-item-entry select{min-width:0;min-height:48px;background:#fff}
 .buy-item-entry button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-width:0;min-height:48px;padding:9px 10px;white-space:normal;font-size:14px}
 .buy-item-entry .buy-scan{border:1px solid #b9d4c5;background:#fff;color:var(--brand-dark,#0b6b47)}
-.buy-item-entry .buy-add-line{border:1px solid var(--brand,#0f7a4d);background:var(--brand,#0f7a4d);color:#fff}
+.buy-item-entry .buy-add-line{border:1px solid #b9d4c5;background:#fff;color:var(--brand-dark,#0b6b47)}
 .buy-item-entry .buy-scan:hover:not(:disabled){background:#edf6f1;color:var(--brand-dark,#0b6b47)}
-.buy-item-entry .buy-add-line:hover:not(:disabled){background:var(--brand-dark,#0b6845);color:#fff}
+.buy-item-entry .buy-add-line:hover:not(:disabled){background:#edf6f1;color:var(--brand-dark,#0b6b47)}
 .buy-item-entry-help{grid-column:1/-1;margin:0;color:var(--muted,#66717d);font-size:12px;line-height:1.45}
 .buy-line-list{gap:8px}
 .buy-line-card{padding:12px;border-radius:12px;background:#fff;border-color:#e2e9e5}
