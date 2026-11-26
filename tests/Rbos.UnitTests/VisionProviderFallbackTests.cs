@@ -19,6 +19,34 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public void SalesInvoiceGeminiModels_UsesSalesSpecificSettingsAndIgnoresItemTagSettings()
+    {
+        var config = Config(
+            ("Gemini:SalesInvoiceModel", "gemini-4-hydrogen"),
+            ("Gemini:SalesInvoiceFallbackModel", "gemini-3.8-flash"),
+            ("Gemini:SalesInvoiceLastResortModel", "gemini-3.5-flash-lite"),
+            ("Gemini:ItemTagModel", "item-tag-only-model"));
+
+        Assert.Equal(
+            new[] { "gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite" },
+            VisionProviderFallback.SalesInvoiceGeminiModels(config));
+    }
+
+    [Fact]
+    public void SalesInvoiceGeminiModels_FallsBackToExistingInvoiceSettingsUntilDedicatedSettingsAreSet()
+    {
+        var config = Config(
+            ("Gemini:InvoiceModel", "invoice-primary"),
+            ("Gemini:InvoiceFallbackModel", "invoice-fallback"),
+            ("Gemini:InvoiceLastResortModel", "invoice-last-resort"),
+            ("Gemini:ItemTagModel", "item-tag-only-model"));
+
+        Assert.Equal(
+            new[] { "invoice-primary", "invoice-fallback", "invoice-last-resort" },
+            VisionProviderFallback.SalesInvoiceGeminiModels(config));
+    }
+
+    [Fact]
     public void LegacyFloatingAndRetiredAliasesAreReplacedByStableDefaults()
     {
         var config = Config(
@@ -141,6 +169,42 @@ public sealed class VisionProviderFallbackTests
 
         Assert.NotNull(result);
         Assert.Equal(new[] { "Gemini-primary", "Groq", "Gemini-secondary" }, order);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_SalesInvoiceCanSkipProviderAfterRateLimit()
+    {
+        var secondaryGeminiAttempted = false;
+        var groqAttempted = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-primary", _ =>
+                throw new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests)),
+            Attempt("Groq", "groq-fallback", _ =>
+            {
+                groqAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject
+                {
+                    ["lines"] = new JsonArray(new JsonObject { ["description"] = "Cable" })
+                });
+            }),
+            Attempt("Gemini", "gemini-secondary", _ =>
+            {
+                secondaryGeminiAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject
+                {
+                    ["lines"] = new JsonArray(new JsonObject { ["description"] = "Fallback cable" })
+                });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SalesInvoiceCapture", attempts, HasLines, NullLogger.Instance, CancellationToken.None,
+            skipProviderOnRateLimit: true);
+
+        Assert.NotNull(result);
+        Assert.True(groqAttempted);
+        Assert.False(secondaryGeminiAttempted);
     }
 
     [Fact]

@@ -1,189 +1,196 @@
-# Handwritten sales-bill import — accuracy and speed
+# Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** Focused scope approved for implementation planning. No code changes in this specification commit.
-**Route:** `#/sell/bill` (Generate Invoice)
-**Existing UI:** `web/src/SalesInvoiceCapture.tsx` hosted by `web/src/GenerateInvoice.tsx`
-**Existing API:** `POST /api/sales/invoice-image-extract`
-**Existing extraction service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`
-**Related UX contract:** [Create Invoice handwritten import refinement](./invoice-handwritten-import-ux-refinement.md)
-**RBOS workflow:** [RBOS UI/UX workflow](./RBOS-UI-UX-WORKFLOW.md)
+**Status:** P0 + P1 implementation complete; code CI #1342 and #1343 passed on 2026-11-26. Manual handwritten-bill validation is the next acceptance step.  
+**Route:** `#/sell/bill` (Generate Invoice)  
+**API:** `POST /api/sales/invoice-image-extract`  
+**Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
+**UI:** `web/src/SalesInvoiceCapture.tsx`, `web/src/GenerateInvoice.tsx`  
+**Comparison evidence:** [Seven-bill comparison v1](../quality/handwritten-sales-seven-bill-comparison-v1.md)  
+**UX contract:** [Handwritten import UX refinement](./invoice-handwritten-import-ux-refinement.md)  
+**Workflow:** [RBOS UI/UX workflow](./RBOS-UI-UX-WORKFLOW.md)
 
-## 1. Product goal
+## 1. Product scope and non-goals
 
-Make the existing handwritten, already-issued sales-bill import accurate and fast enough that a shopkeeper can photograph or select a bill, receive an editable extraction in the same Generate Invoice flow, correct anything uncertain, and continue through the existing sales rules.
+Improve only the existing synchronous import of one already-issued handwritten sales bill inside Generate Invoice.
 
-The goal is not a new document product. Preserve the current synchronous upload → extraction → review interaction.
+Preserve the existing shopkeeper flow:
 
-**Accuracy principle:** never silently invent or accept an uncertain value. The system must prefer an explicit blank/needs-attention state over a plausible but unsupported guess. Human review remains mandatory before a sale is posted.
+`Import bill → synchronous extraction → editable review → Add reviewed lines to bill → existing sale review/posting`
 
-A universal 100% automated reading rate for arbitrary handwriting cannot be promised. The measurable product target is:
-- 100% correctness of values that are finally confirmed and saved, through explicit review and deterministic validation; and
-- continuously improved machine extraction accuracy, measured against a held-out, human-labelled corpus, with no unsupported values silently accepted.
+In scope:
+- Full verbatim product description, including wrapped lines and alphanumeric text.
+- Separate structured brand, model and optional serial-number fields.
+- Invoice number/date/customer/header extraction from their labelled fields.
+- Quantity, unit rate, line amount and printed grand total without inventing absent values.
+- Structured Gemini output plus server-side normalization/validation.
+- Editable serials in review and safe transfer into the existing sale-line `serials` field.
+- Field-specific warning behaviour, retaining the existing human review and posting gate.
+- Fast synchronous interaction; no new upload screen or job polling.
 
-## 2. Strict scope
+Explicitly out of scope:
+- Add Purchase / supplier invoices.
+- Item-tag photo extraction or storing item-tag images.
+- Catalogue CSV/Excel import or storing catalogue files.
+- Bulk upload, central inbox, background workers or queue processing.
+- New provider/AI Gateway or paid-provider expansion.
+- Sales posting, GST/tax, stock, discounts, customer-validation, payment, offline, print or tenant business-rule changes.
+- Redesign/reposition/removal of the floating Chat assistant.
 
-### In scope
-- One already-issued handwritten sales bill per import.
-- Existing Generate Invoice entry point and existing photo/PDF picker.
-- Existing accepted file formats and upload limit unless measurement justifies a separately approved change: JPEG, PNG, WebP or PDF; maximum 8 MB.
-- Extract visible invoice reference/date, customer name/mobile when present, every product line, original description, brand/model/part number, HSN, quantity, unit price, discount, line amount, GST rate/amount, subtotal, tax and grand total.
-- Immediate editable review in the existing screen; preserve current customer validation, line validation, GST/totals, stock, payment, posting, print and offline rules.
-- Retain the original sales-bill evidence and link it to the resulting sale, subject to a small tenant-safe storage design. Retain only the bill source, not item-tag photos or catalogue files.
-- Instrument extraction stages and end-to-end latency.
-- Build and evaluate against a redacted, labelled handwritten-sales-bill corpus.
+## 2. User-approved UI decisions
 
-### Explicitly out of scope
-- Supplier invoice / Add Purchase.
-- Item-tag photo scanning or any item-tag file retention.
-- Product catalogue CSV/Excel import or catalogue-file retention.
-- Bulk upload, multiple separate bills, a new Document Inbox or document review screen.
-- Background worker, asynchronous queue, job polling or a new extraction workflow.
-- New AI provider, AI Gateway or paid-provider expansion without a separate decision.
-- Automatic invoice posting, GST/accounting rule changes or bypassing customer validation.
-- Redesign of Generate Invoice; retain the existing RBOS design and accepted handwritten-import UX refinements.
+- Keep the existing RBOS Create Invoice design, app shell, fonts, palette, controls and card styles.
+- Keep the floating chat launcher exactly as it is. It is not part of this change.
+- Long product descriptions must grow automatically to fit content. There is no user-controlled resize drag handle, no expand/collapse affordance, no fixed maximum height and no inner scrolling for the text.
+- Keep a comfortable minimum height (76px for the normal product-entry description field; smaller minimum for an extracted-line description), and let height expand as text wraps.
+- The same automatic growth applies to normal product entry and imported handwritten description review.
+- Serial number(s) remain optional. They are separately editable in the extracted-line review and remain optional for the existing sales flow.
 
-## 3. Current implementation baseline (main)
+## 3. Seven-case evidence baseline
 
-- `SalesInvoiceCapture` uploads one file to `/sales/invoice-image-extract` and waits for the extraction response before rendering the editable review draft.
-- The endpoint accepts one JPEG/PNG/WebP/PDF up to 8 MB and calls `SalesInvoiceCaptureService.ExtractAsync(mime, bytes)`.
-- Images may be preprocessed with Skia; optional local OCR has a 900 ms budget and its text is appended as a hint to the vision prompt.
-- PDF is sent natively to Gemini; the current Groq fallback is image-only.
-- The current service uses the Item Tag Gemini model selection and `Groq:ItemTagFallbackEnabled` setting. This coupling must be checked and replaced with explicit sales-invoice configuration while preserving existing production provider restrictions.
-- The current response is JSON-mode but does not provide a strict response schema. The acceptance predicate only requires one usable line, so it can accept a partial extraction as usable.
-- The prompt asks for line confidence, but there is no calibrated field-level confidence contract. Provider/model and field-confidence metadata added on the parked WP2 branch are candidates for selective reuse, not a reason to adopt its worker.
-- The current sales extraction processes the source in memory and does not retain it. Existing document-intake `POST /documents/batches` automatically enqueues work; do not call it from this synchronous flow unless a queue-free evidence-only operation is deliberately designed.
+All seven app extraction runs supplied so far have comparison records:
+- ANIL-001 and ANIL-002: Anil Sports & Stationery.
+- MONIKA-001 through MONIKA-005: Monika Electronics.
 
-## 4. Target interaction and behaviour
+See [handwritten-sales-seven-bill-comparison-v1.md](../quality/handwritten-sales-seven-bill-comparison-v1.md).
 
-1. User taps the existing **Import bill** action and takes/selects one bill.
-2. UI immediately shows progress and prevents duplicate submissions.
-3. API validates actual file signature, type, size and image readability.
-4. Extraction runs synchronously and returns a structured draft, warnings and timing/provider metadata.
-5. UI shows the existing editable review state. The original description/model/serial-like identifiers are not silently normalised or replaced with catalogue guesses.
-6. Missing or conflicting values are highlighted. The operator can correct them before adding the reviewed lines to the normal Generate Invoice form.
-7. Existing Generate Invoice validation and server-authoritative calculations remain in force. No extracted data is posted automatically.
-8. After a sale is successfully recorded, retain and link the original source bill as financial evidence. If evidence attachment fails after sale creation, expose a safe retry path and do not create a duplicate sale.
-9. Discarding the import must not create a sale or leave an unlinked evidence record.
+This report is a full record of the seven comparisons provided so far, **not** a verified gold-standard transcription set. Some source amount/model/serial characters remain ambiguous and must be confirmed before numeric accuracy scoring. The original bill images and customer PII are not committed to Git.
 
-## 5. Accuracy strategy
+## 4. P0 findings to address
 
-### 5.1 Ground-truth corpus first
-- Collect redacted real bills from the pilot shop with a human-verified expected JSON transcription.
-- Include legible and difficult handwriting, mixed Hindi/English, abbreviations, faint/blurred photos, shadows, skew, low light, long bills, overwritten values and bills with missing fields.
-- Separate a tuning set from a held-out evaluation set. Never tune prompts/models against the held-out set.
-- Keep source images private to the project; do not commit customer names, phone numbers, addresses or original invoices to Git.
-- Each sample must record which values are actually visible. An unreadable field is labelled unreadable, not guessed.
+1. The previous model output did not include a dedicated serial-number structure; extra identifier lines were lost or merged into description/model.
+2. Sales extraction was coupled to the Item Tag Gemini model and Item Tag fallback settings.
+3. The generic prompt allowed product-name rewriting/correction and did not sufficiently distinguish invoice header fields, wrapped row text, model/serial identifiers, and amount-column continuation strokes.
+4. The Gemini request used JSON MIME mode without an explicit JSON Schema.
+5. Identical quantity/price warnings were emitted once per line instead of consolidating by issue.
+6. Imported review descriptions used a single-line input and clipped long handwritten descriptions.
 
-### 5.2 Extraction contract
-- Use a strict structured response schema and validate every field on the server.
-- Preserve literal source transcription separately from any normalized/suggested value.
-- Preserve all detected rows in source order. Do not silently drop, merge or deduplicate repeated-looking lines.
-- Unknown/unreadable values remain null with a specific warning.
-- Confidence values from a model are hints only until calibrated against the labelled corpus.
-- Keep field provenance explicit: model extraction, deterministic calculation, catalogue suggestion or user correction must not be conflated.
-- Separate sales-invoice model/fallback settings from item-tag and purchase settings.
+## 5. P0 implementation decisions
 
-### 5.3 Image and OCR evaluation
-- Measure the original image and controlled preprocessing variants against the same corpus.
-- Preserve source resolution and fine handwriting; do not downscale/re-encode solely to reduce tokens without accuracy evidence.
-- Evaluate orientation, perspective correction, crop, contrast and denoise changes individually. Keep the original source unchanged.
-- Run local OCR and vision as independent signals where it improves accuracy. Avoid serially delaying the primary model request merely to wait for optional OCR.
-- Compare OCR and vision on critical values. Use selective escalation/targeted retries for conflicts or incomplete drafts; do not call every provider on every upload.
-- PDF handling remains supported, but its actual page/rendering accuracy must be evaluated separately from camera photos.
+### 5.1 Extraction contract
 
-### 5.4 Deterministic validation
-- Validate numeric ranges, data types, required line fields and invoice row count/structure.
-- Reconcile quantity × unit price, discount, line amounts, tax, subtotal and grand total using existing RBOS rounding/tax rules. A discrepancy must be visible; never silently rewrite the source value.
-- Treat product/catalogue matches as suggestions. Preserve the handwritten description even when a match is suggested.
-- A result must not be called complete merely because one line was returned. Return partial data with field-level warnings and an explicit attention state.
+- Use Gemini `generationConfig.responseJsonSchema` with a JSON Schema object. Keep the prompt and schema aligned. Use JSON Schema nullable unions such as `["string", "null"]`, not the legacy `responseSchema`/OpenAPI `nullable` representation.
+- Require all response properties, but allow source-absent/unreadable scalar values to be null. Require `serialNumbers` as an array; return an empty array when no serial is confidently attributable.
+- Enforce output shape and value bounds in `NormalizeForReview` regardless of provider output.
+- Preserve descriptions up to the bounded server limit without catalogue normalization. Do not silently drop text after the first handwritten line.
+- Preserve invoice numbers as strings to retain leading zeroes.
+- Keep sales Gemini model selection separate from Item Tag model selection. Dedicated sales settings may override existing Invoice settings; absent sales-specific values inherit the previous Invoice settings so existing provider choice is not changed.
+- Use `Groq:SalesInvoiceFallbackEnabled` when explicitly configured; otherwise inherit the existing `Groq:InvoiceFallbackEnabled` setting. Keep the current default fallback policy unchanged.
+- Provider-supplied confidence remains an uncalibrated hint, never a correctness guarantee.
 
-### 5.5 Human confirmation
-- Keep the source bill available during review and make uncertain/mismatched fields obvious.
-- Require the operator to confirm/correct all extracted lines and financially material values before posting.
-- The normal sales endpoint remains the only posting path.
+### 5.2 Serial number handling
 
-## 6. Performance strategy
+- Extract only serial numbers clearly associated with the relevant bill row; do not classify a model, part number, invoice number, date or barcode as a serial.
+- When a source identifier is ambiguous, preserve it in the full verbatim description and leave structured serialNumbers empty.
+- Show serial number(s) as optional, editable fields on each extracted item review card.
+- Validate serial format/count and duplicates before adding imported lines to the existing bill, using current RBOS serial/IMEI business validation boundaries.
+- Carry confirmed serials into the existing `Item.serials` array. The existing `POST /api/sales` payload already sends each sale line's `serials`; no sale API or database schema change is intended.
+- Keep the original description unchanged so separately written identifiers are not lost if their serial classification is uncertain.
 
-Capture stage-level timings before tuning:
-- request upload/read time and input byte size;
-- image decode/preprocessing time;
-- local OCR time and whether its output was used;
-- each provider/model attempt and outcome;
-- parsing/validation/reconciliation time;
-- total upload-to-editable-draft latency.
+### 5.3 Header and financial extraction
 
-Report p50 and p95 by image/PDF type, file size and corpus difficulty. Set a numeric latency SLO only after the baseline is measured.
+- Invoice number must come from the labelled Invoice No./Bill No. field only.
+- Date must come from the labelled Date field; interpret as Indian day/month/year and return ISO date. Never infer or replace the handwritten year. Return null and warn when ambiguous.
+- Customer name/mobile must come from their labelled fields only. Do not use a prior bill/customer or unrelated number.
+- Grand total must come from the printed TOTAL box, not handwritten annotations near the authorised-signatory area.
+- Unit price is null when the printed Rate column is blank. Do not copy a total/amount into the rate field.
+- Preserve visible amount separately. Derive a unit price only through a separately approved deterministic UI/business rule; provenance must show it was derived, not read from handwriting.
 
-Optimise in this order:
-1. avoid unnecessary sequential work before the primary inference request;
-2. use the fastest model/configuration that meets the agreed accuracy gate on the held-out corpus;
-3. avoid redundant fallback calls when the first response is already complete and validated;
-4. escalate only when a critical field is missing, inconsistent or low-confidence;
-5. keep the response payload and image processing bounded.
+### 5.4 Warnings and review
 
-Speed must never be improved by silently dropping lines, reducing source quality without evidence, or accepting incomplete numeric data.
+- Consolidate repeated warning text into one category-level warning per extraction (e.g., one warning for unreadable line description; one for missing quantity/rate), with affected fields/line indices identified where available.
+- Do not call a draft accurate or complete because it contains one plausible line.
+- Missing/uncertain source values remain visibly reviewable and editable.
+- Existing Generate Invoice checks remain authoritative. AI extraction must never post a sale directly.
 
-## 7. Acceptance criteria
+## 6. P0 + P1 implementation delta
 
-### Accuracy and correctness
-- [ ] A redacted, human-labelled corpus and separate holdout set exist.
-- [ ] Report field exact-match, line-item recall/precision, critical numeric exact-match, document exact-match and unsupported/hallucinated-value rate.
-- [ ] Every source-visible financial value is either extracted correctly or explicitly flagged for correction; no uncertain value is silently accepted.
-- [ ] All detected lines remain in source order; no silent truncation, merge or omission.
-- [ ] Arithmetic/tax/total discrepancies are surfaced and never silently overwritten.
-- [ ] Human review is required before the existing sales posting path.
-- [ ] No duplicate sale is created by retrying extraction or source-evidence attachment.
+### P0 — extraction contract and review
 
-### Speed
-- [ ] Stage-level latency telemetry is available without logging bill contents or personal data.
-- [ ] p50/p95 baseline and target are documented for the real sample corpus.
-- [ ] The existing synchronous UI receives the draft as soon as the bounded extraction/validation completes.
-- [ ] No worker, polling loop or new inbox is required.
+- [x] Prompt preserves full wrapped descriptions, labelled invoice header fields, source-row mapping, model/serial separation and printed TOTAL provenance.
+- [x] Gemini uses `generationConfig.responseJsonSchema` with nullable values and structured serial arrays.
+- [x] Server normalization bounds fields, de-duplicates serials and supports the previous singular serial response for compatibility.
+- [x] Sales Gemini model and Groq fallback settings are independent of Item Tag settings, with legacy Invoice-setting fallback.
+- [x] Repeated identical warnings are consolidated by category.
+- [x] Extracted lines expose editable descriptions and optional serial numbers; confirmed serials are validated and passed to the existing sale-line serial collection.
+- [x] Manual and imported product descriptions grow automatically. No drag handle, fixed maximum height or inner scrolling.
+- [x] Floating Chat assistant remains unchanged.
 
-### Evidence and boundaries
-- [ ] Original sales-bill evidence is tenant-scoped and linked to the created sale.
-- [ ] Discard/failure does not create a sale or orphaned evidence.
-- [ ] Item-tag images and catalogue import files remain unpersisted.
-- [ ] Supplier purchase flow remains unchanged.
-- [ ] Existing customer, GST, stock, payment, posting, print, offline and tenant rules remain unchanged.
+### P1 — extraction quality, resilience and responsiveness
 
-### Automated and field verification
-- [ ] Focused service tests cover strict schema parsing, field cleaning, row preservation and numeric reconciliation.
-- [ ] Integration test covers upload → draft → correction/review → sale save → evidence link, including safe retry/no duplicate.
-- [ ] A corpus evaluation runs against a deterministic local/fake provider in CI; live provider evaluation is a separately controlled experiment.
-- [ ] Playwright verifies the existing Generate Invoice import/review/accept/discard journey; inspect responsive screenshots and Axe on key states.
-- [ ] Real Android camera/gallery, keyboard and shop-counter lighting acceptance are checked separately.
+- [x] Local OCR runs concurrently with primary vision extraction. The primary Gemini attempt does not wait for OCR; OCR hints may be used by fallback attempts after a short bounded wait.
+- [x] OCR has a configurable, bounded timeout, emits duration/character telemetry, is non-fatal when unavailable, and is observed/cancelled before its image buffer is cleared.
+- [x] Image preparation uses conservative defaults with bounded configuration for inference dimensions, JPEG quality and re-encode threshold.
+- [x] If image preprocessing changed the uploaded image, the last configured Gemini fallback can retry the original full-resolution image to recover small handwritten text lost during optimization.
+- [x] Provider-chain execution remains synchronous and bounded by per-attempt timeout and total request budget. Existing credential-failure short-circuiting is preserved; handwritten-sales requests also skip further models from the same provider after a 429 rate-limit response. Other extraction flows retain their previous fallback semantics.
+- [x] Attempt-level, provider-chain and end-to-end durations are logged; OCR duration and configured latency target are also logged.
+- [x] Model output includes per-field handwriting/attribution hints for invoice header and line fields. Values are normalized to 0–1; out-of-range values are discarded. The UI no longer presents the old uncalibrated line-level score as a percentage.
+- [x] Field-level review flags identify low-confidence values, unreadable required header/line values, invalid date formats, malformed serials, duplicate serials across rows, serial count above quantity, discounts above line value, simple quantity × rate vs line amount mismatches, and line/subtotal or subtotal + tax/grand-total mismatches.
+- [x] Review flags are shown beside the affected fields or as a line/header warning. The relevant field warning clears when the shopkeeper edits that field. Header bill number and date remain editable in the review step.
+- [x] These checks only flag potential issues; they do not auto-correct, recalculate or overwrite what the source document says.
+- [x] Total request duration, provider-chain duration, OCR duration and a configurable latency SLO threshold are recorded. Default target is 15 seconds; provider attempt budget remains configurable and bounded.
 
-## 8. Delivery gates
+**Calibration boundary:** field-confidence values are model estimates, not calibrated probabilities. A statistically meaningful calibration curve or accuracy percentage requires a verified labelled set of handwritten fields. That evaluation must follow the user's manual source-bill validation; no accuracy result is claimed before then.
 
-1. **Baseline:** label a pilot corpus, capture current accuracy and latency, and identify the most common failure classes.
-2. **Extraction improvement:** iterate preprocessing, prompt/schema, provider configuration and validation against the tuning set.
-3. **Holdout gate:** report results on untouched samples and resolve material errors before calling the extraction stable.
-4. **UI and evidence integration:** preserve the current synchronous review flow and attach original evidence to the resulting sale.
-5. **Pilot acceptance:** shopkeeper reviews real bills on Android; collect correction/error data; rerun holdout evaluation after any model/prompt change.
+## 7. Automated validation plan and status
 
-Do not describe AI-only reading as 100% accurate. The launch bar is no silent wrong financial data, high measured extraction accuracy on representative samples, and human-confirmed posting.
+- [x] Contract tests for verbatim description, serial arrays, schema requirements and normalization bounds.
+- [x] Unit tests for field-confidence normalization, low-confidence flags, line arithmetic mismatch, duplicate serials across lines and feature-scoped rate-limit fallback.
+- [x] Frontend test for inline review warnings, editable source bill number/date and clearing a line warning after manual correction.
+- [x] Backend Release solution build, 165 backend unit tests and deployment-container build passed in CI run #1342.
+- [x] Frontend TypeScript, 234 tests across 26 test files, lint, production build and high/critical dependency audit passed in CI run #1342.
+- [x] PostgreSQL integration build, disposable database migration and 186 integration tests passed in CI run #1342.
+- [x] Final P0 + P1 implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed all three required code-CI jobs in [run #1342](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45834679317).
+- [x] Latest pre-merge feature head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed backend, frontend and PostgreSQL integration jobs in code CI #1343.
+- [ ] **Deferred by user request:** Playwright/E2E, responsive screenshots and Axe. Deferred, not passed, and not part of the current code gate.
+- [ ] Visual Audit #297 was auto-triggered by the existing path filter and failed before the invoice-import journey: the shared signup helper waited for `Next` while the signup screen showed `Continue`. This is a signup-test mismatch, not extraction validation; no visual/Axe acceptance is claimed.
+- [ ] Native Android camera/gallery, keyboard and TalkBack checks remain real-device acceptance checks.
 
-## 9. Deferred work
+## 8. Accuracy and acceptance gate
 
-PR [#111](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is parked as Draft. Its worker, migration 059, purchase extraction, grouped background processing and document review metadata are not dependencies for this phase. Selectively reuse a sales-only improvement only after validating its value against the labelled corpus.
+No 100% machine-only reading guarantee is claimed for arbitrary handwriting. The acceptance target is:
+- No unsupported source value is silently invented.
+- Source-visible description, model/serial-like strings and line rows are preserved.
+- Critical fields that cannot be read are marked for correction instead of guessed.
+- Dates, invoice numbers, quantities, prices and printed total are compared to the labelled source.
+- Serial numbers remain optional; when detected, they are preserved and editable.
+- Confirmed sale data still goes through existing validation and explicit user confirmation.
+- Accuracy metrics are calculated only after uncertain source labels are human-verified.
 
-WP1/PR #109 is already merged and provides a tenant-scoped document registry/queue foundation. It remains dormant unless a queue-free source-evidence attachment is intentionally implemented. Do not enable its queue or deploy migrations solely for this synchronous extraction phase.
+No source-photo-to-app accuracy percentage is claimed yet. The seven-case comparison is evidence for regression coverage and failure classification, not an independently verified benchmark.
 
-No merge, production migration or deployment is implied by this specification.
+## 9. Remaining validation and boundaries
 
+- The seven supplied app extraction runs remain comparison records, not an independently verified gold-standard transcription set. The user will manually compare source bills and extraction results after all P0 + P1 code work is complete.
+- The MONIKA-003 source amount and some model/serial characters remain ambiguous in the current report. Do not use them as ground truth until the source is checked.
+- Two of the original Monika source bills still lack matching app extraction screenshots/results in the current comparison report.
+- Actual p50/p95 latency and accuracy results require real pilot executions after deployment and user validation. Logging and an SLO threshold are instrumentation, not evidence that the target has been met.
+- Statistical confidence calibration requires verified handwritten-field labels and is intentionally not claimed as complete by model-generated confidence hints.
+- Supplier invoices, Add Purchase, item-tag uploads, catalogue import, file retention, background workers, queues, bulk inboxes and upload polling remain outside this work package.
+- No sale posting, GST/tax, stock, discounts, customer validation, payment, offline, print, tenant/security or accounting rules are intentionally changed.
 
-## 10. Initial user-supplied corpus (2026-11-26)
+## 10. Current delivery state
+
+- P0 and P1 implementation are kept together in PR #113 and branch `feat/handwritten-sales-import-p0`.
+- The branch was synchronized with current main using merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; current comparison is 45 commits ahead and 0 behind. GitHub now reports the PR as mergeable, but it remains Draft and unmerged.
+- Implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed code CI #1342 (backend 165, frontend 234, PostgreSQL integration 186); latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs again in #1343.
+- No merge or production deployment is included or implied.
+- The user requested manual validation only after the full improvement is implemented; this handoff does not ask them to validate an intermediate P0-only state.
+
+## User validation and E2E scope clarification — 2026-11-26
+
+User confirmed that all P1 improvements belong in the same PR and branch as P0 and that they will validate the completed implementation manually afterwards. Playwright/E2E, screenshots, Axe and real-device verification are deferred (not passed). The automatically triggered Visual Audit #297 failed before reaching the invoice-import flow because the shared signup helper waited for `Next` while the signup screen rendered `Continue`; this is a test-helper mismatch, not extraction evidence. Keep the floating Chat assistant unchanged and retain automatic description growth.
+
+## 11. Initial user-supplied corpus (2026-11-26)
 
 - The initial batch contained 10 photos: S01–S09 are Monika Electronics and S10 is Anil Sports & Stationery. One additional Anil Sports bill was subsequently supplied, so 11 source bills are now tracked: 9 Monika + 2 Anil.
 - Provisional visual observations and uncertainty annotations: [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md).
 - The corpus note is not yet gold-standard ground truth. Amounts and descriptions are provisional visual readings; exact model/serial strings and the S10 row count/total need verification before scoring.
 - Original photos remain in the conversation attachment context and are not committed to Git. The repository stores no customer names, mobile numbers or addresses.
-- No current-RBOS extraction has been run against the eleven images yet. No accuracy/latency score is claimed.
+- Seven app extraction runs (two Anil and five Monika) have since been recorded in the seven-case comparison. Two of the eleven tracked source bills still lack matching app extraction outputs. No accuracy/latency score is claimed.
 - Next step: obtain verified labels for ambiguous source text/financial fields, then run the existing synchronous importer against all eleven samples and capture stage timings.
 
 
-## 11. Two Anil Sports extraction comparisons (2026-11-26)
+## 12. Two Anil Sports extraction comparisons (2026-11-26)
 
 - Both Anil source bills are now captured in [anil-sports-import-comparison-v1.md](../quality/anil-sports-import-comparison-v1.md): ANIL-001 ₹5,000 and ANIL-002 ₹10,020 (source bill no. 468).
 - ANIL-001 app output: 10 detected lines and total ₹5,000; repeated duplicate quantity/price warning text; at least one likely quantity misread; blank rate fields must be judged against the source (whose Rate column appears blank); suspicious customer-name mapping requires verification.
@@ -191,7 +198,7 @@ No merge, production migration or deployment is implied by this specification.
 - The source/app screenshots remain in the conversation and are not committed to Git. The comparison is provisional, not a gold-standard transcription. Do not calculate an accuracy percentage yet.
 
 
-## 12. First Monika app comparison — S01 (2026-11-26)
+## 13. First Monika app comparison — S01 (2026-11-26)
 
 - Detailed record: [MONIKA-001 source/app comparison](../quality/monika-sales-import-comparison-v1.md).
 - Source total/line amount ₹17,500 and quantity 1 match the app. Description/brand are materially misread (“Vultas bike lamp” vs source “Voltas Beko WM”). Model string differs and needs exact verification.

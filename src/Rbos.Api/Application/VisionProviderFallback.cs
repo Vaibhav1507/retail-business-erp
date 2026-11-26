@@ -39,6 +39,12 @@ public static class VisionProviderFallback
             cfg["Gemini:ItemTagFallbackModel"] ?? cfg["Gemini:InvoiceFallbackModel"] ?? cfg["Gemini:FallbackModel"],
             cfg["Gemini:ItemTagLastResortModel"] ?? cfg["Gemini:InvoiceLastResortModel"] ?? cfg["Gemini:LastResortModel"]);
 
+    public static IReadOnlyList<string> SalesInvoiceGeminiModels(IConfiguration cfg) =>
+        Models(
+            cfg["Gemini:SalesInvoiceModel"] ?? cfg["Gemini:InvoiceModel"] ?? cfg["Gemini:Model"],
+            cfg["Gemini:SalesInvoiceFallbackModel"] ?? cfg["Gemini:InvoiceFallbackModel"] ?? cfg["Gemini:FallbackModel"],
+            cfg["Gemini:SalesInvoiceLastResortModel"] ?? cfg["Gemini:InvoiceLastResortModel"] ?? cfg["Gemini:LastResortModel"]);
+
     static IReadOnlyList<string> Models(string? primary, string? secondary, string? tertiary)
     {
         // These old aliases appeared in the former fallback chain. Do not silently keep
@@ -62,7 +68,8 @@ public static class VisionProviderFallback
         Func<JsonNode?, bool> isUsable,
         ILogger logger,
         CancellationToken ct,
-        TimeSpan? totalBudget = null)
+        TimeSpan? totalBudget = null,
+        bool skipProviderOnRateLimit = false)
     {
         var budget = totalBudget ?? TimeSpan.FromSeconds(60);
         budget = TimeSpan.FromMilliseconds(Math.Clamp(budget.TotalMilliseconds, 1000, 120_000));
@@ -128,7 +135,8 @@ public static class VisionProviderFallback
 
                 // Credential/permission/billing errors apply to every model under this provider.
                 // Do not spend the request budget repeating the same bad key on fallback models.
-                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.PaymentRequired)
+                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.PaymentRequired ||
+                    (skipProviderOnRateLimit && e.StatusCode == HttpStatusCode.TooManyRequests))
                     unavailableProviders.Add(attempt.Provider);
             }
             catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)

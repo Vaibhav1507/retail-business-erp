@@ -38,7 +38,14 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await expect(bill).toBeVisible()
 
   const description = bill.locator('#billing-prod')
+  const chatLauncher = page.locator('.assistant-launcher')
+  await expect(chatLauncher).toBeVisible()
   await expect(description).toHaveCSS('resize', 'none')
+  await expect(description).toHaveCSS('height', '76px')
+  await expect(description).toHaveCSS('overflow-y', 'hidden')
+  await description.fill('Long handwritten-style product description with model and package details\n'.repeat(5))
+  await expect.poll(async () => Number((await description.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(76)
+  await description.fill('')
   await expect(description).toHaveCSS('height', '76px')
 
   await page.route('**/api/sales/invoice-image-extract', async route => {
@@ -48,7 +55,8 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
         invoiceNumber: 'HAND-468', date: '2026-11-26', customerName: 'Handwritten Customer',
         customerPhone: '9876543210', subtotal: 10000, taxAmount: 1800, total: 11800,
         lines: [{
-          description: 'Samsung LED Television', brand: 'Samsung', model: 'UA43',
+          description: 'Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line',
+          brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'],
           hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000,
           gstRate: 18, gstAmount: 1800, confidence: 0.92,
         }],
@@ -66,14 +74,19 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
     await (await chooser).setFiles({
       name: 'synthetic-handwritten-bill.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from('%PDF-1.4\\n% synthetic visual audit document\\n%%EOF'),
+      buffer: Buffer.from('%PDF-1.4\n% synthetic visual audit document\n%%EOF'),
     })
   }
 
   await importBill()
   const review = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
   await expect(review).toBeVisible()
-  await expect(review.getByLabel('Extracted line 1 description')).toHaveValue('Samsung LED Television')
+  const extractedDescription = review.getByLabel('Extracted line 1 description')
+  await expect(extractedDescription).toHaveValue('Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line')
+  await expect(extractedDescription).toHaveCSS('resize', 'none')
+  await expect(extractedDescription).toHaveCSS('overflow-y', 'hidden')
+  await expect.poll(async () => Number((await extractedDescription.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(48)
+  await expect(review.getByLabel('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
   await expect(review.getByLabel('Extracted line 1 quantity')).toHaveValue('1')
   await expect(review.getByLabel('Extracted line 1 unit price')).toHaveValue('10000')
   await expect(bill.locator('#billing-prod')).toBeHidden()
@@ -92,6 +105,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   })
   expect(separation).toBeGreaterThanOrEqual(10)
   await captureState(page, 'extraction-review')
+  await expect(chatLauncher).toBeVisible()
 
   await review.getByRole('button', { name: 'Discard extraction' }).click()
   await expect(review).toHaveCount(0)
@@ -103,7 +117,8 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   const acceptedReview = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
   await expect(acceptedReview).toBeVisible()
   await acceptedReview.getByRole('button', { name: 'Add reviewed lines to bill' }).click()
-  await expect(bill.getByText('Samsung LED Television')).toBeVisible()
+  await expect(bill.locator('.invoice-added-item')).toContainText('Samsung LED Television model UA43')
+  await expect(bill.locator('.invoice-added-item')).toContainText('Serial: SN12345678')
   await expect(bill.getByText(/Invoice details extracted/)).toHaveCount(0)
   await expect(description).toBeVisible()
   await page.unroute('**/api/sales/invoice-image-extract')
@@ -135,6 +150,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   expect(bounds.left).toBeGreaterThanOrEqual(0)
   expect(bounds.right).toBeLessThanOrEqual(bounds.viewport)
   await captureState(page, 'tag-extraction-feedback')
+  await expect(chatLauncher).toBeVisible()
   expect(pageErrors).toEqual([])
   writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, captures: audit }, null, 2))
 })

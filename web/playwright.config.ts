@@ -7,9 +7,9 @@ const WEB = 'http://localhost:5173'
 // and the Vite dev server (which proxies /api to the API). Existing servers are reused.
 export default defineConfig({
   testDir: './e2e',
-  // CI runs only deterministic, synthetic-data specs. The invoice-extraction/demo specs
-  // exercise external AI/document providers and remain manual, opt-in acceptance tests.
-  ...(process.env.CI ? { testMatch: ['api-contract.spec.ts', 'collections.spec.ts', 'opening-stock.spec.ts', 'sales.spec.ts', 'first-shop-onboarding.spec.ts', 'ui-audit.spec.ts', 'assistant-visual.spec.ts', 'authentication-visual.spec.ts', 'billing-sales-visual.spec.ts', 'buy-visual.spec.ts'] } : {}),
+  // CI runs deterministic, synthetic-data specs. Extraction is mocked in the invoice-import
+  // visual spec; real AI/provider demo specs remain manual, opt-in acceptance tests.
+  ...(process.env.CI ? { testMatch: ['api-contract.spec.ts', 'collections.spec.ts', 'opening-stock.spec.ts', 'sales.spec.ts', 'first-shop-onboarding.spec.ts', 'ui-audit.spec.ts', 'assistant-visual.spec.ts', 'authentication-visual.spec.ts', 'billing-sales-visual.spec.ts', 'invoice-import-visual.spec.ts', 'buy-visual.spec.ts'] } : {}),
   timeout: 90_000,
   fullyParallel: false,
   workers: 1,

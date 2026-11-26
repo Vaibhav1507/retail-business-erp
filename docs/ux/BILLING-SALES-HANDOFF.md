@@ -98,7 +98,7 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 ### Current PR disposition
 
 - [PR #111 — Document-to-Books worker](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is open as **Draft** and parked. Its worker, migration 059, purchase changes and grouped processing are deferred. The last verified CI run for its branch (run #1314) passed; this validates its configured build/tests, not handwritten extraction accuracy.
-- [PR #112 — focused accuracy scope](https://github.com/Vaibhav1507/retail-business-erp/pull/112) is open as **Draft** and contains this phase's specification. Its docs-only CI run #1315 was in progress at handoff.
+- [PR #112 — focused accuracy scope](https://github.com/Vaibhav1507/retail-business-erp/pull/112) was merged into main in commit `75d047cba629737e3eb7c38697d5beb4d0d18faf`; its docs-only CI run #1316 passed.
 - WP1 [PR #109](https://github.com/Vaibhav1507/retail-business-erp/pull/109) is merged at `b6b0409c3ed522aa70f84d8cde002632807dda77`. Its document registry/queue remains on main, but the existing synchronous sales importer must not call the queue-enqueuing batch endpoint. Production application of migration 058 is not verified.
 
 ### Accuracy evidence required before expansion
@@ -113,9 +113,9 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 
 - User supplied 10 source photos and confirmed all are valid extraction tests: 9 Monika Electronics bills plus 1 Anil Sports & Stationery bill. The tenth is intentionally included to test a different bill template, not rejected as an outlier.
 - Provisional, privacy-minimised observations are recorded in [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md). Customer names, mobile numbers and addresses are excluded; original photos are not committed to Git.
-- This is not yet a gold-standard dataset. Exact product/model/serial transcriptions and ambiguous values (especially S10's rows/total) need verification before accuracy scoring. No extraction run or accuracy score has yet been produced.
+- This is not yet a gold-standard dataset. Exact product/model/serial transcriptions and ambiguous values (especially S10's rows/total) need verification before accuracy scoring. Seven app extraction runs have since been recorded; no accuracy score is claimed.
 - Current CI: PR #112 docs-only CI run [#1316](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45814546118) passed. PR #111 parked worker branch CI run [#1314](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45810285562) passed. Neither run measures handwriting accuracy.
-- **Next concrete task:** verify the provisional labels against the source bills, then execute the existing synchronous importer on all 10 exact images and record output plus stage timings. Keep S10 in the scorecard as a separate template cohort.
+- **Next concrete task:** verify the provisional labels against the source bills; seven app runs (two Anil, five Monika) are already recorded, while two of the eleven source bills still need matching app outputs. Keep the Anil template as a separate cohort and record stage timings during controlled pilot runs.
 
 
 ### Anil Sports source-to-app comparison — 2026-11-26
@@ -135,3 +135,58 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 - Two identifier strings appear in the source item description area (`1200 644A 76A 112258` and `26111412945`). Neither appears in app output; current review card has no serial/identifier field. Their exact semantic roles remain to be verified before assigning a serial label.
 - The source Rate column appears blank, but app sets unit price ₹17,500. Preserve source-vs-derived provenance.
 - App's 90% confidence is not calibrated; this sample has multiple critical transcription errors despite the confidence label.
+
+## P0 + P1 — handwritten sales-bill import improvement (2026-11-26)
+
+**Current implementation branch:** `feat/handwritten-sales-import-p0`  
+**Scope:** Existing synchronous Generate Invoice handwritten sales-bill import only. No worker, bulk inbox, Add Purchase, item-tag persistence or catalogue import work.
+
+### Corpus/comparison state
+
+- All seven app extraction runs shared so far have a consolidated record: [seven-bill comparison v1](../quality/handwritten-sales-seven-bill-comparison-v1.md).
+- Cases: ANIL-001 ₹5,000; ANIL-002 ₹10,020; MONIKA-001 ₹17,500; MONIKA-002 ₹11,000; MONIKA-003 (source total needs verification); MONIKA-004 ₹17,400; MONIKA-005 ₹15,800.
+- This is seven complete comparison records for the supplied app runs, **not** a verified gold-standard dataset. Some values remain ambiguous (notably MONIKA-003 amount and specific model/serial characters); confirm before scoring accuracy.
+- Eleven handwritten source bills are tracked overall (9 Monika + 2 Anil). The remaining two Monika source bills from the initial batch do not yet have app extraction screenshots/results.
+- Original bills and customer PII are not committed to Git.
+
+### User-approved UX constraints
+
+- Keep the existing RBOS Create Invoice layout/design system.
+- Floating Chat button must remain exactly as-is.
+- Product description fields automatically grow to fit content. No manual resize handle, no fixed max height or internal scroll for long text. The normal item entry has a 76px minimum; imported descriptions use a compact minimum and grow with text.
+- No redesigned screen or worker/polling experience.
+
+### P0 + P1 implementation changes on this branch
+
+- Sales extraction prompt now preserves full wrapped verbatim description and distinguishes labelled invoice number/date/customer/total fields.
+- Gemini request uses `generationConfig.responseJsonSchema` (JSON Schema nullable unions) with typed required output including the serialNumbers array.
+- Sales Gemini model configuration is separate from Item Tag configuration; falls back to previous Invoice model settings if no sales-specific setting is configured.
+- Sales Groq fallback can be independently configured; when absent, it inherits the old Invoice fallback flag so rollout policy is unchanged.
+- Server normalizer preserves bounded descriptions and serial arrays, de-duplicates serials and keeps a legacy singular serial response compatible.
+- Identical extraction warnings consolidated by category.
+- Extracted review displays editable optional serial number(s); reviewed serials are passed into the existing sale-line serial array and checked for length/count/duplicates before add.
+- Existing Generate Invoice posting, GST/stock/customer/offline/tenant rules and current chat launcher are not intentionally changed.
+- Product descriptions in manual entry and extracted review use auto-grow textareas with no manual resizing.
+- Local OCR runs concurrently with the primary vision attempt; fallback attempts may consume OCR hints only after a short bounded wait.
+- Conservative image-preparation options are configurable within bounds; the final Gemini fallback retries the untouched original image if preprocessing was used.
+- Per-header/per-line field-confidence hints feed inline review flags; deterministic checks identify missing or invalid critical values, malformed/duplicate serials, serial-count mismatches, excessive discounts and arithmetic inconsistencies without changing the extracted data.
+- Source bill number and date are editable during review, and inline warning acknowledgement occurs when the relevant field is corrected.
+- Provider/total latency, OCR duration and a configurable 15-second target are instrumented for later pilot measurement.
+- Handwritten-sales fallback skips remaining models from a provider after a 429 response, while other invoice/item-tag flows retain their existing behaviour.
+
+### Authoritative design/engineering notes
+
+- [P0 implementation/design contract](./handwritten-sales-bill-import-accuracy.md).
+- [Seven-case source-to-app comparison](../quality/handwritten-sales-seven-bill-comparison-v1.md).
+- [Updated handwritten-import UX decision](./invoice-handwritten-import-ux-refinement.md).
+
+### Validation and delivery state
+
+- Code CI #1342 passed on implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1`: backend 165 tests, frontend 234 tests, PostgreSQL integration 186 tests, plus build/lint/dependency checks.
+- Latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs in run #1343 (backend, frontend and PostgreSQL integration).
+- RBOS Visual Audit run #297 was automatically triggered by the existing invoice-import path filter, although Playwright/Axe were deferred for this phase. It failed after five minutes because the shared signup helper waited for a `Next` button while the current signup screen exposed `Continue`; this is a test-helper/signup-flow mismatch before the invoice-import journey, not an extraction assertion. The visual audit is not counted as passed.
+- Main was synchronized into this feature branch by merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; the branch is now 45 commits ahead and 0 behind main, and GitHub reports it mergeable. PR #113 remains open as Draft and has not been merged. No production deployment has been performed. PR #111 remains parked as Draft; PR #112's scope/corpus documentation is merged into main.
+
+### P0 + P1 validation scope clarification — 2026-11-26
+
+User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. Code CI #1342 passed on the implementation commit; code CI #1343 passed on the latest pre-merge branch head. Playwright/E2E, screenshots, Axe and native Android checks remain deferred (not passed). The automatically triggered Visual Audit #297 failed in the signup helper before reaching the import flow: it expected a `Next` button, but the current signup step renders `Continue`. Do not treat this as an extraction failure or a visual acceptance pass. Statistical confidence calibration and actual p50/p95 latency/accuracy measurements still depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.
