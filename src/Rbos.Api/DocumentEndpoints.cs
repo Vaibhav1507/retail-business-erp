@@ -265,7 +265,23 @@ public static class DocumentEndpoints
                 sizeBytes = pagesReader.GetInt32(3),
                 sha256 = pagesReader.GetString(4).Trim()
             });
-        return Results.Ok(new { document, pages });
+
+        await using var historyCommand = session.Command(@"
+            select status, actor_user_id, occurred_at
+              from documents.document_status_history
+             where document_id = @id
+             order by occurred_at, id");
+        historyCommand.Parameters.AddWithValue("id", id);
+        await using var historyReader = await historyCommand.ExecuteReaderAsync(ct);
+        var statusHistory = new List<object>();
+        while (await historyReader.ReadAsync(ct))
+            statusHistory.Add(new
+            {
+                status = historyReader.GetString(0),
+                actorUserId = historyReader.IsDBNull(1) ? (Guid?)null : historyReader.GetGuid(1),
+                occurredAt = new DateTimeOffset(historyReader.GetDateTime(2), TimeSpan.Zero)
+            });
+        return Results.Ok(new { document, pages, statusHistory });
     }
 
     static async Task<IResult> GetPage(
