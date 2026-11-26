@@ -175,6 +175,11 @@ public static class DocumentEndpoints
             return ApiResults.Fail(400, "Document status is not recognised.");
 
         var userId = UserId(principal);
+        var role = await db.FindRoleAsync(userId, ct);
+        var canReadSales = CanReadDirection(role, "Sale");
+        var canReadPurchases = CanReadDirection(role, "Purchase");
+        if (direction == "Sale" && !canReadSales || direction == "Purchase" && !canReadPurchases)
+            return ApiResults.Fail(403, "You do not have permission to view this type of bill.");
         var tenantId = await db.FindTenantAsync(userId, ct);
         if (tenantId is null) return Results.Ok(Array.Empty<object>());
 
@@ -182,10 +187,13 @@ public static class DocumentEndpoints
         await using var command = session.Command(@"
             select id, batch_id, direction, source_kind, status, page_count, total_size_bytes, created_at
               from documents.business_document
-             where (@direction is null or direction = @direction)
+             where ((direction = 'Sale' and @can_sales) or (direction = 'Purchase' and @can_purchases))
+               and (@direction is null or direction = @direction)
                and (@status is null or status = @status)
              order by created_at desc, id
              limit @limit");
+        command.Parameters.AddWithValue("can_sales", canReadSales);
+        command.Parameters.AddWithValue("can_purchases", canReadPurchases);
         command.Parameters.AddWithValue("direction", NpgsqlTypes.NpgsqlDbType.Text, (object?)direction ?? DBNull.Value);
         command.Parameters.AddWithValue("status", NpgsqlTypes.NpgsqlDbType.Text, (object?)status ?? DBNull.Value);
         command.Parameters.AddWithValue("limit", Math.Clamp(limit ?? 50, 1, 100));
@@ -213,6 +221,7 @@ public static class DocumentEndpoints
         CancellationToken ct)
     {
         var userId = UserId(principal);
+        var role = await db.FindRoleAsync(userId, ct);
         var tenantId = await db.FindTenantAsync(userId, ct);
         if (tenantId is null) return Results.NotFound();
 
@@ -223,11 +232,13 @@ public static class DocumentEndpoints
         command.Parameters.AddWithValue("id", id);
         await using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return Results.NotFound();
+        var documentDirection = reader.GetString(2);
+        if (!CanReadDirection(role, documentDirection)) return Results.NotFound();
         var document = new
         {
             id = reader.GetGuid(0),
             batchId = reader.GetGuid(1),
-            direction = reader.GetString(2),
+            direction = documentDirection,
             sourceKind = reader.GetString(3),
             status = reader.GetString(4),
             pageCount = reader.GetInt32(5),
@@ -266,21 +277,34 @@ public static class DocumentEndpoints
     {
         if (pageNumber is < 1 or > MaxPagesPerDocument) return Results.NotFound();
         var userId = UserId(principal);
+        var role = await db.FindRoleAsync(userId, ct);
         var tenantId = await db.FindTenantAsync(userId, ct);
         if (tenantId is null) return Results.NotFound();
 
         await using var session = await db.BeginAsync(userId, tenantId, ct);
         await using var command = session.Command(@"
-            select content, content_type
-              from documents.document_page
-             where document_id = @id and page_number = @number");
+            select p.content, p.content_type, d.direction
+              from documents.document_page p
+              join documents.business_document d
+                on d.tenant_id = p.tenant_id and d.id = p.document_id
+             where p.document_id = @id and p.page_number = @number");
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("number", pageNumber);
         await using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return Results.NotFound();
+        if (!CanReadDirection(role, reader.GetString(2))) return Results.NotFound();
         var content = (byte[])reader[0];
         var contentType = reader.GetString(1);
         return Results.File(content, contentType);
+    }
+
+    static bool CanReadDirection(string? role, string direction)
+    {
+        var financeOrAudit = Permissions.Has(role, Permissions.FinanceManage)
+            || Permissions.Has(role, Permissions.AuditView);
+        return direction == "Sale"
+            ? financeOrAudit || Permissions.Has(role, Permissions.SalesCreate)
+            : financeOrAudit || Permissions.Has(role, Permissions.PurchasesManage);
     }
 
     static Guid UserId(ClaimsPrincipal principal)
