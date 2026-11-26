@@ -107,3 +107,12 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - Keep a held-out evaluation set separate from prompt/model tuning.
 - Report header and line field exact-match, line-item recall/precision, critical numeric exact-match, document exact-match, unsupported-value rate and p50/p95 latency.
 - A universal 100% AI-only read rate is not a credible guarantee for arbitrary handwriting. The non-negotiable safety bar is no silent acceptance of uncertain/incorrect financial values and explicit human confirmation before sale posting.
+
+
+### Initial handwritten sales-bill corpus — 2026-11-26
+
+- User supplied 10 source photos and confirmed all are valid extraction tests: 9 Monika Electronics bills plus 1 Anil Sports & Stationery bill. The tenth is intentionally included to test a different bill template, not rejected as an outlier.
+- Provisional, privacy-minimised observations are recorded in [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md). Customer names, mobile numbers and addresses are excluded; original photos are not committed to Git.
+- This is not yet a gold-standard dataset. Exact product/model/serial transcriptions and ambiguous values (especially S10's rows/total) need verification before accuracy scoring. No extraction run or accuracy score has yet been produced.
+- Current CI: PR #112 docs-only CI run [#1316](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45814546118) passed. PR #111 parked worker branch CI run [#1314](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45810285562) passed. Neither run measures handwriting accuracy.
+- **Next concrete task:** verify the provisional labels against the source bills, then execute the existing synchronous importer on all 10 exact images and record output plus stage timings. Keep S10 in the scorecard as a separate template cohort.
