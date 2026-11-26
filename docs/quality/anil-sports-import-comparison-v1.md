@@ -25,6 +25,7 @@ The two bills must remain separate test cases. The second case is not a retry of
 - App displayed the same warning repeatedly: “Some line quantities or prices are unreadable. Review and enter them manually.”
 - Visible line examples:
   - Item 1: description “DAT”, quantity 4, line amount ₹1,200; unit price blank.
+  - Item 2: “Ball”, app quantity 1; the source row appears to show quantity 4 (likely quantity mismatch).
   - Item 3: “Foot Bowl”, quantity 1, line amount ₹650; unit price blank.
   - Item 4: “Ludo”, quantity 8, line amount ₹400; unit price blank.
   - Item 6: “chill”, quantity 2, line amount ₹200; unit price blank.
@@ -37,7 +38,7 @@ The two bills must remain separate test cases. The second case is not a retry of
 
 - The source bill total is ₹5,000, matching the app's header total.
 - The source has handwritten line amounts, while the Rate column appears blank on this source photo. Therefore, blank unit-price fields are not automatically an extraction failure. Do not infer rates merely to fill them; a derived rate may be calculated only under an explicitly approved deterministic rule and must be distinguishable from a source-transcribed rate.
-- The source quantity next to the line which RBOS labels “Sukhwar” appears to be 12, while the app shows quantity 1. Mark this as a likely quantity error pending final label verification.
+- The source quantity next to the line which RBOS labels “Sukhwar” also appears higher than the app's quantity 1 (provisionally 12). Mark this as a likely quantity error pending final row-to-description alignment.
 - The app descriptions “DAT”, “Foot Bowl”, “Ludo”, “chill”, “Sukhwar”, “Willy Duel” and “Mocal” are provisional visual readings, not approved product-name ground truth.
 - Repeated identical warnings create noise. Report one consolidated warning with a list of affected item/field pairs rather than one repeated bullet per line.
 
