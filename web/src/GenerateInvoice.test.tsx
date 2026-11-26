@@ -82,7 +82,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '468', date: '2026-11-20', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 10000, taxAmount: 0, total: 10000,
-          lines: [{ description: 'Samsung LED Television\\nModel UA43\\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'], hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
+          lines: [{ description: 'Samsung LED Television\nModel UA43\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'], hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
         }, warnings: []
       }), { status: 200 })
       return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
@@ -102,11 +102,11 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(await screen.findByRole('region', { name: 'Review detected items' })).toBeInTheDocument()
     const extractedDescription = screen.getByLabelText('Extracted line 1 description') as HTMLTextAreaElement
     expect(extractedDescription.tagName).toBe('TEXTAREA')
-    expect(extractedDescription).toHaveValue('Samsung LED Television\\nModel UA43\\nS/N SN12345678')
+    expect(extractedDescription).toHaveValue('Samsung LED Television\nModel UA43\nS/N SN12345678')
     expect(extractedDescription).toHaveStyle({ resize: 'none', overflowY: 'hidden' })
     expect(screen.getByLabelText('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
     Object.defineProperty(extractedDescription, 'scrollHeight', { configurable: true, value: 120 })
-    fireEvent.change(extractedDescription, { target: { value: 'Long handwritten product\\nmodel and serial details' } })
+    fireEvent.change(extractedDescription, { target: { value: 'Long handwritten product\nmodel and serial details' } })
     await waitFor(() => expect(extractedDescription.style.height).toBe('120px'))
     expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue('1')
     expect(screen.getByLabelText('Extracted line 1 unit price')).toHaveValue('10000')
@@ -125,6 +125,35 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByRole('button', { name: /Add item/ })).toBeInTheDocument()
   })
 
+
+  it('carries extracted serial numbers into the added sale item', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      calls.push({ url, method })
+      if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
+      if (url === '/api/business-profile') return new Response(JSON.stringify({ businessName: 'Pilot Shop', address: '', city: '', state: '', pinCode: '', mobile: '', gstin: null }))
+      if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/sales/invoice-image-extract' && method === 'POST') return new Response(JSON.stringify({
+        status: 'ReadyForReview',
+        extraction: {
+          invoiceNumber: '454', date: '2026-11-06', customerName: 'Test Customer', customerPhone: '9876543210',
+          subtotal: 17500, taxAmount: null, total: 17500,
+          lines: [{ description: 'Voltas Beko WM\\nModel WTL8066\\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: ['SN12345678'], hsn: null, quantity: 1, unitPrice: 17500, discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
+        }, warnings: []
+      }), { status: 200 })
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    }))
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="electronics_mobile" />)
+    await userEvent.click(screen.getByRole('button', { name: /Import bill/ }))
+    const inputs = container.querySelectorAll('.sales-invoice-uploader input[type="file"]')
+    const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'monika-bill.jpg', { type: 'image/jpeg' })
+    fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [file] } })
+    expect(await screen.findByLabelText('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
+    await userEvent.click(screen.getByRole('button', { name: 'Add reviewed lines to bill' }))
+    expect(screen.getByText('Voltas Beko WM\\nModel WTL8066\\nS/N SN12345678')).toBeInTheDocument()
+    expect(screen.getByText('Serial: SN12345678')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Review detected items' })).not.toBeInTheDocument()
+  })
 
   it('keeps model and serial in optional details for non-electronics businesses', async () => {
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="general_retail" />)
