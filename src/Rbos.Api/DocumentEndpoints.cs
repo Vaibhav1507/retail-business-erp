@@ -27,6 +27,9 @@ public static class DocumentEndpoints
     {
         "HandwrittenBill", "PrintedInvoice", "ThermalReceipt", "Other"
     };
+    // Bound per-instance upload concurrency because each request validates/inserts one
+    // page buffer at a time and the pilot Cloud Run container has a constrained memory budget.
+    static readonly SemaphoreSlim UploadGate = new(2, 2);
 
     public static void Map(RouteGroupBuilder api)
     {
@@ -37,6 +40,25 @@ public static class DocumentEndpoints
     }
 
     static async Task<IResult> UploadBatch(
+        HttpRequest request,
+        ClaimsPrincipal principal,
+        TenantDb db,
+        DocumentIntakeService intake,
+        CancellationToken ct)
+    {
+        if (!await UploadGate.WaitAsync(TimeSpan.FromSeconds(10), ct))
+            return ApiResults.Fail(429, "Too many bill uploads are being processed. Try again shortly.");
+        try
+        {
+            return await UploadBatchCore(request, principal, db, intake, ct);
+        }
+        finally
+        {
+            UploadGate.Release();
+        }
+    }
+
+    static async Task<IResult> UploadBatchCore(
         HttpRequest request,
         ClaimsPrincipal principal,
         TenantDb db,
