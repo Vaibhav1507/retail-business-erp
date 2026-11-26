@@ -441,7 +441,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
     setTagCaptureKey(value => value + 1)
     setShowTagDetails(false)
-    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate('')
+    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate(''); setSalesInvoiceCaptureKey(value => value + 1)
     setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
