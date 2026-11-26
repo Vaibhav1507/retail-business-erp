@@ -265,7 +265,10 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function salesInvoiceFieldIssue(field: string, lineIndex: number | null = null) {
-    return salesInvoiceReviewIssues.find(issue => issue.field === field && issue.lineIndex === lineIndex)?.message ?? ''
+    return salesInvoiceReviewIssues
+      .filter(issue => issue.field === field && issue.lineIndex === lineIndex)
+      .map(issue => issue.message)
+      .join(' ')
   }
 
   function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'serialNumbers' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
