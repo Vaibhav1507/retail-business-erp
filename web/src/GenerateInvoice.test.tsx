@@ -54,6 +54,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByLabelText('Payment mode').closest('details')).toBeNull()
     expect(container.querySelector('.invoice-more-details #billing-date')).not.toBeNull()
     expect(productInput.tagName).toBe('TEXTAREA')
+    expect(productInput).toHaveClass('invoice-product-description')
+    expect(productInput).toHaveStyle({ height: '76px', minHeight: '76px', maxHeight: '76px', resize: 'none', overflowY: 'auto' })
+    expect(container.querySelector('.invoice-import-prompt')).toHaveTextContent('Have a handwritten bill?')
     expect(screen.getByRole('button', { name: 'Scan tag' })).toHaveTextContent('📷')
     const productRow = productInput.closest('.invoice-product-entry')
     expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
@@ -64,6 +67,53 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(container.querySelector('.invoice-bill-summary')).toBeInTheDocument()
     expect(container.querySelector('.invoice-sticky-review')).toBeInTheDocument()
   })
+
+
+  it('replaces manual item entry with extracted review and clears import feedback on discard', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      calls.push({ url, method })
+      if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
+      if (url === '/api/business-profile') return new Response(JSON.stringify({ businessName: 'Pilot Shop', address: '', city: '', state: '', pinCode: '', mobile: '', gstin: null }))
+      if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/sales/invoice-image-extract' && method === 'POST') return new Response(JSON.stringify({
+        status: 'ReadyForReview',
+        extraction: {
+          invoiceNumber: '468', date: '2026-11-20', customerName: 'Test Customer', customerPhone: '9876543210',
+          subtotal: 10000, taxAmount: 0, total: 10000,
+          lines: [{ description: 'Samsung LED Television', brand: 'Samsung', model: 'UA43', hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
+        }, warnings: []
+      }), { status: 200 })
+      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+    }))
+    const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: /Import bill/ }))
+    expect(screen.getByRole('dialog', { name: 'Add handwritten invoice' })).toBeInTheDocument()
+    const inputs = container.querySelectorAll('.sales-invoice-uploader input[type="file"]')
+    expect(inputs).toHaveLength(2)
+    const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'handwritten-bill.jpg', { type: 'image/jpeg' })
+    fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [file] } })
+    await waitFor(() => expect(calls).toContainEqual({ url: '/api/sales/invoice-image-extract', method: 'POST' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Invoice details extracted|Some details could not be read/))
+    expect(await screen.findByRole('region', { name: 'Review detected items' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Extracted line 1 description')).toHaveValue('Samsung LED Television')
+    expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue('1')
+    expect(screen.getByLabelText('Extracted line 1 unit price')).toHaveValue('10000')
+    expect(container.querySelector('.invoice-product-editor')).not.toHaveAttribute('hidden')
+    expect(container.querySelector('#billing-prod')?.closest('.billing-field')).toHaveAttribute('hidden')
+    expect(container.querySelector('.invoice-brand-model')).toHaveAttribute('hidden')
+    expect(container.querySelector('.invoice-quantity-price')).toHaveAttribute('hidden')
+    expect(container.querySelector('.invoice-product-more-details')).toHaveAttribute('hidden')
+    expect(container.querySelector('.invoice-add-item-action')).toHaveAttribute('hidden')
+    expect(screen.getByLabelText('Customer name *')).toHaveValue('Test Customer')
+    expect(screen.getByText(/Invoice details extracted/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Discard extraction' }))
+    expect(screen.queryByRole('region', { name: 'Review detected items' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Invoice details extracted/)).not.toBeInTheDocument()
+    expect(container.querySelector('.invoice-product-editor')).not.toHaveAttribute('hidden')
+    expect(screen.getByRole('button', { name: /Add item/ })).toBeInTheDocument()
+  })
+
 
   it('keeps model and serial in optional details for non-electronics businesses', async () => {
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="general_retail" />)
@@ -140,6 +190,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(await screen.findByDisplayValue('LG')).toBeInTheDocument()
     expect(screen.getByDisplayValue('PX900H7SD4Z')).toBeInTheDocument()
     expect(screen.getByDisplayValue('610NWHS203785')).toBeInTheDocument()
+    expect(container.querySelector('.invoice-product-entry .item-tag-feedback')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /Add item/ })).toHaveLength(1)
     expect(container.querySelector('.invoice-product-more-details')?.hasAttribute('open')).toBe(false)
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()

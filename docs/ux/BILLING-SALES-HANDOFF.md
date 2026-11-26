@@ -63,3 +63,16 @@ See [invoice-form-field-hierarchy-assistant.md](./invoice-form-field-hierarchy-a
 - Product description is a two-line wrapping field so long scanned/extracted names remain visible instead of being clipped in a single-line input.
 - Tag capture is a compact camera-icon action with accessible name “Scan tag”; the existing camera/gallery chooser and extraction path are unchanged.
 - Layout keeps balanced spacing and preserves the form card's mobile gutters.
+
+## Latest follow-up — handwritten bill import UX refinement (2026-11-26)
+
+A focused correction is being implemented on top of the existing Create Invoice redesign. This is **not** a new redesign and does not require another MagicPath prototype.
+
+- When handwritten bill extraction is active, hide the manual item editor, More item details and manual Add item action. Keep customer fields visible and prefilled from extraction because customer name/mobile remain mandatory for the RBOS invoice.
+- Replace the tall seven-column extracted-lines table with compact review cards. Keep description, quantity and unit price visible/editable; place brand/model/HSN/discount in a per-line disclosure.
+- Separate Add reviewed lines / Discard extraction actions from the cards.
+- Reset the SalesInvoiceCapture instance after accept/discard so stale extraction-success feedback is removed.
+- Fix import callout text wrapping, fixed-height item-description textarea and viewport-safe tag feedback.
+- Design note: [handwritten bill import UX refinement](./invoice-handwritten-import-ux-refinement.md).
+
+Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual acceptance pending. No merge or production deployment has been performed.
