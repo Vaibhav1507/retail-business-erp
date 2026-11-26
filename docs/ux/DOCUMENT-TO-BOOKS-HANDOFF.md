@@ -16,7 +16,7 @@
 - WP0 baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c`; PR #108 merged successfully at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.
 - WP0 PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), merged. CI run #1284 passed frontend, backend and PostgreSQL integration jobs.
 - WP1 PR [#109](https://github.com/Vaibhav1507/retail-business-erp/pull/109) merged at `b6b0409c3ed522aa70f84d8cde002632807dda77` on 2026-11-26, as confirmed by the owner.
-- WP2 branch: `feat/document-processing-worker`, based on the WP1 merge commit. No WP2 PR has been opened yet; verify latest head live before continuing.
+- WP2 branch: `feat/document-processing-worker`, PR [#111 — Document-to-Books processing worker and extraction](https://github.com/Vaibhav1507/retail-business-erp/pull/111), based on the WP1 merge commit. Initial CI run [#1308](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45808792744) is queued; verify the newest run against the latest PR head before merge.
 - WP1 changes merged: migration 058; tenant-scoped batch/document/page/status-history registry; bounded multipart intake API; authenticated document list/detail/page endpoints; durable queue enqueue/claim/finish functions; direction-aware role access; upload concurrency cap (2 per API instance); minimal integration/security tests.
 - WP2 branch adds migration 059; worker-only lease-bound start/load/finish/fail functions; stale-attempt recovery; separate sales/purchase extraction adapters; grouped-page sales extraction; handwriting-aware purchase extraction; review draft/attempt metadata in document detail; and worker integration through `--rbos-workers` / `--document-worker`.
 - WP2 adds a focused worker test for both directions with hosted providers disabled plus a schema-privilege guard. CI has not yet been run for WP2.
@@ -119,3 +119,10 @@ Before starting the worker in a deployed environment, both migrations 058 and 05
 ## RBOS visual consistency requirement
 
 The owner requires every new screen/option to reuse the existing font stack, CSS tokens/styles and action-first hierarchy. PR #110 contains the mandatory extension to Section 8 of `RBOS-UI-UX-WORKFLOW.md`; it was still open at the latest check. The Document-to-Books inbox/review UI in WP3 must follow the current polished RBOS UI regardless of PR #110 merge timing. This WP2 PR is backend-only.
+
+
+## WP2 PR and CI checkpoint — 2026-11-26
+
+- WP2 PR [#111](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is open against main; branch `feat/document-processing-worker`.
+- Initial workflow run [#1308](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45808792744) was queued when this checkpoint was written. Handoff/log updates are committed to the same branch; fetch PR #111 head and checks after those commits and verify a run for that exact head.
+- First fix any compile, migration, integration or Docker failures. Do not merge until latest CI is green and the owner approves. Do not apply production migration 059 or enable the Cloud Run worker as part of this PR.
