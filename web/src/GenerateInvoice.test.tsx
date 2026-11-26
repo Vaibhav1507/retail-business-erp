@@ -54,6 +54,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByLabelText('Payment mode').closest('details')).toBeNull()
     expect(container.querySelector('.invoice-more-details #billing-date')).not.toBeNull()
     expect(productInput.tagName).toBe('TEXTAREA')
+    expect(productInput).toHaveClass('invoice-product-description')
+    expect(productInput).toHaveStyle({ height: '76px', resize: 'none' })
+    expect(container.querySelector('.invoice-import-prompt')).toHaveTextContent('Have a handwritten bill?')
     expect(screen.getByRole('button', { name: 'Scan tag' })).toHaveTextContent('📷')
     const productRow = productInput.closest('.invoice-product-entry')
     expect(productRow).toContainElement(screen.getByRole('button', { name: 'Scan tag' }))
@@ -196,6 +199,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     expect(screen.getByText('Semi Automatic Washing Machine')).toBeInTheDocument()
     expect(screen.getByText(/Serial: 610NWHS203785/)).toBeInTheDocument()
+    expect(container.querySelector('.invoice-product-entry .item-tag-feedback')).toBeInTheDocument()
     expect(screen.getByText(/Barcode: 4006381333931/)).toBeInTheDocument()
   })
 
