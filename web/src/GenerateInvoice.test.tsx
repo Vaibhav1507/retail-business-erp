@@ -55,7 +55,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(container.querySelector('.invoice-more-details #billing-date')).not.toBeNull()
     expect(productInput.tagName).toBe('TEXTAREA')
     expect(productInput).toHaveClass('invoice-product-description')
-    expect(productInput).toHaveStyle({ height: '76px', minHeight: '76px', maxHeight: '76px', resize: 'none', overflowY: 'auto' })
+    expect(productInput).toHaveStyle({ minHeight: '76px', resize: 'none', overflowY: 'hidden' })
     expect(container.querySelector('.invoice-import-prompt')).toHaveTextContent('Have a handwritten bill?')
     expect(screen.getByRole('button', { name: 'Scan tag' })).toHaveTextContent('📷')
     expect(container.querySelector('.invoice-product-entry > .item-tag-uploader')).toHaveClass('invoice-feedback-flow')
@@ -82,7 +82,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '468', date: '2026-11-20', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 10000, taxAmount: 0, total: 10000,
-          lines: [{ description: 'Samsung LED Television', brand: 'Samsung', model: 'UA43', hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
+          lines: [{ description: 'Samsung LED Television\\nModel UA43\\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'], hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
         }, warnings: []
       }), { status: 200 })
       return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
@@ -100,7 +100,14 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(importStatus.parentElement).toHaveClass('sales-invoice-uploader', 'invoice-feedback-flow')
     expect(container.querySelector('.invoice-import-callout')).toContainElement(importStatus)
     expect(await screen.findByRole('region', { name: 'Review detected items' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Extracted line 1 description')).toHaveValue('Samsung LED Television')
+    const extractedDescription = screen.getByLabelText('Extracted line 1 description') as HTMLTextAreaElement
+    expect(extractedDescription.tagName).toBe('TEXTAREA')
+    expect(extractedDescription).toHaveValue('Samsung LED Television\\nModel UA43\\nS/N SN12345678')
+    expect(extractedDescription).toHaveStyle({ resize: 'none', overflowY: 'hidden' })
+    expect(screen.getByLabelText('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
+    Object.defineProperty(extractedDescription, 'scrollHeight', { configurable: true, value: 120 })
+    fireEvent.change(extractedDescription, { target: { value: 'Long handwritten product\\nmodel and serial details' } })
+    await waitFor(() => expect(extractedDescription.style.height).toBe('120px'))
     expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue('1')
     expect(screen.getByLabelText('Extracted line 1 unit price')).toHaveValue('10000')
     expect(container.querySelector('.invoice-product-editor')).not.toHaveAttribute('hidden')
