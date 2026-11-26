@@ -11,7 +11,7 @@ import { NavigationAssistant } from './NavigationAssistant'
 import { BusinessSetup } from './BusinessSetup'
 import type { Product } from './Catalogue'
 import './styles.css'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, resetCsrf } from './api'
 import { clearOfflineWorkspace, describeOfflineStorageError, loadOfflineSnapshot, saveOfflineSnapshot } from './offlineStore'
 import { setLanguage, t, toLang } from './i18n'
@@ -166,6 +166,7 @@ export default function App() {
   const [businessName, setBusinessName] = useState<string | undefined>()
   const [lang, setLang] = useState<Lang>('en')
   const [dark, setDark] = useState(() => localStorage.getItem('rbos.theme') === 'dark')
+  const assistantApprovedHashRef = useRef<string | null>(null)
   useEffect(() => { document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('rbos.theme', dark ? 'dark' : 'light') }, [dark])
 
   const loadMe = useCallback(async () => {
@@ -258,12 +259,24 @@ export default function App() {
     return () => observer.disconnect()
   }, [])
   useEffect(() => { if (me?.tenantId && !offlineMode) loadData().catch(() => undefined) }, [me?.tenantId, loadData, offlineMode])
+  const navigateFromAssistant = useCallback((nextHash: string) => {
+    const currentHash = window.location.hash
+    const protectedRoute = /^#\/(sell\/bill|buy\/receive|stock\/opening)$/
+    if (nextHash !== currentHash && protectedRoute.test(currentHash) && !window.confirm(t('navigation.leave'))) return false
+    if (nextHash !== currentHash) {
+      assistantApprovedHashRef.current = nextHash
+      window.location.hash = nextHash
+    }
+    return true
+  }, [])
+
   useEffect(() => {
     let previousHash = window.location.hash
     const protectedRoute = /^#\/(sell\/bill|buy\/receive|stock\/opening)$/
     const on = () => {
       const nextHash = window.location.hash
-      if (nextHash !== previousHash && protectedRoute.test(previousHash) && !window.confirm(t('navigation.leave'))) { window.location.hash = previousHash; return }
+      if (assistantApprovedHashRef.current === nextHash) assistantApprovedHashRef.current = null
+      else if (nextHash !== previousHash && protectedRoute.test(previousHash) && !window.confirm(t('navigation.leave'))) { window.location.hash = previousHash; return }
       previousHash = nextHash; setRoute(parseRoute()); window.scrollTo(0, 0)
     }
     window.addEventListener('hashchange', on)
@@ -312,7 +325,7 @@ export default function App() {
   return (
 	<AppLockGate email={me.email} onSignOut={logout}><div className={invoiceFocus ? 'shell invoice-focus' : 'shell'}>
 	  <header className="topbar"><img className="brand-logo" src="/logo-mark.svg" alt="Dhandha Mitra" width="40" height="40" /><ProfileMenu businessName={businessName ?? me.email} email={me.email} dark={dark} onToggleDark={() => setDark(d => !d)} onLogout={logout} /></header>
-      <NavigationAssistant />
+      <NavigationAssistant onNavigate={navigateFromAssistant} purchaseContext={page === 'buy' && first('receive') === 'receive'} />
 	  {!invoiceFocus && <nav className="nav" aria-label="Main">
 		{NAV.map(n => <a key={n.key} href={'#/' + n.key} aria-current={active === n.key ? 'page' : undefined}><span className="ico" aria-hidden="true">{n.ico}</span>{t(('nav.' + n.key) as MessageKey)}</a>)}
 	  </nav>}
