@@ -147,7 +147,9 @@ public static class DocumentProcessingWorker
             data["fieldProvenance"] = new JsonObject
             {
                 ["header"] = "ai_extracted",
-                ["lineItems"] = "ai_extracted",
+                ["lineDescriptionsAndValues"] = "ai_extracted",
+                ["partyMatch"] = started.Direction == "Purchase" ? "system_suggested" : "not_applicable",
+                ["catalogueMatches"] = started.Direction == "Purchase" ? "system_suggested" : "not_applicable",
                 ["userCorrections"] = "none",
                 ["derivedValues"] = "none"
             };
