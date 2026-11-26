@@ -257,3 +257,15 @@ Broad unit-test expansion is intentionally deferred as requested.  delimiter for
 ## Continuation
 
 Read `docs/ux/RBOS-UI-UX-WORKFLOW.md` from current `main`, then `docs/ux/DOCUMENT-TO-BOOKS-HANDOFF.md` and this log. Verify the live branch and CI. Continue by validating the WP1 implementation; do not repeat WP0 discovery. Do not merge, apply production migrations or deploy without explicit authorisation.
+
+
+## CI follow-up — 2026-11-26
+
+Latest verified pre-fix CI run: #45800273323 on commit `ae4803a820b66ceae2b06e56cfb1782aadaaf94d`.
+
+- Frontend passed; backend build and unit tests passed; migration 058 applied successfully.
+- PostgreSQL integration: 185 passed, one failed. `DocumentIntakeTests.Upload_batch_persists_grouped_pages_and_is_idempotent` received HTTP 500 from `GET /api/documents/{id}`. Root cause: `GetDocument` attempted the status-history query while `pagesReader` was still active on the same Npgsql connection. Closed the page reader before executing the history query; strengthened the same test to assert both page metadata rows are returned.
+- Docker image build failed during `apt-get update` because Ubuntu Noble archive/security mirrors temporarily served package indexes whose size/hash differed from Release metadata. Replaced the single update/install chain with a bounded five-attempt retry around the full update + install sequence, clearing stale APT indexes and applying incremental delay between attempts.
+- Fixes and this log update are pushed to `feat/document-intake-foundation`. The latest CI run must be checked before calling the remediation complete. Broad unit-test expansion remains deferred; the focused integration flow is retained.
+
+No production migration, merge or deployment has occurred.
