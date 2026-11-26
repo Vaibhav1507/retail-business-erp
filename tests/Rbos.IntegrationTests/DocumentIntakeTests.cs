@@ -59,6 +59,7 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(JpegTwo, await pageResponse.Content.ReadAsByteArrayAsync());
 
         var details = await http.GetFromJsonAsync<JsonElement>($"/api/documents/{documentId}");
+        Assert.Equal(2, details.GetProperty("pages").GetArrayLength());
         var history = details.GetProperty("statusHistory").EnumerateArray().ToArray();
         Assert.Single(history);
         Assert.Equal("Queued", history[0].GetProperty("status").GetString());
