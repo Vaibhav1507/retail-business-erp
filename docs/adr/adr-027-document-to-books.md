@@ -75,6 +75,9 @@ Costs and risks:
 
 ## Implementation status
 
-- WP0 discovery, product scope, architecture proposal and handoff are being documented.
-- No application code, schema migration, provider configuration, live provider call, production migration or deployment is part of ADR-027 creation.
+- WP0 discovery/product/architecture documentation merged in PR #108; CI passed.
+- WP1 intake foundation is being implemented on `feat/document-intake-foundation`: migration 058, tenant-scoped page registry, bounded upload API, idempotency, authenticated source retrieval and durable queue functions.
+- WP1 proposes a Cloud Run-specific PostgreSQL `bytea` storage amendment to ADR-017; it is not yet owner-reviewed or deployed.
+- WP1 does not include the document processing worker, AI extraction, review UI or posting. Those remain WP2–WP4.
+- No production migration, provider call or deployment has been performed.
 - Follow current status and exact next action in [DOCUMENT-TO-BOOKS-HANDOFF.md](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md).
