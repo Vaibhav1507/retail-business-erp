@@ -19,6 +19,34 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public void SalesInvoiceGeminiModels_UsesSalesSpecificSettingsAndIgnoresItemTagSettings()
+    {
+        var config = Config(
+            ("Gemini:SalesInvoiceModel", "gemini-4-hydrogen"),
+            ("Gemini:SalesInvoiceFallbackModel", "gemini-3.8-flash"),
+            ("Gemini:SalesInvoiceLastResortModel", "gemini-3.5-flash-lite"),
+            ("Gemini:ItemTagModel", "item-tag-only-model"));
+
+        Assert.Equal(
+            new[] { "gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite" },
+            VisionProviderFallback.SalesInvoiceGeminiModels(config));
+    }
+
+    [Fact]
+    public void SalesInvoiceGeminiModels_FallsBackToExistingInvoiceSettingsUntilDedicatedSettingsAreSet()
+    {
+        var config = Config(
+            ("Gemini:InvoiceModel", "invoice-primary"),
+            ("Gemini:InvoiceFallbackModel", "invoice-fallback"),
+            ("Gemini:InvoiceLastResortModel", "invoice-last-resort"),
+            ("Gemini:ItemTagModel", "item-tag-only-model"));
+
+        Assert.Equal(
+            new[] { "invoice-primary", "invoice-fallback", "invoice-last-resort" },
+            VisionProviderFallback.SalesInvoiceGeminiModels(config));
+    }
+
+    [Fact]
     public void LegacyFloatingAndRetiredAliasesAreReplacedByStableDefaults()
     {
         var config = Config(
