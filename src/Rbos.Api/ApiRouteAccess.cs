@@ -120,6 +120,10 @@ public static class ApiRouteAccess
         new("GET",  "/api/customers/ageing", ApiAccessKind.AuthenticatedMember),
         new("GET",  "/api/reminders", ApiAccessKind.AuthenticatedMember),
         new("GET",  "/api/brands", ApiAccessKind.AuthenticatedMember),
+        new("GET",  "/api/documents", ApiAccessKind.AuthenticatedMember),
+        new("GET",  "/api/documents/{id:guid}", ApiAccessKind.AuthenticatedMember),
+        new("GET",  "/api/documents/{id:guid}/pages/{pageNumber:int}", ApiAccessKind.AuthenticatedMember),
+        new("POST", "/api/documents/batches", ApiAccessKind.AuthenticatedMember),
 
         // Explicit named permissions. Role bundles remain unchanged.
         new("POST", "/api/profile/mobile/send-otp", ApiAccessKind.Permission, Permissions.SettingsManage),

@@ -2,7 +2,7 @@
 
 **Status:** Product direction approved for discovery and staged implementation; posting-policy gates remain open.  
 **Owner:** RBOS product owner  
-**First discovery baseline:** `main` at `92c181f6f0ba861acac954545e7d630d07f3305c` (2026-11-26).  
+**First discovery baseline:** `main` at `92c181f6f0ba861acac954545e7d630d07f3305c` (2026-11-26). WP1 implementation baseline: `main` at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.  
 **Living handoff:** [DOCUMENT-TO-BOOKS-HANDOFF.md](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md)  
 **Architecture:** [document-ingestion-pipeline.md](../architecture/document-ingestion-pipeline.md)  
 **Decision record:** [ADR-027](../adr/adr-027-document-to-books.md)
@@ -128,7 +128,7 @@ An exact duplicate hash can be blocked from a second upload or linked to the exi
 | Work package | Outcome | Gate |
 |---|---|---|
 | WP0 — Discovery/specification | Current-state audit, product spec, architecture, ADR and handoff | This document set |
-| WP1 — Document foundation | Tenant-scoped document registry, durable file storage decision, upload intake, batch/page grouping, statuses and inbox | Security, RLS, storage and retry design accepted |
+| WP1 — Document foundation | Tenant-scoped registry, bounded Cloud Run pilot evidence storage, upload intake, batch/page grouping, status API and durable queue | Tenant/RLS, idempotency and backup/retention design accepted; implementation PR review |
 | WP2 — Extraction | Sales and purchase extractors with versioned schemas, handwriting support, field provenance/confidence, image preprocessing and validation | Evaluation corpus and field-level quality evidence |
 | WP3 — Review UX | One mobile-first inbox and document review experience for both directions | User journey and screen states documented |
 | WP4 — Posting integration | Human-approved sales and purchase posting, source links and accounting reconciliation | Walk-in cash policy and purchase bill/receipt/CA gates resolved |
@@ -164,7 +164,8 @@ The full end-to-end Playwright, responsive screenshot and Axe pass is required a
 
 - [Architecture and current-state audit](../architecture/document-ingestion-pipeline.md)
 - [ADR-027](../adr/adr-027-document-to-books.md)
-- [Implementation/discovery log](../implementation-log/2026-11-26-document-to-books-discovery.md)
+- [WP0 discovery log](../implementation-log/2026-11-26-document-to-books-discovery.md)
+- [WP1 intake implementation log](../implementation-log/2026-11-26-document-intake-wp1.md)
 - [Continuation handoff](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md)
 - [RBOS engineering workflow](../ux/RBOS-UI-UX-WORKFLOW.md)
 - [Existing flexible sales/handwritten capture plan](../implementation-plans/flexible-sales-and-handwritten-invoice-capture.md)

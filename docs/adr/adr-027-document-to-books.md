@@ -25,7 +25,7 @@ Two current domain constraints make a naive unified invoice importer unsafe:
 3. Keep extracted drafts non-posting. Approval creates a domain command and calls the existing sales or purchasing posting interface. AI must not create journals, calculate authoritative tax/cost/totals, change inventory, settle supplier/customer balances or post transactions.
 4. Use the existing ADR-018 PostgreSQL-backed job/lease approach for durable work; inspect the actual worker runtime before implementation. Reuse the mechanics in migration 050, not the item-tag queue's schema or semantics. Queue payloads contain identifiers only, never file bytes.
 5. Keep exact source values, system-derived values and user-corrected values distinct. Add field-level provenance and confidence as review metadata; model confidence is not treated as calibrated probability without corpus evidence.
-6. Use tenant-scoped file metadata and private object storage with authenticated access. Generalise the storage abstraction rather than adding another feature-specific table that duplicates source transaction data. The exact backing store and retention/deletion policy must be selected in WP1.
+6. Use tenant-scoped file metadata and private authenticated access. For the current Cloud Run + Neon pilot, WP1 proposes bounded PostgreSQL `bytea` page storage with RLS (8 MB/page, 24 MB/batch), because the Cloud Run writable layer is ephemeral and no paid object-storage service is approved/configured. This is a pilot storage choice, not the final scale architecture. Revisit a private object store only after measured database-growth/backup evidence and explicit cost approval. No automatic source deletion is enabled until the retention policy is defined.
 7. Use tenant-scoped content hashes and source document identity for duplicate detection. Exact duplicates may be blocked/linked; fuzzy candidates require operator review. A document may link to no more than one successful posting transaction.
 8. Preserve existing provider policy: no new provider/credential and no AI Gateway dependency for this capability unless separately approved. Keep the current feature-specific fallback flags until a provider-policy amendment is explicitly recorded.
 
@@ -75,6 +75,9 @@ Costs and risks:
 
 ## Implementation status
 
-- WP0 discovery, product scope, architecture proposal and handoff are being documented.
-- No application code, schema migration, provider configuration, live provider call, production migration or deployment is part of ADR-027 creation.
+- WP0 discovery/product/architecture documentation merged in PR #108; CI passed.
+- WP1 intake foundation is being implemented on `feat/document-intake-foundation`: migration 058, tenant-scoped page registry, bounded upload API, idempotency, authenticated source retrieval and durable queue functions.
+- WP1 proposes a Cloud Run-specific PostgreSQL `bytea` storage amendment to ADR-017; it is not yet owner-reviewed or deployed.
+- WP1 does not include the document processing worker, AI extraction, review UI or posting. Those remain WP2–WP4.
+- No production migration, provider call or deployment has been performed.
 - Follow current status and exact next action in [DOCUMENT-TO-BOOKS-HANDOFF.md](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md).

@@ -42,6 +42,7 @@ public static class Endpoints
 
 		var api = app.MapGroup("/api");
 		PermissionFilter.Apply(api);
+		DocumentEndpoints.Map(api);
 		api.MapGet("/csrf", (HttpContext c, IAntiforgery af) => Results.Ok(new { token = af.GetAndStoreTokens(c).RequestToken })).AllowAnonymous();
 
 		api.MapGet("/voice/intent/config", (VoiceNavigationIntentService intent) =>

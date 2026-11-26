@@ -6,18 +6,20 @@
 **Architecture source of truth:** [Document ingestion pipeline](../architecture/document-ingestion-pipeline.md)  
 **Decision record:** [ADR-027](../adr/adr-027-document-to-books.md)  
 **Discovery log:** [2026-11-26 WP0 log](../implementation-log/2026-11-26-document-to-books-discovery.md)  
+**WP1 implementation log:** [2026-11-26 intake foundation](../implementation-log/2026-11-26-document-intake-wp1.md)  
 **RBOS workflow:** [RBOS UI/UX workflow](./RBOS-UI-UX-WORKFLOW.md)
 
 ## Current status
 
-**Status: WP0 — documentation PR open**
+**Status: WP1 — PR #109 open; CI failure fixes pushed; latest CI pending**
 
-- Baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c` (verified 2026-11-26).
-- Discovery implementation branch: `docs/document-to-books-foundation`.
-- Deliverables on this branch: product definition, architecture/current-state audit, ADR-027, discovery log and this handoff.
-- No application code/schema changes; no provider calls; no migrations; no deployment.
-- Documentation PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), open against `main`. Verify its live head SHA and CI status before continuing; do not rely on a stale copied SHA.
-- WP0 has documentation-only checks; no unit tests were needed.
+- WP0 baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c`; PR #108 merged successfully at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.
+- WP0 PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), merged. CI run #1284 passed frontend, backend and PostgreSQL integration jobs.
+- WP1 implementation branch: `feat/document-intake-foundation`, PR [#109](https://github.com/Vaibhav1507/retail-business-erp/pull/109), based on the merged WP0 main commit above. Fixes for the first CI failure pass were pushed on 2026-11-26; verify the latest branch head live before continuing.
+- WP1 changes so far: migration 058; tenant-scoped batch/document/page/status-history registry; bounded multipart intake API; authenticated document list/detail/page endpoints; durable queue enqueue/claim/finish functions; direction-aware role access; upload concurrency cap (2 per API instance); and minimal integration/security tests. Page bytes are validated and inserted one at a time to avoid holding a full batch in API memory.
+- CI run [#45800273323](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45800273323) completed with frontend, backend build/unit tests and migration application passing, but the document detail integration flow failed with HTTP 500 and the Docker build hit an Ubuntu Noble mirror index mismatch. Both root causes were fixed in the latest PR commits: the page reader is closed before the status-history query, and Docker retries the full APT update+install sequence with bounded backoff. The new CI result is pending verification.
+- No AI extraction worker, review UI, posting integration, production migration or deployment is included yet.
+- WP1 proposes a Cloud Run pilot storage amendment to ADR-017: bounded PostgreSQL `bytea` evidence storage because Cloud Run local container storage is ephemeral and no paid object store is configured. This is subject to PR review; no automatic deletion/retention policy has been applied.
 
 ## Product direction
 
@@ -47,14 +49,14 @@ The uploader selects Sales or Purchase before processing. The system supports a 
 ### Critical accounting gates
 1. **Sales:** current Create Invoice requires customer name/mobile. Some cash bills omit both. Do not weaken this rule silently. Before importer posting for anonymous cash memos, approve an explicit Walk-in/Cash Sale mode/party and its payment/accounting rules.
 2. **Purchases:** current Purchase Receipt posts payable and stock receipt together. An invoice alone does not prove that every item was received. The first implementation must not post stock from an invoice without explicit goods-received confirmation. Partial/unreceived cases need a separate Purchase Bill/Goods Receipt domain decision and CA review.
-3. **Evidence:** sales source documents are not retained; purchase documents are. Choose a shared tenant-scoped storage, retention, deletion and backup policy in WP1.
+3. **Evidence:** sales source documents were not retained; purchase documents were. WP1 now proposes bounded tenant-RLS PostgreSQL page storage for the Cloud Run pilot (8 MB/page, 24 MB/batch). Retention/deletion policy remains open; no automatic deletion is enabled.
 
 ## Work packages
 
 | WP | Status | Next output |
 |---|---|---|
-| WP0 — Discovery/spec | PR #108 open | Review documentation and CI; merge only with owner authorisation |
-| WP1 — Registry, storage, intake and durable jobs | Not started | Tenant-scoped document store, page/batch model, status API, durable queue, minimal flow tests |
+| WP0 — Discovery/spec | Merged in PR #108; CI passed | Complete |
+| WP1 — Registry, storage, intake and durable jobs | PR #109 open; CI fixes pushed | Verify latest CI, review storage amendment/security, then owner review/merge; queue processing moves to WP2 |
 | WP2 — Sales/purchase extraction | Not started | Handwriting-aware purchase extraction; field-level provenance/confidence; shared validation |
 | WP3 — Inbox and review UX | Not started | Mobile-first inbox, review and correction design/implementation |
 | WP4 — Posting | Not started / gated | Approved sale and purchase adapters with reconciliation |
@@ -68,7 +70,7 @@ Update this table at each PR/implementation milestone. Do not restart discovery 
 The owner requested minimal high-value tests first and broader unit-test expansion later. Follow that preference without dropping critical controls.
 
 - WP0: docs-only, no tests.
-- WP1: minimal flow/contract coverage for authenticated upload, MIME/signature/size limit, tenant isolation, idempotent retry and durable job lease/recovery.
+- WP1: two focused integration flows cover grouped-page upload, idempotent replay/conflict, status history, original-page retrieval, durable queue lease/finish and cross-tenant isolation; a schema guard checks worker-only queue permissions and forced RLS. CI must verify migration/build/test execution. Defer broad unit-test expansion.
 - WP2: small fixed document corpus and a few extraction contract tests; broad prompt/parser permutations later.
 - WP3: focused component/Playwright journeys while implementing; complete relevant inbox/review journey, responsive screenshots and Axe at the screen-group gate.
 - WP4: at least one sales and one purchase flow to committed transaction, assert key totals and source link; protect duplicate/concurrency and tenant boundaries.
@@ -87,11 +89,19 @@ The owner requested minimal high-value tests first and broader unit-test expansi
 ## Exact next action for the next chat
 
 1. Read `docs/ux/RBOS-UI-UX-WORKFLOW.md` from current main.
-2. Read this handoff, product definition, architecture note, ADR-027 and discovery log.
+2. Read this handoff, product definition, architecture note, ADR-027, WP0 discovery log and WP1 intake implementation log.
 3. Verify current main, this branch/PR and any active PRs before editing.
-4. Complete WP0 documentation PR review/CI/merge only with the owner's authorisation.
-5. Begin WP1: inspect actual document storage and worker runtime, decide tenant-scoped evidence storage/retention, then implement the smallest common document registry + upload + durable status/queue vertical slice. Do not start WP2 extraction prompt changes before the intake contract is stable.
+4. WP0 is already merged; do not repeat its discovery.
+5. Finish WP1 PR #109 CI and review. Both failures in run #45800273323 have been addressed in code; confirm the latest CI run passes and update the WP1 log. Do not merge without owner authorisation or run the migration in production.
+6. After WP1 is merged and the intake contract is stable, begin WP2: implement the document queue worker and extraction adapters. Do not start handwriting prompt tuning before the worker and durable document retrieval path are verified.
 
 ## Copy-paste continuation prompt
 
-> Continue RBOS Document-to-Books in `Vaibhav1507/retail-business-erp`. Read the current-main `docs/ux/RBOS-UI-UX-WORKFLOW.md`, then `docs/ux/DOCUMENT-TO-BOOKS-HANDOFF.md`, `docs/product/document-to-books.md`, `docs/architecture/document-ingestion-pipeline.md`, `docs/adr/adr-027-document-to-books.md` and `docs/implementation-log/2026-11-26-document-to-books-discovery.md`. Verify live main, branches, PRs, CI and current code before continuing. The goal is to let small Indian retailers upload the sales and purchase bills they already create/receive; human review is required before posting. Keep sales and purchase extraction/posting separate, use the existing direct-provider policy (no AI Gateway/new provider), protect tenant isolation and idempotent accounting. The owner wants minimal high-signal flow tests first; defer broad unit-test expansion, but never defer tenant, duplicate-posting or accounting safety checks. Start at WP1 (document registry, storage/retention decision, batch/page intake, durable queue/status and inbox foundation). Make small focused PRs, update this handoff and implementation log at every milestone, and do not merge, migrate production or deploy without explicit permission.
+> Continue RBOS Document-to-Books in `Vaibhav1507/retail-business-erp`. Read the current-main `docs/ux/RBOS-UI-UX-WORKFLOW.md`, then `docs/ux/DOCUMENT-TO-BOOKS-HANDOFF.md`, `docs/product/document-to-books.md`, `docs/architecture/document-ingestion-pipeline.md`, `docs/adr/adr-027-document-to-books.md` and `docs/implementation-log/2026-11-26-document-to-books-discovery.md` and `docs/implementation-log/2026-11-26-document-intake-wp1.md`. Verify live main, branches, PRs, CI and current code before continuing. The goal is to let small Indian retailers upload the sales and purchase bills they already create/receive; human review is required before posting. Keep sales and purchase extraction/posting separate, use the existing direct-provider policy (no AI Gateway/new provider), protect tenant isolation and idempotent accounting. The owner wants minimal high-signal flow tests first; defer broad unit-test expansion, but never defer tenant, duplicate-posting or accounting safety checks. Start at WP1 (document registry, storage/retention decision, batch/page intake, durable queue/status and inbox foundation). Make small focused PRs, update this handoff and implementation log at every milestone, and do not merge, migrate production or deploy without explicit permission.
+
+
+## CI failure remediation — 2026-11-26
+
+- The failed document-detail integration flow exposed an active PostgreSQL reader: `GetDocument` read page metadata and then ran the status-history query before closing `pagesReader`. The endpoint now closes that reader before issuing the next query. The existing high-signal integration test also asserts that both uploaded pages are present in the detail response.
+- The container build failure was an Ubuntu Noble archive mirror size/hash mismatch during mirror synchronisation. Docker now retries the complete `apt-get update` + package-install block up to five times, clearing stale package indexes and applying a bounded backoff. APT's transport-level retry alone did not address mirror metadata inconsistency.
+- Fixes are pushed to `feat/document-intake-foundation`; final CI verification is pending. Neither migration 058 nor the application has been deployed to production.
