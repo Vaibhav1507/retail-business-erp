@@ -95,7 +95,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [file] } })
     await waitFor(() => expect(calls).toContainEqual({ url: '/api/sales/invoice-image-extract', method: 'POST' }))
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Invoice details extracted|Some details could not be read/))
-    expect(await screen.findByRole('region', { name: 'Review extracted sales invoice' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Review detected items' })).toBeInTheDocument()
     expect(screen.getByLabelText('Extracted line 1 description')).toHaveValue('Samsung LED Television')
     expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue(1)
     expect(screen.getByLabelText('Extracted line 1 unit price')).toHaveValue(10000)
