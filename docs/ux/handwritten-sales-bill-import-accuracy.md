@@ -125,9 +125,10 @@ Automated tests added/updated:
 - [x] GenerateInvoice UI tests for auto-growing description, editable serial and serial carry-through to the added sale item.
 - [ ] Backend build and unit tests.
 - [ ] Frontend TypeScript, unit tests, lint and production build.
-- [ ] Full RBOS CI.
-- [ ] Focused Playwright test of handwritten bill import → review → add/discard on phone widths; inspect screenshots and Axe on the important states.
-- [ ] Inspect visual result on a real Android device. Native camera/gallery and TalkBack remain device checks.
+- [x] Full RBOS code CI (latest run #1339 still executing at this documentation update; earlier #1338 passed on the preceding commit).
+- [ ] Latest #1339 final status to be recorded when complete.
+- [ ] **Deferred by user for this P0 pass:** Playwright/E2E journey, responsive screenshots and Axe visual audit. Do not treat as passed; schedule after this focused extraction implementation is accepted.
+- [ ] Real Android visual/device verification remains deferred. Native camera/gallery and TalkBack require device checks.
 
 ## 8. Accuracy and acceptance gate
 
@@ -149,3 +150,8 @@ No source-photo-to-app accuracy percentage is claimed yet. The seven-case compar
 - Supplier invoice and other import flows remain outside this work package.
 
 No merge or production deployment is implied by this branch.
+
+
+## User scope clarification — 2026-11-26
+
+User explicitly asked to ignore E2E/Playwright for now. P0 gate is therefore backend build/unit tests, frontend type-check/unit tests/lint/production build, and PostgreSQL integration tests. Playwright, responsive screenshots, Axe and real-device checks are **deferred**, not passed and not a blocker for this focused P0 code review. The floating Chat assistant remains unchanged; automatic textarea growth remains required.
