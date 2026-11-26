@@ -34,6 +34,8 @@ public static class ApiRouteAccess
         new("POST", "/api/auth/register", ApiAccessKind.Anonymous),
         new("POST", "/api/auth/login", ApiAccessKind.Anonymous),
         new("POST", "/api/auth/login/otp", ApiAccessKind.Anonymous),
+        new("POST", "/api/auth/password-reset/request", ApiAccessKind.Anonymous),
+        new("POST", "/api/auth/password-reset/confirm", ApiAccessKind.Anonymous),
 
         // Identity-only routes must work before business bootstrap and must remain
         // available for logout even when a business membership has been revoked.
