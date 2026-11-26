@@ -148,7 +148,7 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         workerServices.AddSingleton(purchaseCapture);
         using var provider = workerServices.BuildServiceProvider();
 
-        var workerLogger = loggerFactory.CreateLogger<DocumentProcessingWorker>();
+        var workerLogger = loggerFactory.CreateLogger("DocumentProcessingWorker");
         await DocumentProcessingWorker.RunAsync(queueDataSource, provider, workerLogger, CancellationToken.None, saleId);
         await DocumentProcessingWorker.RunAsync(queueDataSource, provider, workerLogger, CancellationToken.None, purchaseId);
 
