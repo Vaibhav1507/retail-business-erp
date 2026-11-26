@@ -252,7 +252,7 @@ public sealed class SalesInvoiceCaptureService(
             ["generationConfig"] = new JsonObject
             {
                 ["responseMimeType"] = "application/json",
-                ["responseSchema"] = BuildResponseSchema(),
+                ["responseJsonSchema"] = BuildResponseJsonSchema(),
                 ["temperature"] = 0
             }
         };
@@ -338,9 +338,13 @@ public sealed class SalesInvoiceCaptureService(
         return result;
     }
 
-    public static JsonObject BuildResponseSchema()
+    public static JsonObject BuildResponseJsonSchema()
     {
-        static JsonObject Scalar(string type) => new() { ["type"] = type, ["nullable"] = true };
+        static JsonObject Scalar(string type, string description) => new()
+        {
+            ["type"] = new JsonArray(type, "null"),
+            ["description"] = description
+        };
         static JsonArray Required(params string[] names)
         {
             var required = new JsonArray();
@@ -350,50 +354,54 @@ public sealed class SalesInvoiceCaptureService(
 
         var lineProperties = new JsonObject
         {
-            ["description"] = Scalar("STRING"),
-            ["brand"] = Scalar("STRING"),
-            ["model"] = Scalar("STRING"),
+            ["description"] = Scalar("string", "Complete verbatim product text exactly as handwritten, including wrapped description lines and any identifiers."),
+            ["brand"] = Scalar("string", "Brand exactly as written, without guessing or normalizing."),
+            ["model"] = Scalar("string", "Model or part number exactly as written; do not confuse it with a serial number."),
             ["serialNumbers"] = new JsonObject
             {
-                ["type"] = "ARRAY",
-                ["items"] = new JsonObject { ["type"] = "STRING" }
+                ["type"] = "array",
+                ["description"] = "Clearly identifiable per-unit serial numbers associated with this product row. Empty when uncertain or absent.",
+                ["items"] = new JsonObject { ["type"] = "string" }
             },
-            ["hsn"] = Scalar("STRING"),
-            ["quantity"] = Scalar("NUMBER"),
-            ["unitPrice"] = Scalar("NUMBER"),
-            ["discount"] = Scalar("NUMBER"),
-            ["amount"] = Scalar("NUMBER"),
-            ["gstRate"] = Scalar("NUMBER"),
-            ["gstAmount"] = Scalar("NUMBER"),
-            ["confidence"] = Scalar("NUMBER")
+            ["hsn"] = Scalar("string", "HSN code only when visible in the HSN column."),
+            ["quantity"] = Scalar("number", "Quantity exactly as written in this row."),
+            ["unitPrice"] = Scalar("number", "Rate only when explicitly written in the Rate column; null when blank."),
+            ["discount"] = Scalar("number", "Discount only when explicitly visible."),
+            ["amount"] = Scalar("number", "Line amount only when explicitly visible in the Amount column."),
+            ["gstRate"] = Scalar("number", "GST rate only when explicitly visible."),
+            ["gstAmount"] = Scalar("number", "GST amount only when explicitly visible."),
+            ["confidence"] = Scalar("number", "Uncalibrated model confidence hint from 0 to 1; never treat as verified accuracy.")
         };
         var lineSchema = new JsonObject
         {
-            ["type"] = "OBJECT",
+            ["type"] = "object",
             ["properties"] = lineProperties,
             ["required"] = Required("description", "brand", "model", "serialNumbers", "hsn",
-                "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount", "confidence")
+                "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount", "confidence"),
+            ["additionalProperties"] = false
         };
         return new JsonObject
         {
-            ["type"] = "OBJECT",
+            ["type"] = "object",
             ["properties"] = new JsonObject
             {
-                ["invoiceNumber"] = Scalar("STRING"),
-                ["date"] = Scalar("STRING"),
-                ["customerName"] = Scalar("STRING"),
-                ["customerPhone"] = Scalar("STRING"),
-                ["subtotal"] = Scalar("NUMBER"),
-                ["taxAmount"] = Scalar("NUMBER"),
-                ["total"] = Scalar("NUMBER"),
+                ["invoiceNumber"] = Scalar("string", "Invoice number from the labelled Invoice No. field only; preserve leading zeroes."),
+                ["date"] = Scalar("string", "Date from the labelled Date field, ISO YYYY-MM-DD; use null if any part/year is unclear."),
+                ["customerName"] = Scalar("string", "Customer name only from the labelled customer/name field."),
+                ["customerPhone"] = Scalar("string", "Customer phone only from the labelled mobile field."),
+                ["subtotal"] = Scalar("number", "Subtotal only when explicitly visible."),
+                ["taxAmount"] = Scalar("number", "Total tax only when explicitly visible."),
+                ["total"] = Scalar("number", "Grand total from the printed TOTAL box, not signatory-area notes."),
                 ["lines"] = new JsonObject
                 {
-                    ["type"] = "ARRAY",
+                    ["type"] = "array",
+                    ["description"] = "Every physical product row in source order. Do not split wrapped descriptions or merge rows.",
                     ["items"] = lineSchema
                 }
             },
             ["required"] = Required("invoiceNumber", "date", "customerName", "customerPhone",
-                "subtotal", "taxAmount", "total", "lines")
+                "subtotal", "taxAmount", "total", "lines"),
+            ["additionalProperties"] = false
         };
     }
 
