@@ -100,7 +100,7 @@ public static class DocumentEndpoints
                 if (file.Length is <= 0 or > MaxPageBytes)
                     return ApiResults.Fail(413, "Each bill page must be between 1 byte and 8 MB.");
 
-                var contentType = file.ContentType?.Split(';')[0].Trim() ?? "";
+                var contentType = (file.ContentType?.Split(';')[0].Trim() ?? "").ToLowerInvariant();
                 if (!AllowedContentTypes.Contains(contentType))
                     return ApiResults.Fail(415, "Choose JPEG, PNG, WebP or PDF files.");
 
