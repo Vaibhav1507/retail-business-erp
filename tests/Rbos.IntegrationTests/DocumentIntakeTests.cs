@@ -58,6 +58,11 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(HttpStatusCode.OK, pageResponse.StatusCode);
         Assert.Equal(JpegTwo, await pageResponse.Content.ReadAsByteArrayAsync());
 
+        var details = await http.GetFromJsonAsync<JsonElement>($"/api/documents/{documentId}");
+        var history = details.GetProperty("statusHistory").EnumerateArray().ToArray();
+        Assert.Single(history);
+        Assert.Equal("Queued", history[0].GetProperty("status").GetString());
+
         // Verify the API-created durable queue row is claimable only through the worker function.
         var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
         await using var worker = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestWhatsAppWorker"]);
