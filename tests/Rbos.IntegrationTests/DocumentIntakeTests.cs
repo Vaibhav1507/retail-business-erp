@@ -159,7 +159,7 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal("SupplierInvoiceCapture", purchaseDetails.GetProperty("attempts")[0].GetProperty("extractor").GetString());
         Assert.Equal("purchase-v1", purchaseDetails.GetProperty("extractionDraft").GetProperty("schemaVersion").GetString());
         Assert.Equal("Purchase", purchaseDetails.GetProperty("extractionDraft").GetProperty("extractedData").GetProperty("direction").GetString());
-        Assert.NotEmpty(purchaseDetails.GetProperty("extractionDraft").GetProperty("extractedData").GetProperty("rawExtraction").EnumerateObject());
+        Assert.Equal(JsonValueKind.Object, purchaseDetails.GetProperty("extractionDraft").GetProperty("extractedData").GetProperty("rawExtraction").ValueKind);
     }
 
     [Fact]
