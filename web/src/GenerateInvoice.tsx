@@ -567,7 +567,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         <p className="invoice-section-subtitle">Search your catalogue or enter the item manually.</p>
 
         <div className="invoice-import-callout">
-          <span>Have a handwritten bill?</span>
+          <span className="invoice-import-prompt">Have a handwritten bill?</span>
           <SalesInvoiceCapture key={salesInvoiceCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
         </div>
 
@@ -575,7 +575,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <div className="billing-field billing-col-12 billing-rel" hidden={Boolean(salesInvoiceDraft)}>
             <label htmlFor="billing-prod">Item description *</label>
             <div className="invoice-product-entry">
-              <textarea id="billing-prod" rows={2} autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search product or type a name" value={pname}
+              <textarea id="billing-prod" className={`invoice-product-description${fieldErrors.product ? ' field-invalid' : ''}`} rows={2} autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} placeholder="Search product or type a name" value={pname}
                 onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
               <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
             </div>
