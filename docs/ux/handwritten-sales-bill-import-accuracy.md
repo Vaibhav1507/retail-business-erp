@@ -171,3 +171,13 @@ PR [#111](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is parked
 WP1/PR #109 is already merged and provides a tenant-scoped document registry/queue foundation. It remains dormant unless a queue-free source-evidence attachment is intentionally implemented. Do not enable its queue or deploy migrations solely for this synchronous extraction phase.
 
 No merge, production migration or deployment is implied by this specification.
+
+
+## 10. Initial user-supplied corpus (2026-11-26)
+
+- Ten photos were supplied and all ten are included in the initial extraction test: S01–S09 are Monika Electronics; S10 is Anil Sports & Stationery and is deliberately retained as a second-template test.
+- Provisional visual observations and uncertainty annotations: [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md).
+- The corpus note is not yet gold-standard ground truth. Amounts and descriptions are provisional visual readings; exact model/serial strings and the S10 row count/total need verification before scoring.
+- Original photos remain in the conversation attachment context and are not committed to Git. The repository stores no customer names, mobile numbers or addresses.
+- No current-RBOS extraction has been run against the ten images yet. No accuracy/latency score is claimed.
+- Next step: obtain verified labels for ambiguous source text/financial fields, then run the existing synchronous importer against the same ten samples and capture stage timings.
