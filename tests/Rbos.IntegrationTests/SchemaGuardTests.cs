@@ -82,6 +82,42 @@ public class SchemaGuardTests
     }
 
     [Fact]
+    public async Task Document_extraction_storage_is_read_only_to_app_and_worker_only_for_processing()
+    {
+        var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
+        await using var conn = new NpgsqlConnection(cfg["ConnectionStrings:RbosTestMigrator"]);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(@"
+            select
+              has_table_privilege('rbos_app', 'documents.document_extraction_attempt', 'SELECT'),
+              has_table_privilege('rbos_app', 'documents.document_extraction_draft', 'SELECT'),
+              has_table_privilege('rbos_app', 'documents.document_extraction_draft', 'INSERT'),
+              has_table_privilege('rbos_worker', 'documents.document_extraction_attempt', 'SELECT'),
+              has_table_privilege('rbos_worker', 'documents.document_extraction_draft', 'INSERT'),
+              has_function_privilege('rbos_app', 'integrations.start_document_processing(uuid,uuid,uuid)', 'EXECUTE'),
+              has_function_privilege('rbos_app', 'integrations.load_document_processing_pages(uuid,uuid,uuid,uuid)', 'EXECUTE'),
+              has_function_privilege('rbos_app', 'integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamp with time zone)', 'EXECUTE'),
+              has_function_privilege('rbos_worker', 'integrations.start_document_processing(uuid,uuid,uuid)', 'EXECUTE'),
+              has_function_privilege('rbos_worker', 'integrations.load_document_processing_pages(uuid,uuid,uuid,uuid)', 'EXECUTE'),
+              has_function_privilege('rbos_worker', 'integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamp with time zone)', 'EXECUTE'),
+              has_function_privilege('rbos_worker', 'integrations.fail_document_processing_before_start(uuid,uuid,uuid,text)', 'EXECUTE')", conn);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.True(reader.GetBoolean(0));
+        Assert.True(reader.GetBoolean(1));
+        Assert.False(reader.GetBoolean(2));
+        Assert.False(reader.GetBoolean(3));
+        Assert.False(reader.GetBoolean(4));
+        Assert.False(reader.GetBoolean(5));
+        Assert.False(reader.GetBoolean(6));
+        Assert.False(reader.GetBoolean(7));
+        Assert.True(reader.GetBoolean(8));
+        Assert.True(reader.GetBoolean(9));
+        Assert.True(reader.GetBoolean(10));
+        Assert.True(reader.GetBoolean(11));
+    }
+
+    [Fact]
     public async Task WhatsApp_queue_operations_are_worker_only()
     {
         var cfg = new ConfigurationBuilder().AddUserSecrets<Program>().AddEnvironmentVariables().Build();
