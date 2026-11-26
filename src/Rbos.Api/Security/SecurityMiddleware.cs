@@ -8,6 +8,9 @@ public sealed class SecurityMiddleware(RequestDelegate next)
     // envelope for boundaries/headers while keeping the actual file bytes capped at 12 MiB.
     public const long MaxInvoiceBodyBytes = 12L * 1024 * 1024;
     public const long MaxInvoiceMultipartBodyBytes = 13L * 1024 * 1024;
+    // Document batches are bounded below Cloud Run's request ceiling; the endpoint
+    // separately enforces 8 MB per page and 24 MB aggregate file bytes.
+    public const long MaxDocumentBatchBodyBytes = 26L * 1024 * 1024;
     /// <summary>Catalogue import carries a 12 MB file as base64 inside JSON (4/3 overhead) plus a small envelope.</summary>
     public const long MaxCatalogueImportBodyBytes = 12L * 1024 * 1024 / 3 * 4 + 16 * 1024;
     public const long MaxItemTagPhotoBodyBytes = 8L * 1024 * 1024;
@@ -31,10 +34,14 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                 var isItemTagPhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/item-tag-scan");
                 var isSalesInvoicePhotoUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/sales/invoice-image-extract");
                 var isInvoiceExtraction = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/purchases/extract");
+                var isDocumentBatchUpload = HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.Path.Equals("/api/documents/batches");
                 var contentType = ctx.Request.ContentType?.Split(';')[0].Trim();
                 var isMultipartInvoiceUpload = isInvoiceExtraction
                     && string.Equals(contentType, "multipart/form-data", StringComparison.OrdinalIgnoreCase);
+                var isMultipartDocumentUpload = isDocumentBatchUpload
+                    && string.Equals(contentType, "multipart/form-data", StringComparison.OrdinalIgnoreCase);
                 var limit = isItemTagPhotoUpload || isSalesInvoicePhotoUpload ? MaxItemTagPhotoBodyBytes
+                    : isMultipartDocumentUpload ? MaxDocumentBatchBodyBytes
                     : isMultipartInvoiceUpload ? MaxInvoiceMultipartBodyBytes
                     : isInvoiceExtraction ? MaxInvoiceBodyBytes
                     : ctx.Request.Path.Equals("/api/products/import/read") ? MaxCatalogueImportBodyBytes
@@ -66,7 +73,7 @@ public sealed class SecurityMiddleware(RequestDelegate next)
                         return;
                     }
                 }
-                else if (hasBody && !ctx.Request.HasJsonContentType() && !isMultipartInvoiceUpload)
+                else if (hasBody && !ctx.Request.HasJsonContentType() && !isMultipartInvoiceUpload && !isMultipartDocumentUpload)
                 {
                     ctx.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;
                     await ctx.Response.WriteAsJsonAsync(new { error = "Content-Type must be application/json." });
