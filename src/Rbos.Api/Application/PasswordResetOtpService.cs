@@ -45,8 +45,8 @@ public sealed class SmtpEmailOtpSender(IConfiguration configuration) : IEmailOtp
         using var client = new SmtpClient();
         client.Timeout = Math.Clamp(configuration.GetValue("Email:Smtp:TimeoutSeconds", 15), 5, 60) * 1000;
         await client.ConnectAsync(Host!, configuration.GetValue("Email:Smtp:Port", 587), security, cancellationToken);
-        await client.AuthenticateAsync(configuration["Email:Smtp:Username"], configuration["Email:Smtp:Password"], cancellationToken);
-        await client.SendAsync(message, cancellationToken);
+        await client.AuthenticateAsync(configuration["Email:Smtp:Username"]!, configuration["Email:Smtp:Password"]!, cancellationToken);
+        await client.SendAsync(new SmtpSendRequest(message), cancellationToken);
         await client.DisconnectAsync(true, cancellationToken);
     }
 }
