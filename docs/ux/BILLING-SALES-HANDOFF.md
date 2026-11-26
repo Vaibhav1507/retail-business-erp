@@ -83,3 +83,49 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - Product-tag busy/status/warning/error feedback now occupies a full-width row below the description + camera row and above Brand/Model/Quantity fields.
 - Feedback is no longer absolutely positioned over the form, and the photo buttons retain their existing sizes and actions.
 - No extraction, validation, invoice, camera/gallery, or API behaviour changes. Focused unit tests assert the feedback component wrappers; frontend CI is the implementation gate. Android screenshot review remains pending.
+
+
+## P0 — handwritten sales-bill extraction accuracy (2026-11-26)
+
+**Current implementation branch:** `feat/handwritten-sales-import-p0`  
+**Scope:** Existing synchronous Generate Invoice handwritten sales-bill import only. No worker, bulk inbox, Add Purchase, item-tag persistence or catalogue import work.
+
+### Corpus/comparison state
+
+- All seven app extraction runs shared so far have a consolidated record: [seven-bill comparison v1](../quality/handwritten-sales-seven-bill-comparison-v1.md).
+- Cases: ANIL-001 ₹5,000; ANIL-002 ₹10,020; MONIKA-001 ₹17,500; MONIKA-002 ₹11,000; MONIKA-003 (source total needs verification); MONIKA-004 ₹17,400; MONIKA-005 ₹15,800.
+- This is seven complete comparison records for the supplied app runs, **not** a verified gold-standard dataset. Some values remain ambiguous (notably MONIKA-003 amount and specific model/serial characters); confirm before scoring accuracy.
+- Eleven handwritten source bills are tracked overall (9 Monika + 2 Anil). The remaining two Monika source bills from the initial batch do not yet have app extraction screenshots/results.
+- Original bills and customer PII are not committed to Git.
+
+### User-approved UX constraints
+
+- Keep the existing RBOS Create Invoice layout/design system.
+- Floating Chat button must remain exactly as-is.
+- Product description fields automatically grow to fit content. No manual resize handle, no fixed max height or internal scroll for long text. The normal item entry has a 76px minimum; imported descriptions use a compact minimum and grow with text.
+- No redesigned screen or worker/polling experience.
+
+### P0 implementation changes on this branch
+
+- Sales extraction prompt now preserves full wrapped verbatim description and distinguishes labelled invoice number/date/customer/total fields.
+- Gemini request uses `generationConfig.responseJsonSchema` (JSON Schema nullable unions) with typed required output including the serialNumbers array.
+- Sales Gemini model configuration is separate from Item Tag configuration; falls back to previous Invoice model settings if no sales-specific setting is configured.
+- Sales Groq fallback can be independently configured; when absent, it inherits the old Invoice fallback flag so rollout policy is unchanged.
+- Server normalizer preserves bounded descriptions and serial arrays, de-duplicates serials and keeps a legacy singular serial response compatible.
+- Identical extraction warnings consolidated by category.
+- Extracted review displays editable optional serial number(s); reviewed serials are passed into the existing sale-line serial array and checked for length/count/duplicates before add.
+- Existing Generate Invoice posting, GST/stock/customer/offline/tenant rules and current chat launcher are not intentionally changed.
+- Product descriptions in manual entry and extracted review use auto-grow textareas with no manual resizing.
+
+### Authoritative design/engineering notes
+
+- [P0 implementation/design contract](./handwritten-sales-bill-import-accuracy.md).
+- [Seven-case source-to-app comparison](../quality/handwritten-sales-seven-bill-comparison-v1.md).
+- [Updated handwritten-import UX decision](./invoice-handwritten-import-ux-refinement.md).
+
+### Validation and delivery state
+
+- Focused unit/component tests have been added for JSON schema/serial preservation, sales-vs-tag provider settings, serial carry-through and auto-growing description text.
+- Backend/frontend CI, full RBOS CI and focused Playwright/visual/Axe verification remain pending on this implementation branch at handoff.
+- No live AI-provider extraction against the seven original bills has been triggered from GitHub; the seven comparisons use the user-supplied app screenshots.
+- No merge, migration or production deployment has been performed. PR #111 remains parked as Draft; PR #112 remains the earlier documentation-only scope draft.
