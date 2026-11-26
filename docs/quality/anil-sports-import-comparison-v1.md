@@ -20,7 +20,7 @@ The two bills must remain separate test cases. The second case is not a retry of
 
 - RBOS summary: 10 detected items.
 - App-extracted source bill number: 192.
-- App-extracted date: 20/11/24.
+- App-extracted date: 20/11/24. Source date/invoice-number transcription still needs direct verification because the header writing is soft/partly obscured.
 - App-extracted handwritten total: ₹5,000.
 - App displayed the same warning repeatedly: “Some line quantities or prices are unreadable. Review and enter them manually.”
 - Visible line examples:
