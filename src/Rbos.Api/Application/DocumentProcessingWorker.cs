@@ -170,10 +170,22 @@ public static class DocumentProcessingWorker
 
             if (started is null)
             {
-                try { await FinishLegacyQueueAsync(queueDataSource, item, null, ct); }
+                var canRetryBeforeStart = IsRetryable(ex) && item.AttemptCount < MaxAttempts;
+                var retryBeforeStart = canRetryBeforeStart
+                    ? DateTimeOffset.UtcNow.AddSeconds(Math.Min(3600, 30 * Math.Pow(2, Math.Max(0, item.AttemptCount - 1))))
+                    : (DateTimeOffset?)null;
+                try
+                {
+                    if (canRetryBeforeStart)
+                        await FinishLegacyQueueAsync(queueDataSource, item, retryBeforeStart, ct);
+                    else
+                        await FailBeforeStartAsync(queueDataSource, item, SafeErrorCode(ex), ct);
+                }
                 catch (Exception finishError)
                 {
-                    logger.LogError(finishError, "Could not retire invalid document lease {DocumentId}", item.DocumentId);
+                    // If the database is unavailable the lease will expire and be reclaimed;
+                    // never silently delete an unprocessed document from the queue.
+                    logger.LogError(finishError, "Could not complete pre-extraction failure for document {DocumentId}", item.DocumentId);
                 }
                 return;
             }
@@ -286,6 +298,19 @@ public static class DocumentProcessingWorker
         var value = await command.ExecuteScalarAsync(ct);
         if (value is not true)
             throw new InvalidOperationException("The document processing lease expired before the result could be saved.");
+    }
+
+    static async Task FailBeforeStartAsync(
+        NpgsqlDataSource source, Claimed item, string safeErrorCode, CancellationToken ct)
+    {
+        await using var conn = await source.OpenConnectionAsync(ct);
+        await using var command = new NpgsqlCommand(
+            "select integrations.fail_document_processing_before_start(@tenant, @document, @lease, @code)", conn);
+        command.Parameters.AddWithValue("tenant", item.TenantId);
+        command.Parameters.AddWithValue("document", item.DocumentId);
+        command.Parameters.AddWithValue("lease", item.LeaseToken);
+        command.Parameters.AddWithValue("code", safeErrorCode);
+        await command.ExecuteScalarAsync(ct);
     }
 
     static async Task FinishLegacyQueueAsync(
