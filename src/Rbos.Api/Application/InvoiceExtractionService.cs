@@ -197,7 +197,18 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         {
             var desc = Clip(Str(n?["description"])) ?? "";
             var qty = Num(n?["quantity"]); var rate = Num(n?["unitCost"]); var amt = Num(n?["amount"]); var lineGst = Num(n?["gstAmount"]);
-            if (qty > 0 && amt > 0 && !(rate is not null && lineGst > 0 && Math.Abs(rate.Value * qty.Value + lineGst.Value - amt.Value) <= 1m) && (rate is null || Math.Abs(rate.Value * qty.Value - amt.Value) > 1m)) { if (rate is not null) warnings.Add($"\"{desc}\": rate {rate:0.00} x {qty:0.##} differs from line amount {amt:0.00} (discount or untagged GST). Cost set from the line amount."); rate = Math.Round(amt.Value / qty.Value, 4); }
+            if (retainLegacyEvidence && qty > 0 && amt > 0 && !(rate is not null && lineGst > 0 && Math.Abs(rate.Value * qty.Value + lineGst.Value - amt.Value) <= 1m) && (rate is null || Math.Abs(rate.Value * qty.Value - amt.Value) > 1m))
+            {
+                // Preserve the legacy New Stock Entry behavior. Document-to-Books must not
+                // silently derive a missing handwritten unit cost from quantity and amount.
+                if (rate is not null)
+                    warnings.Add($"\"{desc}\": rate {rate:0.00} x {qty:0.##} differs from line amount {amt:0.00} (discount or untagged GST). Cost set from the line amount.");
+                rate = Math.Round(amt.Value / qty.Value, 4);
+            }
+            else if (!retainLegacyEvidence && qty > 0 && amt > 0 && rate is null)
+            {
+                warnings.Add($"\"{desc}\": unit cost was not readable on the bill. Check the original before recording this purchase.");
+            }
             var match = Best(desc, products);
             if (match is null) warnings.Add($"Choose a product for \"{desc}\".");
             var confidence = Num(n?["confidence"]);
@@ -248,7 +259,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             supplierName, supplier?.Id, invoiceNumber, date, total, subtotal, tax,
             lines, warnings, selectedProvider, selectedModel, "purchase-v1",
             CleanFieldConfidence(parsed?["fieldConfidence"]),
-            parsed is JsonObject rawExtraction ? (JsonObject)rawExtraction.DeepClone() : new JsonObject()));
+            CleanRawExtraction(parsed)));
     }
 
     public async Task<(string Mime, byte[] Bytes)?> FileAsync(Guid uid, Guid receiptId, CancellationToken ct)
@@ -343,6 +354,39 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
                 }
             }
         };
+    }
+
+    static JsonObject CleanRawExtraction(JsonNode? source)
+    {
+        var result = new JsonObject();
+        foreach (var (field, max) in new[] { ("supplierName", 120), ("invoiceNumber", 60), ("date", 40) })
+            result[field] = Clip(Str(source?[field]), max);
+        foreach (var field in new[] { "total", "subtotal", "taxAmount" })
+        {
+            var value = Num(source?[field]);
+            result[field] = value is >= 0 and <= 100_000_000m ? value : null;
+        }
+
+        result["fieldConfidence"] = CleanFieldConfidence(source?["fieldConfidence"]);
+        var lines = new JsonArray();
+        if (source?["lines"] is JsonArray sourceLines)
+        {
+            foreach (var item in sourceLines.OfType<JsonObject>().Take(100))
+            {
+                var line = new JsonObject();
+                foreach (var (field, max) in new[] { ("description", 240), ("category", 60), ("brand", 80) })
+                    line[field] = Clip(Str(item[field]), max);
+                foreach (var field in new[] { "quantity", "unitCost", "amount", "gstAmount", "confidence" })
+                {
+                    var value = Num(item[field]);
+                    var max = field == "confidence" ? 1m : 100_000_000m;
+                    line[field] = value is >= 0 && value <= max ? value : null;
+                }
+                lines.Add(line);
+            }
+        }
+        result["lines"] = lines;
+        return result;
     }
 
     static JsonObject CleanFieldConfidence(JsonNode? source)
