@@ -6,7 +6,9 @@
 - WP0 documentation PR #108 merged into `main` at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.
 - PR #108 CI run #1284 completed successfully: frontend, backend and PostgreSQL integration jobs passed.
 - WP1 branch: `feat/document-intake-foundation`, created from the merged WP0 baseline.
-- WP1 implementation PR has not yet been opened. Recheck branch SHA and changed files before creating it.
+- WP1 implementation PR: [#109 — Document-to-Books intake foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/109), open against `main`.
+- Latest head when this log was updated: check PR #109 live before continuing.
+- CI run #45798154794 was in progress; verify its final status live.
 
 ## Storage decision proposal
 
@@ -47,6 +49,7 @@ Migration `058_document_intake_foundation.sql` adds:
 - CSRF protection remains active through the existing API middleware.
 - Content type and file signatures are checked (JPEG, PNG, WebP, PDF).
 - Upload requires an `Idempotency-Key`; same key + same payload replays the original batch; same key + different content returns 409.
+- Page bytes are validated first, then re-opened and inserted one page at a time inside the tenant transaction; each page buffer is cleared after insert to bound memory.
 - Page bytes, metadata and queue enqueue are committed in one tenant transaction.
 - No extraction provider is called and no accounting transaction is posted.
 
@@ -88,8 +91,8 @@ Broad unit-test expansion is intentionally deferred as requested. CI has not yet
 - [x] Add explicit route access and upload body limits.
 - [x] Add minimal integration flow tests for upload/replay/queue and tenant isolation.
 - [x] Update product/architecture/ADR/handoff with the pilot storage decision proposal.
+- [x] Open focused WP1 PR #109.
 - [ ] Run CI on WP1 branch and fix failures.
-- [ ] Open focused WP1 PR after checks pass.
 - [ ] Owner review/merge authorisation.
 - [ ] Apply migration only through approved deployment process.
 - [ ] Begin WP2 worker + extraction after WP1 is merged and deployed.
