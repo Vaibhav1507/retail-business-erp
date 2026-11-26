@@ -158,7 +158,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
     try {
       await api('POST', '/auth/password-reset/request', { email: recoveryEmail.trim() })
       setRecoverySent(true)
-      setRecoveryMessage('If an account matches this email, a 6-digit code has been sent. Check your inbox and spam folder.')
+      setRecoveryMessage('If an account matches this email and email delivery is available, a 6-digit code will be sent. Check your inbox and spam folder.')
     } catch (err) {
       setRecoveryError(err instanceof Error ? err.message : 'Could not request a password reset.')
     } finally {
@@ -227,6 +227,8 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
                   setRecoveryCode('')
                   setRecoveryMessage('')
                   setRecoveryError('')
+                  setNewPassword('')
+                  setConfirmNewPassword('')
                 }}
                 required
                 placeholder="you@example.com"
@@ -250,13 +252,13 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
                 </label>
                 <label className="auth-field">
                   <span>New password</span>
-                  <input type="password" autoComplete="new-password" value={newPassword}
+                  <input type="password" maxLength={128} autoComplete="new-password" value={newPassword}
                     onChange={e => setNewPassword(e.target.value)} required />
                 </label>
                 <p className="auth-field-hint">At least 12 characters, including uppercase, lowercase, a number and a symbol.</p>
                 <label className="auth-field">
                   <span>Confirm new password</span>
-                  <input type="password" autoComplete="new-password" value={confirmNewPassword}
+                  <input type="password" maxLength={128} autoComplete="new-password" value={confirmNewPassword}
                     onChange={e => setConfirmNewPassword(e.target.value)} required />
                 </label>
               </>

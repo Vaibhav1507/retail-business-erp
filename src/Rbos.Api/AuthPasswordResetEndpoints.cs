@@ -46,7 +46,7 @@ public static class AuthPasswordResetEndpoints
             var email = CleanEmail(request.Email);
             if (email is null || request.Code is null || request.Code.Length != 6 ||
                 request.Code.Any(character => !char.IsAsciiDigit(character)) ||
-                string.IsNullOrWhiteSpace(request.NewPassword))
+                string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length > 128)
                 return ApiResults.Fail(400, "Enter your email, six-digit code and a valid new password.");
 
             var user = await users.FindByEmailAsync(email);
