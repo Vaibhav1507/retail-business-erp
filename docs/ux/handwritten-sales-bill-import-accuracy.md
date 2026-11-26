@@ -189,3 +189,13 @@ No merge, production migration or deployment is implied by this specification.
 - ANIL-001 app output: 10 detected lines and total ₹5,000; repeated duplicate quantity/price warning text; at least one likely quantity misread; blank rate fields must be judged against the source (whose Rate column appears blank); suspicious customer-name mapping requires verification.
 - ANIL-002 app output: 13 detected lines; app total ₹10,000 while the source's main TOTAL box appears ₹10,020 and a separate ₹10,000 annotation is present near the signatory area. Keep both values as separate source observations until user/accounting intent is verified. One visible Crown line appears misread (source qty 10 / rate ₹80 / amount ₹800; app qty 2 / rate ₹80 / amount ₹160). Other card values are partly cropped.
 - The source/app screenshots remain in the conversation and are not committed to Git. The comparison is provisional, not a gold-standard transcription. Do not calculate an accuracy percentage yet.
+
+
+## 12. First Monika app comparison — S01 (2026-11-26)
+
+- Detailed record: [MONIKA-001 source/app comparison](../quality/monika-sales-import-comparison-v1.md).
+- Source total/line amount ₹17,500 and quantity 1 match the app. Description/brand are materially misread (“Vultas bike lamp” vs source “Voltas Beko WM”). Model string differs and needs exact verification.
+- Source date appears 6-11-2026; app reports 6-11-2020. App invoice number 153 appears inconsistent with the red source number (approximately 454; verify).
+- Source includes two serial/model-like identifiers (one looks like `1200 644A 76A 112258`, a separate one like `26111412945`). The review card exposes no serial/identifier field and neither value is displayed. Their exact roles must be labelled; preserve both rather than guessing.
+- Source Rate column appears blank but app populates ₹17,500 unit price. Track whether this is a source-transcribed or derived amount/quantity value.
+- The 90% confidence label did not prevent these errors and is not calibrated evidence of correctness.
