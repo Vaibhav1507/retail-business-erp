@@ -62,8 +62,9 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         Guid leaseToken;
         await using (var claim = new NpgsqlCommand(@"
             select document_id, lease_token
-              from integrations.claim_document_processing(1, 300)", worker))
+              from integrations.claim_document_processing(1, 300, @document)", worker))
         {
+            claim.Parameters.AddWithValue("document", documentId);
             await using var reader = await claim.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             claimedId = reader.GetGuid(0);
