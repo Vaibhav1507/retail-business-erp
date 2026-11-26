@@ -129,3 +129,8 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - Backend/frontend CI, full RBOS CI and focused Playwright/visual/Axe verification remain pending on this implementation branch at handoff.
 - No live AI-provider extraction against the seven original bills has been triggered from GitHub; the seven comparisons use the user-supplied app screenshots.
 - No merge, migration or production deployment has been performed. PR #111 remains parked as Draft; PR #112 remains the earlier documentation-only scope draft.
+
+
+### P0 validation scope clarification — 2026-11-26
+
+User requested to ignore E2E/Playwright for now. Current P0 validation gate is backend build/unit tests, frontend type-check/unit tests/lint/production build and PostgreSQL integration tests. Playwright, screenshots, Axe and real-device validation are explicitly deferred (not passed). Continue with core code CI only.
