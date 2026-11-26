@@ -23,9 +23,10 @@ public static class DocumentProcessingWorker
         NpgsqlDataSource queueDataSource,
         IServiceProvider services,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        Guid? onlyDocumentId = null)
     {
-        var claimed = await ClaimAsync(queueDataSource, ct);
+        var claimed = await ClaimAsync(queueDataSource, ct, onlyDocumentId);
         if (claimed.Count == 0) return;
 
         logger.LogInformation("Document processing worker claimed {Count} documents", claimed.Count);
@@ -36,14 +37,15 @@ public static class DocumentProcessingWorker
         }
     }
 
-    static async Task<List<Claimed>> ClaimAsync(NpgsqlDataSource source, CancellationToken ct)
+    static async Task<List<Claimed>> ClaimAsync(NpgsqlDataSource source, CancellationToken ct, Guid? onlyDocumentId)
     {
         await using var conn = await source.OpenConnectionAsync(ct);
         await using var command = new NpgsqlCommand(
-            "select document_id, tenant_id, actor_user_id, lease_token, attempt_count from integrations.claim_document_processing(@limit, @lease)",
+            "select document_id, tenant_id, actor_user_id, lease_token, attempt_count from integrations.claim_document_processing(@limit, @lease, @document)",
             conn);
-        command.Parameters.AddWithValue("limit", MaxJobsPerRun);
+        command.Parameters.AddWithValue("limit", onlyDocumentId is null ? MaxJobsPerRun : 1);
         command.Parameters.AddWithValue("lease", 900);
+        command.Parameters.AddWithValue("document", (object?)onlyDocumentId ?? DBNull.Value);
         await using var reader = await command.ExecuteReaderAsync(ct);
         var result = new List<Claimed>();
         while (await reader.ReadAsync(ct))
