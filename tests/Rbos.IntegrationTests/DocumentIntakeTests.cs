@@ -3,7 +3,11 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
+using Rbos.Api.Application;
+using Rbos.Api.Persistence;
 
 namespace Rbos.IntegrationTests;
 
