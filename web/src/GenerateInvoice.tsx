@@ -571,8 +571,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <SalesInvoiceCapture key={salesInvoiceCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
         </div>
 
-        <div className="billing-grid invoice-product-editor" hidden={Boolean(salesInvoiceDraft)}>
-          <div className="billing-field billing-col-12 billing-rel">
+        <div className="billing-grid invoice-product-editor">
+          <div className="billing-field billing-col-12 billing-rel" hidden={Boolean(salesInvoiceDraft)}>
             <label htmlFor="billing-prod">Item description *</label>
             <div className="invoice-product-entry">
               <textarea id="billing-prod" rows={2} autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} className={fieldErrors.product ? 'field-invalid' : ''} placeholder="Search product or type a name" value={pname}
@@ -585,7 +585,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             </ul>}
           </div>
 
-          <div className={`invoice-electronics-fields invoice-brand-model billing-col-12${isElectronicsBusiness ? '' : ' invoice-brand-only'}`}>
+          <div className={`invoice-electronics-fields invoice-brand-model billing-col-12${isElectronicsBusiness ? '' : ' invoice-brand-only'}`} hidden={Boolean(salesInvoiceDraft)}>
             <div className="billing-field">
               <label htmlFor="billing-brand">Brand</label>
               <input id="billing-brand" autoComplete="off" value={brandText} onChange={e => setBrandText(e.target.value)} />
