@@ -14,6 +14,7 @@ on:
           - buy
           - auth
           - invoice-import
+          - assistant
   pull_request:
     paths:
       - "web/src/Procurement.tsx"
