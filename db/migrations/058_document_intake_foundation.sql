@@ -81,18 +81,29 @@ create table documents.document_status_history (
 create index ix_document_status_history_document
   on documents.document_status_history (tenant_id, document_id, occurred_at);
 
-do $
-declare t text;
-begin
-  foreach t in array array['documents.document_batch','documents.business_document','documents.document_page','documents.document_status_history'] loop
-    execute format('alter table %s enable row level security', t);
-    execute format('alter table %s force row level security', t);
-    execute format(
-      'create policy tenant_isolation on %s for all to rbos_app using (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id)) with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id))',
-      t
-    );
-  end loop;
-end $;
+alter table documents.document_batch enable row level security;
+alter table documents.document_batch force row level security;
+create policy tenant_isolation on documents.document_batch for all to rbos_app
+  using (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id))
+  with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id));
+
+alter table documents.business_document enable row level security;
+alter table documents.business_document force row level security;
+create policy tenant_isolation on documents.business_document for all to rbos_app
+  using (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id))
+  with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id));
+
+alter table documents.document_page enable row level security;
+alter table documents.document_page force row level security;
+create policy tenant_isolation on documents.document_page for all to rbos_app
+  using (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id))
+  with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id));
+
+alter table documents.document_status_history enable row level security;
+alter table documents.document_status_history force row level security;
+create policy tenant_isolation on documents.document_status_history for all to rbos_app
+  using (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id))
+  with check (tenant_id = core.current_tenant_id() and core.is_active_member(tenant_id));
 
 create policy document_status_history_owner_only
   on documents.document_status_history
@@ -103,7 +114,7 @@ create or replace function documents.record_document_status()
 returns trigger
 language plpgsql security definer
 set search_path = pg_catalog, documents, core
-as $
+as $function$
 begin
   if tg_op = 'INSERT' or new.status is distinct from old.status then
     insert into documents.document_status_history
@@ -113,7 +124,7 @@ begin
   end if;
   return new;
 end;
-$;
+$function$;
 revoke all on function documents.record_document_status() from public;
 create trigger document_status_history_after_write
   after insert or update of status on documents.business_document
