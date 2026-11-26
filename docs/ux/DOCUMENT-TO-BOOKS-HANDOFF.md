@@ -10,14 +10,14 @@
 
 ## Current status
 
-**Status: WP0 — documentation PR open**
+**Status: WP1 — document intake implementation in progress; PR not yet opened**
 
-- Baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c` (verified 2026-11-26).
-- Discovery implementation branch: `docs/document-to-books-foundation`.
-- Deliverables on this branch: product definition, architecture/current-state audit, ADR-027, discovery log and this handoff.
-- No application code/schema changes; no provider calls; no migrations; no deployment.
-- Documentation PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), open against `main`. Verify its live head SHA and CI status before continuing; do not rely on a stale copied SHA.
-- WP0 has documentation-only checks; no unit tests were needed.
+- WP0 baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c`; PR #108 merged successfully at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.
+- WP0 PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), merged. CI run #1284 passed frontend, backend and PostgreSQL integration jobs.
+- WP1 implementation branch: `feat/document-intake-foundation`, based on the merged main commit above. Current implementation commit must be rechecked live before continuing.
+- WP1 changes so far: migration 058; tenant-scoped batch/document/page registry; bounded multipart intake API; authenticated document list/detail/page endpoints; durable queue enqueue/claim/finish functions; route authorization and request-size limits; two high-signal integration tests.
+- No AI extraction worker, review UI, posting integration, production migration or deployment is included yet.
+- WP1 proposes a Cloud Run pilot storage amendment to ADR-017: bounded PostgreSQL `bytea` evidence storage because Cloud Run local container storage is ephemeral and no paid object store is configured. This is subject to PR review; no automatic deletion/retention policy has been applied.
 
 ## Product direction
 
@@ -47,14 +47,14 @@ The uploader selects Sales or Purchase before processing. The system supports a 
 ### Critical accounting gates
 1. **Sales:** current Create Invoice requires customer name/mobile. Some cash bills omit both. Do not weaken this rule silently. Before importer posting for anonymous cash memos, approve an explicit Walk-in/Cash Sale mode/party and its payment/accounting rules.
 2. **Purchases:** current Purchase Receipt posts payable and stock receipt together. An invoice alone does not prove that every item was received. The first implementation must not post stock from an invoice without explicit goods-received confirmation. Partial/unreceived cases need a separate Purchase Bill/Goods Receipt domain decision and CA review.
-3. **Evidence:** sales source documents are not retained; purchase documents are. Choose a shared tenant-scoped storage, retention, deletion and backup policy in WP1.
+3. **Evidence:** sales source documents were not retained; purchase documents were. WP1 now proposes bounded tenant-RLS PostgreSQL page storage for the Cloud Run pilot (8 MB/page, 24 MB/batch). Retention/deletion policy remains open; no automatic deletion is enabled.
 
 ## Work packages
 
 | WP | Status | Next output |
 |---|---|---|
-| WP0 — Discovery/spec | PR #108 open | Review documentation and CI; merge only with owner authorisation |
-| WP1 — Registry, storage, intake and durable jobs | Not started | Tenant-scoped document store, page/batch model, status API, durable queue, minimal flow tests |
+| WP0 — Discovery/spec | Merged in PR #108; CI passed | Complete |
+| WP1 — Registry, storage, intake and durable jobs | In progress on `feat/document-intake-foundation` | Complete CI validation, review API/security/migration, open focused PR; queue processing moves to WP2 |
 | WP2 — Sales/purchase extraction | Not started | Handwriting-aware purchase extraction; field-level provenance/confidence; shared validation |
 | WP3 — Inbox and review UX | Not started | Mobile-first inbox, review and correction design/implementation |
 | WP4 — Posting | Not started / gated | Approved sale and purchase adapters with reconciliation |
@@ -68,7 +68,7 @@ Update this table at each PR/implementation milestone. Do not restart discovery 
 The owner requested minimal high-value tests first and broader unit-test expansion later. Follow that preference without dropping critical controls.
 
 - WP0: docs-only, no tests.
-- WP1: minimal flow/contract coverage for authenticated upload, MIME/signature/size limit, tenant isolation, idempotent retry and durable job lease/recovery.
+- WP1: two focused integration flows cover grouped-page upload, idempotent replay, original-page retrieval, durable queue lease/finish and cross-tenant isolation. CI must still verify migration/build/test execution. Add only any missing critical flow test; defer broad unit-test expansion.
 - WP2: small fixed document corpus and a few extraction contract tests; broad prompt/parser permutations later.
 - WP3: focused component/Playwright journeys while implementing; complete relevant inbox/review journey, responsive screenshots and Axe at the screen-group gate.
 - WP4: at least one sales and one purchase flow to committed transaction, assert key totals and source link; protect duplicate/concurrency and tenant boundaries.
@@ -89,8 +89,9 @@ The owner requested minimal high-value tests first and broader unit-test expansi
 1. Read `docs/ux/RBOS-UI-UX-WORKFLOW.md` from current main.
 2. Read this handoff, product definition, architecture note, ADR-027 and discovery log.
 3. Verify current main, this branch/PR and any active PRs before editing.
-4. Complete WP0 documentation PR review/CI/merge only with the owner's authorisation.
-5. Begin WP1: inspect actual document storage and worker runtime, decide tenant-scoped evidence storage/retention, then implement the smallest common document registry + upload + durable status/queue vertical slice. Do not start WP2 extraction prompt changes before the intake contract is stable.
+4. WP0 is already merged; do not repeat its discovery.
+5. Finish WP1 PR review and CI for `feat/document-intake-foundation`. Do not merge without owner authorisation or run the migration in production.
+6. After WP1 is merged and the intake contract is stable, begin WP2: implement the document queue worker and extraction adapters. Do not start handwriting prompt tuning before the worker and durable document retrieval path are verified.
 
 ## Copy-paste continuation prompt
 
