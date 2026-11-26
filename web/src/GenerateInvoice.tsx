@@ -35,9 +35,10 @@ const itemTotal = (i: Item) => Math.round(i.quantity * i.unitPrice * 100) / 100 
 const msg = (e: unknown) => (e instanceof ApiError && e.status >= 500 ? 'Server error. Retrying is safe.' : e instanceof Error ? e.message : 'Something went wrong')
 
 function AutoGrowTextarea({
-  value, onChange, className, ariaLabel, placeholder, minHeight = 52, rows = 1,
+  id, value, onChange, className, ariaLabel, placeholder, minHeight = 52, rows = 1,
   required = false, ariaInvalid, onFocus, onBlur, autoComplete = 'off'
 }: {
+  id?: string
   value: string
   onChange: (value: string) => void
   className?: string
@@ -58,8 +59,8 @@ function AutoGrowTextarea({
     element.style.height = 'auto'
     element.style.height = `${Math.max(minHeight, element.scrollHeight)}px`
   }, [value, minHeight])
-  return <textarea ref={ref} rows={rows} className={className} aria-label={ariaLabel}
-    aria-required={required || undefined} aria-invalid={ariaInvalid || undefined}
+  return <textarea id={id} ref={ref} rows={rows} className={className} aria-label={ariaLabel}
+    required={required} aria-invalid={ariaInvalid || undefined}
     autoComplete={autoComplete} placeholder={placeholder} value={value}
     onChange={event => onChange(event.target.value)} onFocus={onFocus} onBlur={onBlur}
     style={{ minHeight, resize: 'none', overflowY: 'hidden' }} />
@@ -269,7 +270,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         [field]: ['quantity', 'unitPrice', 'discount'].includes(field)
           ? (value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null)
           : field === 'serialNumbers'
-            ? value.split(/[\\r\\n,;]+/).map(part => part.trim()).filter(Boolean)
+            ? value.split(/[\r\n,;]+/).map(part => part.trim()).filter(Boolean)
             : value
       })
     }) : current)
@@ -286,7 +287,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       setError('Complete a description or model number, quantity and unit price for every extracted line before adding them to the bill.')
       return
     }
-    const knownSerials = new Set(items.flatMap(item => item.serials).map(value => value.trim().toLowerCase()))
+    const knownSerials = new Set(items.flatMap(item => [...item.serials, ...item.imei1s, ...item.imei2s]).map(value => value.trim().toLowerCase()))
     for (const line of salesInvoiceDraft.lines) {
       const serials = (line.serialNumbers ?? []).map(value => value.trim()).filter(Boolean)
       if (serials.some(value => value.length < 4 || value.length > 40 || /\\s/.test(value)) || serials.length > (line.quantity ?? 0)) {
@@ -696,7 +697,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             {salesInvoiceDraft.lines.map((line, index) => <article className="invoice-extracted-line" key={index}>
               <div className="invoice-extracted-line-heading"><strong>Item {index + 1}</strong>{line.confidence != null && <span>{Math.round(line.confidence * 100)}% read confidence</span>}</div>
               <label>Product description (as written)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' description'} className="invoice-extracted-description" value={line.description ?? ''} minHeight={48} onChange={value => updateCapturedLine(index, 'description', value)} /></label>
-              <label>Serial number(s) (optional)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' serial numbers'} className="invoice-extracted-serials" value={(line.serialNumbers ?? []).join('\\n')} minHeight={44} placeholder="One serial number per line" onChange={value => updateCapturedLine(index, 'serialNumbers', value)} /></label>
+              <label>Serial number(s) (optional)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' serial numbers'} className="invoice-extracted-serials" value={(line.serialNumbers ?? []).join('\n')} minHeight={44} placeholder="One serial number per line" onChange={value => updateCapturedLine(index, 'serialNumbers', value)} /></label>
               <div className="invoice-extracted-line-values">
                 <label>Qty<input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></label>
                 <label>Unit price (₹)<input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></label>
