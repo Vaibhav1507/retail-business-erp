@@ -40,6 +40,13 @@ on:
       - "web/e2e/authentication-visual.spec.ts"
       - "docs/ux/authentication-onboarding-pixel-accurate-plan.md"
       - ".github/workflows/visual-audit.yml"
+      - 'web/src/NavigationAssistant.tsx'
+      - 'web/src/navigation-assistant.css'
+      - 'web/src/NavigationAssistant.test.tsx'
+      - 'web/src/speech-provider.ts'
+      - 'web/src/speech-provider.test.ts'
+      - 'web/e2e/assistant-visual.spec.ts'
+      - 'docs/ux/business-assistant-mobile-design.md'
 
 permissions:
   contents: read
@@ -81,7 +88,504 @@ jobs:
           else
             git fetch origin "$GITHUB_BASE_REF" --depth=1
             changed_files="$(git diff --name-only FETCH_HEAD...HEAD)"
-            if printf '%s\n' "$changed_files" | grep -Eq '^(web/src/GenerateInvoice\.tsx|web/src/invoice\.css|web/src/GenerateInvoice\.test\.tsx|web/e2e/invoice-import-visual\.spec\.ts|docs/ux/invoice-handwritten-import-ux-refinement\.md|docs/ux/BILLING-SALES-HANDOFF\.md)$'; then
+            if printf '%s\\n' "$changed_files" | grep -Eq '^(web/src/NavigationAssistant\.tsx|web/src/navigation-assistant\.css|web/src/NavigationAssistant\.test\.tsx|web/src/speech-provider\.ts|web/src/speech-provider\.test\.ts|web/e2e/assistant-visual\.spec\.ts|docs/ux/business-assistant-mobile-design\.md)
+              scope="invoice-import"
+            elif printf '%s\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\.tsx|web/src/AccountAccess\.tsx|web/src/BusinessSetup\.tsx|web/src/AppLock\.tsx|web/src/auth-access\.css|web/src/app-lock\.css|web/e2e/authentication-visual\.spec\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\.md)$'; then
+              scope="auth"
+            else
+              scope="buy"
+            fi
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Assistant visual audit
+        if: steps.resolve.outputs.scope == 'assistant'
+        working-directory: web
+        run: npx playwright test e2e/assistant-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Home visual audit
+        if: steps.resolve.outputs.scope == 'home'
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: steps.resolve.outputs.scope == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Invoice import visual audit
+        if: steps.resolve.outputs.scope == 'invoice-import'
+        working-directory: web
+        run: npx playwright test e2e/invoice-import-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Buy visual audit
+        if: steps.resolve.outputs.scope == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
+          path: |
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
+            web/test-results/.last-run.json
+          if-no-files-found: warn
+          retention-days: 7
+; then
+              scope="invoice-import"
+            elif printf '%s\\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\\.tsx|web/src/AccountAccess\\.tsx|web/src/BusinessSetup\\.tsx|web/src/AppLock\\.tsx|web/src/auth-access\\.css|web/src/app-lock\\.css|web/e2e/authentication-visual\\.spec\\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\\.md)
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Home visual audit
+        if: steps.resolve.outputs.scope == 'home'
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: steps.resolve.outputs.scope == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Buy visual audit
+        if: steps.resolve.outputs.scope == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
+          path: |
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
+            web/test-results/.last-run.json
+          if-no-files-found: warn
+          retention-days: 7
+; then
+              scope="auth"
+            else
+              scope="buy"
+            fi
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Home visual audit
+        if: steps.resolve.outputs.scope == 'home'
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: steps.resolve.outputs.scope == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Buy visual audit
+        if: steps.resolve.outputs.scope == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
+          path: |
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
+            web/test-results/.last-run.json
+          if-no-files-found: warn
+          retention-days: 7
+; then
+              scope="assistant"
+            elif printf '%s\\n' "$changed_files" | grep -Eq '^(web/src/GenerateInvoice\.tsx|web/src/invoice\.css|web/src/GenerateInvoice\.test\.tsx|web/e2e/invoice-import-visual\.spec\.ts|docs/ux/invoice-handwritten-import-ux-refinement\.md|docs/ux/BILLING-SALES-HANDOFF\.md)
+              scope="invoice-import"
+            elif printf '%s\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\.tsx|web/src/AccountAccess\.tsx|web/src/BusinessSetup\.tsx|web/src/AppLock\.tsx|web/src/auth-access\.css|web/src/app-lock\.css|web/e2e/authentication-visual\.spec\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\.md)$'; then
+              scope="auth"
+            else
+              scope="buy"
+            fi
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Home visual audit
+        if: steps.resolve.outputs.scope == 'home'
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: steps.resolve.outputs.scope == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Invoice import visual audit
+        if: steps.resolve.outputs.scope == 'invoice-import'
+        working-directory: web
+        run: npx playwright test e2e/invoice-import-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Buy visual audit
+        if: steps.resolve.outputs.scope == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
+          path: |
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
+            web/test-results/.last-run.json
+          if-no-files-found: warn
+          retention-days: 7
+; then
+              scope="invoice-import"
+            elif printf '%s\\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\\.tsx|web/src/AccountAccess\\.tsx|web/src/BusinessSetup\\.tsx|web/src/AppLock\\.tsx|web/src/auth-access\\.css|web/src/app-lock\\.css|web/e2e/authentication-visual\\.spec\\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\\.md)
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Home visual audit
+        if: steps.resolve.outputs.scope == 'home'
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: steps.resolve.outputs.scope == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Buy visual audit
+        if: steps.resolve.outputs.scope == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
+          path: |
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
+            web/test-results/.last-run.json
+          if-no-files-found: warn
+          retention-days: 7
+; then
+              scope="auth"
+            else
+              scope="buy"
+            fi
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Resolved visual audit scope: $scope"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Bootstrap isolated test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f scripts/database/bootstrap-postgresql.sql
+          psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE rbos_migrator PASSWORD 'ci_migrator_only_2026'; ALTER ROLE rbos_app PASSWORD 'ci_app_only_2026'; ALTER ROLE rbos_worker PASSWORD 'ci_worker_only_2026';"
+
+      - name: Build API
+        run: dotnet build RetailBusinessOs.slnx --nologo -c Release
+
+      - name: Apply migrations to disposable test database
+        run: dotnet run --project src/Rbos.Api/Rbos.Api.csproj --no-build -c Release -- --migrate test
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Home visual audit
+        if: steps.resolve.outputs.scope == 'home'
+        working-directory: web
+        run: npx playwright test e2e/ui-audit.spec.ts --project=mobile-390x844
+
+      - name: Run Billing & Sales visual audit
+        if: steps.resolve.outputs.scope == 'billing-sales'
+        working-directory: web
+        run: npx playwright test e2e/billing-sales-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Buy visual audit
+        if: steps.resolve.outputs.scope == 'buy'
+        working-directory: web
+        run: npx playwright test e2e/buy-visual.spec.ts --project=mobile-390x844
+
+      - name: Run Authentication visual audit
+        if: steps.resolve.outputs.scope == 'auth'
+        working-directory: web
+        run: npx playwright test e2e/authentication-visual.spec.ts --project=mobile-390x844
+
+      - name: Upload selected screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbos-visual-audit-${{ steps.resolve.outputs.scope }}
+          path: |
+            web/test-results/authentication/
+            web/test-results/ui-audit/${{ steps.resolve.outputs.scope }}/
+            web/test-results/billing-sales-visual-*/
+            web/test-results/buy-visual-*/
+            web/test-results/.last-run.json
+          if-no-files-found: warn
+          retention-days: 7
+; then
               scope="invoice-import"
             elif printf '%s\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\.tsx|web/src/AccountAccess\.tsx|web/src/BusinessSetup\.tsx|web/src/AppLock\.tsx|web/src/auth-access\.css|web/src/app-lock\.css|web/e2e/authentication-visual\.spec\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\.md)$'; then
               scope="auth"
