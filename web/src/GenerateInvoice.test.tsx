@@ -77,6 +77,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
       if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
       if (url === '/api/business-profile') return new Response(JSON.stringify({ businessName: 'Pilot Shop', address: '', city: '', state: '', pinCode: '', mobile: '', gstin: null }))
       if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/customers' && method === 'POST') return new Response(JSON.stringify({ id: 'customer-1' }), { status: 200 })
       if (url === '/api/sales' && method === 'POST') {
         postedSale = JSON.parse(String(init?.body)) as { lines: { serials: string[] }[] }
         return new Response(JSON.stringify({ id: 'sale-1' }), { status: 200 })
