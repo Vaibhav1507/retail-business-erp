@@ -622,29 +622,43 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {pname.trim() && !match && <span className="billing-hint">This will be billed as an ad-hoc line and will not create a catalogue product.</span>}
         </div>
 
-        {salesInvoiceDraft && <div className="invoice-extraction-review" role="region" aria-label="Review extracted sales invoice">
-          <h3>Review extracted invoice before adding it to the bill</h3>
-          {salesInvoiceDraft.invoiceNumber && <p>Source invoice reference: <strong>{salesInvoiceDraft.invoiceNumber}</strong> (not the Dhandha Mitra invoice number)</p>}
-          {salesInvoiceDraft.total != null && <p>Handwritten total detected: {money(salesInvoiceDraft.total)} INR — verify it against the line values.</p>}
-          {salesInvoiceWarnings.length > 0 && <ul className="billing-hint">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
-          {salesInvoiceDraft.lines.length === 0 && <p>No usable lines were detected. You can still enter the bill manually.</p>}
-          {salesInvoiceDraft.lines.length > 0 && <div className="billing-table-wrap" role="region" aria-label="Extracted invoice lines" tabIndex={0}><table className="billing-table">
-            <thead><tr><th>Description / model</th><th>Brand</th><th>Model</th><th>HSN</th><th>Qty</th><th>Unit price</th><th>Discount</th></tr></thead>
-            <tbody>{salesInvoiceDraft.lines.map((line, index) => <tr key={index}>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' description'} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} />{line.confidence != null && <small>Extraction confidence: {Math.round(line.confidence * 100)}%</small>}</td>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' brand'} value={line.brand ?? ''} onChange={e => updateCapturedLine(index, 'brand', e.target.value)} /></td>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' model'} value={line.model ?? ''} onChange={e => updateCapturedLine(index, 'model', e.target.value)} /></td>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' HSN'} value={line.hsn ?? ''} onChange={e => updateCapturedLine(index, 'hsn', e.target.value)} /></td>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></td>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></td>
-              <td><input aria-label={'Extracted line ' + (index + 1) + ' discount'} inputMode="decimal" value={line.discount ?? ''} onChange={e => updateCapturedLine(index, 'discount', e.target.value)} /></td>
-            </tr>)}</tbody>
-          </table></div>}
-          <div className="billing-row">
+        {salesInvoiceDraft && <section className="invoice-extraction-review" role="region" aria-label="Review extracted sales invoice" aria-labelledby="invoice-extraction-title">
+          <header className="invoice-extraction-header">
+            <div><p className="invoice-extraction-eyebrow">HANDWRITTEN BILL</p><h3 id="invoice-extraction-title">Review detected items</h3></div>
+            <span className="invoice-extraction-count">{salesInvoiceDraft.lines.length} {salesInvoiceDraft.lines.length === 1 ? 'item' : 'items'}</span>
+          </header>
+          {salesInvoiceDraft.invoiceNumber && <p className="invoice-extraction-meta">Source bill no. <strong>{salesInvoiceDraft.invoiceNumber}</strong></p>}
+          {salesInvoiceDraft.date && <p className="invoice-extraction-meta">Bill date <strong>{salesInvoiceDraft.date}</strong></p>}
+          {salesInvoiceDraft.total != null && <p className="invoice-extraction-total">Handwritten total <strong>₹{money(salesInvoiceDraft.total)}</strong><small>Compare this with the extracted line values before continuing.</small></p>}
+          {salesInvoiceWarnings.length > 0 && <ul className="invoice-extraction-warnings">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
+          {salesInvoiceDraft.lines.length === 0 && <p className="invoice-extraction-empty">No usable items were detected. Discard this import to enter items manually.</p>}
+          {salesInvoiceDraft.lines.length > 0 && <div className="invoice-extraction-lines">
+            {salesInvoiceDraft.lines.map((line, index) => <article className="invoice-extracted-line" key={index}>
+              <div className="invoice-extracted-line-heading"><strong>Item {index + 1}</strong>{line.confidence != null && <span>{Math.round(line.confidence * 100)}% read confidence</span>}</div>
+              <label>Description / model<input aria-label={'Extracted line ' + (index + 1) + ' description'} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} /></label>
+              <div className="invoice-extracted-line-values">
+                <label>Qty<input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></label>
+                <label>Unit price (₹)<input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></label>
+              </div>
+              <details className="invoice-extracted-line-details">
+                <summary>Brand, model, HSN and discount</summary>
+                <div className="invoice-extracted-line-extra">
+                  <label>Brand<input aria-label={'Extracted line ' + (index + 1) + ' brand'} value={line.brand ?? ''} onChange={e => updateCapturedLine(index, 'brand', e.target.value)} /></label>
+                  <label>Model<input aria-label={'Extracted line ' + (index + 1) + ' model'} value={line.model ?? ''} onChange={e => updateCapturedLine(index, 'model', e.target.value)} /></label>
+                  <label>HSN<input aria-label={'Extracted line ' + (index + 1) + ' HSN'} value={line.hsn ?? ''} onChange={e => updateCapturedLine(index, 'hsn', e.target.value)} /></label>
+                  <label>Discount (₹)<input aria-label={'Extracted line ' + (index + 1) + ' discount'} inputMode="decimal" value={line.discount ?? ''} onChange={e => updateCapturedLine(index, 'discount', e.target.value)} /></label>
+                </div>
+              </details>
+              {(line.gstRate != null || line.gstAmount != null || line.amount != null) && <p className="invoice-extracted-line-meta">
+                {line.amount != null && <strong>Line amount ₹{money(line.amount)}</strong>}{line.gstRate != null && <span>GST {line.gstRate}%</span>}{line.gstAmount != null && <span>Tax ₹{money(line.gstAmount)}</span>}
+              </p>}
+            </article>)}
+          </div>}
+          <div className="invoice-extraction-actions">
             <button type="button" onClick={addCapturedLines} disabled={salesInvoiceDraft.lines.length === 0}>Add reviewed lines to bill</button>
-            <button type="button" className="secondary" onClick={() => { setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate('') }}>Discard extraction</button>
+            <button type="button" className="secondary" onClick={discardSalesInvoiceDraft}>Discard extraction</button>
           </div>
-        </div>}
+        </section>}
 
         {items.length > 0 && <div className="invoice-added-items" aria-label="Items added to this bill">
           {items.map((i, n) => <article className="invoice-added-item" key={n}>
