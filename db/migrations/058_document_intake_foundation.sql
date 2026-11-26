@@ -78,7 +78,8 @@ begin
 end $$;
 
 grant select, insert on documents.document_batch to rbos_app;
-grant select, insert, update on documents.business_document to rbos_app;
+grant select, insert on documents.business_document to rbos_app;
+grant update (status, updated_at) on documents.business_document to rbos_app;
 grant select, insert on documents.document_page to rbos_app;
 
 -- Queue rows are not directly visible to either runtime role. All access is through
