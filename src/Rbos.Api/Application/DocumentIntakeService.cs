@@ -166,4 +166,4 @@ public sealed class DocumentIntakeService(TenantDb tenantDb)
     }
 }
 
-public sealed class DocumentIdempotencyConflictException : Exception;
+public sealed class DocumentIdempotencyConflictException : Exception { }
