@@ -175,9 +175,17 @@ No merge, production migration or deployment is implied by this specification.
 
 ## 10. Initial user-supplied corpus (2026-11-26)
 
-- Ten photos were supplied and all ten are included in the initial extraction test: S01–S09 are Monika Electronics; S10 is Anil Sports & Stationery and is deliberately retained as a second-template test.
+- The initial batch contained 10 photos: S01–S09 are Monika Electronics and S10 is Anil Sports & Stationery. One additional Anil Sports bill was subsequently supplied, so 11 source bills are now tracked: 9 Monika + 2 Anil.
 - Provisional visual observations and uncertainty annotations: [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md).
 - The corpus note is not yet gold-standard ground truth. Amounts and descriptions are provisional visual readings; exact model/serial strings and the S10 row count/total need verification before scoring.
 - Original photos remain in the conversation attachment context and are not committed to Git. The repository stores no customer names, mobile numbers or addresses.
-- No current-RBOS extraction has been run against the ten images yet. No accuracy/latency score is claimed.
-- Next step: obtain verified labels for ambiguous source text/financial fields, then run the existing synchronous importer against the same ten samples and capture stage timings.
+- No current-RBOS extraction has been run against the eleven images yet. No accuracy/latency score is claimed.
+- Next step: obtain verified labels for ambiguous source text/financial fields, then run the existing synchronous importer against all eleven samples and capture stage timings.
+
+
+## 11. Two Anil Sports extraction comparisons (2026-11-26)
+
+- Both Anil source bills are now captured in [anil-sports-import-comparison-v1.md](../quality/anil-sports-import-comparison-v1.md): ANIL-001 ₹5,000 and ANIL-002 ₹10,020 (source bill no. 468).
+- ANIL-001 app output: 10 detected lines and total ₹5,000; repeated duplicate quantity/price warning text; at least one likely quantity misread; blank rate fields must be judged against the source (whose Rate column appears blank); suspicious customer-name mapping requires verification.
+- ANIL-002 app output: 13 detected lines; app total ₹10,000 while the source's main TOTAL box appears ₹10,020 and a separate ₹10,000 annotation is present near the signatory area. Keep both values as separate source observations until user/accounting intent is verified. One visible Crown line appears misread (source qty 10 / rate ₹80 / amount ₹800; app qty 2 / rate ₹80 / amount ₹160). Other card values are partly cropped.
+- The source/app screenshots remain in the conversation and are not committed to Git. The comparison is provisional, not a gold-standard transcription. Do not calculate an accuracy percentage yet.
