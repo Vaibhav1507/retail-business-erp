@@ -2,7 +2,7 @@
 
 **Status:** provisional visual transcription; not yet a gold-standard benchmark  
 **Received:** 2026-11-26  
-**Samples:** 10 images supplied in this conversation  
+**Samples:** 11 source bills tracked so far (10 in the initial batch plus one additional Anil Sports bill supplied during extraction comparison)  
 **Privacy:** customer names, phone numbers and addresses are intentionally excluded. Original photos are not committed to this repository.
 
 ## Corpus composition
@@ -18,7 +18,8 @@
 | S07 | Monika Electronics | 2 | ₹23,000 | Two line items; first amount ₹17,000 and second ₹6,000; multiple model/serial-like strings; important row-separation test |
 | S08 | Monika Electronics | 1 | ₹15,800 | LED description; model/serial-like strings; relatively clear |
 | S09 | Monika Electronics | 1 | ₹12,800 | Washing-machine description; multi-line model/identifier; perspective and handwriting variation |
-| S10 | Anil Sports & Stationery | Many (approximately 14 rows; verify exact count) | Not yet reliable; total handwriting appears overwritten/ambiguous | Different invoice template; soft focus; dense list; quantities/rates/amounts in narrow columns; corrections/overwriting |
+| S10 | Anil Sports & Stationery — bill no. 468 | App detected 13; source row count needs verification | Main TOTAL box appears ₹10,020; separate ₹10,000 note near signatory | Different invoice template; soft focus; dense list; tightly spaced rows; total conflict |
+| S11 | Anil Sports & Stationery — additional ₹5,000 bill | App detected 10 | ₹5,000 | Same retailer/template family; source rates appear blank; quantity and customer-field mapping need verification |
 
 **Important:** visible totals and item counts above are provisional observations from the supplied photographs, not verified accounting ground truth. Do not use them to claim an extraction accuracy score until independently confirmed.
 
@@ -42,21 +43,21 @@ The descriptions below preserve only the portions that are reasonably visible. T
 
 ## Labeling rules before scoring
 
-1. Keep S01–S09 as the primary Monika template cohort and S10 as a separate template cohort. **All ten remain in the evaluation.**
+1. Keep S01–S09 as the Monika cohort and S10–S11 as the Anil Sports & Stationery cohort. **All eleven remain in the evaluation.**
 2. Never silently convert a provisional visual reading into a verified label. Mark each field as `verified`, `uncertain` or `unreadable`.
 3. Do not infer a model/serial number from a catalogue, brand pattern or other bills. Similarity is not proof of character identity.
 4. Keep the original writing as a verbatim transcription where possible; store a normalized value separately only after the verbatim value is verified.
 5. Exclude customer name, phone, address and other personal data from the evaluation fixture and logs.
 6. Record item count/order, quantity, unit rate (including blank), line amount, discounts/tax if present, and final total separately.
 7. Distinguish a drawn cancellation/continuation stroke in the amount column from an amount or additional row.
-8. For S10, establish the exact row count and corrected/final total from the source before calculating metrics.
+8. For S10, establish the exact row count and whether the ₹10,000 signatory-area note changes the ₹10,020 main TOTAL field before scoring. For S11, verify quantities and confirm that blank source rates are not incorrectly scored as extraction misses.
 
 ## Next benchmark actions
 
 - Human verification of provisional descriptions, identifiers, line amounts and totals.
-- Capture the current RBOS synchronous Generate Invoice extraction output for the exact same ten source images, with provider/model/config and stage timings.
+- Capture the current RBOS synchronous Generate Invoice extraction output for all eleven source images, with provider/model/config and stage timings.
 - Compare output to verified labels field by field; do not score uncertain labels.
-- Keep these ten as the initial development/evaluation batch. As the corpus grows, reserve a separate untouched holdout set before tuning prompts/models.
+- Keep these eleven as the current development/evaluation batch. As the corpus grows, reserve a separate untouched holdout set before tuning prompts/models.
 - Do not upload original customer-bearing photos to GitHub. Store any future redacted benchmark images in an access-controlled test fixture location approved for this purpose.
 
 ## Current evidence limitations
@@ -65,3 +66,10 @@ The descriptions below preserve only the portions that are reasonably visible. T
 - This document is a first-pass visual transcription by inspection, not a second-person verified ground truth.
 - No RBOS extraction run has yet been performed on these ten samples in this phase.
 - No accuracy or latency score is claimed.
+
+
+## Anil Sports comparison update — 2026-11-26
+
+- Two separate Anil Sports & Stationery bills now have source-to-app comparisons: [ANIL-001 ₹5,000](./anil-sports-import-comparison-v1.md#anil-001--5000-bill) and [ANIL-002 ₹10,020](./anil-sports-import-comparison-v1.md#anil-002--10020-bill-source-bill-no-468).
+- ANIL-002 is the Anil source bill from the original ten-photo batch; ANIL-001 is the additional Anil source bill supplied afterward. They are both retained. Current corpus therefore contains 9 Monika bills + 2 Anil bills (11 total).
+- This corrects the earlier single-Anil-sample inventory. No source image or customer personal details are committed to Git.
