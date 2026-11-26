@@ -85,6 +85,57 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - No extraction, validation, invoice, camera/gallery, or API behaviour changes. Focused unit tests assert the feedback component wrappers; frontend CI is the implementation gate. Android screenshot review remains pending.
 
 
+## Current focused phase — handwritten sales-bill import accuracy (2026-11-26)
+
+**Current scope:** only the existing, already-issued handwritten sales-bill import inside Generate Invoice (`#/sell/bill`). This phase preserves the synchronous upload → extraction → editable review interaction.
+
+- Authoritative scope and engineering acceptance: [handwritten sales-bill import accuracy](./handwritten-sales-bill-import-accuracy.md).
+- Preserve the existing Create Invoice layout and the accepted mobile handwritten-import UX decisions above; this is not a form redesign.
+- Prioritise measured extraction accuracy, no silent wrong financial fields, deterministic row/tax/total reconciliation, latency instrumentation and fast synchronous review.
+- Retain the original handwritten sales-bill evidence and link it to the resulting sale. Do not retain item-tag photos or catalogue-import files.
+- Supplier invoice/Add Purchase, item-tag extraction changes, catalogue imports, bulk uploads, central inbox and background workers are explicitly out of scope.
+
+### Current PR disposition
+
+- [PR #111 — Document-to-Books worker](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is open as **Draft** and parked. Its worker, migration 059, purchase changes and grouped processing are deferred. The last verified CI run for its branch (run #1314) passed; this validates its configured build/tests, not handwritten extraction accuracy.
+- [PR #112 — focused accuracy scope](https://github.com/Vaibhav1507/retail-business-erp/pull/112) was merged into main in commit `75d047cba629737e3eb7c38697d5beb4d0d18faf`; its docs-only CI run #1316 passed.
+- WP1 [PR #109](https://github.com/Vaibhav1507/retail-business-erp/pull/109) is merged at `b6b0409c3ed522aa70f84d8cde002632807dda77`. Its document registry/queue remains on main, but the existing synchronous sales importer must not call the queue-enqueuing batch endpoint. Production application of migration 058 is not verified.
+
+### Accuracy evidence required before expansion
+
+- Build a redacted, human-labelled sample set of real handwritten sales bills with independently verified field/line values.
+- Keep a held-out evaluation set separate from prompt/model tuning.
+- Report header and line field exact-match, line-item recall/precision, critical numeric exact-match, document exact-match, unsupported-value rate and p50/p95 latency.
+- A universal 100% AI-only read rate is not a credible guarantee for arbitrary handwriting. The non-negotiable safety bar is no silent acceptance of uncertain/incorrect financial values and explicit human confirmation before sale posting.
+
+
+### Initial handwritten sales-bill corpus — 2026-11-26
+
+- User supplied 10 source photos and confirmed all are valid extraction tests: 9 Monika Electronics bills plus 1 Anil Sports & Stationery bill. The tenth is intentionally included to test a different bill template, not rejected as an outlier.
+- Provisional, privacy-minimised observations are recorded in [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md). Customer names, mobile numbers and addresses are excluded; original photos are not committed to Git.
+- This is not yet a gold-standard dataset. Exact product/model/serial transcriptions and ambiguous values (especially S10's rows/total) need verification before accuracy scoring. Seven app extraction runs have since been recorded; no accuracy score is claimed.
+- Current CI: PR #112 docs-only CI run [#1316](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45814546118) passed. PR #111 parked worker branch CI run [#1314](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45810285562) passed. Neither run measures handwriting accuracy.
+- **Next concrete task:** verify the provisional labels against the source bills; seven app runs (two Anil, five Monika) are already recorded, while two of the eleven source bills still need matching app outputs. Keep the Anil template as a separate cohort and record stage timings during controlled pilot runs.
+
+
+### Anil Sports source-to-app comparison — 2026-11-26
+
+The initial inventory note has been corrected: the first ten-photo batch contains nine Monika bills and one Anil Sports bill; the user subsequently supplied one more Anil Sports source bill. Current tracked corpus is **11 bills: 9 Monika + 2 Anil**.
+
+- [ANIL-001 — ₹5,000 bill comparison](../quality/anil-sports-import-comparison-v1.md#anil-001--5000-bill): app detected 10 items and ₹5,000 total. Repeated identical unreadable-quantity/price warnings; one likely quantity mapping issue. The source Rate column appears blank, so do not mark empty unit prices as extraction misses without label verification.
+- [ANIL-002 — ₹10,020 bill comparison](../quality/anil-sports-import-comparison-v1.md#anil-002--10020-bill-source-bill-no-468): bill no. 468, app detected 13 items and extracted ₹10,000. The source main TOTAL box appears ₹10,020, with a separate ₹10,000 annotation near the signatory area. App Item 4 Crown appears qty 2 × ₹80 = ₹160 while the corresponding source row appears qty 10 / amount ₹800. Several cards are cropped in the supplied screenshots; no claims are made about unseen values.
+- Full privacy-minimised notes: [Anil Sports import comparison v1](../quality/anil-sports-import-comparison-v1.md). No original bill photo or customer personal data is committed to Git.
+- **Next action:** independently verify the line-by-line source transcription for these two Anil bills, keep ambiguous values flagged, then run the existing synchronous importer against the nine Monika bills one at a time as the user supplies their app outputs.
+
+
+### First Monika source-to-app comparison — S01 / MONIKA-001 (2026-11-26)
+
+- [Detailed comparison](../quality/monika-sales-import-comparison-v1.md). Source bill visually shows one Voltas Beko washing machine line, quantity 1, amount/total ₹17,500; app agrees on quantity and amount/total.
+- High-impact discrepancies: app product text “Vultas bike lamp” versus source “Voltas Beko WM”; brand/model text differs; app date says 6-11-2020 while source appears 6-11-2026; app invoice no. 153 appears inconsistent with red source number (approximately 454, verify).
+- Two identifier strings appear in the source item description area (`1200 644A 76A 112258` and `26111412945`). Neither appears in app output; current review card has no serial/identifier field. Their exact semantic roles remain to be verified before assigning a serial label.
+- The source Rate column appears blank, but app sets unit price ₹17,500. Preserve source-vs-derived provenance.
+- App's 90% confidence is not calibrated; this sample has multiple critical transcription errors despite the confidence label.
+
 ## P0 + P1 — handwritten sales-bill import improvement (2026-11-26)
 
 **Current implementation branch:** `feat/handwritten-sales-import-p0`  
@@ -131,12 +182,11 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 
 ### Validation and delivery state
 
-- Focused unit/component tests have been added for JSON schema/serial preservation, sales-vs-tag provider settings, serial carry-through, auto-growing description text, confidence/review diagnostics and provider rate-limit behaviour.
-- Backend/frontend CI, full RBOS CI and focused Playwright/visual/Axe verification remain pending on this implementation branch at handoff.
-- No live AI-provider extraction against the seven original bills has been triggered from GitHub; the seven comparisons use the user-supplied app screenshots.
-- No merge, migration or production deployment has been performed. PR #111 remains parked as Draft; PR #112 remains the earlier documentation-only scope draft.
-
+- Code CI #1342 passed on implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1`: backend 165 tests, frontend 234 tests, PostgreSQL integration 186 tests, plus build/lint/dependency checks.
+- Latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs in run #1343 (backend, frontend and PostgreSQL integration).
+- RBOS Visual Audit run #297 was automatically triggered by the existing invoice-import path filter, although Playwright/Axe were deferred for this phase. It failed after five minutes because the shared signup helper waited for a `Next` button while the current signup screen exposed `Continue`; this is a test-helper/signup-flow mismatch before the invoice-import journey, not an extraction assertion. The visual audit is not counted as passed.
+- No merge or production deployment has been performed. PR #111 remains parked as Draft; PR #112's scope/corpus documentation is now merged into main.
 
 ### P0 + P1 validation scope clarification — 2026-11-26
 
-User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. Code CI run #1342 is green on head `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1`: backend 165 tests, frontend 234 tests, PostgreSQL integration 186 tests, plus build/lint/dependency checks. Playwright, screenshots, Axe and real-device validation remain explicitly deferred (not passed). Statistical confidence calibration and actual p50/p95 latency/accuracy measurements depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.
+User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. Code CI #1342 passed on the implementation commit; code CI #1343 passed on the latest pre-merge branch head. Playwright/E2E, screenshots, Axe and native Android checks remain deferred (not passed). The automatically triggered Visual Audit #297 failed in the signup helper before reaching the import flow: it expected a `Next` button, but the current signup step renders `Continue`. Do not treat this as an extraction failure or a visual acceptance pass. Statistical confidence calibration and actual p50/p95 latency/accuracy measurements still depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.

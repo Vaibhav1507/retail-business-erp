@@ -1,6 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** P0 + P1 implementation complete; code CI passed on 2026-11-26 in run #1342. Manual handwritten-bill validation is the next acceptance step.  
+**Status:** P0 + P1 implementation complete; code CI #1342 and #1343 passed on 2026-11-26. Manual handwritten-bill validation remains the next acceptance step. Manual handwritten-bill validation is the next acceptance step.  
 **Route:** `#/sell/bill` (Generate Invoice)  
 **API:** `POST /api/sales/invoice-image-extract`  
 **Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
@@ -169,10 +169,37 @@ No source-photo-to-app accuracy percentage is claimed yet. The seven-case compar
 ## 10. Current delivery state
 
 - P0 and P1 implementation are kept together in PR #113 and branch `feat/handwritten-sales-import-p0`.
-- Latest code head `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed backend (165), frontend (234) and PostgreSQL integration (186) tests in CI run #1342.
+- Implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed code CI #1342 (backend 165, frontend 234, PostgreSQL integration 186); latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs again in #1343.
 - No merge or production deployment is included or implied.
 - The user requested manual validation only after the full improvement is implemented; this handoff does not ask them to validate an intermediate P0-only state.
 
 ## User validation and E2E scope clarification — 2026-11-26
 
-User confirmed that all P1 improvements belong in the same PR and branch as P0 and that they will validate the completed implementation manually afterwards. Playwright/E2E, screenshots, Axe and real-device verification are deferred (not passed). Keep the floating Chat assistant unchanged and retain automatic description growth.
+User confirmed that all P1 improvements belong in the same PR and branch as P0 and that they will validate the completed implementation manually afterwards. Playwright/E2E, screenshots, Axe and real-device verification are deferred (not passed). The automatically triggered Visual Audit #297 failed before reaching the invoice-import flow because the shared signup helper waited for `Next` while the signup screen rendered `Continue`; this is a test-helper mismatch, not extraction evidence. Keep the floating Chat assistant unchanged and retain automatic description growth.
+
+## 11. Initial user-supplied corpus (2026-11-26)
+
+- The initial batch contained 10 photos: S01–S09 are Monika Electronics and S10 is Anil Sports & Stationery. One additional Anil Sports bill was subsequently supplied, so 11 source bills are now tracked: 9 Monika + 2 Anil.
+- Provisional visual observations and uncertainty annotations: [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md).
+- The corpus note is not yet gold-standard ground truth. Amounts and descriptions are provisional visual readings; exact model/serial strings and the S10 row count/total need verification before scoring.
+- Original photos remain in the conversation attachment context and are not committed to Git. The repository stores no customer names, mobile numbers or addresses.
+- Seven app extraction runs (two Anil and five Monika) have since been recorded in the seven-case comparison. Two of the eleven tracked source bills still lack matching app extraction outputs. No accuracy/latency score is claimed.
+- Next step: obtain verified labels for ambiguous source text/financial fields, then run the existing synchronous importer against all eleven samples and capture stage timings.
+
+
+## 12. Two Anil Sports extraction comparisons (2026-11-26)
+
+- Both Anil source bills are now captured in [anil-sports-import-comparison-v1.md](../quality/anil-sports-import-comparison-v1.md): ANIL-001 ₹5,000 and ANIL-002 ₹10,020 (source bill no. 468).
+- ANIL-001 app output: 10 detected lines and total ₹5,000; repeated duplicate quantity/price warning text; at least one likely quantity misread; blank rate fields must be judged against the source (whose Rate column appears blank); suspicious customer-name mapping requires verification.
+- ANIL-002 app output: 13 detected lines; app total ₹10,000 while the source's main TOTAL box appears ₹10,020 and a separate ₹10,000 annotation is present near the signatory area. Keep both values as separate source observations until user/accounting intent is verified. One visible Crown line appears misread (source qty 10 / rate ₹80 / amount ₹800; app qty 2 / rate ₹80 / amount ₹160). Other card values are partly cropped.
+- The source/app screenshots remain in the conversation and are not committed to Git. The comparison is provisional, not a gold-standard transcription. Do not calculate an accuracy percentage yet.
+
+
+## 13. First Monika app comparison — S01 (2026-11-26)
+
+- Detailed record: [MONIKA-001 source/app comparison](../quality/monika-sales-import-comparison-v1.md).
+- Source total/line amount ₹17,500 and quantity 1 match the app. Description/brand are materially misread (“Vultas bike lamp” vs source “Voltas Beko WM”). Model string differs and needs exact verification.
+- Source date appears 6-11-2026; app reports 6-11-2020. App invoice number 153 appears inconsistent with the red source number (approximately 454; verify).
+- Source includes two serial/model-like identifiers (one looks like `1200 644A 76A 112258`, a separate one like `26111412945`). The review card exposes no serial/identifier field and neither value is displayed. Their exact roles must be labelled; preserve both rather than guessing.
+- Source Rate column appears blank but app populates ₹17,500 unit price. Track whether this is a source-transcribed or derived amount/quantity value.
+- The 90% confidence label did not prevent these errors and is not calibrated evidence of correctness.
