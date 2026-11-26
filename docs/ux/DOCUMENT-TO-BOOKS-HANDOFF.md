@@ -10,13 +10,13 @@
 
 ## Current status
 
-<badge>WP0 — discovery/specification</badge>
+**Status: WP0 — documentation PR open**
 
 - Baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c` (verified 2026-11-26).
 - Discovery implementation branch: `docs/document-to-books-foundation`.
 - Deliverables on this branch: product definition, architecture/current-state audit, ADR-027, discovery log and this handoff.
 - No application code/schema changes; no provider calls; no migrations; no deployment.
-- PR has not yet been created at the time this handoff was authored. Add the PR URL and exact head SHA here after creation.
+- Documentation PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), open against `main`. Verify its live head SHA and CI status before continuing; do not rely on a stale copied SHA.
 - WP0 has documentation-only checks; no unit tests were needed.
 
 ## Product direction
@@ -53,7 +53,7 @@ The uploader selects Sales or Purchase before processing. The system supports a 
 
 | WP | Status | Next output |
 |---|---|---|
-| WP0 — Discovery/spec | In progress on branch | Merge docs PR after review |
+| WP0 — Discovery/spec | PR #108 open | Review documentation and CI; merge only with owner authorisation |
 | WP1 — Registry, storage, intake and durable jobs | Not started | Tenant-scoped document store, page/batch model, status API, durable queue, minimal flow tests |
 | WP2 — Sales/purchase extraction | Not started | Handwriting-aware purchase extraction; field-level provenance/confidence; shared validation |
 | WP3 — Inbox and review UX | Not started | Mobile-first inbox, review and correction design/implementation |
