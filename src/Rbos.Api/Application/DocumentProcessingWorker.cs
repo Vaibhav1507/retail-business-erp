@@ -144,6 +144,14 @@ public static class DocumentProcessingWorker
             data["sourceKind"] = started.SourceKind;
             data["extractor"] = extractor;
             data["schemaVersion"] = schemaVersion;
+            data["fieldProvenance"] = new JsonObject
+            {
+                ["header"] = "ai_extracted",
+                ["lineItems"] = "ai_extracted",
+                ["userCorrections"] = "none",
+                ["derivedValues"] = "none"
+            };
+            data["confidenceSemantics"] = "uncalibrated_review_hint";
 
             var warnings = data["warnings"] is JsonArray warningArray
                 ? (JsonArray)warningArray.DeepClone()
