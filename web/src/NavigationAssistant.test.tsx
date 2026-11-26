@@ -59,6 +59,15 @@ describe('NavigationAssistant', () => {
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
   await waitFor(() => expect(window.location.hash).toBe('#/sell/bill'))
  })
+ it('keeps the assistant open when navigation is declined to protect current work', async () => {
+  render(<NavigationAssistant onNavigate={() => false} />)
+  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
+  await userEvent.type(screen.getByLabelText('Ask your business assistant'), 'make a new bill')
+  await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
+  expect(window.location.hash).toBe('')
+  expect(screen.getByRole('button', { name: 'Close assistant' })).toBeInTheDocument()
+  expect(screen.getByText('Navigation cancelled. Your current work is unchanged.')).toBeInTheDocument()
+ })
  it('asks the user to choose when a command is ambiguous', async () => {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
