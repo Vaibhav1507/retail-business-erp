@@ -86,11 +86,12 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
 
   const actions = review.locator('.invoice-extraction-actions')
   const lastCard = review.locator('.invoice-extracted-line').last()
-  const separation = await actions.evaluate((element, card) => {
-    const actionRect = element.getBoundingClientRect()
-    const cardRect = (card as Element).getBoundingClientRect()
-    return actionRect.top - cardRect.bottom
-  }, await lastCard.elementHandle())
+  const separation = await review.evaluate(element => {
+    const cards = element.querySelectorAll('.invoice-extracted-line')
+    const action = element.querySelector('.invoice-extraction-actions')
+    if (!cards.length || !action) return -1
+    return action.getBoundingClientRect().top - cards[cards.length - 1]!.getBoundingClientRect().bottom
+  })
   expect(separation).toBeGreaterThanOrEqual(10)
   await captureState(page, 'extraction-review')
 
