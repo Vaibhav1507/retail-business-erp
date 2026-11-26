@@ -92,7 +92,7 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
     public static JsonNode? MergeInvoicePageResults(IReadOnlyList<JsonNode?> partials)
     {
         var merged = new JsonObject { ["lines"] = new JsonArray() };
-        var identityFields = new[] { "supplierName", "invoiceNumber", "date" };
+        var identityFields = new[] { "supplierName", "customerName", "customerPhone", "invoiceNumber", "date" };
         var trailingSummaryFields = new[] { "total", "subtotal", "taxAmount" };
         foreach (var partial in partials)
         {
