@@ -43,7 +43,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await expect(description).toHaveCSS('resize', 'none')
   await expect(description).toHaveCSS('height', '76px')
   await expect(description).toHaveCSS('overflow-y', 'hidden')
-  await description.fill('Long handwritten-style product description with model and package details\\n'.repeat(5))
+  await description.fill('Long handwritten-style product description with model and package details\n'.repeat(5))
   await expect.poll(async () => Number((await description.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(76)
   await description.fill('')
   await expect(description).toHaveCSS('height', '76px')
@@ -55,7 +55,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
         invoiceNumber: 'HAND-468', date: '2026-11-26', customerName: 'Handwritten Customer',
         customerPhone: '9876543210', subtotal: 10000, taxAmount: 1800, total: 11800,
         lines: [{
-          description: 'Samsung LED Television model UA43\\nSerial: SN12345678\\nFull handwritten model and package text preserved on this line',
+          description: 'Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line',
           brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'],
           hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000,
           gstRate: 18, gstAmount: 1800, confidence: 0.92,
@@ -74,7 +74,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
     await (await chooser).setFiles({
       name: 'synthetic-handwritten-bill.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from('%PDF-1.4\\n% synthetic visual audit document\\n%%EOF'),
+      buffer: Buffer.from('%PDF-1.4\n% synthetic visual audit document\n%%EOF'),
     })
   }
 
@@ -82,7 +82,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   const review = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
   await expect(review).toBeVisible()
   const extractedDescription = review.getByLabel('Extracted line 1 description')
-  await expect(extractedDescription).toHaveValue('Samsung LED Television model UA43\\nSerial: SN12345678\\nFull handwritten model and package text preserved on this line')
+  await expect(extractedDescription).toHaveValue('Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line')
   await expect(extractedDescription).toHaveCSS('resize', 'none')
   await expect(extractedDescription).toHaveCSS('overflow-y', 'hidden')
   await expect.poll(async () => Number((await extractedDescription.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(48)
