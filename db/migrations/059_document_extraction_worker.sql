@@ -102,7 +102,26 @@ begin
    for update of q, d;
 
   if not found then return; end if;
-  if v_attempt_number > 4 then return; end if;
+
+  if v_attempt_number > 4 then
+    update documents.business_document
+       set status = 'FailedNeedsAction', updated_at = now()
+     where tenant_id = p_tenant_id and id = p_document_id;
+    delete from integrations.document_processing_queue
+     where tenant_id = p_tenant_id and document_id = p_document_id and lease_token = p_lease_token;
+    return;
+  end if;
+
+  -- A previous worker may have been terminated after claiming but before saving its result.
+  -- Its lease has expired before this queue row could be reclaimed. Close its attempt so
+  -- the history explains why processing started again.
+  update documents.document_extraction_attempt
+     set state = 'FailedRetryable',
+         safe_error_code = 'worker_lease_recovered',
+         completed_at = now()
+   where tenant_id = p_tenant_id
+     and document_id = p_document_id
+     and state = 'Started';
 
   update documents.business_document
      set status = 'Processing', updated_at = now()
@@ -259,6 +278,51 @@ begin
        and document_id = p_document_id
        and lease_token = p_lease_token;
   end if;
+  return true;
+end;
+$function$;
+
+-- Classify a non-retryable failure that occurred before an extraction attempt could be created.
+-- This prevents an invalid/poisoned queue item from remaining Queued forever.
+create or replace function integrations.fail_document_processing_before_start(
+  p_tenant_id uuid,
+  p_document_id uuid,
+  p_lease_token uuid,
+  p_safe_error_code text
+) returns boolean
+language plpgsql security definer
+set search_path = pg_catalog, integrations, documents
+as $function$
+begin
+  if p_safe_error_code is null or p_safe_error_code !~ '^[a-z0-9_]{1,64}
+revoke all on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) from public, rbos_app;
+revoke all on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) from public, rbos_app;
+grant execute on function integrations.start_document_processing(uuid,uuid,uuid) to rbos_worker;
+grant execute on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) to rbos_worker;
+grant execute on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) to rbos_worker;
+revoke all on function integrations.fail_document_processing_before_start(uuid,uuid,uuid,text) from public, rbos_app;
+grant execute on function integrations.fail_document_processing_before_start(uuid,uuid,uuid,text) to rbos_worker;
+ then
+    raise exception 'Invalid safe error code' using errcode = '22023';
+  end if;
+
+  update documents.business_document d
+     set status = 'FailedNeedsAction', updated_at = now()
+    from integrations.document_processing_queue q
+   where q.tenant_id = p_tenant_id
+     and q.document_id = p_document_id
+     and q.lease_token = p_lease_token
+     and q.lease_until > now()
+     and d.tenant_id = q.tenant_id
+     and d.id = q.document_id
+     and d.status in ('Queued','Processing','FailedRetryable');
+
+  if not found then return false; end if;
+
+  delete from integrations.document_processing_queue
+   where tenant_id = p_tenant_id
+     and document_id = p_document_id
+     and lease_token = p_lease_token;
   return true;
 end;
 $function$;
