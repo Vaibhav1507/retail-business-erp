@@ -162,7 +162,7 @@ export function ItemTagCapture({
   }
 
   return (
-    <div className="item-tag-uploader">
+    <div className="item-tag-uploader invoice-feedback-flow">
       <PhotoSourcePicker
         triggerLabel="Scan tag"
         triggerIcon="📷"
