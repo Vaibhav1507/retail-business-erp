@@ -116,3 +116,13 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - This is not yet a gold-standard dataset. Exact product/model/serial transcriptions and ambiguous values (especially S10's rows/total) need verification before accuracy scoring. No extraction run or accuracy score has yet been produced.
 - Current CI: PR #112 docs-only CI run [#1316](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45814546118) passed. PR #111 parked worker branch CI run [#1314](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45810285562) passed. Neither run measures handwriting accuracy.
 - **Next concrete task:** verify the provisional labels against the source bills, then execute the existing synchronous importer on all 10 exact images and record output plus stage timings. Keep S10 in the scorecard as a separate template cohort.
+
+
+### Anil Sports source-to-app comparison — 2026-11-26
+
+The initial inventory note has been corrected: the first ten-photo batch contains nine Monika bills and one Anil Sports bill; the user subsequently supplied one more Anil Sports source bill. Current tracked corpus is **11 bills: 9 Monika + 2 Anil**.
+
+- [ANIL-001 — ₹5,000 bill comparison](../quality/anil-sports-import-comparison-v1.md#anil-001--5000-bill): app detected 10 items and ₹5,000 total. Repeated identical unreadable-quantity/price warnings; one likely quantity mapping issue. The source Rate column appears blank, so do not mark empty unit prices as extraction misses without label verification.
+- [ANIL-002 — ₹10,020 bill comparison](../quality/anil-sports-import-comparison-v1.md#anil-002--10020-bill-source-bill-no-468): bill no. 468, app detected 13 items and extracted ₹10,000. The source main TOTAL box appears ₹10,020, with a separate ₹10,000 annotation near the signatory area. App Item 4 Crown appears qty 2 × ₹80 = ₹160 while the corresponding source row appears qty 10 / amount ₹800. Several cards are cropped in the supplied screenshots; no claims are made about unseen values.
+- Full privacy-minimised notes: [Anil Sports import comparison v1](../quality/anil-sports-import-comparison-v1.md). No original bill photo or customer personal data is committed to Git.
+- **Next action:** independently verify the line-by-line source transcription for these two Anil bills, keep ambiguous values flagged, then run the existing synchronous importer against the nine Monika bills one at a time as the user supplies their app outputs.
