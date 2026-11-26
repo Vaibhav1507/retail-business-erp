@@ -8,13 +8,17 @@ using Rbos.Api.Persistence;
 using Rbos.Api.Application;
 
 // Tooling modes (no web server). Normal startup is added in a later stage.
-var runWhatsAppWorker = args.Contains("--whatsapp-worker") || args.Contains("--rbos-workers");
-if (runWhatsAppWorker)
+// --rbos-workers runs both bounded queues; the specific flags remain available for
+// targeted operations and preserve the legacy WhatsApp-only command.
+var runAllWorkers = args.Contains("--rbos-workers");
+var runWhatsAppWorker = args.Contains("--whatsapp-worker") || runAllWorkers;
+var runDocumentWorker = args.Contains("--document-worker") || runAllWorkers;
+if (runWhatsAppWorker || runDocumentWorker)
 {
     var config = new ConfigurationBuilder().AddUserSecrets<RbosIdentityDbContext>().AddEnvironmentVariables().Build();
     var database = config["Rbos:Database"] ?? "dev";
     var appKey = database switch { "test" => "ConnectionStrings:RbosTestApp", "prod" => "ConnectionStrings:RbosProdApp", _ => "ConnectionStrings:RbosDevApp" };
-    // WhatsApp delivery uses the existing least-privilege rbos_worker role/secret.
+    // Both queue processors use the existing least-privilege rbos_worker role/secret.
     var workerKey = database switch { "test" => "ConnectionStrings:RbosTestWhatsAppWorker", "prod" => "ConnectionStrings:RbosProdWhatsAppWorker", _ => "ConnectionStrings:RbosDevWhatsAppWorker" };
     var appConnectionString = config[appKey] ?? throw new InvalidOperationException($"Missing secret {appKey}");
     var workerConnectionString = config[workerKey] ?? throw new InvalidOperationException($"Missing secret {workerKey}");
@@ -41,6 +45,22 @@ if (runWhatsAppWorker)
 
     QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
     QuestPDF.Settings.UseSystemFonts = true;
+    if (runDocumentWorker)
+    {
+        var workerServices = new ServiceCollection();
+        workerServices.AddLogging(logging => logging.AddConsole());
+        workerServices.AddSingleton<IConfiguration>(config);
+        workerServices.AddSingleton(dataSource);
+        workerServices.AddScoped<TenantDb>();
+        workerServices.AddSingleton<LocalOcr>();
+        workerServices.AddHttpClient<GroqVisionClient>(http => http.Timeout = TimeSpan.FromSeconds(90));
+        workerServices.AddHttpClient<SalesInvoiceCaptureService>(http => http.Timeout = TimeSpan.FromSeconds(90));
+        workerServices.AddHttpClient<InvoiceExtractionService>(http => http.Timeout = TimeSpan.FromSeconds(90));
+        using var serviceProvider = workerServices.BuildServiceProvider();
+        await DocumentProcessingWorker.RunAsync(
+            queueDataSource, serviceProvider,
+            loggerFactory.CreateLogger("DocumentProcessingWorker"), cancellation.Token);
+    }
     if (runWhatsAppWorker)
         await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config,
             loggerFactory.CreateLogger("WhatsAppInvoiceWorker"), cancellation.Token);
