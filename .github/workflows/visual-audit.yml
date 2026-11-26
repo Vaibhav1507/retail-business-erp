@@ -81,9 +81,13 @@ jobs:
           else
             git fetch origin "$GITHUB_BASE_REF" --depth=1
             changed_files="$(git diff --name-only FETCH_HEAD...HEAD)"
-            if printf '%s\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\.tsx|web/src/AccountAccess\.tsx|web/src/BusinessSetup\.tsx|web/src/AppLock\.tsx|web/src/auth-access\.css|web/src/app-lock\.css|web/e2e/authentication-visual\.spec\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\.md)$'; then
+            if printf '%s\n' "$changed_files" | grep -Eq '^(web/src/GenerateInvoice\.tsx|web/src/invoice\.css|web/src/GenerateInvoice\.test\.tsx|web/e2e/invoice-import-visual\.spec\.ts|docs/ux/invoice-handwritten-import-ux-refinement\.md|docs/ux/BILLING-SALES-HANDOFF\.md)$'; then
+              scope="invoice-import"
+            elif printf '%s\n' "$changed_files" | grep -Eq '^(web/src/AuthBrand\.tsx|web/src/AccountAccess\.tsx|web/src/BusinessSetup\.tsx|web/src/AppLock\.tsx|web/src/auth-access\.css|web/src/app-lock\.css|web/e2e/authentication-visual\.spec\.ts|docs/ux/authentication-onboarding-pixel-accurate-plan\.md)$'; then
               scope="auth"
-            if printf '%s\\n' "$changed_files" | grep -Eq '^(web/src/GenerateInvoice\\.tsx|web/src/invoice\\.css|web/src/GenerateInvoice\\.test\\.tsx|web/e2e/invoice-import-visual\\.spec\\.ts|docs/ux/invoice-handwritten-import-ux-refinement\\.md|docs/ux/BILLING-SALES-HANDOFF\\.md)
+            else
+              scope="buy"
+            fi
           fi
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
           echo "Resolved visual audit scope: $scope"
