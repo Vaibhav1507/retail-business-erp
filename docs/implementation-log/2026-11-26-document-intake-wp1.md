@@ -269,3 +269,10 @@ Latest verified pre-fix CI run: #45800273323 on commit `ae4803a820b66ceae2b06e56
 - Fixes and this log update are pushed to `feat/document-intake-foundation`. The latest CI run must be checked before calling the remediation complete. Broad unit-test expansion remains deferred; the focused integration flow is retained.
 
 No production migration, merge or deployment has occurred.
+
+
+## Merge confirmation correction — 2026-11-26
+
+- PR #109 was merged by the owner into `main` at `b6b0409c3ed522aa70f84d8cde002632807dda77`. Earlier lines in this WP1-only log that say PR #109 is open or pending owner merge are historical snapshots and are superseded by this correction.
+- Merge does not prove migration 058 has been applied to production. Verify release/deployment separately before enabling any worker or UI that depends on the document schema.
+- WP2 implementation is tracked in [2026-11-26-document-processing-wp2.md](2026-11-26-document-processing-wp2.md).
