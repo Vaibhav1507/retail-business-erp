@@ -625,7 +625,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <div className="billing-field billing-col-12 billing-rel" hidden={Boolean(salesInvoiceDraft)}>
             <label htmlFor="billing-prod">Item description *</label>
             <div className="invoice-product-entry">
-              <AutoGrowTextarea id="billing-prod" className={`invoice-product-description${fieldErrors.product ? ' field-invalid' : ''}`} rows={2} minHeight={76} autoComplete="off" required aria-label="Item description *" aria-invalid={Boolean(fieldErrors.product)} placeholder="Search product or type a name" value={pname}
+              <AutoGrowTextarea id="billing-prod" className={`invoice-product-description${fieldErrors.product ? ' field-invalid' : ''}`} rows={2} minHeight={76} autoComplete="off" required ariaLabel="Item description *" ariaInvalid={Boolean(fieldErrors.product)} placeholder="Search product or type a name" value={pname}
                 onChange={value => { setPname(value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
               <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
             </div>
