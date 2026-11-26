@@ -212,9 +212,8 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
 
   MockSpeechWorker.instance?.emit({type:'result', text:'make a new bill'})
   await waitFor(() => expect(window.location.hash).toBe('#/sell/bill'))
-  expect(screen.getByText('make a new bill')).toBeInTheDocument()
-  expect(screen.getByText('Opening New sale bill.')).toBeInTheDocument()
-  expect((screen.getByLabelText('Ask your business assistant') as HTMLInputElement).value).toBe('')
+  expect(screen.getByRole('button', {name:'Open assistant'})).toBeInTheDocument()
+  expect(screen.queryByLabelText('Ask your business assistant')).not.toBeInTheDocument()
  } finally {
   restore()
  }
