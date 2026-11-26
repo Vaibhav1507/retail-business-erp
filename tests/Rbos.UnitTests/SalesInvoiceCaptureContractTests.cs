@@ -79,7 +79,8 @@ public sealed class SalesInvoiceCaptureContractTests
         var required = Assert.IsType<JsonArray>(lineSchema["required"]);
 
         Assert.Equal("array", serialSchema["type"]!.GetValue<string>());
-        Assert.Equal("string", Assert.IsType<JsonArray>(serialSchema["items"])[0] is JsonObject item ? item["type"]!.GetValue<string>() : null);
+        var serialItemSchema = Assert.IsType<JsonObject>(serialSchema["items"]);
+        Assert.Equal("string", serialItemSchema["type"]!.GetValue<string>());
         Assert.Contains(required, item => item?.GetValue<string>() == "serialNumbers");
         Assert.Contains(required, item => item?.GetValue<string>() == "description");
     }
