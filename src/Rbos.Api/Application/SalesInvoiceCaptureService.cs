@@ -38,7 +38,10 @@ public sealed class SalesInvoiceCaptureService(
           "total": number|null, "lines": [{ "description": string|null, "brand": string|null,
           "model": string|null, "hsn": string|null, "quantity": number|null, "unitPrice": number|null,
           "discount": number|null, "amount": number|null, "gstRate": number|null,
-          "gstAmount": number|null, "confidence": number|null }] }
+          "gstAmount": number|null, "confidence": number|null }],
+          "fieldConfidence": { "invoiceNumber": number|null, "date": number|null,
+          "customerName": number|null, "customerPhone": number|null,
+          "subtotal": number|null, "taxAmount": number|null, "total": number|null } }
         """;
 
     public async Task<ServiceResult<object>> ExtractAsync(string? mime, byte[] bytes, CancellationToken ct)
@@ -431,6 +434,13 @@ public sealed class SalesInvoiceCaptureService(
             }
         }
         result["lines"] = lines;
+        var fieldConfidence = new JsonObject();
+        foreach (var field in new[] { "invoiceNumber", "date", "customerName", "customerPhone", "subtotal", "taxAmount", "total" })
+        {
+            var value = SafeNumber(source?["fieldConfidence"]?[field], 1m);
+            fieldConfidence[field] = value is >= 0 and <= 1 ? value : null;
+        }
+        result["fieldConfidence"] = fieldConfidence;
         return result;
     }
 
