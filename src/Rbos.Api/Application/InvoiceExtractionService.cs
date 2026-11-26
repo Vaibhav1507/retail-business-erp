@@ -8,7 +8,8 @@ using Rbos.Domain;
 namespace Rbos.Api.Application;
 
 public sealed record DraftLine(string Description, decimal? Quantity, decimal? UnitCost, decimal? Amount, Guid? ProductId, string? ProductName, string? Category = null, string? Brand = null, decimal? Gst = null);
-public sealed record InvoiceDraft(Guid FileId, string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, List<DraftLine> Lines, List<string> Warnings, decimal? Subtotal = null, decimal? TaxAmount = null);
+public sealed record InvoiceDraft(Guid FileId, string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, List<DraftLine> Lines, List<string> Warnings, decimal? Subtotal = null, decimal? TaxAmount = null, string? Provider = null, string? Model = null, string SchemaVersion = "purchase-v1");
+public sealed record DocumentPurchaseExtraction(string? SupplierName, Guid? SupplierId, string? InvoiceNumber, string? Date, decimal? Total, decimal? Subtotal, decimal? TaxAmount, List<DraftLine> Lines, List<string> Warnings, string? Provider, string? Model, string SchemaVersion);
 
 /// <summary>Reads a supplier invoice photo/PDF with Gemini and Groq vision fallback, then returns an unsaved draft. Nothing is posted here.</summary>
 public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConfiguration cfg, ILogger<InvoiceExtractionService> log, GroqVisionClient groq)
@@ -50,8 +51,20 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         return await ExtractAsync(uid, decoded, ct);
     }
 
-    public async Task<ServiceResult<object>> ExtractAsync(
+    public Task<ServiceResult<object>> ExtractAsync(
         Guid uid, IReadOnlyList<(string? Mime, byte[] Bytes)> pages, CancellationToken ct)
+        => ExtractCoreAsync(uid, pages, retainLegacyEvidence: true, ct);
+
+    /// <summary>
+    /// Runs supplier extraction for Document-to-Books without creating a second copy of the
+    /// original source evidence in the legacy procurement.invoice_file table.
+    /// </summary>
+    public Task<ServiceResult<object>> ExtractForDocumentAsync(
+        Guid uid, IReadOnlyList<(string? Mime, byte[] Bytes)> pages, CancellationToken ct)
+        => ExtractCoreAsync(uid, pages, retainLegacyEvidence: false, ct);
+
+    async Task<ServiceResult<object>> ExtractCoreAsync(
+        Guid uid, IReadOnlyList<(string? Mime, byte[] Bytes)> pages, bool retainLegacyEvidence, CancellationToken ct)
     {
         var requestTimer = Stopwatch.StartNew();
         if (pages.Count is 0 or > MaxPages)
@@ -83,7 +96,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         // could spend AI budget on an upload that cannot be retained.
         var storedMime = mime;
         var stored = bytes;
-        if (providerPages.Count > 1)
+        if (retainLegacyEvidence && providerPages.Count > 1)
         {
             using var archive = new MemoryStream();
             using (var zip = new System.IO.Compression.ZipArchive(archive, System.IO.Compression.ZipArchiveMode.Create, true))
@@ -135,20 +148,28 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
             }
         }
 
+        string? selectedProvider = null;
+        string? selectedModel = null;
         var parsed = await VisionProviderFallback.ExecuteAsync(
             "SupplierInvoice",
             attempts,
             HasUsableInvoiceLines,
             log,
             ct,
-            TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)));
+            TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:TotalProviderBudgetSeconds", 60), 1, 120)),
+            (provider, model) => { selectedProvider = provider; selectedModel = model; });
         if (parsed is null)
         {
             requestTimer.Stop();
             log.LogWarning(
-                "Supplier invoice extraction failed. Pages {PageCount}, uploaded bytes {UploadedBytes}, outcome {Outcome}, total latency {TotalMs}ms, trace {TraceId}",
+                "Supplier invoice extraction returned no usable lines. Pages {PageCount}, uploaded bytes {UploadedBytes}, outcome {Outcome}, total latency {TotalMs}ms, trace {TraceId}",
                 providerPages.Count, suppliedBytes,
                 "provider_chain_exhausted", requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
+            if (!retainLegacyEvidence)
+                return ServiceResult<object>.Ok(new DocumentPurchaseExtraction(
+                    null, null, null, null, null, null, null, [],
+                    ["The configured vision providers could not read this supplier bill. Retake a clearer photo or enter the details manually."],
+                    selectedProvider, selectedModel, "purchase-v1"));
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
         }
 
@@ -188,21 +209,36 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
         var date = Str(parsed?["date"]);
         if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)) date = null;
 
-        var fileId = Guid.NewGuid();
-        await using (var ins = s.Command("insert into procurement.invoice_file(tenant_id,id,content_type,size_bytes,content,created_by) values (@t,@i,@m,@z,@c,@u)"))
+        var invoiceNumber = Clip(Str(parsed?["invoiceNumber"]), 60);
+        if (retainLegacyEvidence)
         {
-            ins.Parameters.AddWithValue("t", tid.Value); ins.Parameters.AddWithValue("i", fileId); ins.Parameters.AddWithValue("m", storedMime);
-            ins.Parameters.AddWithValue("z", stored.Length); ins.Parameters.AddWithValue("c", stored); ins.Parameters.AddWithValue("u", uid);
-            await ins.ExecuteNonQueryAsync(ct);
+            var fileId = Guid.NewGuid();
+            await using (var ins = s.Command("insert into procurement.invoice_file(tenant_id,id,content_type,size_bytes,content,created_by) values (@t,@i,@m,@z,@c,@u)"))
+            {
+                ins.Parameters.AddWithValue("t", tid.Value); ins.Parameters.AddWithValue("i", fileId); ins.Parameters.AddWithValue("m", storedMime);
+                ins.Parameters.AddWithValue("z", stored.Length); ins.Parameters.AddWithValue("c", stored); ins.Parameters.AddWithValue("u", uid);
+                await ins.ExecuteNonQueryAsync(ct);
+            }
+            await s.CommitAsync(ct);
+            draftTimer.Stop();
+            requestTimer.Stop();
+            log.LogInformation(
+                "Supplier invoice draft created. Pages {PageCount}, uploaded bytes {UploadedBytes}, stored bytes {StoredBytes}, lines {LineCount}, draft processing {DraftMs}ms, total latency {TotalMs}ms, trace {TraceId}",
+                providerPages.Count, suppliedBytes, stored.Length, lines.Count, draftTimer.ElapsedMilliseconds,
+                requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
+            return ServiceResult<object>.Ok(new InvoiceDraft(fileId, supplierName, supplier?.Id, invoiceNumber, date, total, lines, warnings, subtotal, tax, selectedProvider, selectedModel));
         }
+
         await s.CommitAsync(ct);
         draftTimer.Stop();
         requestTimer.Stop();
         log.LogInformation(
-            "Supplier invoice draft created. Pages {PageCount}, uploaded bytes {UploadedBytes}, stored bytes {StoredBytes}, lines {LineCount}, draft processing {DraftMs}ms, total latency {TotalMs}ms, trace {TraceId}",
-            providerPages.Count, suppliedBytes, stored.Length, lines.Count, draftTimer.ElapsedMilliseconds,
-            requestTimer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
-        return ServiceResult<object>.Ok(new InvoiceDraft(fileId, supplierName, supplier?.Id, Clip(Str(parsed?["invoiceNumber"]), 60), date, total, lines, warnings, subtotal, tax));
+            "Supplier document extraction completed. Pages {PageCount}, uploaded bytes {UploadedBytes}, lines {LineCount}, provider {Provider}, latency {TotalMs}ms, trace {TraceId}",
+            providerPages.Count, suppliedBytes, lines.Count, selectedProvider, requestTimer.ElapsedMilliseconds,
+            Activity.Current?.TraceId.ToString());
+        return ServiceResult<object>.Ok(new DocumentPurchaseExtraction(
+            supplierName, supplier?.Id, invoiceNumber, date, total, subtotal, tax,
+            lines, warnings, selectedProvider, selectedModel, "purchase-v1"));
     }
 
     public async Task<(string Mime, byte[] Bytes)?> FileAsync(Guid uid, Guid receiptId, CancellationToken ct)
