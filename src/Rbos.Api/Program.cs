@@ -56,10 +56,17 @@ if (runWhatsAppWorker || runDocumentWorker)
         workerServices.AddHttpClient<GroqVisionClient>(http => http.Timeout = TimeSpan.FromSeconds(90));
         workerServices.AddHttpClient<SalesInvoiceCaptureService>(http => http.Timeout = TimeSpan.FromSeconds(90));
         workerServices.AddHttpClient<InvoiceExtractionService>(http => http.Timeout = TimeSpan.FromSeconds(90));
-        using var serviceProvider = new DefaultServiceProviderFactory().CreateServiceProvider(workerServices);
-        await DocumentProcessingWorker.RunAsync(
-            queueDataSource, serviceProvider,
-            loggerFactory.CreateLogger("DocumentProcessingWorker"), cancellation.Token);
+        var serviceProvider = new DefaultServiceProviderFactory().CreateServiceProvider(workerServices);
+        try
+        {
+            await DocumentProcessingWorker.RunAsync(
+                queueDataSource, serviceProvider,
+                loggerFactory.CreateLogger("DocumentProcessingWorker"), cancellation.Token);
+        }
+        finally
+        {
+            (serviceProvider as IDisposable)?.Dispose();
+        }
     }
     if (runWhatsAppWorker)
         await WhatsAppInvoiceWorker.RunAsync(dataSource, queueDataSource, config,
