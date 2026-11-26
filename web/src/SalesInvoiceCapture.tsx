@@ -6,6 +6,7 @@ export type ExtractedSalesInvoiceLine = {
   description: string | null
   brand: string | null
   model: string | null
+  serialNumbers: string[]
   hsn: string | null
   quantity: number | null
   unitPrice: number | null
