@@ -86,6 +86,8 @@ public sealed class SalesInvoiceCaptureService(
                 }
             }
 
+            string? selectedProvider = null;
+            string? selectedModel = null;
             var attempts = new List<VisionProviderAttempt>();
             var apiKey = cfg["Gemini:ApiKey"];
             var models = VisionProviderFallback.ItemTagGeminiModels(cfg);
@@ -119,7 +121,8 @@ public sealed class SalesInvoiceCaptureService(
 
             var parsed = await VisionProviderFallback.ExecuteAsync(
                 "SalesInvoiceCapture", attempts, HasUsableLines, log, ct,
-                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceTotalProviderBudgetSeconds", 20), 5, 30)));
+                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceTotalProviderBudgetSeconds", 20), 5, 30)),
+                (provider, model) => { selectedProvider = provider; selectedModel = model; });
 
             var warnings = new List<string>();
             var extraction = Clean(parsed);
@@ -151,7 +154,10 @@ public sealed class SalesInvoiceCaptureService(
             {
                 status = parsed is null ? "NeedsAttention" : "ReadyForReview",
                 extraction,
-                warnings
+                warnings,
+                provider = selectedProvider,
+                model = selectedModel,
+                schemaVersion = "sale-v1"
             });
         }
         finally
@@ -160,6 +166,163 @@ public sealed class SalesInvoiceCaptureService(
                 CryptographicOperations.ZeroMemory(aiBytes);
             CryptographicOperations.ZeroMemory(bytes);
         }
+    }
+
+    /// <summary>
+    /// Extracts a grouped, multi-photo sales document. The caller owns the original page
+    /// buffers; only transformed working buffers are cleared here.
+    /// </summary>
+    public async Task<ServiceResult<object>> ExtractAsync(
+        IReadOnlyList<(string? Mime, byte[] Bytes)> pages,
+        CancellationToken ct)
+    {
+        if (pages.Count is < 1 or > 6)
+            return ServiceResult<object>.Fail("Upload 1 to 6 pages of one sales bill.");
+        var suppliedBytes = pages.Sum(x => (long)(x.Bytes?.Length ?? 0));
+        if (suppliedBytes is <= 0 or > 24L * 1024 * 1024)
+            return ServiceResult<object>.Fail("The bill pages must be 24 MB or smaller together.");
+
+        var prepared = new List<(string Mime, byte[] Bytes)>(pages.Count);
+        var ownedBuffers = new List<byte[]>();
+        var timer = Stopwatch.StartNew();
+        try
+        {
+            foreach (var (mime, bytes) in pages)
+            {
+                if (mime is null || !Allowed.Contains(mime, StringComparer.OrdinalIgnoreCase))
+                    return ServiceResult<object>.Fail("Upload JPEG, PNG, WebP or PDF pages.");
+                if (bytes is null || bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, mime))
+                    return ServiceResult<object>.Fail("A bill page is empty, larger than 8 MB, corrupt or has an invalid file type.");
+
+                if (string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    prepared.Add((mime, bytes));
+                }
+                else
+                {
+                    var transformed = PrepareVisionImage(bytes, mime, out var transformedMime);
+                    prepared.Add((transformedMime, transformed));
+                    if (!ReferenceEquals(transformed, bytes)) ownedBuffers.Add(transformed);
+                }
+            }
+
+            string? selectedProvider = null;
+            string? selectedModel = null;
+            var attempts = new List<VisionProviderAttempt>();
+            var apiKey = cfg["Gemini:ApiKey"];
+            var models = VisionProviderFallback.ItemTagGeminiModels(cfg);
+            var attemptTimeout = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceAttemptTimeoutSeconds", 7), 5, 15);
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var primary = models[0];
+                attempts.Add(new VisionProviderAttempt("Gemini", primary, attemptTimeout,
+                    token => ExtractPagesWithGeminiAsync(apiKey!, primary, prepared, token)));
+            }
+
+            if (groq.Available && cfg.GetValue("Groq:ItemTagFallbackEnabled", false))
+            {
+                attempts.Add(new VisionProviderAttempt("Groq", groq.Model, attemptTimeout,
+                    token => groq.ExtractInvoiceAsync(prepared, Prompt, token)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                foreach (var model in models.Skip(1))
+                {
+                    var fallback = model;
+                    attempts.Add(new VisionProviderAttempt("Gemini", fallback, attemptTimeout,
+                        token => ExtractPagesWithGeminiAsync(apiKey!, fallback, prepared, token)));
+                }
+            }
+
+            var parsed = await VisionProviderFallback.ExecuteAsync(
+                "SalesInvoiceCapture", attempts, HasUsableLines, log, ct,
+                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceTotalProviderBudgetSeconds", 20), 5, 30)),
+                (provider, model) => { selectedProvider = provider; selectedModel = model; });
+
+            var warnings = new List<string>();
+            var extraction = Clean(parsed);
+            if (parsed is null)
+                warnings.Add("The configured image providers could not read this bill. Retake a clearer photo or enter the details manually.");
+            else
+            {
+                var lines = extraction["lines"] as JsonArray ?? [];
+                if (lines.Count == 0) warnings.Add("No readable bill lines were found.");
+                foreach (var line in lines.OfType<JsonObject>())
+                {
+                    if (ReadString(line["description"]) is null)
+                        warnings.Add("At least one line has no readable description. Check it before recording the sale.");
+                    if (ReadDecimal(line["quantity"]) is null || ReadDecimal(line["unitPrice"]) is null)
+                        warnings.Add("Some line quantities or prices are unreadable. Review and enter them manually.");
+                }
+                if (ReadDecimal(extraction["total"]) is null)
+                    warnings.Add("The bill total was not readable. RBOS will calculate totals from the values you confirm.");
+            }
+
+            timer.Stop();
+            log.LogInformation(
+                "Sales document extraction completed. Pages {PageCount}, bytes {UploadedBytes}, lines {LineCount}, provider {Provider}, latency {LatencyMs}ms",
+                pages.Count, suppliedBytes, (extraction["lines"] as JsonArray)?.Count ?? 0,
+                selectedProvider, timer.ElapsedMilliseconds);
+
+            return ServiceResult<object>.Ok(new
+            {
+                status = parsed is null ? "NeedsAttention" : "ReadyForReview",
+                extraction,
+                warnings,
+                provider = selectedProvider,
+                model = selectedModel,
+                schemaVersion = "sale-v1"
+            });
+        }
+        finally
+        {
+            foreach (var buffer in ownedBuffers)
+                CryptographicOperations.ZeroMemory(buffer);
+        }
+    }
+
+    async Task<JsonNode?> ExtractPagesWithGeminiAsync(
+        string apiKey, string model, IReadOnlyList<(string Mime, byte[] Bytes)> pages, CancellationToken ct)
+    {
+        var parts = new JsonArray();
+        foreach (var (mime, bytes) in pages)
+        {
+            ct.ThrowIfCancellationRequested();
+            parts.Add(new JsonObject
+            {
+                ["inline_data"] = new JsonObject
+                {
+                    ["mime_type"] = mime,
+                    ["data"] = Convert.ToBase64String(bytes)
+                }
+            });
+        }
+        parts.Add(new JsonObject { ["text"] = Prompt });
+        var body = new JsonObject
+        {
+            ["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
+            ["generationConfig"] = new JsonObject
+            {
+                ["responseMimeType"] = "application/json",
+                ["temperature"] = 0
+            }
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
+        request.Headers.Add("x-goog-api-key", apiKey);
+        request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        using var response = await http.SendAsync(request, ct);
+        response.EnsureSuccessStatusCode();
+        var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+        var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
+        var blockReason = root?["promptFeedback"]?["blockReason"]?.GetValue<string>();
+        if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(blockReason))
+            throw new VisionProviderRefusalException("Gemini declined the sales-document extraction request.");
+        var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
+        return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
 
     static byte[] PrepareVisionImage(byte[] original, string mime, out string outputMime)
