@@ -100,7 +100,9 @@ public class SchemaGuardTests
               has_function_privilege('rbos_worker', 'integrations.start_document_processing(uuid,uuid,uuid)', 'EXECUTE'),
               has_function_privilege('rbos_worker', 'integrations.load_document_processing_pages(uuid,uuid,uuid,uuid)', 'EXECUTE'),
               has_function_privilege('rbos_worker', 'integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamp with time zone)', 'EXECUTE'),
-              has_function_privilege('rbos_worker', 'integrations.fail_document_processing_before_start(uuid,uuid,uuid,text)', 'EXECUTE')", conn);
+              has_function_privilege('rbos_worker', 'integrations.fail_document_processing_before_start(uuid,uuid,uuid,text)', 'EXECUTE'),
+              has_table_privilege('rbos_worker', 'documents.document_extraction_attempt', 'SELECT'),
+              has_table_privilege('rbos_worker', 'documents.document_extraction_draft', 'SELECT')", conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.True(reader.GetBoolean(0));
@@ -115,6 +117,8 @@ public class SchemaGuardTests
         Assert.True(reader.GetBoolean(9));
         Assert.True(reader.GetBoolean(10));
         Assert.True(reader.GetBoolean(11));
+        Assert.False(reader.GetBoolean(12));
+        Assert.False(reader.GetBoolean(13));
     }
 
     [Fact]
