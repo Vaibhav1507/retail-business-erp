@@ -1,6 +1,6 @@
 # Document ingestion and Document-to-Books architecture
 
-**Status:** Discovery baseline and target architecture proposal; no schema or application code changes in WP0.  
+**Status:** WP0 merged; WP1 intake foundation merged in PR #109; WP2 worker/extraction implementation in progress on `feat/document-processing-worker` (not yet merged).  
 **Baseline:** `main` commit `92c181f6f0ba861acac954545e7d630d07f3305c` (2026-11-26).  
 **Product contract:** [docs/product/document-to-books.md](../product/document-to-books.md)  
 **Decision:** [ADR-027](../adr/adr-027-document-to-books.md)  
@@ -17,10 +17,10 @@ The system already has two separate invoice capture implementations. They solve 
 | UI entry | `web/src/GenerateInvoice.tsx` → `web/src/SalesInvoiceCapture.tsx` |
 | API | Authenticated `POST /api/sales/invoice-image-extract` |
 | Input | One raw binary JPEG/PNG/WebP/PDF; max 8 MB |
-| Processing | Synchronous request; image preprocessing via SkiaSharp; optional local Tesseract fast path capped at 900 ms |
-| Providers | Direct Gemini model chain; optional Groq image fallback gated by `Groq:ItemTagFallbackEnabled`; image-only OCR/Groq path is skipped for PDF |
-| Output | `ReadyForReview` or `NeedsAttention`, extracted header/lines/warnings |
-| Confidence | A line-level confidence property is accepted; field-level confidence/provenance/geometry are not a complete contract |
+| Processing | Existing single-page Generate Invoice action remains synchronous; WP2 adds a grouped-page extraction method for background Document-to-Books jobs |
+| Providers | Direct Gemini model chain; optional Groq multi-page image fallback gated by `Groq:ItemTagFallbackEnabled`; no AI Gateway dependency |
+| Output | Existing `ReadyForReview` / `NeedsAttention`; WP2 persists a versioned `sale-v1` review draft in the document registry |
+| Confidence | Line confidence is retained; header field-confidence hints and extraction provenance metadata are now persisted for Document-to-Books review (not calibrated probability) |
 | Evidence | Input is processed in memory and buffers are cleared; source image/PDF is not persisted |
 | Review | Editable extracted-line review is embedded in Generate Invoice |
 | Posting | Accepted rows enter normal Generate Invoice state and later the existing sales posting flow; AI endpoint has no posting authority |
@@ -49,7 +49,8 @@ Relevant files:
 | Evidence | Original page(s) stored in `procurement.invoice_file` as `bytea`; multiple pages are stored as a ZIP; row is staged with no receipt until later posting |
 | Review | `InvoiceUpload` lets operator map each line to catalogue product, edit quantity/cost/GST and choose a supplier |
 | Posting | UI carries selected lines and `invoiceFileId` to `POST /api/purchases`; purchase receipt attaches the file |
-| Prompt limitation | Supplier prompt explicitly says to ignore handwriting |
+| Prompt | WP2 changes the supplier contract to cover handwritten, printed, thermal and mixed English/Hindi bills; unknown values stay null |
+| Document-to-Books path | `ExtractForDocumentAsync` reuses supplier interpretation/matching but does not duplicate source bytes into `procurement.invoice_file`; it returns a `purchase-v1` review draft |
 
 Relevant files:
 - `src/Rbos.Api/ProcurementEndpoints.cs`
@@ -244,13 +245,41 @@ Use server-side calculations as authoritative. If quantity and amount are confir
 - The document may transition to Posted only after the transaction is committed and the linkage is verified.
 - Reversals/corrections use the domain's existing reversal and adjustment rules.
 
+## 2.8 WP2 worker and extraction implementation
+
+The current implementation branch `feat/document-processing-worker` is a backend-only WP2 slice; it has not yet been merged or deployed.
+
+### Durable processing
+
+- Migration `059_document_extraction_worker.sql` adds tenant-RLS `documents.document_extraction_attempt` and `documents.document_extraction_draft`.
+- Worker-only SECURITY DEFINER functions start a lease-bound attempt, load page bytes only for a current lease/attempt, save a review draft or retry/actionable failure, and classify failures before an attempt starts.
+- The worker process reuses the scheduled Cloud Run Job and the existing `rbos_worker` connection. `--rbos-workers` now runs up to two document jobs then the existing WhatsApp delivery queue; `--document-worker` is available for a document-only run.
+- Queue payloads contain identifiers only. Pages are fetched through the live tenant/document/attempt lease. The worker verifies page length and SHA-256 before handing bytes to an extractor and clears page buffers in a `finally` block.
+- A stale `Started` attempt is marked `FailedRetryable / worker_lease_recovered` when its expired lease is reclaimed. Retryable database/provider failures use bounded exponential backoff (maximum four claims/attempts); invalid/exhausted work is marked `FailedNeedsAction` instead of remaining queued.
+- The worker cannot directly select or update document page, attempt or draft tables. The API app role can read review data only under tenant RLS; it cannot write extraction results.
+
+### Separate extraction adapters
+
+- **Sale:** `SalesInvoiceCaptureService.ExtractAsync(pages)` accepts a grouped set of 1–6 pages/photographs (up to 24 MB total), preserves page order, sends one multi-part document request to Gemini, and optionally uses the existing Groq image fallback. Existing Generate Invoice single-file behaviour is preserved.
+- **Purchase:** `InvoiceExtractionService.ExtractForDocumentAsync` reuses supplier/catalogue matching and provider selection, accepts the same 24 MB document limit, understands handwriting/mixed scripts, and returns `DocumentPurchaseExtraction`. It does not create a second legacy `procurement.invoice_file` copy; WP1's `documents.document_page` remains the source evidence. The existing supplier-upload method still retains its legacy evidence exactly as before.
+- Contracts have separate `sale-v1` and `purchase-v1` versions. They carry per-line and header confidence hints, raw supplier extraction output, provider/model metadata, warnings and provenance group markers.
+- Confidence scores are explicitly uncalibrated review hints. They must not auto-approve or suppress review. Unreadable values stay null.
+- Provider configuration remains the existing direct Gemini/optional Groq policy. No new provider, AI Gateway, external queue or credentials are introduced.
+
+### API and product boundary
+
+- `GET /api/documents/{id}` now returns status history, extraction-attempt metadata and the latest review draft alongside page metadata. This gives WP3 the required read contract without a second extraction call.
+- A successful extraction moves a document to `NeedsReview`, never `Posted`. The worker does not call sales posting, purchasing receipt or accounting services.
+- Purchase extraction still requires the uploader to be an active tenant member for its supplier/catalogue matching context. If that context is unavailable, the job is marked for user action rather than bypassing RLS.
+- No Document Inbox/review UI, posting integration, duplicate matching beyond upload idempotency, labelled accuracy corpus, production migration or deployment is included in WP2.
+
 ## 3. Proposed implementation sequence
 
 | WP | Scope | Main dependencies | Gate / output |
 |---|---|---|---|
 | WP0 | Current-state audit, product scope, ADR and handoff | Existing source and docs | Completed in discovery branch |
-| WP1 | Document registry, storage adapter, upload, batch/page grouping, durable job, inbox status API | Storage policy, worker runtime, tenant/RLS design | Upload persists and resumes after process restart |
-| WP2 | Versioned sales/purchase extraction, handwriting, image quality pipeline, validation and confidence | WP1, representative corpus | Per-field/line quality evidence, no posting |
+| WP1 | Document registry, storage adapter, upload, batch/page grouping, durable job, inbox status API | Storage policy, worker runtime, tenant/RLS design | Merged in PR #109; production migration/deployment still to verify |
+| WP2 | Lease-safe worker, source retrieval, versioned sales/purchase extraction adapters, failure/retry lifecycle and review draft API | WP1 merged; migration 059 | In progress on `feat/document-processing-worker`; high-signal no-provider flow tests; no posting |
 | WP3 | Mobile inbox and review/correction UX | WP1/WP2 API contracts | Phone-first approved design and working review flow |
 | WP4 | Sales and purchase posting integration | WP2/WP3; walk-in and purchase bill/receipt policies | One real posted sale and purchase each, fully reconciled |
 | WP5 | Batch controls, retries, duplicate review, monitoring | WP1–WP4 | Partial failure recovery and no duplicate posts |

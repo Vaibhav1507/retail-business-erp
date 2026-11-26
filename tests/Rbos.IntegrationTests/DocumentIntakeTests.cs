@@ -3,7 +3,11 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
+using Rbos.Api.Application;
+using Rbos.Api.Persistence;
 
 namespace Rbos.IntegrationTests;
 
@@ -88,6 +92,78 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
             Assert.True((bool)(await finish.ExecuteScalarAsync())!);
         }
         Assert.Equal(documentId, claimedId);
+    }
+
+    [Fact]
+    public async Task Document_worker_creates_sales_and_purchase_review_drafts_without_posting()
+    {
+        using var http = factory.CreateClient();
+        var client = new Client(http);
+        await client.SignUpAndBootstrap();
+
+        // PDFs avoid the optional local OCR fast path. Blank provider keys keep this
+        // integration flow deterministic and prove the worker persists a review-needed
+        // draft even when no hosted vision provider is configured.
+        var pdf = Encoding.ASCII.GetBytes("%PDF-1.4\\n% document worker flow");
+        var saleUpload = await UploadAsync(http, "Sale",
+            [new UploadPage("page-0-0", "handwritten-sale.pdf", "application/pdf", pdf)],
+            Guid.NewGuid().ToString("N"));
+        Assert.Equal(HttpStatusCode.OK, saleUpload.StatusCode);
+        using var saleJson = JsonDocument.Parse(await saleUpload.Content.ReadAsStringAsync());
+        var saleId = saleJson.RootElement.GetProperty("documents")[0].GetProperty("id").GetGuid();
+
+        var purchaseUpload = await UploadAsync(http, "Purchase",
+            [new UploadPage("page-0-0", "handwritten-purchase.pdf", "application/pdf", pdf)],
+            Guid.NewGuid().ToString("N"));
+        Assert.Equal(HttpStatusCode.OK, purchaseUpload.StatusCode);
+        using var purchaseJson = JsonDocument.Parse(await purchaseUpload.Content.ReadAsStringAsync());
+        var purchaseId = purchaseJson.RootElement.GetProperty("documents")[0].GetProperty("id").GetGuid();
+
+        var config = new ConfigurationBuilder()
+            .AddUserSecrets<Program>()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Gemini:ApiKey"] = "",
+                ["Groq:ApiKey"] = "",
+                ["Groq:ItemTagFallbackEnabled"] = "false",
+                ["Groq:InvoiceFallbackEnabled"] = "false"
+            })
+            .Build();
+
+        await using var appDataSource = NpgsqlDataSource.Create(config["ConnectionStrings:RbosTestApp"]!);
+        await using var queueDataSource = NpgsqlDataSource.Create(config["ConnectionStrings:RbosTestWhatsAppWorker"]!);
+        using var loggerFactory = LoggerFactory.Create(_ => { });
+        using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+
+        var groq = new GroqVisionClient(httpClient, config, loggerFactory.CreateLogger<GroqVisionClient>());
+        var localOcr = new LocalOcr(config, loggerFactory.CreateLogger<LocalOcr>());
+        var salesCapture = new SalesInvoiceCaptureService(
+            httpClient, groq, localOcr, config, loggerFactory.CreateLogger<SalesInvoiceCaptureService>());
+        var purchaseCapture = new InvoiceExtractionService(
+            httpClient, new TenantDb(appDataSource), config, loggerFactory.CreateLogger<InvoiceExtractionService>(), groq);
+
+        var workerServices = new ServiceCollection();
+        workerServices.AddSingleton(salesCapture);
+        workerServices.AddSingleton(purchaseCapture);
+        using var provider = workerServices.BuildServiceProvider();
+
+        var workerLogger = loggerFactory.CreateLogger("DocumentProcessingWorker");
+        await DocumentProcessingWorker.RunAsync(queueDataSource, provider, workerLogger, CancellationToken.None, saleId);
+        await DocumentProcessingWorker.RunAsync(queueDataSource, provider, workerLogger, CancellationToken.None, purchaseId);
+
+        var saleDetails = await http.GetFromJsonAsync<JsonElement>($"/api/documents/{saleId}");
+        Assert.Equal("NeedsReview", saleDetails.GetProperty("document").GetProperty("status").GetString());
+        Assert.Equal("SalesInvoiceCapture", saleDetails.GetProperty("attempts")[0].GetProperty("extractor").GetString());
+        Assert.Equal("sale-v1", saleDetails.GetProperty("extractionDraft").GetProperty("schemaVersion").GetString());
+        Assert.Equal("Sale", saleDetails.GetProperty("extractionDraft").GetProperty("extractedData").GetProperty("direction").GetString());
+
+        var purchaseDetails = await http.GetFromJsonAsync<JsonElement>($"/api/documents/{purchaseId}");
+        Assert.Equal("NeedsReview", purchaseDetails.GetProperty("document").GetProperty("status").GetString());
+        Assert.Equal("SupplierInvoiceCapture", purchaseDetails.GetProperty("attempts")[0].GetProperty("extractor").GetString());
+        Assert.Equal("purchase-v1", purchaseDetails.GetProperty("extractionDraft").GetProperty("schemaVersion").GetString());
+        Assert.Equal("Purchase", purchaseDetails.GetProperty("extractionDraft").GetProperty("extractedData").GetProperty("direction").GetString());
+        Assert.Equal(JsonValueKind.Object, purchaseDetails.GetProperty("extractionDraft").GetProperty("extractedData").GetProperty("rawExtraction").ValueKind);
     }
 
     [Fact]

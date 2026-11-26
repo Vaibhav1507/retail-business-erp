@@ -306,7 +306,60 @@ public static class DocumentEndpoints
                 actorUserId = historyReader.IsDBNull(1) ? (Guid?)null : historyReader.GetGuid(1),
                 occurredAt = new DateTimeOffset(historyReader.GetDateTime(2), TimeSpan.Zero)
             });
-        return Results.Ok(new { document, pages, statusHistory });
+        await historyReader.CloseAsync();
+
+        var attempts = new List<object>();
+        await using (var attemptsCommand = session.Command(@"
+            select attempt_number, state, extractor, schema_version, provider, model,
+                   safe_error_code, processing_ms, started_at, completed_at
+              from documents.document_extraction_attempt
+             where document_id = @id
+             order by attempt_number"))
+        {
+            attemptsCommand.Parameters.AddWithValue("id", id);
+            await using var attemptsReader = await attemptsCommand.ExecuteReaderAsync(ct);
+            while (await attemptsReader.ReadAsync(ct))
+                attempts.Add(new
+                {
+                    attemptNumber = attemptsReader.GetInt32(0),
+                    state = attemptsReader.GetString(1),
+                    extractor = attemptsReader.GetString(2),
+                    schemaVersion = attemptsReader.GetString(3),
+                    provider = attemptsReader.IsDBNull(4) ? null : attemptsReader.GetString(4),
+                    model = attemptsReader.IsDBNull(5) ? null : attemptsReader.GetString(5),
+                    safeErrorCode = attemptsReader.IsDBNull(6) ? null : attemptsReader.GetString(6),
+                    processingMs = attemptsReader.IsDBNull(7) ? (int?)null : attemptsReader.GetInt32(7),
+                    startedAt = new DateTimeOffset(attemptsReader.GetDateTime(8), TimeSpan.Zero),
+                    completedAt = attemptsReader.IsDBNull(9) ? (DateTimeOffset?)null : new DateTimeOffset(attemptsReader.GetDateTime(9), TimeSpan.Zero)
+                });
+        }
+
+        object? extractionDraft = null;
+        await using (var draftCommand = session.Command(@"
+            select schema_version, provider, model, extracted_data, warnings, created_at, updated_at
+              from documents.document_extraction_draft
+             where document_id = @id"))
+        {
+            draftCommand.Parameters.AddWithValue("id", id);
+            await using var draftReader = await draftCommand.ExecuteReaderAsync(ct);
+            if (await draftReader.ReadAsync(ct))
+            {
+                using var extracted = JsonDocument.Parse(draftReader.GetString(3));
+                using var warnings = JsonDocument.Parse(draftReader.GetString(4));
+                extractionDraft = new
+                {
+                    schemaVersion = draftReader.GetString(0),
+                    provider = draftReader.IsDBNull(1) ? null : draftReader.GetString(1),
+                    model = draftReader.IsDBNull(2) ? null : draftReader.GetString(2),
+                    extractedData = extracted.RootElement.Clone(),
+                    warnings = warnings.RootElement.Clone(),
+                    createdAt = new DateTimeOffset(draftReader.GetDateTime(5), TimeSpan.Zero),
+                    updatedAt = new DateTimeOffset(draftReader.GetDateTime(6), TimeSpan.Zero)
+                };
+            }
+        }
+
+        return Results.Ok(new { document, pages, statusHistory, attempts, extractionDraft });
     }
 
     static async Task<IResult> GetPage(

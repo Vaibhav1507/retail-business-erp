@@ -92,8 +92,10 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
     public static JsonNode? MergeInvoicePageResults(IReadOnlyList<JsonNode?> partials)
     {
         var merged = new JsonObject { ["lines"] = new JsonArray() };
-        var identityFields = new[] { "supplierName", "invoiceNumber", "date" };
+        var identityFields = new[] { "supplierName", "customerName", "customerPhone", "invoiceNumber", "date" };
         var trailingSummaryFields = new[] { "total", "subtotal", "taxAmount" };
+        var confidenceFields = new[] { "supplierName", "customerName", "customerPhone", "invoiceNumber", "date", "total", "subtotal", "taxAmount" };
+        var mergedConfidence = new JsonObject();
         foreach (var partial in partials)
         {
             if (partial is not JsonObject) return null;
@@ -104,10 +106,14 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
             }
             foreach (var key in trailingSummaryFields)
                 if (HasUsableScalar(partial[key])) merged[key] = partial[key]!.DeepClone();
+            foreach (var key in confidenceFields)
+                if (mergedConfidence[key] is null && HasUsableScalar(partial["fieldConfidence"]?[key]))
+                    mergedConfidence[key] = partial["fieldConfidence"]![key]!.DeepClone();
             if (partial["lines"] is JsonArray lines)
                 foreach (var line in lines)
                     if (line is not null) ((JsonArray)merged["lines"]!).Add(line.DeepClone());
         }
+        merged["fieldConfidence"] = mergedConfidence;
         return merged;
     }
 
