@@ -117,7 +117,7 @@ public sealed class SalesInvoiceCaptureService(
 
             var attempts = new List<VisionProviderAttempt>();
             var apiKey = cfg["Gemini:ApiKey"];
-            var models = VisionProviderFallback.InvoiceGeminiModels(cfg);
+            var models = VisionProviderFallback.SalesInvoiceGeminiModels(cfg);
             var attemptTimeout = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceAttemptTimeoutSeconds", 7), 5, 15);
             if (!string.IsNullOrWhiteSpace(apiKey))
             {
@@ -127,7 +127,7 @@ public sealed class SalesInvoiceCaptureService(
                     token => ExtractWithGeminiAsync(apiKey!, primary, aiMime, aiBytes, ocrText, token)));
             }
 
-            if (!string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase) && groq.Available && cfg.GetValue("Groq:InvoiceFallbackEnabled", false))
+            if (!string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase) && groq.Available && cfg.GetValue("Groq:SalesInvoiceFallbackEnabled", cfg.GetValue("Groq:InvoiceFallbackEnabled", false)))
             {
                 var prompt = ocrText is null ? Prompt : Prompt + "\nOptional local OCR hints (may contain errors; image is authoritative):\n" + ocrText;
                 attempts.Add(new VisionProviderAttempt("Groq", groq.Model,
