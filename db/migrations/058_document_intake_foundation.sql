@@ -123,7 +123,7 @@ end;
 $$;
 
 create or replace function integrations.claim_document_processing(
-  p_limit integer default 5, p_lease_seconds integer default 300
+  p_limit integer default 5, p_lease_seconds integer default 300, p_document_id uuid default null
 ) returns table (
   document_id uuid, tenant_id uuid, actor_user_id uuid,
   lease_token uuid, attempt_count integer
@@ -138,6 +138,7 @@ begin
       from integrations.document_processing_queue q
      where q.available_at <= now()
        and (q.lease_until is null or q.lease_until < now())
+       and (p_document_id is null or q.document_id = p_document_id)
      order by q.available_at, q.created_at
      for update skip locked
      limit greatest(1, least(coalesce(p_limit, 5), 10))
@@ -176,8 +177,8 @@ $$;
 
 revoke all on integrations.document_processing_queue from public, rbos_app, rbos_worker;
 revoke all on function integrations.enqueue_document_processing(uuid,uuid,uuid) from public;
-revoke all on function integrations.claim_document_processing(integer,integer) from public;
+revoke all on function integrations.claim_document_processing(integer,integer,uuid) from public;
 revoke all on function integrations.finish_document_processing(uuid,uuid,timestamptz) from public;
 grant execute on function integrations.enqueue_document_processing(uuid,uuid,uuid) to rbos_app;
-grant execute on function integrations.claim_document_processing(integer,integer) to rbos_worker;
+grant execute on function integrations.claim_document_processing(integer,integer,uuid) to rbos_worker;
 grant execute on function integrations.finish_document_processing(uuid,uuid,timestamptz) to rbos_worker;
