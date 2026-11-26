@@ -84,8 +84,6 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await expect(bill.locator('#billing-name')).toHaveValue('Handwritten Customer')
   await expect(bill.locator('#billing-phone')).toHaveValue('9876543210')
 
-  const actions = review.locator('.invoice-extraction-actions')
-  const lastCard = review.locator('.invoice-extracted-line').last()
   const separation = await review.evaluate(element => {
     const cards = element.querySelectorAll('.invoice-extracted-line')
     const action = element.querySelector('.invoice-extraction-actions')
