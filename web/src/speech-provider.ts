@@ -43,6 +43,22 @@ export function getSpeechProvider(
   return providers[id]
 }
 
+let persistentVoiceStorageRequest: Promise<boolean> | null = null
+
+/** Request browser-persistent origin storage once so cached voice assets are less likely to be evicted. */
+export function requestPersistentVoiceStorage(): Promise<boolean> {
+  persistentVoiceStorageRequest ??= (async () => {
+    try {
+      const storage = navigator.storage
+      if (!storage?.persist) return false
+      return await storage.persist()
+    } catch {
+      return false
+    }
+  })()
+  return persistentVoiceStorageRequest
+}
+
 /** Create the worker for the selected provider without coupling UI to its URL. */
 export function createSpeechWorker(
   id: SpeechWorkerProviderId = DEFAULT_SPEECH_PROVIDER,

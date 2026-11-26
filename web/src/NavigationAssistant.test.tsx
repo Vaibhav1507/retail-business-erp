@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NavigationAssistant } from './NavigationAssistant'
 import { setLanguage } from './i18n'
@@ -15,7 +15,7 @@ describe('NavigationAssistant', () => {
  it('opens a panel with a visible voice action and typed navigation', async () => {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
-  expect(screen.getByRole('button', { name: /Hold to talk/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Start voice command/ })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /Set up voice/ })).not.toBeInTheDocument()
   expect(screen.getByLabelText('Ask your business assistant')).toBeInTheDocument()
  })
@@ -27,7 +27,7 @@ describe('NavigationAssistant', () => {
   const actions = panel.querySelector('.navigation-top-actions') as HTMLElement
   const history = panel.querySelector('.navigation-history') as HTMLElement
   const form = panel.querySelector('.navigation-assistant-form') as HTMLElement
-  const mic = screen.getByRole('button', { name: 'Hold to talk' })
+  const mic = screen.getByRole('button', { name: 'Start voice command' })
   expect(header.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(actions.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(history.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -58,6 +58,15 @@ describe('NavigationAssistant', () => {
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), 'make a new bill')
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
   await waitFor(() => expect(window.location.hash).toBe('#/sell/bill'))
+ })
+ it('keeps the assistant open when navigation is declined to protect current work', async () => {
+  render(<NavigationAssistant onNavigate={() => false} />)
+  await userEvent.click(screen.getByRole('button', { name: 'Open assistant' }))
+  await userEvent.type(screen.getByLabelText('Ask your business assistant'), 'make a new bill')
+  await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
+  expect(window.location.hash).toBe('')
+  expect(within(screen.getByRole('region', { name: 'Navigation assistant' })).getByRole('button', { name: 'Close assistant' })).toBeInTheDocument()
+  expect(screen.getByText('Navigation cancelled. Your current work is unchanged.')).toBeInTheDocument()
  })
  it('asks the user to choose when a command is ambiguous', async () => {
   render(<NavigationAssistant />)
@@ -170,10 +179,10 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
  try {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', {name:'Open assistant'}))
-  const mic = screen.getByRole('button', {name:'Hold to talk'})
-  fireEvent.pointerDown(mic, {pointerId:7, button:0})
+  const mic = screen.getByRole('button', {name:'Start voice command'})
+  await userEvent.click(mic)
   await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce())
-  expect(await screen.findByText('Listening… release to send')).toBeInTheDocument()
+  expect(await screen.findByText('Listening… tap mic to finish')).toBeInTheDocument()
   expect(screen.queryByRole('button', {name:/Set up voice/})).not.toBeInTheDocument()
   expect(screen.getByLabelText('Ask your business assistant')).toHaveAttribute('readonly')
   expect(screen.getByRole('button', {name:'Go'})).toBeDisabled()
@@ -198,14 +207,13 @@ it('starts microphone capture on the first press-and-hold and auto-submits the f
 
   MockAudioWorkletNode.instance?.emitAudio(new Float32Array(16000).fill(0.05))
   await new Promise(resolve => setTimeout(resolve, 450))
-  fireEvent.pointerUp(mic, {pointerId:7, button:0})
+  await userEvent.click(screen.getByRole('button', {name:'Stop voice command'}))
   await waitFor(() => expect(MockSpeechWorker.instance?.messages.some(item => item.type === 'transcribe')).toBe(true))
 
   MockSpeechWorker.instance?.emit({type:'result', text:'make a new bill'})
   await waitFor(() => expect(window.location.hash).toBe('#/sell/bill'))
-  expect(screen.getByText('make a new bill')).toBeInTheDocument()
-  expect(screen.getByText('Opening New sale bill.')).toBeInTheDocument()
-  expect((screen.getByLabelText('Ask your business assistant') as HTMLInputElement).value).toBe('')
+  expect(screen.getByRole('button', {name:'Open assistant'})).toBeInTheDocument()
+  expect(screen.queryByLabelText('Ask your business assistant')).not.toBeInTheDocument()
  } finally {
   restore()
  }
@@ -220,12 +228,12 @@ it('does not execute a voice command if the assistant is closed during final tra
  try {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', {name:'Open assistant'}))
-  const mic = screen.getByRole('button', {name:'Hold to talk'})
-  fireEvent.pointerDown(mic, {pointerId:9, button:0})
-  await screen.findByText('Listening… release to send')
+  const mic = screen.getByRole('button', {name:'Start voice command'})
+  await userEvent.click(mic)
+  await screen.findByText('Listening… tap mic to finish')
   MockAudioWorkletNode.instance?.emitAudio(new Float32Array(16000).fill(0.05))
   await new Promise(resolve => setTimeout(resolve, 450))
-  fireEvent.pointerUp(mic, {pointerId:9, button:0})
+  await userEvent.click(screen.getByRole('button', {name:'Stop voice command'}))
   await waitFor(() => expect(MockSpeechWorker.instance?.messages.some(item => item.type === 'transcribe')).toBe(true))
 
   await userEvent.click(screen.getAllByRole('button', {name:'Close assistant'})[0])
@@ -243,7 +251,7 @@ it('reports a denied microphone permission from the first press-and-hold', async
  try {
   render(<NavigationAssistant />)
   await userEvent.click(screen.getByRole('button', {name:'Open assistant'}))
-  fireEvent.pointerDown(screen.getByRole('button', {name:'Hold to talk'}), {pointerId:2, button:0})
+  await userEvent.click(screen.getByRole('button', {name:'Start voice command'}))
   expect(getUserMedia).toHaveBeenCalledOnce()
   expect(await screen.findByRole('alert')).toHaveTextContent('Microphone access was denied')
  } finally {

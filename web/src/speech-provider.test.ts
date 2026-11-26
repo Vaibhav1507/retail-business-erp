@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createSpeechWorker,
+  requestPersistentVoiceStorage,
   DEFAULT_SPEECH_PROVIDER,
   getSpeechProvider,
 } from './speech-provider'
@@ -16,6 +17,34 @@ describe('speech provider registry', () => {
       workerUrl: '/shruti-worker.js',
       modelDownloadBytes: 29_546_527,
     })
+  })
+
+  it('requests persistent origin storage when supported', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'storage')
+    const persist = vi.fn().mockResolvedValue(true)
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: { persist } })
+    try {
+      await expect(requestPersistentVoiceStorage()).resolves.toBe(true)
+      expect(persist).toHaveBeenCalledOnce()
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'storage', descriptor)
+      else Reflect.deleteProperty(navigator, 'storage')
+    }
+  })
+
+  it('treats unavailable persistent storage as a recoverable browser limitation', async () => {
+    // Load a fresh module instance so the previous test's module-level request
+    // cache does not leak its successful browser capability result into this case.
+    vi.resetModules()
+    const { requestPersistentVoiceStorage: request } = await import('./speech-provider')
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'storage')
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: {} })
+    try {
+      await expect(request()).resolves.toBe(false)
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'storage', descriptor)
+      else Reflect.deleteProperty(navigator, 'storage')
+    }
   })
 
   it('creates the selected provider worker without UI-owned runtime paths', () => {
