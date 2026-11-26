@@ -301,7 +301,12 @@ public sealed class SalesInvoiceCaptureService(
                 })
                     line[key] = Clip(ReadString(item[key]), max);
 
-                line["serialNumbers"] = CleanStringArray(item["serialNumbers"], 12, 64);
+                var serialNumbers = CleanStringArray(item["serialNumbers"], 12, 64);
+                var singleSerial = Clip(ReadString(item["serialNumber"]), 64);
+                if (singleSerial is not null && !serialNumbers.Any(value =>
+                    string.Equals(ReadString(value), singleSerial, StringComparison.OrdinalIgnoreCase)))
+                    serialNumbers.Add(singleSerial);
+                line["serialNumbers"] = serialNumbers;
                 foreach (var key in new[] { "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount" })
                     line[key] = SafeNumber(item[key], 100_000_000m);
                 var confidence = SafeNumber(item["confidence"], 1m);
