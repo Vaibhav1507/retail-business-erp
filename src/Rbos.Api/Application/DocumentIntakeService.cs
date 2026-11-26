@@ -143,7 +143,7 @@ public sealed class DocumentIntakeService(TenantDb tenantDb)
         while (await reader.ReadAsync(ct))
             result.Add(new DocumentUploadSummary(
                 reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                reader.GetInt32(4), reader.GetInt32(5), reader.GetFieldValue<DateTimeOffset>(6)));
+                reader.GetInt32(4), reader.GetInt32(5), new DateTimeOffset(reader.GetDateTime(6), TimeSpan.Zero)));
         return result;
     }
 
