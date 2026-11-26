@@ -218,3 +218,35 @@ Use the repository playbook, MagicPath when available, repository design specifi
 - Fix issues from that pass and rerun affected coverage. Group verification is not a reason to leave known defects unaddressed during implementation.
 - Keep automated checks, final visual verification, native Android acceptance, user acceptance, merge and deployment as distinct statuses.
 - Every significant pause must update the living programme and docs/ux/BILLING-SALES-HANDOFF.md with the exact next task and latest branch/PR/commit/test evidence.
+
+
+## 8. App-wide visual consistency contract (effective 2026-11-26)
+
+Every new screen, route, option, modal, drawer, form, empty state or workflow must look and behave like part of the existing RBOS application. The recent app-wide UI/UX improvements are the baseline to extend, not a reason to introduce a parallel visual system.
+
+### Required before implementation
+
+- Inspect at least one current, polished screen that serves a similar task, plus the app shell and its responsive behaviour. Reuse existing components and patterns wherever possible.
+- Read the actual shared styles and tokens in `web/src/styles.css` and `web/src/ui-polish.css`; inspect screen-specific styles such as `launcher.css` when relevant. Treat the repository implementation as the source of truth, not a newly invented mockup.
+- Preserve the existing font stack: `system-ui, 'Segoe UI', Roboto, sans-serif`. Do not add a new font family or import a font for an isolated feature.
+- Reuse the existing CSS variables for colours, type sizes, spacing, radii, shadows, focus rings, touch targets and navigation/safe-area sizing. Do not hard-code a second palette or create duplicate tokens without an approved design-system change.
+- Use existing buttons, fields, cards, tabs, status/alert patterns, navigation and responsive conventions. Add scoped component styles only where the current system has no suitable pattern.
+
+### Interaction and hierarchy
+
+- Default to **action-first**: show the user's next meaningful action prominently, then supporting information and secondary actions. Do not make every action visually equal or bury the primary task beneath explanation or decoration.
+- Keep labels and helper copy short, plain and familiar to Indian shopkeepers. Use progressive disclosure for advanced/rare options.
+- Match existing primary/secondary/destructive action hierarchy, loading/disabled/error/success feedback, confirmation patterns and keyboard focus behaviour.
+- New options must fit the existing page flow; do not add a new screen, modal or step unless it materially simplifies the task or is required for safety.
+- Keep mobile layouts first-class: respect the existing content width, fixed bottom navigation, safe-area padding, compact top bar, 44px minimum targets and established breakpoints. Verify long English/Hindi labels and narrow devices.
+
+### Acceptance criteria for every new UI surface
+
+1. Same typography/font family, palette, spacing rhythm, radii, controls and interaction language as current RBOS screens.
+2. One obvious primary action where the task has a clear next step; secondary actions are visually subordinate.
+3. Existing app shell/navigation and route semantics remain intact.
+4. Loading, empty, validation, error, success and retry states use established patterns where applicable.
+5. Responsive and accessibility checks follow Stage G; screenshots are compared against adjacent polished RBOS screens, not only the feature's own mockup.
+6. Any genuinely necessary design-system extension is documented first in `docs/ux/`, uses existing tokens, and is scoped to avoid regressions.
+
+This contract applies to all future RBOS feature work, including Document-to-Books inbox/review screens, settings/options and smaller additions to existing pages.

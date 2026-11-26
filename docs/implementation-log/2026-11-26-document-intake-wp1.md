@@ -269,3 +269,12 @@ Latest verified pre-fix CI run: #45800273323 on commit `ae4803a820b66ceae2b06e56
 - Fixes and this log update are pushed to `feat/document-intake-foundation`. The latest CI run must be checked before calling the remediation complete. Broad unit-test expansion remains deferred; the focused integration flow is retained.
 
 No production migration, merge or deployment has occurred.
+
+
+## Merge and handoff update — 2026-11-26
+
+- Owner confirmed PR #109 merged. Verified GitHub state: merged at 2026-11-26 10:39:31 UTC; merge commit `b6b0409c3ed522aa70f84d8cde002632807dda77`.
+- The owner also made the app-wide visual consistency requirement explicit: all future screens/options must use the existing font family, CSS tokens/styles, action-first hierarchy and established page patterns. This has been added as mandatory Section 8 of `docs/ux/RBOS-UI-UX-WORKFLOW.md` and is required for Document-to-Books inbox/review UI.
+- Merge is not deployment. Migration 058 application in the target environment remains unverified and must be checked before starting a worker that depends on it.
+- WP2 preparation: reuse the existing scheduled Cloud Run worker execution model and distinct `rbos_app` / `rbos_worker` connections; implement lease-safe source retrieval and worker-attributed status history with restricted database functions; add bounded retry/recovery; keep sales and purchase extraction adapters separate. Do not let automated extraction post accounting transactions.
+- No production migration or deployment was performed as part of this documentation update.
