@@ -2,6 +2,9 @@
 
 ## Repository baseline
 
+- Discovery branch: `docs/document-to-books-foundation`.
+- Documentation PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), opened against the verified main baseline; currently open and not merged.
+
 - Repository: `Vaibhav1507/retail-business-erp`
 - Verified `main` SHA: `92c181f6f0ba861acac954545e7d630d07f3305c`
 - Baseline commit message: `fix(invoice): keep capture feedback out of input fields (#107)`
@@ -61,6 +64,7 @@ The product owner asked to begin end-to-end work, keep early test effort small, 
 - [x] Trace current purchase extraction, file retention, review and receipt posting.
 - [x] Identify tenant/security, durable queue and accounting dependencies.
 - [x] Write product, architecture and ADR-027 discovery baseline.
+- [x] Open documentation PR #108 and add the continuation handoff.
 - [ ] Confirm product/CA policies for Walk-in/Cash Sale and purchase bill versus goods receipt before WP4.
 - [ ] Finalise shared source-document storage/retention decision in WP1.
 - [ ] Implement WP1 document registry, intake and durable processing.
@@ -68,5 +72,6 @@ The product owner asked to begin end-to-end work, keep early test effort small, 
 ## Tests and operations
 
 - WP0 contains documentation-only changes; no application tests, live provider calls, database migrations, production data reads or deployments were performed.
+- GitHub Actions run #1284 was observed in progress for PR #108 at the time of handoff update; verify its final result live before merge.
 - This discovery log is not an accuracy benchmark. No extraction calls were made on the two sample bills supplied in chat.
 - WP1 must include a minimal flow test for authenticated upload, tenant isolation, retry/idempotency and durable job persistence/reclaim. Broader parser/unit coverage is deferred.
