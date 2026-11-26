@@ -38,7 +38,7 @@ Android screenshots supplied on 2026-11-26 show:
 - [ ] Discard clears extraction, source metadata and stale success status, then restores manual entry.
 - [ ] Accepting lines clears stale extraction status and returns to normal item entry.
 - [x] Product description is fixed-height and not manually resizable.
-- [x] Tag feedback is positioned as a viewport-capped popover rather than expanding the form row.
+- [x] Tag feedback occupies its own full-width in-flow row below the description/camera controls; it no longer overlays Brand, Model, Quantity or price fields.
 - [ ] Customer validation, line validation, totals, GST, posting, print, offline and tenant/business rules remain unchanged.
 
 ## Validation
@@ -54,3 +54,11 @@ Android screenshots supplied on 2026-11-26 show:
 - No new MagicPath prototype; this is a contained correction to an already implemented design.
 - No full Create Invoice redesign, API/schema/migration, extraction-model, accounting, invoice-payload or other Billing & Sales changes.
 - No merge or production deployment in this follow-up.
+
+## Screenshot follow-up — feedback placement
+
+The 2026-11-26 Android screenshots showed that both the handwritten-invoice status and the product-tag status bubble covered adjacent content. The cause was absolute positioning relative to the compact upload control.
+
+**Correction:** use the existing parent layouts as grids and expose the uploader's feedback children as grid items. Handwritten-invoice feedback occupies a full-width second row inside the dashed import callout. Tag feedback occupies a full-width row beneath the description/camera row and before the remaining product fields. All feedback uses static positioning; no overlay may cover form controls.
+
+Acceptance: feedback messages must expand the containing section and push subsequent content down, remain within the card gutters at phone widths, and keep the import/camera actions aligned in their original positions. Automated scope: focused unit tests plus frontend TypeScript/lint/build; no E2E/Playwright/MagicPath for this small correction.

@@ -76,3 +76,10 @@ A focused correction is being implemented on top of the existing Create Invoice 
 - Design note: [handwritten bill import UX refinement](./invoice-handwritten-import-ux-refinement.md).
 
 Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual acceptance pending. No merge or production deployment has been performed.
+
+### Latest screenshot follow-up — capture feedback alignment (2026-11-26)
+
+- Handwritten invoice busy/success/error feedback now participates in the import callout's normal grid flow below the prompt and Import bill action.
+- Product-tag busy/status/warning/error feedback now occupies a full-width row below the description + camera row and above Brand/Model/Quantity fields.
+- Feedback is no longer absolutely positioned over the form, and the photo buttons retain their existing sizes and actions.
+- No extraction, validation, invoice, camera/gallery, or API behaviour changes. Focused unit tests assert the feedback component wrappers; frontend CI is the implementation gate. Android screenshot review remains pending.

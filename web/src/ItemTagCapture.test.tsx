@@ -60,6 +60,9 @@ describe('ItemTagCapture', () => {
     fireEvent.change(inputs[1], { target: { files: [file] } })
 
     expect(await screen.findByText(/Catalogue match: Test Cable/)).toBeInTheDocument()
+    const feedback = screen.getByRole('status')
+    expect(feedback).toHaveClass('item-tag-feedback')
+    expect(feedback.parentElement).toHaveClass('invoice-feedback-flow')
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Product name')).not.toBeInTheDocument()
     await waitFor(() => expect(onExtract).toHaveBeenCalledWith({
