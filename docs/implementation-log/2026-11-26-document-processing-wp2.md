@@ -6,7 +6,8 @@
 - WP0 documentation PR #108 is merged.
 - WP1 intake PR #109 is merged at `b6b0409c3ed522aa70f84d8cde002632807dda77`.
 - WP2 branch: `feat/document-processing-worker`, created from the merged WP1 main commit above.
-- WP2 PR has not yet been opened at the time this log was authored. Verify the live branch and PR/CI state before continuing.
+- WP2 PR [#111 — Document-to-Books processing worker and extraction](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is open against main.
+- Initial CI run [#1308](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45808792744) was queued at PR creation; verify latest CI for the latest PR head before merge.
 - PR #110, which adds the mandatory visual consistency/action-first UI rule, was still open when checked. This WP2 slice is backend-only; future WP3 UI must follow the rule in PR #110 and the existing RBOS styles/tokens.
 
 ## WP2 scope
@@ -116,7 +117,8 @@ This is intentionally a small set of high-signal integration tests. Broad unit/p
 - [x] Wire worker into `--rbos-workers` and add `--document-worker`.
 - [x] Add focused worker-flow and schema-privilege integration tests.
 - [x] Update deployment runbook and handoff.
-- [ ] Open focused WP2 PR and verify current CI end-to-end.
+- [x] Open focused WP2 PR #111.
+- [ ] Verify CI end-to-end on the latest updated PR head.
 - [ ] Review any CI/security findings and fix them before merge.
 - [ ] Confirm migration 058/059 deployment separately after PR merge; do not infer deployment from merge.
 - [ ] Begin WP3 only after WP2 is merged and its runtime/migration requirements are available.
@@ -124,3 +126,11 @@ This is intentionally a small set of high-signal integration tests. Broad unit/p
 ## Exact next action
 
 Read the current-main `docs/ux/RBOS-UI-UX-WORKFLOW.md`, this WP2 log and `docs/ux/DOCUMENT-TO-BOOKS-HANDOFF.md`. Verify live main, branch, PR and CI. Continue by fixing CI findings for WP2; do not repeat WP0/WP1 discovery. No merge, production migration or deployment without explicit authorisation.
+
+
+## PR/CI checkpoint — 2026-11-26
+
+- WP2 implementation PR: [#111](https://github.com/Vaibhav1507/retail-business-erp/pull/111).
+- Initial CI run: [#1308](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45808792744), queued at PR creation. Later handoff/log commits trigger another workflow; always inspect the newest run whose `head_sha` matches the live PR head.
+- The last implementation refinement preserves a missing purchase unit cost as `null` in the Document-to-Books path, emits a review warning, and leaves legacy New Stock Entry rate inference unchanged. The raw purchase extraction is restricted to known fields, bounded strings/line count/numeric ranges. Provenance distinguishes AI-extracted descriptions/values from system-suggested supplier/catalogue matches.
+- Merge only after latest CI green, security/migration review and owner approval. Production migrations 058/059 and Cloud Run worker enablement remain separate, unperformed operations.
