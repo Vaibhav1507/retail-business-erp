@@ -48,6 +48,17 @@ create table documents.document_extraction_draft (
 create index ix_document_extraction_draft_attempt
   on documents.document_extraction_draft (tenant_id, extraction_attempt_id);
 
+-- All RBOS roles use NOBYPASSRLS and the source-document tables FORCE RLS.
+-- SECURITY DEFINER processing functions are owned by rbos_migrator, so give
+-- that non-runtime role an explicit owner policy on the source rows it must load/update.
+-- rbos_app remains tenant-filtered; rbos_worker still has no direct table privileges.
+create policy document_processing_owner_only
+  on documents.business_document for all to rbos_migrator
+  using (true) with check (true);
+create policy document_page_processing_owner_only
+  on documents.document_page for all to rbos_migrator
+  using (true) with check (true);
+
 alter table documents.document_extraction_attempt enable row level security;
 alter table documents.document_extraction_attempt force row level security;
 create policy document_extraction_attempt_tenant_read
