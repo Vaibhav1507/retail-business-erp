@@ -180,8 +180,8 @@ public static class DocumentEndpoints
                and (@status is null or status = @status)
              order by created_at desc, id
              limit @limit");
-        command.Parameters.AddWithValue("direction", (object?)direction ?? DBNull.Value);
-        command.Parameters.AddWithValue("status", (object?)status ?? DBNull.Value);
+        command.Parameters.AddWithValue("direction", NpgsqlTypes.NpgsqlDbType.Text, (object?)direction ?? DBNull.Value);
+        command.Parameters.AddWithValue("status", NpgsqlTypes.NpgsqlDbType.Text, (object?)status ?? DBNull.Value);
         command.Parameters.AddWithValue("limit", Math.Clamp(limit ?? 50, 1, 100));
         await using var reader = await command.ExecuteReaderAsync(ct);
         var documents = new List<object>();
@@ -195,7 +195,7 @@ public static class DocumentEndpoints
                 status = reader.GetString(4),
                 pageCount = reader.GetInt32(5),
                 totalSizeBytes = reader.GetInt32(6),
-                createdAt = reader.GetFieldValue<DateTimeOffset>(7)
+                createdAt = new DateTimeOffset(reader.GetDateTime(7), TimeSpan.Zero)
             });
         return Results.Ok(documents);
     }
@@ -227,7 +227,7 @@ public static class DocumentEndpoints
             pageCount = reader.GetInt32(5),
             totalSizeBytes = reader.GetInt32(6),
             contentSha256 = reader.GetString(7).Trim(),
-            createdAt = reader.GetFieldValue<DateTimeOffset>(8)
+            createdAt = new DateTimeOffset(reader.GetDateTime(8), TimeSpan.Zero)
         };
         await reader.CloseAsync();
 
@@ -287,7 +287,7 @@ public static class DocumentEndpoints
 
     static string SafeFileName(string? value)
     {
-        var name = Path.GetFileName(value ?? "").Trim();
+        var name = Path.GetFileName((value ?? "").Replace('\\', '/')).Trim();
         var safe = new string(name.Where(c => !char.IsControl(c)).Take(180).ToArray());
         return string.IsNullOrWhiteSpace(safe) ? "bill-page" : safe;
     }
