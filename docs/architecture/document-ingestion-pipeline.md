@@ -129,7 +129,7 @@ A proposed tenant-owned document aggregate should represent:
 - Duplicate candidates and resolution.
 - Approval actor/time and one resulting transaction link, if posted.
 
-Candidate concepts (not final table names/schema): `business_document`, `business_document_file`, `document_extraction_attempt`, `document_review_draft`, `document_duplicate_candidate`, `document_transaction_link`, and a durable document job. Prefer the smallest schema that satisfies this lifecycle; do not create one table per document format or duplicate existing source-of-truth transaction data.
+WP1's concrete intake schema is `documents.document_batch`, `documents.business_document`, `documents.document_page` and append-only `documents.document_status_history`, plus `integrations.document_processing_queue`. The queue stores identifiers only. WP2 will add versioned extraction-attempt/draft data; WP4 will add the source-to-transaction link only when posting integration is ready. Keep these as document lifecycle metadata, not a duplicate of sales or purchase source-of-truth transactions.
 
 ### 2.2 Storage decision
 
@@ -142,7 +142,8 @@ Current evidence and deployment constraints:
 **WP1 pilot storage choice (proposed in this implementation PR):** store bounded source-page bytes in PostgreSQL `documents.document_page.content` (`bytea`) with tenant RLS. This reuses the existing durable database and backup path, avoids adding a paid object-storage dependency or new credentials, and keeps upload metadata, page evidence and queue enqueue in one database transaction. It is a deliberate Cloud Run pilot amendment to ADR-017's local-filesystem proposal, not a claim that database blobs are the ideal long-term scale architecture.
 
 Hard limits in the intake contract:
-- 8 MB per page;
+- 8 MiB per page;
+- at most 2 concurrent document batch uploads per API instance (a 10-second wait, then 429) to bound memory use;
 - up to 6 pages per bill;
 - up to 10 independent bills per batch;
 - 24 MB aggregate file bytes per batch (26 MiB HTTP envelope).
@@ -153,7 +154,7 @@ Revisit a private object store behind a storage abstraction when measured databa
 Required storage contract:
 - opaque server-generated page IDs; never user-controlled storage paths;
 - tenant-scoped metadata and RLS on batch, document and page rows;
-- no public/static URLs; source bytes are returned only by authenticated tenant-authorized endpoints;
+- no public/static URLs; source bytes are returned only by authenticated tenant-authorized endpoints with direction-aware role checks;
 - content type and file-signature validation plus page/file/aggregate size limits;
 - SHA-256 checksum for integrity and future duplicate detection;
 - documented retention/deletion and backup/restore policy;
