@@ -338,7 +338,7 @@ public sealed class SalesInvoiceCaptureService(
         return result;
     }
 
-    static JsonObject BuildResponseSchema()
+    public static JsonObject BuildResponseSchema()
     {
         static JsonObject Scalar(string type) => new() { ["type"] = type, ["nullable"] = true };
         static JsonArray Required(params string[] names)
