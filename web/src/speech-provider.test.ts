@@ -33,10 +33,14 @@ describe('speech provider registry', () => {
   })
 
   it('treats unavailable persistent storage as a recoverable browser limitation', async () => {
+    // Load a fresh module instance so the previous test's module-level request
+    // cache does not leak its successful browser capability result into this case.
+    vi.resetModules()
+    const { requestPersistentVoiceStorage: request } = await import('./speech-provider')
     const descriptor = Object.getOwnPropertyDescriptor(navigator, 'storage')
     Object.defineProperty(navigator, 'storage', { configurable: true, value: {} })
     try {
-      await expect(requestPersistentVoiceStorage()).resolves.toBe(false)
+      await expect(request()).resolves.toBe(false)
     } finally {
       if (descriptor) Object.defineProperty(navigator, 'storage', descriptor)
       else Reflect.deleteProperty(navigator, 'storage')
