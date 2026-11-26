@@ -1093,3 +1093,42 @@
     min-height: 56px;
   }
 }
+
+
+/* Focused handwritten bill import refinements for the existing Create Invoice screen. */
+.invoice-import-callout > span{flex:1 1 auto;min-width:0;white-space:normal;word-break:normal;overflow-wrap:normal}
+.invoice-import-callout .sales-invoice-uploader{flex:0 1 auto;min-width:0;max-width:100%}
+.invoice-import-callout .sales-invoice-uploader .item-tag-feedback,.invoice-import-callout .sales-invoice-uploader .item-tag-error{max-width:min(260px,calc(100vw - 48px));overflow-wrap:anywhere;text-align:right}
+.invoice-create-page [hidden]{display:none!important}
+.invoice-create-page .invoice-product-entry>textarea{height:76px;min-height:76px;max-height:76px;resize:none;overflow-y:auto}
+.invoice-create-page .invoice-product-entry .item-tag-uploader{position:relative;z-index:3}
+.invoice-create-page .invoice-product-entry .item-tag-feedback,.invoice-create-page .invoice-product-entry .item-tag-warning,.invoice-create-page .invoice-product-entry .item-tag-error{position:absolute;top:calc(100% + 7px);right:0;left:auto;z-index:8;width:min(260px,calc(100vw - 32px));max-width:calc(100vw - 32px);padding:9px 11px;border:1px solid #cfe1d6;border-radius:11px;background:#f0faf4;color:#145d40;box-shadow:0 8px 22px rgba(25,65,45,.14);text-align:left;overflow-wrap:anywhere}
+.invoice-extraction-review{display:grid;gap:14px;margin-top:20px;padding:16px;border:1px solid #dce7df;border-radius:18px;background:#f9fcfa}
+.invoice-extraction-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.invoice-extraction-eyebrow{margin:0 0 4px;color:#1d7954;font-size:11px;font-weight:800;letter-spacing:.1em}
+.invoice-extraction-header h3{margin:0;color:#26352d;font-size:19px;line-height:1.25}
+.invoice-extraction-count{flex:0 0 auto;display:grid;min-width:42px;min-height:42px;place-items:center;padding:0 10px;border-radius:999px;background:#eaf4ee;color:#176b49;font-size:13px;font-weight:800}
+.invoice-extraction-meta{margin:0;color:#69766f;font-size:13px}
+.invoice-extraction-total{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 8px;margin:0;color:#59675f;font-size:14px}
+.invoice-extraction-total strong{color:#202a25;font-size:17px}
+.invoice-extraction-total small{flex:1 1 100%;color:#7a857e;font-size:12px}
+.invoice-extraction-warnings{margin:0;padding:10px 12px 10px 30px;border-radius:10px;background:#fff7e8;color:#795b20;font-size:13px;line-height:1.45}
+.invoice-extraction-empty{margin:0;color:#69766f;font-size:14px;line-height:1.45}
+.invoice-extraction-lines{display:grid;gap:10px}
+.invoice-extracted-line{display:grid;gap:11px;min-width:0;padding:13px;border:1px solid #e0e9e3;border-radius:14px;background:#fff}
+.invoice-extracted-line-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.invoice-extracted-line-heading strong{color:#26352d;font-size:14px}
+.invoice-extracted-line-heading span{color:#6d7b72;font-size:11px;white-space:nowrap}
+.invoice-extracted-line label{display:grid;gap:5px;min-width:0;color:#66736b;font-size:12px;font-weight:650}
+.invoice-extracted-line input{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:8px 10px;border:1px solid #d8e1dc;border-radius:10px;background:#fff;color:#202a25;font:inherit;font-size:14px;font-weight:450}
+.invoice-extracted-line-values,.invoice-extracted-line-extra{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.invoice-extracted-line-details{border-top:1px solid #edf1ee;padding-top:8px}
+.invoice-extracted-line-details summary{min-height:36px;display:flex;align-items:center;color:#176b49;font-size:13px;font-weight:650;cursor:pointer}
+.invoice-extracted-line-extra{padding-top:8px}
+.invoice-extracted-line-meta{display:flex;flex-wrap:wrap;gap:6px 12px;margin:0;color:#69766f;font-size:12px}
+.invoice-extracted-line-meta strong{color:#26352d}
+.invoice-extraction-actions{display:flex;align-items:stretch;flex-wrap:wrap;gap:10px;margin-top:4px;padding-top:14px;border-top:1px solid #e3ebe5}
+.invoice-extraction-actions button{min-height:48px;margin:0}
+.invoice-extraction-actions button:first-child{flex:1 1 220px}
+.invoice-extraction-actions button.secondary{flex:0 1 auto}
+@media(max-width:420px){.invoice-extraction-review{padding:12px;border-radius:15px}.invoice-extracted-line{padding:11px}.invoice-extraction-actions{display:grid;grid-template-columns:1fr}.invoice-extraction-actions button{width:100%}}
