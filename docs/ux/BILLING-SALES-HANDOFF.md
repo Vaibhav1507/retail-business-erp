@@ -126,3 +126,12 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 - [ANIL-002 — ₹10,020 bill comparison](../quality/anil-sports-import-comparison-v1.md#anil-002--10020-bill-source-bill-no-468): bill no. 468, app detected 13 items and extracted ₹10,000. The source main TOTAL box appears ₹10,020, with a separate ₹10,000 annotation near the signatory area. App Item 4 Crown appears qty 2 × ₹80 = ₹160 while the corresponding source row appears qty 10 / amount ₹800. Several cards are cropped in the supplied screenshots; no claims are made about unseen values.
 - Full privacy-minimised notes: [Anil Sports import comparison v1](../quality/anil-sports-import-comparison-v1.md). No original bill photo or customer personal data is committed to Git.
 - **Next action:** independently verify the line-by-line source transcription for these two Anil bills, keep ambiguous values flagged, then run the existing synchronous importer against the nine Monika bills one at a time as the user supplies their app outputs.
+
+
+### First Monika source-to-app comparison — S01 / MONIKA-001 (2026-11-26)
+
+- [Detailed comparison](../quality/monika-sales-import-comparison-v1.md). Source bill visually shows one Voltas Beko washing machine line, quantity 1, amount/total ₹17,500; app agrees on quantity and amount/total.
+- High-impact discrepancies: app product text “Vultas bike lamp” versus source “Voltas Beko WM”; brand/model text differs; app date says 6-11-2020 while source appears 6-11-2026; app invoice no. 153 appears inconsistent with red source number (approximately 454, verify).
+- Two identifier strings appear in the source item description area (`1200 644A 76A 112258` and `26111412945`). Neither appears in app output; current review card has no serial/identifier field. Their exact semantic roles remain to be verified before assigning a serial label.
+- The source Rate column appears blank, but app sets unit price ₹17,500. Preserve source-vs-derived provenance.
+- App's 90% confidence is not calibrated; this sample has multiple critical transcription errors despite the confidence label.
