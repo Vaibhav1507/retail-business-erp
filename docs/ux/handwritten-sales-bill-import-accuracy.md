@@ -1,6 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** P0 implemented; P1 engineering improvements being completed in the same PR/branch `feat/handwritten-sales-import-p0`  
+**Status:** P0 + P1 implementation complete; code CI passed on 2026-11-26 in run #1342. Manual handwritten-bill validation is the next acceptance step.  
 **Route:** `#/sell/bill` (Generate Invoice)  
 **API:** `POST /api/sales/invoice-image-extract`  
 **Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
@@ -136,10 +136,10 @@ This report is a full record of the seven comparisons provided so far, **not** a
 - [x] Contract tests for verbatim description, serial arrays, schema requirements and normalization bounds.
 - [x] Unit tests for field-confidence normalization, low-confidence flags, line arithmetic mismatch, duplicate serials across lines and feature-scoped rate-limit fallback.
 - [x] Frontend test for inline review warnings, editable source bill number/date and clearing a line warning after manual correction.
-- [ ] Backend build and unit tests after this P1 commit.
-- [ ] Frontend TypeScript, unit tests, lint and production build after this P1 commit.
-- [ ] PostgreSQL integration tests after this P1 commit.
-- [ ] New PR CI result on the final P0 + P1 commit.
+- [x] Backend Release solution build, 165 backend unit tests and deployment-container build passed in CI run #1342.
+- [x] Frontend TypeScript, 234 tests across 26 test files, lint, production build and high/critical dependency audit passed in CI run #1342.
+- [x] PostgreSQL integration build, disposable database migration and 186 integration tests passed in CI run #1342.
+- [x] Final P0 + P1 commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed all three required code-CI jobs in [run #1342](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45834679317).
 - [ ] **Deferred by user request:** Playwright/E2E, responsive screenshots and Axe. Deferred, not passed, and not part of the current code gate.
 - [ ] Native Android camera/gallery, keyboard and TalkBack checks remain real-device acceptance checks.
 
@@ -169,7 +169,7 @@ No source-photo-to-app accuracy percentage is claimed yet. The seven-case compar
 ## 10. Current delivery state
 
 - P0 and P1 implementation are kept together in PR #113 and branch `feat/handwritten-sales-import-p0`.
-- The pre-P1 CI run #1340 passed before these changes; it is not evidence for the final P0 + P1 commit. New CI must pass before the user validates manually.
+- Latest code head `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed backend (165), frontend (234) and PostgreSQL integration (186) tests in CI run #1342.
 - No merge or production deployment is included or implied.
 - The user requested manual validation only after the full improvement is implemented; this handoff does not ask them to validate an intermediate P0-only state.
 
