@@ -174,7 +174,9 @@ Target upload sequence:
 9. All state changes are guarded so retry/concurrency cannot create a second extraction or posting.
 10. The user can cancel only work that has not entered a non-cancellable commit stage.
 
-Use the existing ADR-018 PostgreSQL job pattern and migration-050 lease mechanics as the starting point. Decide whether to extend the existing generic job abstraction or introduce a document-specific queue only after inspecting the actual worker/runtime registration. Do not store file bytes in job payloads.
+WP1 adds a document-specific queue in migration `058_document_intake_foundation.sql`, using the ADR-018 PostgreSQL `FOR UPDATE SKIP LOCKED` lease pattern. Queue rows contain document/tenant/actor identifiers only; page bytes remain in `documents.document_page`. Enqueue occurs in the same transaction as the batch, documents and pages. The queue is private to SECURITY DEFINER functions: `rbos_app` may enqueue, and `rbos_worker` may claim/finish leases, but neither role can query the queue table directly.
+
+The current `--rbos-workers` process runs the WhatsApp invoice-delivery worker only; it does not yet consume document jobs. WP1 persists the durable queue but deliberately leaves documents in `Queued`. WP2 must add the document processor/worker and its retry/status transitions before any uploaded bill can be extracted. Do not mark a document processed merely because its queue lease was claimed.
 
 ### 2.4 Separate extraction contracts
 
