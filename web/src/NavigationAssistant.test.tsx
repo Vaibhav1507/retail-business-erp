@@ -65,7 +65,7 @@ describe('NavigationAssistant', () => {
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), 'make a new bill')
   await userEvent.type(screen.getByLabelText('Ask your business assistant'), '{Enter}')
   expect(window.location.hash).toBe('')
-  expect(screen.getByRole('button', { name: 'Close assistant' })).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: 'Navigation assistant' })).getByRole('button', { name: 'Close assistant' })).toBeInTheDocument()
   expect(screen.getByText('Navigation cancelled. Your current work is unchanged.')).toBeInTheDocument()
  })
  it('asks the user to choose when a command is ambiguous', async () => {
