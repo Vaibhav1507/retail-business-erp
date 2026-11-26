@@ -63,6 +63,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [tagCaptureKey, setTagCaptureKey] = useState(0)
   const [showTagDetails, setShowTagDetails] = useState(false)
   const [salesInvoiceDraft, setSalesInvoiceDraft] = useState<ExtractedSalesInvoice | null>(null)
+  const [salesInvoiceCaptureKey, setSalesInvoiceCaptureKey] = useState(0)
   const [salesInvoiceWarnings, setSalesInvoiceWarnings] = useState<string[]>([])
   const [sourceInvoiceRef, setSourceInvoiceRef] = useState('')
   const [sourceInvoiceDate, setSourceInvoiceDate] = useState('')
@@ -266,6 +267,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems(current => [...current, ...next])
     setSalesInvoiceDraft(null)
     setSalesInvoiceWarnings([])
+    setSalesInvoiceCaptureKey(value => value + 1)
+    setError('')
+  }
+
+  function discardSalesInvoiceDraft() {
+    setSalesInvoiceDraft(null)
+    setSalesInvoiceWarnings([])
+    setSourceInvoiceRef('')
+    setSourceInvoiceDate('')
+    setSalesInvoiceCaptureKey(value => value + 1)
     setError('')
   }
 
@@ -557,10 +568,10 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
 
         <div className="invoice-import-callout">
           <span>Have a handwritten bill?</span>
-          <SalesInvoiceCapture disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
+          <SalesInvoiceCapture key={salesInvoiceCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applySalesInvoiceDraft} />
         </div>
 
-        <div className="billing-grid invoice-product-editor">
+        <div className="billing-grid invoice-product-editor" hidden={Boolean(salesInvoiceDraft)}>
           <div className="billing-field billing-col-12 billing-rel">
             <label htmlFor="billing-prod">Item description *</label>
             <div className="invoice-product-entry">
@@ -603,7 +614,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </div>}
         </div>
 
-        <details className="invoice-product-more-details" open={showTagDetails} onToggle={event => setShowTagDetails(event.currentTarget.open)}>
+        <details className="invoice-product-more-details" hidden={Boolean(salesInvoiceDraft)} open={showTagDetails} onToggle={event => setShowTagDetails(event.currentTarget.open)}>
           <summary><span>More item details</span><small>Optional</small></summary>
           <div className="billing-grid invoice-product-extra-grid">
             <div className="billing-field billing-col-6"><label htmlFor="billing-disc">{tr('bill.disc')}</label><input id="billing-disc" aria-invalid={Boolean(fieldErrors.discount)} className={fieldErrors.discount ? 'field-invalid' : ''} inputMode="decimal" value={disc} onChange={e => { setDisc(e.target.value); setFieldErrors(current => ({ ...current, discount: '' })) }} />{fieldErrors.discount && <small className="field-error">{fieldErrors.discount}</small>}</div>
@@ -617,7 +628,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </div>
         </details>
 
-        <div className="invoice-add-item-action">
+        <div className="invoice-add-item-action" hidden={Boolean(salesInvoiceDraft)}>
           <button type="button" onClick={addItem}>＋ Add item</button>
           {pname.trim() && !match && <span className="billing-hint">This will be billed as an ad-hoc line and will not create a catalogue product.</span>}
         </div>
