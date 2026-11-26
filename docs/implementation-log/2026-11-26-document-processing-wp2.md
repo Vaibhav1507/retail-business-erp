@@ -70,6 +70,7 @@ No accounting posting, invoice issuance, product creation or supplier/customer m
 - Does not create an extra `procurement.invoice_file` copy; WP1 source pages remain the original evidence.
 - Allows up to six pages / 24 MB for Document-to-Books (legacy supplier-invoice upload retains its existing 12 MB combined limit and evidence-storage behavior).
 - Prompt now covers handwritten, printed, thermal, mixed Hindi/English and abbreviated product descriptions; unknown values remain null.
+- A missing handwritten unit cost remains `null` in Document-to-Books and is flagged for review; the legacy New Stock Entry inference behaviour is preserved only in its existing path. Raw purchase values are restricted to known fields/lengths and bounded line counts.
 - Adds `purchase-v1`, provider/model, field/line confidence hints and a sanitized schema-defined raw extraction payload.
 - Legacy New Stock Entry extraction remains on its original method and still retains its invoice file.
 
