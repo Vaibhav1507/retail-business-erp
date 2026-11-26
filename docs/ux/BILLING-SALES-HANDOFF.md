@@ -83,3 +83,27 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - Product-tag busy/status/warning/error feedback now occupies a full-width row below the description + camera row and above Brand/Model/Quantity fields.
 - Feedback is no longer absolutely positioned over the form, and the photo buttons retain their existing sizes and actions.
 - No extraction, validation, invoice, camera/gallery, or API behaviour changes. Focused unit tests assert the feedback component wrappers; frontend CI is the implementation gate. Android screenshot review remains pending.
+
+
+## Current focused phase — handwritten sales-bill import accuracy (2026-11-26)
+
+**Current scope:** only the existing, already-issued handwritten sales-bill import inside Generate Invoice (`#/sell/bill`). This phase preserves the synchronous upload → extraction → editable review interaction.
+
+- Authoritative scope and engineering acceptance: [handwritten sales-bill import accuracy](./handwritten-sales-bill-import-accuracy.md).
+- Preserve the existing Create Invoice layout and the accepted mobile handwritten-import UX decisions above; this is not a form redesign.
+- Prioritise measured extraction accuracy, no silent wrong financial fields, deterministic row/tax/total reconciliation, latency instrumentation and fast synchronous review.
+- Retain the original handwritten sales-bill evidence and link it to the resulting sale. Do not retain item-tag photos or catalogue-import files.
+- Supplier invoice/Add Purchase, item-tag extraction changes, catalogue imports, bulk uploads, central inbox and background workers are explicitly out of scope.
+
+### Current PR disposition
+
+- [PR #111 — Document-to-Books worker](https://github.com/Vaibhav1507/retail-business-erp/pull/111) is open as **Draft** and parked. Its worker, migration 059, purchase changes and grouped processing are deferred. The last verified CI run for its branch (run #1314) passed; this validates its configured build/tests, not handwritten extraction accuracy.
+- [PR #112 — focused accuracy scope](https://github.com/Vaibhav1507/retail-business-erp/pull/112) is open as **Draft** and contains this phase's specification. Its docs-only CI run #1315 was in progress at handoff.
+- WP1 [PR #109](https://github.com/Vaibhav1507/retail-business-erp/pull/109) is merged at `b6b0409c3ed522aa70f84d8cde002632807dda77`. Its document registry/queue remains on main, but the existing synchronous sales importer must not call the queue-enqueuing batch endpoint. Production application of migration 058 is not verified.
+
+### Accuracy evidence required before expansion
+
+- Build a redacted, human-labelled sample set of real handwritten sales bills with independently verified field/line values.
+- Keep a held-out evaluation set separate from prompt/model tuning.
+- Report header and line field exact-match, line-item recall/precision, critical numeric exact-match, document exact-match, unsupported-value rate and p50/p95 latency.
+- A universal 100% AI-only read rate is not a credible guarantee for arbitrary handwriting. The non-negotiable safety bar is no silent acceptance of uncertain/incorrect financial values and explicit human confirmation before sale posting.
