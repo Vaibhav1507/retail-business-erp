@@ -175,7 +175,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
                 return ServiceResult<object>.Ok(new DocumentPurchaseExtraction(
                     null, null, null, null, null, null, null, [],
                     ["The configured vision providers could not read this supplier bill. Retake a clearer photo or enter the details manually."],
-                    selectedProvider, selectedModel, "purchase-v1"));
+                    selectedProvider, selectedModel, "purchase-v1", new JsonObject(), new JsonObject()));
             return ServiceResult<object>.Fail("Could not read this invoice with the configured AI providers. Try a clearer photo or enter it by hand.");
         }
 
