@@ -22,7 +22,7 @@ Android screenshots supplied on 2026-11-26 show:
 3. Replace the seven-column extracted-lines table with compact, stacked review cards. Description, quantity and unit price remain directly editable; brand, model, HSN and discount move into a per-line disclosure. Confidence and extracted amount/GST are secondary metadata.
 4. Separate the primary "Add reviewed lines to bill" action and "Discard extraction" action from the line cards with a clear divider and spacing.
 5. Reset the capture component after accept/discard so stale success feedback cannot remain after the extraction is gone.
-6. Keep the description textarea at a fixed 76px height with internal scrolling and no manual resize handle.
+6. Product descriptions use automatic height adjustment based on their content. Keep a sensible minimum height (76px for the normal product-entry field); disable the native resize handle and avoid a fixed maximum height or an inner scroll area. The field grows as the text wraps, without user-controlled dragging or expansion.
 7. Anchor tag feedback to the uploader's right edge, cap it to the viewport width and layer it above adjacent content.
 8. Preserve the source bill reference/date, customer prefill, editable extracted values, line validation and existing add-to-bill conversion.
 
@@ -37,7 +37,7 @@ Android screenshots supplied on 2026-11-26 show:
 - [ ] Add/discard actions are separated from the line cards.
 - [ ] Discard clears extraction, source metadata and stale success status, then restores manual entry.
 - [ ] Accepting lines clears stale extraction status and returns to normal item entry.
-- [x] Product description is fixed-height and not manually resizable.
+- [x] Product description adjusts its height automatically to fit text, with a sensible minimum height, no manual resize handle and no fixed maximum height.
 - [x] Tag feedback occupies its own full-width in-flow row below the description/camera controls; it no longer overlays Brand, Model, Quantity or price fields.
 - [ ] Customer validation, line validation, totals, GST, posting, print, offline and tenant/business rules remain unchanged.
 
@@ -62,3 +62,17 @@ The 2026-11-26 Android screenshots showed that both the handwritten-invoice stat
 **Correction:** use the existing parent layouts as grids and expose the uploader's feedback children as grid items. Handwritten-invoice feedback occupies a full-width second row inside the dashed import callout. Tag feedback occupies a full-width row beneath the description/camera row and before the remaining product fields. All feedback uses static positioning; no overlay may cover form controls.
 
 Acceptance: feedback messages must expand the containing section and push subsequent content down, remain within the card gutters at phone widths, and keep the import/camera actions aligned in their original positions. Automated scope: focused unit tests plus frontend TypeScript/lint/build; no E2E/Playwright/MagicPath for this small correction.
+
+
+## Updated product-description behaviour — 2026-11-26
+
+The user clarified the desired behaviour after reviewing long imported descriptions:
+
+- Do **not** use a manually resizable textarea or drag handle.
+- Do **not** clamp the description to a fixed height with an internal scrollbar.
+- Use automatic height growth based on the content, with a minimum comfortable height. Long wrapped descriptions should remain readable without manual interaction.
+- Apply this to both the normal product-description entry and the extracted handwritten-bill description field.
+- Keep the existing font, borders, radius, spacing and responsive RBOS styles. This is not a redesign.
+- Keep the floating Chat assistant button exactly as currently positioned/behaving. Do not remove, replace, recolour, reposition or otherwise modify it as part of this P0 extraction work.
+
+The existing fixed-height decision above is superseded by this dated update.
