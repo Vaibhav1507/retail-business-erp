@@ -62,7 +62,8 @@ public static class VisionProviderFallback
         Func<JsonNode?, bool> isUsable,
         ILogger logger,
         CancellationToken ct,
-        TimeSpan? totalBudget = null)
+        TimeSpan? totalBudget = null,
+        Action<string, string>? onSuccess = null)
     {
         var budget = totalBudget ?? TimeSpan.FromSeconds(60);
         budget = TimeSpan.FromMilliseconds(Math.Clamp(budget.TotalMilliseconds, 1000, 120_000));
@@ -93,6 +94,7 @@ public static class VisionProviderFallback
                     logger.LogInformation(
                         "Vision extraction succeeded. Feature {Feature}, provider {Provider}, model {Model}, latency {LatencyMs}ms",
                         feature, attempt.Provider, attempt.Model, timer.ElapsedMilliseconds);
+                    onSuccess?.Invoke(attempt.Provider, attempt.Model);
                     return result;
                 }
 
