@@ -141,6 +141,7 @@ describe('Dhandha Mitra authentication screens', () => {
     await user.click(screen.getByRole('button', { name: 'Digit 3' }))
     expect(pin).toHaveValue('123')
 
+    expect(screen.getByRole('button', { name: 'Backspace' })).toHaveTextContent('Back')
     await user.click(screen.getByRole('button', { name: 'Backspace' }))
     expect(pin).toHaveValue('12')
     await user.click(screen.getByRole('button', { name: 'Clear PIN field' }))
@@ -168,5 +169,42 @@ describe('Dhandha Mitra authentication screens', () => {
     expect(document.querySelector('main.app-lock-screen-compact')).toBeInTheDocument()
     expect(screen.getByText(/local privacy lock only/)).toBeInTheDocument()
   })
+
+
+  it('lets the user request an email code and set a new account password', async () => {
+    const user = userEvent.setup()
+    mocks.api.mockImplementation(async (_method: string, path: string) => {
+      if (path === '/auth/password-reset/request') return { accepted: true }
+      if (path === '/auth/password-reset/confirm') return { reset: true }
+      return {}
+    })
+
+    render(<AccountAccess onDone={vi.fn()} />)
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Forgot password?' }))
+    expect(screen.getByRole('heading', { name: 'Reset your password' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Email address'), 'owner@example.test')
+    await user.click(screen.getByRole('button', { name: 'Send code' }))
+    await waitFor(() => expect(mocks.api).toHaveBeenCalledWith(
+      'POST', '/auth/password-reset/request', { email: 'owner@example.test' },
+    ))
+    expect(screen.getByRole('status')).toHaveTextContent('If an account matches this email')
+
+    await user.type(screen.getByLabelText('6-digit email code'), '123456')
+    await user.type(screen.getByLabelText('New password'), 'NewPassword#123')
+    await user.type(screen.getByLabelText('Confirm new password'), 'NewPassword#123')
+    await user.click(screen.getByRole('button', { name: 'Reset password' }))
+    await waitFor(() => expect(mocks.api).toHaveBeenCalledWith(
+      'POST', '/auth/password-reset/confirm', {
+        email: 'owner@example.test',
+        code: '123456',
+        newPassword: 'NewPassword#123',
+      },
+    ))
+    expect(await screen.findByRole('heading', { name: 'Password updated' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Sign in with your new password')
+  })
+
 
 })

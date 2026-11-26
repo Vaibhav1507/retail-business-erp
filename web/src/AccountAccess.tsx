@@ -19,6 +19,16 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
   const [otp, setOtp] = useState(false)
   const [passkeyAvailable, setPasskeyAvailable] = useState(false)
   const [passkeyOptions, setPasskeyOptions] = useState<PublicKeyCredentialRequestOptions | null>(null)
+  const [recovery, setRecovery] = useState(false)
+  const [recoveryEmail, setRecoveryEmail] = useState('')
+  const [recoverySent, setRecoverySent] = useState(false)
+  const [recoveryCode, setRecoveryCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
+  const [recoveryError, setRecoveryError] = useState('')
+  const [recoveryMessage, setRecoveryMessage] = useState('')
+  const [recoveryComplete, setRecoveryComplete] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -115,6 +125,164 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
     }
   }
 
+
+  function openRecovery() {
+    setRecoveryEmail(isEmail ? value : '')
+    setRecovery(true)
+    setRecoverySent(false)
+    setRecoveryCode('')
+    setNewPassword('')
+    setConfirmNewPassword('')
+    setRecoveryError('')
+    setRecoveryMessage('')
+    setRecoveryComplete(false)
+  }
+
+  function backToSignIn() {
+    setRecovery(false)
+    setId(recoveryEmail)
+    setPassword('')
+    setError('')
+    setRecoveryError('')
+  }
+
+  async function requestPasswordReset(e?: React.FormEvent) {
+    e?.preventDefault()
+    setRecoveryError('')
+    setRecoveryMessage('')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recoveryEmail.trim())) {
+      setRecoveryError('Enter a valid email address.')
+      return
+    }
+    setRecoveryBusy(true)
+    try {
+      await api('POST', '/auth/password-reset/request', { email: recoveryEmail.trim() })
+      setRecoverySent(true)
+      setRecoveryMessage('If an account matches this email, a 6-digit code has been sent. Check your inbox and spam folder.')
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Could not request a password reset.')
+    } finally {
+      setRecoveryBusy(false)
+    }
+  }
+
+  async function submitPasswordReset(e: React.FormEvent) {
+    e.preventDefault()
+    setRecoveryError('')
+    if (!/^\d{6}$/.test(recoveryCode)) {
+      setRecoveryError('Enter the 6-digit code from your email.')
+      return
+    }
+    if (newPassword.length < 12 || !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) ||
+        !/\d/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setRecoveryError('Use at least 12 characters with uppercase, lowercase, a number and a symbol.')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setRecoveryError('The passwords do not match.')
+      return
+    }
+    setRecoveryBusy(true)
+    try {
+      await api('POST', '/auth/password-reset/confirm', {
+        email: recoveryEmail.trim(),
+        code: recoveryCode,
+        newPassword,
+      })
+      setRecoveryComplete(true)
+      setRecoveryMessage('Your password has been updated. Sign in with your new password.')
+      setRecoveryCode('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch (err) {
+      setRecoveryError(err instanceof Error ? err.message : 'Could not reset the password.')
+    } finally {
+      setRecoveryBusy(false)
+    }
+  }
+
+  if (recovery) return (
+    <main className="access auth-access">
+      <AuthBrand />
+      <section className="auth-content">
+        <div className="auth-intro">
+          <h1>{recoveryComplete ? 'Password updated' : 'Reset your password'}</h1>
+          <p>{recoveryComplete
+            ? 'Your account is secure with the new password.'
+            : 'We will send a one-time code to your account email address.'}</p>
+        </div>
+
+        {!recoveryComplete && (
+          <form className="auth-form" aria-label="Reset password" onSubmit={recoverySent ? submitPasswordReset : requestPasswordReset}>
+            <label className="auth-field">
+              <span>Email address</span>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={recoveryEmail}
+                onChange={e => {
+                  setRecoveryEmail(e.target.value)
+                  setRecoverySent(false)
+                  setRecoveryCode('')
+                  setRecoveryMessage('')
+                  setRecoveryError('')
+                }}
+                required
+                placeholder="you@example.com"
+              />
+            </label>
+
+            {recoverySent && (
+              <>
+                <label className="auth-field">
+                  <span>6-digit email code</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={recoveryCode}
+                    onChange={e => setRecoveryCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    required
+                    placeholder="Enter code"
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>New password</span>
+                  <input type="password" autoComplete="new-password" value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)} required />
+                </label>
+                <p className="auth-field-hint">At least 12 characters, including uppercase, lowercase, a number and a symbol.</p>
+                <label className="auth-field">
+                  <span>Confirm new password</span>
+                  <input type="password" autoComplete="new-password" value={confirmNewPassword}
+                    onChange={e => setConfirmNewPassword(e.target.value)} required />
+                </label>
+              </>
+            )}
+
+            {recoveryMessage && <p className="auth-success" role="status">{recoveryMessage}</p>}
+            {recoveryError && <p className="auth-error" role="alert">{recoveryError}</p>}
+            <button type="submit" className="auth-primary" disabled={recoveryBusy}>
+              {recoveryBusy ? 'Please wait…' : recoverySent ? 'Reset password' : 'Send code'}
+            </button>
+            {recoverySent && (
+              <button type="button" className="auth-inline-link" onClick={() => void requestPasswordReset()} disabled={recoveryBusy}>
+                Send a new code
+              </button>
+            )}
+          </form>
+        )}
+
+        {recoveryComplete && <p className="auth-success" role="status">{recoveryMessage}</p>}
+        <div className="auth-account-switch">
+          <button type="button" onClick={backToSignIn}>← Back to sign in</button>
+        </div>
+      </section>
+    </main>
+  )
+
   if (register) return (
     <main className="access auth-access">
       <AuthBrand />
@@ -173,6 +341,9 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
                 </button>
               </span>
             </label>
+            <button type="button" className="auth-forgot-link" onClick={openRecovery}>
+              Forgot password?
+            </button>
           )}
 
           {isMobile && sent && (
