@@ -15,9 +15,9 @@
 
 - WP0 baseline `main`: `92c181f6f0ba861acac954545e7d630d07f3305c`; PR #108 merged successfully at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.
 - WP0 PR: [#108 — Document-to-Books foundation](https://github.com/Vaibhav1507/retail-business-erp/pull/108), merged. CI run #1284 passed frontend, backend and PostgreSQL integration jobs.
-- WP1 implementation branch: `feat/document-intake-foundation`, PR [#109](https://github.com/Vaibhav1507/retail-business-erp/pull/109), based on the merged main commit above. Latest head at handoff update: `499d5101e5436c428f6eef9ce7c8536c09e96b94`.
-- WP1 changes so far: migration 058; tenant-scoped batch/document/page registry; bounded multipart intake API; authenticated document list/detail/page endpoints; durable queue enqueue/claim/finish functions; route authorization and request-size limits; two high-signal integration tests. Page bytes are validated and inserted one at a time to avoid holding a full batch in API memory.
-- PR #109 CI run [#45798154794](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45798154794) was in progress at handoff update; check final status before merge.
+- WP1 implementation branch: `feat/document-intake-foundation`, PR [#109](https://github.com/Vaibhav1507/retail-business-erp/pull/109), based on the merged main commit above. Latest head SHA: recheck PR #109 live before continuing; documentation updates are still being committed to this branch.
+- WP1 changes so far: migration 058; tenant-scoped batch/document/page/status-history registry; bounded multipart intake API; authenticated document list/detail/page endpoints; durable queue enqueue/claim/finish functions; direction-aware role access; upload concurrency cap (2 per API instance); and minimal integration/security tests. Page bytes are validated and inserted one at a time to avoid holding a full batch in API memory.
+- PR #109 latest CI run [#45799712942](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45799712942) was in progress after the migration delimiter fix; check its final result before merge. An earlier run caught a malformed RLS `DO` block; the migration was corrected to explicit policies and a named trigger-function delimiter.
 - No AI extraction worker, review UI, posting integration, production migration or deployment is included yet.
 - WP1 proposes a Cloud Run pilot storage amendment to ADR-017: bounded PostgreSQL `bytea` evidence storage because Cloud Run local container storage is ephemeral and no paid object store is configured. This is subject to PR review; no automatic deletion/retention policy has been applied.
 
@@ -56,7 +56,7 @@ The uploader selects Sales or Purchase before processing. The system supports a 
 | WP | Status | Next output |
 |---|---|---|
 | WP0 — Discovery/spec | Merged in PR #108; CI passed | Complete |
-| WP1 — Registry, storage, intake and durable jobs | PR #109 open; CI running | Fix any CI issues, review migration/security and request owner merge approval; queue processing moves to WP2 |
+| WP1 — Registry, storage, intake and durable jobs | PR #109 open; CI rerunning after migration fix | Confirm latest CI, review storage amendment/security, request owner merge approval; queue processing moves to WP2 |
 | WP2 — Sales/purchase extraction | Not started | Handwriting-aware purchase extraction; field-level provenance/confidence; shared validation |
 | WP3 — Inbox and review UX | Not started | Mobile-first inbox, review and correction design/implementation |
 | WP4 — Posting | Not started / gated | Approved sale and purchase adapters with reconciliation |
@@ -70,7 +70,7 @@ Update this table at each PR/implementation milestone. Do not restart discovery 
 The owner requested minimal high-value tests first and broader unit-test expansion later. Follow that preference without dropping critical controls.
 
 - WP0: docs-only, no tests.
-- WP1: two focused integration flows cover grouped-page upload, idempotent replay, original-page retrieval, durable queue lease/finish and cross-tenant isolation. CI must still verify migration/build/test execution. Add only any missing critical flow test; defer broad unit-test expansion.
+- WP1: two focused integration flows cover grouped-page upload, idempotent replay/conflict, status history, original-page retrieval, durable queue lease/finish and cross-tenant isolation; a schema guard checks worker-only queue permissions and forced RLS. CI must verify migration/build/test execution. Defer broad unit-test expansion.
 - WP2: small fixed document corpus and a few extraction contract tests; broad prompt/parser permutations later.
 - WP3: focused component/Playwright journeys while implementing; complete relevant inbox/review journey, responsive screenshots and Axe at the screen-group gate.
 - WP4: at least one sales and one purchase flow to committed transaction, assert key totals and source link; protect duplicate/concurrency and tenant boundaries.
@@ -89,7 +89,7 @@ The owner requested minimal high-value tests first and broader unit-test expansi
 ## Exact next action for the next chat
 
 1. Read `docs/ux/RBOS-UI-UX-WORKFLOW.md` from current main.
-2. Read this handoff, product definition, architecture note, ADR-027 and discovery log.
+2. Read this handoff, product definition, architecture note, ADR-027, WP0 discovery log and WP1 intake implementation log.
 3. Verify current main, this branch/PR and any active PRs before editing.
 4. WP0 is already merged; do not repeat its discovery.
 5. Finish WP1 PR #109 CI and review. Fix any failures and update the WP1 log. Do not merge without owner authorisation or run the migration in production.
