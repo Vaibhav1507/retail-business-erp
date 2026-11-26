@@ -91,6 +91,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'handwritten-bill.jpg', { type: 'image/jpeg' })
     fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [file] } })
     await waitFor(() => expect(calls).toContainEqual({ url: '/api/sales/invoice-image-extract', method: 'POST' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Invoice details extracted|Some details could not be read/))
     expect(await screen.findByRole('region', { name: 'Review extracted sales invoice' })).toBeInTheDocument()
     expect(screen.getByLabelText('Extracted line 1 description')).toHaveValue('Samsung LED Television')
     expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue(1)
