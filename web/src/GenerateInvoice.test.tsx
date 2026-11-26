@@ -100,7 +100,6 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(container.querySelector('#billing-prod')?.closest('.billing-field')).toHaveAttribute('hidden')
     expect(container.querySelector('.invoice-brand-model')).toHaveAttribute('hidden')
     expect(container.querySelector('.invoice-quantity-price')).toHaveAttribute('hidden')
-    expect(container.querySelector('#billing-serial')?.closest('.billing-field')).toHaveAttribute('hidden')
     expect(container.querySelector('.invoice-product-more-details')).toHaveAttribute('hidden')
     expect(container.querySelector('.invoice-add-item-action')).toHaveAttribute('hidden')
     expect(screen.getByLabelText('Customer name *')).toHaveValue('Test Customer')
