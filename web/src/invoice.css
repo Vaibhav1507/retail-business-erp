@@ -1236,13 +1236,34 @@
   color: #a12d25;
 }
 .invoice-create-page .invoice-product-entry > .invoice-product-description {
-  height: 76px;
+  height: auto;
   min-height: 76px;
-  max-height: 76px;
+  max-height: none;
   resize: none;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
+.invoice-extracted-line textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #d8e1dc;
+  border-radius: 10px;
+  background: #fff;
+  color: #202a25;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 1.4;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.invoice-extracted-line .invoice-extracted-description { min-height: 48px; }
+.invoice-extracted-line .invoice-extracted-serials { min-height: 44px; }
 @media (max-width: 700px) {
   .invoice-import-callout {
     column-gap: 8px;
