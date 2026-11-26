@@ -133,22 +133,31 @@ Candidate concepts (not final table names/schema): `business_document`, `busines
 
 ### 2.2 Storage decision
 
-Current evidence is inconsistent:
-- purchase invoice content is stored in PostgreSQL `bytea`;
+Current evidence and deployment constraints:
+- purchase invoice content is stored in PostgreSQL `bytea` in `procurement.invoice_file`;
 - sales invoice content is not retained;
-- ADR-017 describes an `IDocumentStore` abstraction with local storage, but the current purchase implementation directly uses `procurement.invoice_file`.
+- ADR-017 proposed an `IDocumentStore` abstraction with local filesystem storage;
+- the pilot deployment runbook targets Cloud Run + Neon PostgreSQL. A Cloud Run container's writable layer is not a durable document store across instance replacement, and no persistent volume or object-storage bucket is configured in the repository.
 
-WP1 must decide the real storage implementation based on the deployed environment, backups, size limits, access controls and cost. Do not assume a Cloud Run local filesystem is durable, and do not assume the current database `bytea` table is the final multi-tenant document store.
+**WP1 pilot storage choice (proposed in this implementation PR):** store bounded source-page bytes in PostgreSQL `documents.document_page.content` (`bytea`) with tenant RLS. This reuses the existing durable database and backup path, avoids adding a paid object-storage dependency or new credentials, and keeps upload metadata, page evidence and queue enqueue in one database transaction. It is a deliberate Cloud Run pilot amendment to ADR-017's local-filesystem proposal, not a claim that database blobs are the ideal long-term scale architecture.
+
+Hard limits in the intake contract:
+- 8 MB per page;
+- up to 6 pages per bill;
+- up to 10 independent bills per batch;
+- 24 MB aggregate file bytes per batch (26 MiB HTTP envelope).
+The database backup/restore process must include these page rows. No automatic retention deletion is enabled; a tenant retention/deletion policy remains an explicit follow-up before broad rollout.
+
+Revisit a private object store behind a storage abstraction when measured database growth, backup time or throughput justifies it and the owner approves its recurring cost. Do not use Cloud Run's local container filesystem for retained source evidence.
 
 Required storage contract:
-- random opaque object keys, never user-controlled file paths;
-- tenant-scoped metadata and RLS;
-- private objects, no public/static URLs;
-- authenticated downloads through a tenant-authorized endpoint;
-- content type and signature validation, page/file/aggregate size limits;
-- checksum for exact duplicate detection and integrity;
-- retention/deletion and backup/restore policy;
-- bounded streaming; avoid buffering an entire multi-document batch in API memory.
+- opaque server-generated page IDs; never user-controlled storage paths;
+- tenant-scoped metadata and RLS on batch, document and page rows;
+- no public/static URLs; source bytes are returned only by authenticated tenant-authorized endpoints;
+- content type and file-signature validation plus page/file/aggregate size limits;
+- SHA-256 checksum for integrity and future duplicate detection;
+- documented retention/deletion and backup/restore policy;
+- bounded upload envelope and per-page reads.
 
 ### 2.3 Durable intake and worker model
 
