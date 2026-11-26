@@ -380,7 +380,7 @@ public sealed class InvoiceExtractionService(HttpClient http, TenantDb db, IConf
                 {
                     var value = Num(item[field]);
                     var max = field == "confidence" ? 1m : 100_000_000m;
-                    line[field] = value is >= 0 && value <= max ? value : null;
+                    line[field] = value is decimal number && number >= 0m && number <= max ? number : null;
                 }
                 lines.Add(line);
             }
