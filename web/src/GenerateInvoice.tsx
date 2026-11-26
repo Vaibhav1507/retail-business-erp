@@ -595,7 +595,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               <input id="billing-model" autoComplete="off" placeholder="Enter model if available" value={modelText} onChange={e => setModelText(e.target.value)} />
             </div>}
           </div>
-          <div className="invoice-electronics-fields invoice-quantity-price billing-col-12">
+          <div className="invoice-electronics-fields invoice-quantity-price billing-col-12" hidden={Boolean(salesInvoiceDraft)}>
             <div className="billing-field">
               <label htmlFor="billing-qty">Quantity *</label>
               <input id="billing-qty" aria-invalid={Boolean(fieldErrors.quantity)} aria-describedby={fieldErrors.quantity ? "billing-qty-error" : undefined} className={fieldErrors.quantity ? 'field-invalid' : ''} inputMode="decimal" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem() } }} value={qty} onChange={e => { setQty(e.target.value); setFieldErrors(current => ({ ...current, quantity: '' })) }} />
@@ -607,7 +607,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               {fieldErrors.price && <small id="billing-price-error" className="field-error">{fieldErrors.price}</small>}
             </div>
           </div>
-          {isElectronicsBusiness && <div className="billing-field billing-col-12">
+          {isElectronicsBusiness && <div className="billing-field billing-col-12" hidden={Boolean(salesInvoiceDraft)}>
             <label htmlFor="billing-serial">Serial number (optional)</label>
             <input id="billing-serial" aria-invalid={Boolean(fieldErrors.serial)} aria-describedby={fieldErrors.serial ? "billing-serial-error" : undefined} className={fieldErrors.serial ? 'field-invalid' : ''} autoComplete="off" placeholder="Enter serial number if available" value={serialText} onChange={e => { setSerialText(e.target.value); setFieldErrors(current => ({ ...current, serial: '' })) }} />
             {fieldErrors.serial && <small id="billing-serial-error" className="field-error">{fieldErrors.serial}</small>}
