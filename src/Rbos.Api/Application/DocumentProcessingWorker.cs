@@ -44,7 +44,7 @@ public static class DocumentProcessingWorker
             "select document_id, tenant_id, actor_user_id, lease_token, attempt_count from integrations.claim_document_processing(@limit, @lease, @document)",
             conn);
         command.Parameters.AddWithValue("limit", onlyDocumentId is null ? MaxJobsPerRun : 1);
-        command.Parameters.AddWithValue("lease", 900);
+        command.Parameters.AddWithValue("lease", 300);
         command.Parameters.AddWithValue("document", (object?)onlyDocumentId ?? DBNull.Value);
         await using var reader = await command.ExecuteReaderAsync(ct);
         var result = new List<Claimed>();
