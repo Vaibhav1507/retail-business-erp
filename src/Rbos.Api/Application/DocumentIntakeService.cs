@@ -152,9 +152,10 @@ public sealed class DocumentIntakeService(TenantDb tenantDb)
         var builder = new StringBuilder(direction);
         foreach (var document in documents)
         {
-            builder.Append('|').Append(document.SourceKind);
+            // Include page count so distinct page-group boundaries cannot collide.
+            builder.Append("|D:").Append(document.SourceKind).Append(':').Append(document.Pages.Count);
             foreach (var page in document.Pages)
-                builder.Append('|').Append(page.Sha256);
+                builder.Append("|P:").Append(page.Sha256);
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()))).ToLowerInvariant();
     }
