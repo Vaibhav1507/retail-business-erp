@@ -64,7 +64,7 @@ The descriptions below preserve only the portions that are reasonably visible. T
 
 - The photos are not stored in the repository; sample IDs refer to upload order in the 2026-11-26 conversation.
 - This document is a first-pass visual transcription by inspection, not a second-person verified ground truth.
-- No RBOS extraction run has yet been performed on these ten samples in this phase.
+- The user has supplied existing RBOS app extraction screenshots for both Anil bills (ANIL-001 and ANIL-002). No direct API invocation or provider/stage telemetry was available in this chat.
 - No accuracy or latency score is claimed.
 
 
