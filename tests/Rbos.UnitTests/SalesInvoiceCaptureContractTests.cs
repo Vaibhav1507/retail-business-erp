@@ -67,4 +67,20 @@ public sealed class SalesInvoiceCaptureContractTests
 
         Assert.Empty(Assert.IsType<JsonArray>(line["serialNumbers"]));
     }
+    [Fact]
+    public void GeminiResponseSchema_RequiresStructuredSerialArrayAndCoreInvoiceFields()
+    {
+        var schema = SalesInvoiceCaptureService.BuildResponseSchema();
+        var rootProperties = Assert.IsType<JsonObject>(schema["properties"]);
+        var lineArray = Assert.IsType<JsonObject>(rootProperties["lines"]);
+        var lineSchema = Assert.IsType<JsonObject>(lineArray["items"]);
+        var lineProperties = Assert.IsType<JsonObject>(lineSchema["properties"]);
+        var serialSchema = Assert.IsType<JsonObject>(lineProperties["serialNumbers"]);
+        var required = Assert.IsType<JsonArray>(lineSchema["required"]);
+
+        Assert.Equal("ARRAY", serialSchema["type"]!.GetValue<string>());
+        Assert.Contains(required, item => item?.GetValue<string>() == "serialNumbers");
+        Assert.Contains(required, item => item?.GetValue<string>() == "description");
+    }
+
 }
