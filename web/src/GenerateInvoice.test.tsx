@@ -55,7 +55,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(container.querySelector('.invoice-more-details #billing-date')).not.toBeNull()
     expect(productInput.tagName).toBe('TEXTAREA')
     expect(productInput).toHaveClass('invoice-product-description')
-    expect(productInput).toHaveStyle({ height: '76px', resize: 'none' })
+    expect(productInput).toHaveStyle({ height: '76px', minHeight: '76px', maxHeight: '76px', resize: 'none', overflowY: 'auto' })
     expect(container.querySelector('.invoice-import-prompt')).toHaveTextContent('Have a handwritten bill?')
     expect(screen.getByRole('button', { name: 'Scan tag' })).toHaveTextContent('📷')
     const productRow = productInput.closest('.invoice-product-entry')
@@ -190,6 +190,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(await screen.findByDisplayValue('LG')).toBeInTheDocument()
     expect(screen.getByDisplayValue('PX900H7SD4Z')).toBeInTheDocument()
     expect(screen.getByDisplayValue('610NWHS203785')).toBeInTheDocument()
+    expect(container.querySelector('.invoice-product-entry .item-tag-feedback')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /Add item/ })).toHaveLength(1)
     expect(container.querySelector('.invoice-product-more-details')?.hasAttribute('open')).toBe(false)
     expect(screen.queryByAltText('Captured product tag preview')).not.toBeInTheDocument()
@@ -199,7 +200,6 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
     expect(screen.getByText('Semi Automatic Washing Machine')).toBeInTheDocument()
     expect(screen.getByText(/Serial: 610NWHS203785/)).toBeInTheDocument()
-    expect(container.querySelector('.invoice-product-entry .item-tag-feedback')).toBeInTheDocument()
     expect(screen.getByText(/Barcode: 4006381333931/)).toBeInTheDocument()
   })
 
