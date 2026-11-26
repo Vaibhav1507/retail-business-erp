@@ -138,7 +138,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '454', date: '2026-11-06', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 17500, taxAmount: null, total: 17500,
-          lines: [{ description: 'Voltas Beko WM\\nModel WTL8066\\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: ['SN12345678'], hsn: null, quantity: 1, unitPrice: 17500, discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
+          lines: [{ description: 'Voltas Beko WM\nModel WTL8066\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: ['SN12345678'], hsn: null, quantity: 1, unitPrice: 17500, discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
         }, warnings: []
       }), { status: 200 })
       return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
@@ -150,7 +150,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [file] } })
     expect(await screen.findByLabelText('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
     await userEvent.click(screen.getByRole('button', { name: 'Add reviewed lines to bill' }))
-    expect(screen.getByText('Voltas Beko WM\\nModel WTL8066\\nS/N SN12345678')).toBeInTheDocument()
+    expect(screen.getByText('Voltas Beko WM\nModel WTL8066\nS/N SN12345678')).toBeInTheDocument()
     expect(screen.getByText('Serial: SN12345678')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Review detected items' })).not.toBeInTheDocument()
   })
