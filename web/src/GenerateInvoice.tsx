@@ -290,7 +290,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const knownSerials = new Set(items.flatMap(item => [...item.serials, ...item.imei1s, ...item.imei2s]).map(value => value.trim().toLowerCase()))
     for (const line of salesInvoiceDraft.lines) {
       const serials = (line.serialNumbers ?? []).map(value => value.trim()).filter(Boolean)
-      if (serials.some(value => value.length < 4 || value.length > 40 || /\\s/.test(value)) || serials.length > (line.quantity ?? 0)) {
+      if (serials.some(value => value.length < 4 || value.length > 40 || /\s/.test(value)) || serials.length > (line.quantity ?? 0)) {
         setError('Check the extracted serial numbers. Each must be 4–40 characters and the count cannot exceed the item quantity.')
         return
       }
@@ -348,7 +348,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const normalizedIdentifiers = identifiers.map(value => value.trim().toLowerCase())
     if (new Set(normalizedIdentifiers).size !== normalizedIdentifiers.length || normalizedIdentifiers.some(value => existingIdentifiers.includes(value)))
       nextErrors.serial = 'This serial/IMEI is already present in this invoice.'
-    if (serials.some(value => value.length < 4 || value.length > 40 || /\\s/.test(value)) || serials.length > quantity)
+    if (serials.some(value => value.length < 4 || value.length > 40 || /\s/.test(value)) || serials.length > quantity)
       nextErrors.serial = 'Enter valid serial numbers (4–40 characters each, no more than the quantity).'
     const validImei = (value: string) => {
       if (!/^\\d{15}$/.test(value)) return false
