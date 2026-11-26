@@ -30,8 +30,8 @@ Implementation note: code now exists beyond Slice 4 (returns, period lock, repor
 | 022 | Offline synchronisation deferred | adr-019-024-capabilities.md | Yes | No |
 | 023 | Direct government integrations deferred | adr-019-024-capabilities.md | Yes | No |
 | 024 | English/Hindi localisation foundation | adr-019-024-capabilities.md | Yes | No |
-
-Grouping into four files is deliberate for readability; each ADR keeps its own number and can be split out later without renumbering.
-
 | 025 | Physical negative stock with provisional cost and later reconciliation | adr-025-026-flexible-sales-and-handwritten-capture.md | Owner review before production | **Yes before production** |
 | 026 | Handwritten sales invoice capture as an unposted draft | adr-025-026-flexible-sales-and-handwritten-capture.md | Review source-evidence retention | Tax/accounting rules: Yes |
+| 027 | Shared Document-to-Books lifecycle with separate sales/purchase posting | adr-027-document-to-books.md | Discovery direction only; implementation gates pending | Yes for purchase/cash-sale accounting changes |
+
+Grouping into four files is deliberate for readability; each ADR keeps its own number and can be split out later without renumbering.
