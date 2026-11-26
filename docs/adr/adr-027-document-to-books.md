@@ -1,6 +1,6 @@
 # ADR-027 — Shared Document-to-Books lifecycle with separate sales and purchase posting
 
-**Status:** Proposed for staged implementation; accounting gates and evidence-retention policy remain open.  
+**Status:** Accepted product/architecture direction for staged implementation; accounting gates and evidence-retention policy remain open. WP0/WP1 merged; WP2 implementation in progress.  
 **Date:** 2026-11-26  
 **Related:** ADR-013 (double-entry accounting), ADR-014 (immutable posted transactions), ADR-015 (idempotent posting), ADR-017 (document storage), ADR-018 (database-backed jobs), ADR-026 (handwritten sales extraction).
 
@@ -75,9 +75,10 @@ Costs and risks:
 
 ## Implementation status
 
-- WP0 discovery/product/architecture documentation merged in PR #108; CI passed.
-- WP1 intake foundation is being implemented on `feat/document-intake-foundation`: migration 058, tenant-scoped page registry, bounded upload API, idempotency, authenticated source retrieval and durable queue functions.
-- WP1 proposes a Cloud Run-specific PostgreSQL `bytea` storage amendment to ADR-017; it is not yet owner-reviewed or deployed.
-- WP1 does not include the document processing worker, AI extraction, review UI or posting. Those remain WP2–WP4.
-- No production migration, provider call or deployment has been performed.
+- WP0 documentation merged in PR #108; CI passed.
+- WP1 intake foundation merged in PR #109 at `b6b0409c3ed522aa70f84d8cde002632807dda77`: migration 058, tenant-scoped page registry, bounded upload API, idempotency, authenticated source retrieval and durable queue functions.
+- WP2 worker/extraction implementation is in progress on `feat/document-processing-worker`: migration 059 adds versioned attempts/drafts and lease-bound functions; a scheduled worker calls separate grouped-page sales and handwriting-aware purchase extractors; document detail exposes attempts/drafts for review.
+- WP2 never posts sales or purchase transactions. It stores `NeedsReview` drafts only.
+- ADR-017's Cloud Run pilot bytea storage amendment remains a bounded pilot choice; retention policy and deployment must be verified separately.
+- WP2 PR/CI has not yet been opened/run. No production migration, provider call or deployment has been performed.
 - Follow current status and exact next action in [DOCUMENT-TO-BOOKS-HANDOFF.md](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md).
