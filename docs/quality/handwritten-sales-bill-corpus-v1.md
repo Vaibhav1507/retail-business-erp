@@ -9,7 +9,7 @@
 
 | Sample | Source format | Items visible | Visible total (provisional) | Initial difficulty notes |
 |---|---|---:|---:|---|
-| S01 | Monika Electronics | 1 | ₹17,500 | Faint/soft writing; multi-line product description; long handwritten identifier; extra handwritten number near lower description area |
+| S01 | Monika Electronics | 1 | ₹17,500 | App/source comparison captured; date year and product transcription wrong; two identifier strings not surfaced; source handwriting/model characters need verification |
 | S02 | Monika Electronics | 1 | ₹11,000 | Brand/product wording and model text need verification; mixed cursive and block characters |
 | S03 | Monika Electronics | 1 | ₹7,500 (verify) | Low contrast/soft focus; short product name and long identifier |
 | S04 | Monika Electronics | 1 | ₹17,400 | Tilted photo; refrigerator description; long model and serial-like strings |
@@ -73,3 +73,14 @@ The descriptions below preserve only the portions that are reasonably visible. T
 - Two separate Anil Sports & Stationery bills now have source-to-app comparisons: [ANIL-001 ₹5,000](./anil-sports-import-comparison-v1.md#anil-001--5000-bill) and [ANIL-002 ₹10,020](./anil-sports-import-comparison-v1.md#anil-002--10020-bill-source-bill-no-468).
 - ANIL-002 is the Anil source bill from the original ten-photo batch; ANIL-001 is the additional Anil source bill supplied afterward. They are both retained. Current corpus therefore contains 9 Monika bills + 2 Anil bills (11 total).
 - This corrects the earlier single-Anil-sample inventory. No source image or customer personal details are committed to Git.
+
+
+## MONIKA-001 app comparison update — S01 (2026-11-26)
+
+- Source/app comparison: [Monika sales import comparison v1](./monika-sales-import-comparison-v1.md).
+- App extracted one line, quantity 1, line amount and total ₹17,500 (both match the source visually).
+- App date is 6-11-2020; source date appears 6-11-2026. App invoice number 153 does not appear to match the red handwritten source number (approximately 454; verify).
+- App description “Vultas bike lamp” is materially wrong against source “Voltas Beko WM”. App brand “Vultas” and model “WTL 8036 UAA15” also differ from provisional source readings (model looks like WTL 8066 UAA / SPCOD; exact characters need verification).
+- Source contains two further identifier strings, `1200 644A 76A 112258` and `26111412945`. The app review card has no serial/identifier field and displays neither. Do not assume which is the actual serial until verified.
+- Source Rate column appears blank while app fills unit price ₹17,500. Quantity is 1; amount matches. Provenance (source-read versus derived amount/quantity) is not exposed.
+- These are visual findings from this source and its app screenshots, not a corpus-level accuracy score.
