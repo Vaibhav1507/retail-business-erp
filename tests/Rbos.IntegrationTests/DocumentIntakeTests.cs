@@ -47,6 +47,10 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         Assert.Equal(batchId, replayJson.RootElement.GetProperty("batchId").GetGuid());
         Assert.Equal(documentId, replayJson.RootElement.GetProperty("documents")[0].GetProperty("id").GetGuid());
 
+        var conflict = await UploadAsync(http, "Sale",
+            [new UploadPage("page-0-0", "different-bill.jpg", "image/jpeg", [0xFF, 0xD8, 0xFF, 0xEE])], key);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+
         var list = await http.GetFromJsonAsync<JsonElement>("/api/documents?direction=Sale");
         Assert.Single(list.EnumerateArray());
 
@@ -117,7 +121,7 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
                 new { sourceKind = "HandwrittenBill", pages = pages.Select(x => x.Field).ToArray() }
             }
         };
-        var content = new MultipartFormDataContent();
+        using var content = new MultipartFormDataContent();
         content.Add(new StringContent(JsonSerializer.Serialize(manifest), Encoding.UTF8, "application/json"), "manifest");
         foreach (var page in pages)
         {
@@ -126,7 +130,7 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
             content.Add(file, page.Field, page.FileName);
         }
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/documents/batches");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/documents/batches");
         request.Headers.Add("X-CSRF-TOKEN", token.GetProperty("token").GetString());
         request.Headers.Add("Idempotency-Key", idempotencyKey);
         request.Content = content;
