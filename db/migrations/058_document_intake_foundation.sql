@@ -64,10 +64,27 @@ create table documents.document_page (
 create index ix_document_page_document
   on documents.document_page (tenant_id, document_id, page_number);
 
-do $$
+create table documents.document_status_history (
+  tenant_id uuid not null,
+  id uuid not null,
+  document_id uuid not null,
+  status text not null check (status in (
+    'Queued','Processing','NeedsReview','ReadyToPost','Posted',
+    'FailedRetryable','FailedNeedsAction','DuplicateReview','Rejected','Cancelled'
+  )),
+  actor_user_id uuid null,
+  occurred_at timestamptz not null default now(),
+  primary key (tenant_id, id),
+  foreign key (tenant_id, document_id) references documents.business_document(tenant_id, id)
+);
+
+create index ix_document_status_history_document
+  on documents.document_status_history (tenant_id, document_id, occurred_at);
+
+do $
 declare t text;
 begin
-  foreach t in array array['documents.document_batch','documents.business_document','documents.document_page'] loop
+  foreach t in array array['documents.document_batch','documents.business_document','documents.document_page','documents.document_status_history'] loop
     execute format('alter table %s enable row level security', t);
     execute format('alter table %s force row level security', t);
     execute format(
@@ -75,7 +92,32 @@ begin
       t
     );
   end loop;
-end $$;
+end $;
+
+create policy document_status_history_owner_only
+  on documents.document_status_history
+  for all to rbos_migrator using (true) with check (true);
+grant select on documents.document_status_history to rbos_app;
+
+create or replace function documents.record_document_status()
+returns trigger
+language plpgsql security definer
+set search_path = pg_catalog, documents, core
+as $
+begin
+  if tg_op = 'INSERT' or new.status is distinct from old.status then
+    insert into documents.document_status_history
+      (tenant_id, id, document_id, status, actor_user_id)
+    values
+      (new.tenant_id, gen_random_uuid(), new.id, new.status, core.current_user_id());
+  end if;
+  return new;
+end;
+$;
+revoke all on function documents.record_document_status() from public;
+create trigger document_status_history_after_write
+  after insert or update of status on documents.business_document
+  for each row execute function documents.record_document_status();
 
 grant select, insert on documents.document_batch to rbos_app;
 grant select, insert on documents.business_document to rbos_app;
