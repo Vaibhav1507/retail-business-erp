@@ -294,15 +294,7 @@ language plpgsql security definer
 set search_path = pg_catalog, integrations, documents
 as $function$
 begin
-  if p_safe_error_code is null or p_safe_error_code !~ '^[a-z0-9_]{1,64}
-revoke all on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) from public, rbos_app;
-revoke all on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) from public, rbos_app;
-grant execute on function integrations.start_document_processing(uuid,uuid,uuid) to rbos_worker;
-grant execute on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) to rbos_worker;
-grant execute on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) to rbos_worker;
-revoke all on function integrations.fail_document_processing_before_start(uuid,uuid,uuid,text) from public, rbos_app;
-grant execute on function integrations.fail_document_processing_before_start(uuid,uuid,uuid,text) to rbos_worker;
- then
+  if p_safe_error_code is null or p_safe_error_code !~ '^[a-z0-9_]{1,64}$' then
     raise exception 'Invalid safe error code' using errcode = '22023';
   end if;
 
@@ -330,6 +322,9 @@ $function$;
 revoke all on function integrations.start_document_processing(uuid,uuid,uuid) from public, rbos_app;
 revoke all on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) from public, rbos_app;
 revoke all on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) from public, rbos_app;
+revoke all on function integrations.fail_document_processing_before_start(uuid,uuid,uuid,text) from public, rbos_app;
+
 grant execute on function integrations.start_document_processing(uuid,uuid,uuid) to rbos_worker;
 grant execute on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) to rbos_worker;
 grant execute on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) to rbos_worker;
+grant execute on function integrations.fail_document_processing_before_start(uuid,uuid,uuid,text) to rbos_worker;
