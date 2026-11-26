@@ -154,37 +154,50 @@ public sealed class SalesInvoiceCaptureService(
             var extraction = NormalizeForReview(parsed);
             if (parsed is null)
                 warnings.Add("The configured image providers could not read this invoice. Enter the details manually or try a clearer photo.");
-            else
+
+            var lines = extraction["lines"] as JsonArray ?? [];
+            if (parsed is not null && lines.Count == 0)
+                warnings.Add("No readable invoice lines were found.");
+
+            var hasUnreadableDescription = false;
+            var hasMissingQuantity = false;
+            var hasMissingUnitPrice = false;
+            var hasMissingAmount = false;
+            foreach (var line in lines.OfType<JsonObject>())
             {
-                var lines = extraction["lines"] as JsonArray ?? [];
-                if (lines.Count == 0) warnings.Add("No readable invoice lines were found.");
-                var hasUnreadableDescription = false;
-                var hasUnreadableQuantityOrPrice = false;
-                foreach (var line in lines.OfType<JsonObject>())
-                {
-                    if (ReadString(line["description"]) is null)
-                        hasUnreadableDescription = true;
-                    if (ReadDecimal(line["quantity"]) is null || ReadDecimal(line["unitPrice"]) is null)
-                        hasUnreadableQuantityOrPrice = true;
-                }
-                if (hasUnreadableDescription)
-                    warnings.Add("One or more product descriptions could not be read fully. Review the original text before adding the lines.");
-                if (hasUnreadableQuantityOrPrice)
-                    warnings.Add("Some line quantities or prices are unreadable. Review the affected fields manually.");
-                if (ReadDecimal(extraction["total"]) is null)
-                    warnings.Add("The invoice total was not readable. The bill total will be calculated from the values you confirm.");
+                if (ReadString(line["description"]) is null)
+                    hasUnreadableDescription = true;
+                if (ReadDecimal(line["quantity"]) is null)
+                    hasMissingQuantity = true;
+                if (ReadDecimal(line["unitPrice"]) is null)
+                    hasMissingUnitPrice = true;
+                if (ReadDecimal(line["amount"]) is null)
+                    hasMissingAmount = true;
             }
+
+            if (hasUnreadableDescription)
+                warnings.Add("One or more product descriptions could not be read fully. Review the original text before adding the lines.");
+            if (hasMissingQuantity)
+                warnings.Add("One or more line quantities are blank or unreadable. Confirm them before adding the lines.");
+            if (hasMissingUnitPrice)
+                warnings.Add("One or more unit rates are blank or unreadable. The original bill may leave the Rate column empty; enter the selling price before adding those lines.");
+            if (hasMissingAmount)
+                warnings.Add("One or more line amounts are blank or unreadable. Confirm them against the original bill.");
+            if (ReadDecimal(extraction["total"]) is null)
+                warnings.Add("The invoice total was not readable. Review the printed TOTAL box and confirm the bill total.");
+
+            var needsAttention = warnings.Count > 0;
 
             timer.Stop();
             log.LogInformation(
-                "Sales invoice extraction completed. Status {Status}, bytes {UploadedBytes}, lines {LineCount}, OCR used {OcrUsed}, total latency {TotalMs}ms, trace {TraceId}",
-                parsed is null ? "NeedsAttention" : "ReadyForReview", bytes.Length,
-                (extraction["lines"] as JsonArray)?.Count ?? 0, !string.IsNullOrWhiteSpace(ocrText),
+                "Sales invoice extraction completed. Status {Status}, bytes {UploadedBytes}, lines {LineCount}, OCR used {OcrUsed}, warning count {WarningCount}, total latency {TotalMs}ms, trace {TraceId}",
+                needsAttention ? "NeedsAttention" : "ReadyForReview", bytes.Length,
+                lines.Count, !string.IsNullOrWhiteSpace(ocrText), warnings.Count,
                 timer.ElapsedMilliseconds, Activity.Current?.TraceId.ToString());
 
             return ServiceResult<object>.Ok(new
             {
-                status = parsed is null ? "NeedsAttention" : "ReadyForReview",
+                status = needsAttention ? "NeedsAttention" : "ReadyForReview",
                 extraction,
                 warnings
             });
