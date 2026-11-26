@@ -221,14 +221,10 @@ public static class DocumentProcessingWorker
         await using var conn = await source.OpenConnectionAsync(ct);
         await using var command = new NpgsqlCommand(@"
             select attempt_id, attempt_number, direction, source_kind
-              from integrations.start_document_processing(
-                @tenant, @document, @lease,
-                case when @direction = 'Sale' then 'SalesInvoiceCapture' else 'SupplierInvoiceCapture' end,
-                case when @direction = 'Sale' then 'sale-v1' else 'purchase-v1' end)", conn);
+              from integrations.start_document_processing(@tenant, @document, @lease)", conn);
         command.Parameters.AddWithValue("tenant", item.TenantId);
         command.Parameters.AddWithValue("document", item.DocumentId);
         command.Parameters.AddWithValue("lease", item.LeaseToken);
-        command.Parameters.AddWithValue("direction", DBNull.Value);
         await using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return null;
         return new Started(reader.GetGuid(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3));
@@ -282,8 +278,8 @@ public static class DocumentProcessingWorker
         command.Parameters.AddWithValue("state", finalState);
         command.Parameters.AddWithValue("provider", (object?)provider ?? DBNull.Value);
         command.Parameters.AddWithValue("model", (object?)model ?? DBNull.Value);
-        command.Parameters.AddWithValue("data", (object?)extractedData?.ToJsonString() ?? DBNull.Value);
-        command.Parameters.AddWithValue("warnings", (object?)warnings?.ToJsonString() ?? DBNull.Value);
+        command.Parameters.Add("data", NpgsqlTypes.NpgsqlDbType.Jsonb).Value = (object?)extractedData?.ToJsonString() ?? DBNull.Value;
+        command.Parameters.Add("warnings", NpgsqlTypes.NpgsqlDbType.Jsonb).Value = (object?)warnings?.ToJsonString() ?? DBNull.Value;
         command.Parameters.AddWithValue("error", (object?)safeErrorCode ?? DBNull.Value);
         command.Parameters.AddWithValue("duration", processingMs);
         command.Parameters.AddWithValue("retryAt", (object?)retryAt ?? DBNull.Value);
