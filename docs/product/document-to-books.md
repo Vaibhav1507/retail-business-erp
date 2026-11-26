@@ -164,7 +164,8 @@ The full end-to-end Playwright, responsive screenshot and Axe pass is required a
 
 - [Architecture and current-state audit](../architecture/document-ingestion-pipeline.md)
 - [ADR-027](../adr/adr-027-document-to-books.md)
-- [Implementation/discovery log](../implementation-log/2026-11-26-document-to-books-discovery.md)
+- [WP0 discovery log](../implementation-log/2026-11-26-document-to-books-discovery.md)
+- [WP1 intake implementation log](../implementation-log/2026-11-26-document-intake-wp1.md)
 - [Continuation handoff](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md)
 - [RBOS engineering workflow](../ux/RBOS-UI-UX-WORKFLOW.md)
 - [Existing flexible sales/handwritten capture plan](../implementation-plans/flexible-sales-and-handwritten-invoice-capture.md)
