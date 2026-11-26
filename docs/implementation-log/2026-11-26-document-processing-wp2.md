@@ -118,7 +118,8 @@ This is intentionally a small set of high-signal integration tests. Broad unit/p
 - [x] Add focused worker-flow and schema-privilege integration tests.
 - [x] Update deployment runbook and handoff.
 - [x] Open focused WP2 PR #111.
-- [ ] Verify CI end-to-end on the latest updated PR head.
+- [x] Verify CI on head `9fe7478`: frontend, backend build/unit tests, container build, migration application, and PostgreSQL integration tests all passed (188/188).
+- [ ] Verify CI again on the latest head after the `DefaultServiceProviderFactory` analyzer-warning cleanup.
 - [ ] Review any CI/security findings and fix them before merge.
 - [ ] Confirm migration 058/059 deployment separately after PR merge; do not infer deployment from merge.
 - [ ] Begin WP3 only after WP2 is merged and its runtime/migration requirements are available.
@@ -134,3 +135,10 @@ Read the current-main `docs/ux/RBOS-UI-UX-WORKFLOW.md`, this WP2 log and `docs/u
 - Initial CI run: [#1308](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45808792744), queued at PR creation. Later handoff/log commits trigger another workflow; always inspect the newest run whose `head_sha` matches the live PR head.
 - The last implementation refinement preserves a missing purchase unit cost as `null` in the Document-to-Books path, emits a review warning, and leaves legacy New Stock Entry rate inference unchanged. The raw purchase extraction is restricted to known fields, bounded strings/line count/numeric ranges. Provenance distinguishes AI-extracted descriptions/values from system-suggested supplier/catalogue matches.
 - Merge only after latest CI green, security/migration review and owner approval. Production migrations 058/059 and Cloud Run worker enablement remain separate, unperformed operations.
+
+
+## CI validation — 2026-11-26
+
+- CI run [#1310](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45808981331) passed on `9fe747895bcc906504f7e583b77b4666ee5832f3`: backend solution build and unit tests passed; frontend TypeScript, frontend tests, lint, production build and high/critical dependency audit passed; deployment container built; migrations through 059 applied to the disposable PostgreSQL CI database; PostgreSQL integration tests passed **188/188, 0 failed, 0 skipped**.
+- The backend build raised analyzer warning ASP0000 for calling `BuildServiceProvider` while creating the worker-only DI container. Replaced the call with `DefaultServiceProviderFactory.CreateServiceProvider`; this follow-up must be validated by the next CI run on the new head.
+- No production migration, AI provider call, production-data operation, deployment or merge has occurred.
