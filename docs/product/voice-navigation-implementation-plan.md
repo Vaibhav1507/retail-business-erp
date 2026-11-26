@@ -188,3 +188,13 @@ Update this file at every meaningful implementation milestone, provider decision
 - PR #25 merged the focused CSS-only quick-action wrapping fix; duplicate PR #26 closed without merge. This UI correction is separate from the PR #24 voice implementation.
 - No voice-specific database migration is introduced by PR #24. Provider flags remain disabled by default. Existing Gemini/Groq server-side credentials are reused; no new voice-specific secret type is required.
 - Remaining acceptance: Android Chrome and low-end device checks; consented RBOS speech corpus and real utterance evaluation; provider quota/cost verification before enabling hosted paths; production pilot with non-real business data and rollback readiness.
+
+
+## 9. Assistant UX implementation — 2026-11-26
+
+- The navigation assistant is redesigned as a compact responsive sheet with a two-column quick-action grid, a stable scrolling conversation, and a fixed command composer.
+- Microphone interaction changes from press-and-hold to tap-to-start/tap-to-stop, with a distinct microphone-starting state while permission and AudioWorklet setup complete.
+- The frontend requests persistent origin storage once on the first microphone gesture where supported. The existing Shruti worker remains authoritative for SHA-256 validation, cache/network source and whether the model was saved. Download progress is shown only after a real worker progress event.
+- Quick actions, typed commands, voice results and suggestions share one navigation helper. Accepted routes close the assistant; declined protected-route confirmation leaves it open and protects unsaved work.
+- Add Purchase uses a dedicated positioning context above the fixed review bar and global navigation. No Procurement, OCR, route allowlist, provider-order, backend or accounting contract changes are intended.
+- Focused component tests and a dedicated Playwright/Axe audit are added. CI, screenshot inspection and Android real-device acceptance remain pending until validated.
