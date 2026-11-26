@@ -78,6 +78,8 @@ Evidence only; this is not product-owner acceptance. No CA review has occurred.
 **Required validation:** Slice 2. **Required tests:** Cross-tenant, traversal, size/type.
 **PO decision needed:** Yes. **Professional review:** No.
 
+**Cloud Run pilot amendment proposal (2026-11-26; implementation PR review pending):** ADR-017's local-filesystem implementation is not safe for retained evidence on the current Cloud Run deployment because the container writable layer is ephemeral. For the bounded Document-to-Books pilot, WP1 proposes storing source pages in tenant-RLS PostgreSQL `bytea` rows (8 MB/page, 24 MB/batch), with authenticated retrieval and database backup/restore. This avoids adding a paid object-storage service or new credentials. It is a pilot-specific deviation from the original local-filesystem choice, not a long-term scale recommendation. No automatic retention deletion is enabled until the owner defines the retention policy. Revisit object storage only with measured need and explicit cost approval.
+
 ---
 
 ## ADR-018 Database-backed jobs
