@@ -1,5 +1,6 @@
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
@@ -25,23 +26,28 @@ public sealed class SmtpEmailOtpSender(IConfiguration configuration) : IEmailOtp
 
     public async Task SendAsync(string email, string code, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
         if (!IsConfigured) throw new InvalidOperationException("Email SMTP delivery is not configured.");
-        var from = new MailAddress(FromAddress!, configuration["Email:Smtp:FromName"] ?? "Dhandha Mitra");
-        using var message = new MailMessage(from, new MailAddress(email))
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(configuration["Email:Smtp:FromName"] ?? "Dhandha Mitra", FromAddress!));
+        message.To.Add(MailboxAddress.Parse(email));
+        message.Subject = "Your Dhandha Mitra password reset code";
+        message.Body = new TextPart("plain")
         {
-            Subject = "Your Dhandha Mitra password reset code",
-            Body = $"Your password reset code is {code}. It expires in 10 minutes. If you did not request this, you can ignore this email.",
-            IsBodyHtml = false
+            Text = $"Your password reset code is {code}. It expires in 10 minutes. If you did not request this, you can ignore this email."
         };
-        using var client = new SmtpClient(Host!, configuration.GetValue("Email:Smtp:Port", 587))
+
+        var security = (configuration["Email:Smtp:Security"] ?? "StartTls").Trim() switch
         {
-            EnableSsl = configuration.GetValue("Email:Smtp:EnableSsl", true),
-            DeliveryMethod = SmtpDeliveryMethod.Network,
-            UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(configuration["Email:Smtp:Username"], configuration["Email:Smtp:Password"])
+            "StartTls" => SecureSocketOptions.StartTls,
+            "SslOnConnect" => SecureSocketOptions.SslOnConnect,
+            _ => throw new InvalidOperationException("Email:Smtp:Security must be StartTls or SslOnConnect.")
         };
-        await client.SendMailAsync(message);
+        using var client = new SmtpClient();
+        client.Timeout = Math.Clamp(configuration.GetValue("Email:Smtp:TimeoutSeconds", 15), 5, 60) * 1000;
+        await client.ConnectAsync(Host!, configuration.GetValue("Email:Smtp:Port", 587), security, cancellationToken);
+        await client.AuthenticateAsync(configuration["Email:Smtp:Username"], configuration["Email:Smtp:Password"], cancellationToken);
+        await client.SendAsync(message, cancellationToken);
+        await client.DisconnectAsync(true, cancellationToken);
     }
 }
 
@@ -126,7 +132,7 @@ public sealed class PasswordResetOtpService(
         {
             await sender.SendAsync(user.Email, code, cancellationToken);
         }
-        catch (Exception exception) when (exception is SmtpException or InvalidOperationException or IOException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogError(exception, "Password reset email delivery failed for user {UserId}.", user.Id);
             await using var connection = await dataSource.OpenConnectionAsync(CancellationToken.None);

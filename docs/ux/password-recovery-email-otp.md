@@ -29,7 +29,8 @@ Endpoints stay disabled until these Cloud Run environment variables are configur
 - Email__Smtp__Password
 - Email__Smtp__FromAddress (verified sender)
 - Email__Smtp__FromName (optional; defaults to Dhandha Mitra)
-- Email__Smtp__EnableSsl (defaults to true)
+- Email__Smtp__Security (StartTls on port 587, or SslOnConnect on port 465)
+- Email__Smtp__TimeoutSeconds (defaults to 15)
 - Auth__PasswordReset__Pepper (long random secret used only for HMAC)
 
 Never commit real secret values. Configure and deploy separately after PR review and merge. The UI/API report that recovery is unavailable while the provider is not configured.

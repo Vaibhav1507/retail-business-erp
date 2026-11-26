@@ -18,6 +18,7 @@
     <PackageReference Include="QuestPDF" Version="2026.9.1" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="PDFtoImage" Version="5.4.0" />
+    <PackageReference Include="MailKit" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>
