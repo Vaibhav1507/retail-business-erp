@@ -322,6 +322,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
           </label>
 
           {(isEmail || !otp) && (
+            <>
             <label className="auth-field">
               <span>Password</span>
               <span className="auth-password-control">
@@ -346,6 +347,7 @@ export function AccountAccess({ onDone }: { onDone: () => void }) {
             <button type="button" className="auth-forgot-link" onClick={openRecovery}>
               Forgot password?
             </button>
+            </>
           )}
 
           {isMobile && sent && (
