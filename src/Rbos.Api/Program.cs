@@ -113,6 +113,7 @@ builder.Services.AddHttpClient<Rbos.Api.Application.IProductLookupProvider, Rbos
 builder.Services.AddScoped<Rbos.Api.Application.ExternalBarcodeLookupCache>();
 builder.Services.AddScoped<Rbos.Api.Application.ProductLookupCoordinator>();
 builder.Services.AddScoped<Rbos.Api.Application.ProcurementService>();
+builder.Services.AddScoped<Rbos.Api.Application.DocumentIntakeService>();
 builder.Services.AddSingleton<Rbos.Api.Application.LocalOcr>();
 builder.Services.AddHttpClient("AiGateway.Gemini", h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddHttpClient("AiGateway.Groq", h => h.Timeout = TimeSpan.FromSeconds(90));
