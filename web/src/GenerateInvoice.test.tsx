@@ -77,6 +77,11 @@ describe('GenerateInvoice WhatsApp independence', () => {
       if (url === '/api/csrf') return new Response(JSON.stringify({ token: 'csrf-test' }))
       if (url === '/api/business-profile') return new Response(JSON.stringify({ businessName: 'Pilot Shop', address: '', city: '', state: '', pinCode: '', mobile: '', gstin: null }))
       if (url === '/api/products') return new Response(JSON.stringify(products))
+      if (url === '/api/sales' && method === 'POST') {
+        postedSale = JSON.parse(String(init?.body)) as { lines: { serials: string[] }[] }
+        return new Response(JSON.stringify({ id: 'sale-1' }), { status: 200 })
+      }
+      if (url === '/api/sales/sale-1') return new Response(JSON.stringify({ sale: { number: 1, whatsappStatus: 'ConsentRequired' } }), { status: 200 })
       if (url === '/api/sales/invoice-image-extract' && method === 'POST') return new Response(JSON.stringify({
         status: 'ReadyForReview',
         extraction: {
@@ -126,7 +131,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
   })
 
 
-  it('carries extracted serial numbers into the added sale item', async () => {
+  it('carries extracted serial numbers into the added sale item and final sale request', async () => {
+    let postedSale: { lines: { serials: string[] }[] } | null = null
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
       calls.push({ url, method })
@@ -153,6 +159,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.getByText('Voltas Beko WM\nModel WTL8066\nS/N SN12345678')).toBeInTheDocument()
     expect(screen.getByText('Serial: SN12345678')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Review detected items' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirm & print' }))
+    await waitFor(() => expect(postedSale?.lines[0]?.serials).toEqual(['SN12345678']))
   })
 
   it('keeps model and serial in optional details for non-electronics businesses', async () => {
