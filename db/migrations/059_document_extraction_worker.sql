@@ -73,9 +73,7 @@ grant select on documents.document_extraction_draft to rbos_app;
 create or replace function integrations.start_document_processing(
   p_tenant_id uuid,
   p_document_id uuid,
-  p_lease_token uuid,
-  p_extractor text,
-  p_schema_version text
+  p_lease_token uuid
 ) returns table (
   attempt_id uuid,
   attempt_number integer,
@@ -113,7 +111,9 @@ begin
   insert into documents.document_extraction_attempt (
     tenant_id, id, document_id, attempt_number, state, extractor, schema_version
   ) values (
-    p_tenant_id, v_attempt_id, p_document_id, v_attempt_number, 'Started', p_extractor, p_schema_version
+    p_tenant_id, v_attempt_id, p_document_id, v_attempt_number, 'Started',
+    case when v_direction = 'Sale' then 'SalesInvoiceCapture' else 'SupplierInvoiceCapture' end,
+    case when v_direction = 'Sale' then 'sale-v1' else 'purchase-v1' end
   );
 
   return query select v_attempt_id, v_attempt_number, v_direction, v_source_kind;
@@ -263,9 +263,9 @@ begin
 end;
 $function$;
 
-revoke all on function integrations.start_document_processing(uuid,uuid,uuid,text,text) from public, rbos_app;
+revoke all on function integrations.start_document_processing(uuid,uuid,uuid) from public, rbos_app;
 revoke all on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) from public, rbos_app;
 revoke all on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) from public, rbos_app;
-grant execute on function integrations.start_document_processing(uuid,uuid,uuid,text,text) to rbos_worker;
+grant execute on function integrations.start_document_processing(uuid,uuid,uuid) to rbos_worker;
 grant execute on function integrations.load_document_processing_pages(uuid,uuid,uuid,uuid) to rbos_worker;
 grant execute on function integrations.finish_document_processing(uuid,uuid,uuid,uuid,text,text,text,jsonb,jsonb,text,integer,timestamptz) to rbos_worker;
