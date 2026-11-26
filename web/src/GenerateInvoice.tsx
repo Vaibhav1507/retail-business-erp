@@ -34,6 +34,37 @@ function spreadDiscount(items: Item[], billDisc: number): Item[] {
 const itemTotal = (i: Item) => Math.round(i.quantity * i.unitPrice * 100) / 100 - i.discount
 const msg = (e: unknown) => (e instanceof ApiError && e.status >= 500 ? 'Server error. Retrying is safe.' : e instanceof Error ? e.message : 'Something went wrong')
 
+function AutoGrowTextarea({
+  value, onChange, className, ariaLabel, placeholder, minHeight = 52, rows = 1,
+  required = false, ariaInvalid, onFocus, onBlur, autoComplete = 'off'
+}: {
+  value: string
+  onChange: (value: string) => void
+  className?: string
+  ariaLabel: string
+  placeholder?: string
+  minHeight?: number
+  rows?: number
+  required?: boolean
+  ariaInvalid?: boolean
+  onFocus?: () => void
+  onBlur?: () => void
+  autoComplete?: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
+    element.style.height = 'auto'
+    element.style.height = `${Math.max(minHeight, element.scrollHeight)}px`
+  }, [value, minHeight])
+  return <textarea ref={ref} rows={rows} className={className} aria-label={ariaLabel}
+    aria-required={required || undefined} aria-invalid={ariaInvalid || undefined}
+    autoComplete={autoComplete} placeholder={placeholder} value={value}
+    onChange={event => onChange(event.target.value)} onFocus={onFocus} onBlur={onBlur}
+    style={{ minHeight, resize: 'none', overflowY: 'hidden' }} />
+}
+
 export function GenerateInvoice({ products, locations, reload, offlineMode = false, ownerKey = '', businessCategory = null }: { products: Opt[]; locations: Opt[]; reload: () => void; offlineMode?: boolean; ownerKey?: string; businessCategory?: string | null }) {
   const isElectronicsBusiness = businessCategory === 'electronics_mobile'
   const [step, setStep] = useState<'form' | 'review' | 'done' | 'pending'>('form')
@@ -230,14 +261,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     if (draft.date && /^\d{4}-\d{2}-\d{2}$/.test(draft.date)) setDate(draft.date)
   }
 
-  function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
+  function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'serialNumbers' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
     setSalesInvoiceDraft(current => current ? ({
       ...current,
       lines: current.lines.map((line, lineIndex) => lineIndex !== index ? line : {
         ...line,
         [field]: ['quantity', 'unitPrice', 'discount'].includes(field)
           ? (value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null)
-          : value
+          : field === 'serialNumbers'
+            ? value.split(/[\\r\\n,;]+/).map(part => part.trim()).filter(Boolean)
+            : value
       })
     }) : current)
   }
@@ -253,13 +286,29 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       setError('Complete a description or model number, quantity and unit price for every extracted line before adding them to the bill.')
       return
     }
+    const knownSerials = new Set(items.flatMap(item => item.serials).map(value => value.trim().toLowerCase()))
+    for (const line of salesInvoiceDraft.lines) {
+      const serials = (line.serialNumbers ?? []).map(value => value.trim()).filter(Boolean)
+      if (serials.some(value => value.length < 4 || value.length > 40 || /\\s/.test(value)) || serials.length > (line.quantity ?? 0)) {
+        setError('Check the extracted serial numbers. Each must be 4–40 characters and the count cannot exceed the item quantity.')
+        return
+      }
+      for (const serial of serials) {
+        const normalized = serial.toLowerCase()
+        if (knownSerials.has(normalized)) {
+          setError('A serial number is repeated in this bill. Correct the serial number before adding the extracted lines.')
+          return
+        }
+        knownSerials.add(normalized)
+      }
+    }
     const next: Item[] = salesInvoiceDraft.lines.map(line => ({
       productId: '',
       name: line.description?.trim() || line.model!.trim(),
       quantity: line.quantity!,
       unitPrice: line.unitPrice!,
       discount: line.discount ?? 0,
-      serials: [], imei1s: [], imei2s: [],
+      serials: line.serialNumbers ?? [], imei1s: [], imei2s: [],
       brand: line.brand?.trim() || undefined,
       model: line.model?.trim() || undefined,
       hsn: line.hsn?.trim() || undefined
@@ -575,8 +624,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <div className="billing-field billing-col-12 billing-rel" hidden={Boolean(salesInvoiceDraft)}>
             <label htmlFor="billing-prod">Item description *</label>
             <div className="invoice-product-entry">
-              <textarea id="billing-prod" className={`invoice-product-description${fieldErrors.product ? ' field-invalid' : ''}`} style={{ height: 76, minHeight: 76, maxHeight: 76, resize: 'none', overflowY: 'auto' }} rows={2} autoComplete="off" required aria-invalid={Boolean(fieldErrors.product)} placeholder="Search product or type a name" value={pname}
-                onChange={e => { setPname(e.target.value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
+              <AutoGrowTextarea id="billing-prod" className={`invoice-product-description${fieldErrors.product ? ' field-invalid' : ''}`} rows={2} minHeight={76} autoComplete="off" required aria-label="Item description *" aria-invalid={Boolean(fieldErrors.product)} placeholder="Search product or type a name" value={pname}
+                onChange={value => { setPname(value); setSelectedProductId(''); setFieldErrors(current => ({ ...current, product: '' })); setShowProducts(true) }} onFocus={() => setShowProducts(true)} onBlur={() => setTimeout(() => setShowProducts(false), 150)} />
               <ItemTagCapture key={tagCaptureKey} disabled={offlineMode || !navigator.onLine} onExtract={applyCapturedItem} />
             </div>
             {fieldErrors.product && <small className="field-error">{fieldErrors.product}</small>}
@@ -646,7 +695,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {salesInvoiceDraft.lines.length > 0 && <div className="invoice-extraction-lines">
             {salesInvoiceDraft.lines.map((line, index) => <article className="invoice-extracted-line" key={index}>
               <div className="invoice-extracted-line-heading"><strong>Item {index + 1}</strong>{line.confidence != null && <span>{Math.round(line.confidence * 100)}% read confidence</span>}</div>
-              <label>Description / model<input aria-label={'Extracted line ' + (index + 1) + ' description'} value={line.description ?? ''} onChange={e => updateCapturedLine(index, 'description', e.target.value)} /></label>
+              <label>Product description (as written)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' description'} className="invoice-extracted-description" value={line.description ?? ''} minHeight={48} onChange={value => updateCapturedLine(index, 'description', value)} /></label>
+              <label>Serial number(s) (optional)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' serial numbers'} className="invoice-extracted-serials" value={(line.serialNumbers ?? []).join('\\n')} minHeight={44} placeholder="One serial number per line" onChange={value => updateCapturedLine(index, 'serialNumbers', value)} /></label>
               <div className="invoice-extracted-line-values">
                 <label>Qty<input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} /></label>
                 <label>Unit price (₹)<input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} /></label>
