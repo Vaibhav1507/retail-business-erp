@@ -129,6 +129,8 @@ builder.Services.AddHttpClient<Rbos.Api.Application.SalesInvoiceCaptureService>(
 builder.Services.AddScoped<Rbos.Api.Application.VoiceNavigationIntentService>();
 builder.Services.AddScoped<Rbos.Api.Application.ProductFileReader>();
 builder.Services.AddScoped<Rbos.Api.Application.OtpService>();
+builder.Services.AddSingleton<Rbos.Api.Application.IEmailOtpSender, Rbos.Api.Application.SmtpEmailOtpSender>();
+builder.Services.AddScoped<Rbos.Api.Application.PasswordResetOtpService>();
 if (builder.Configuration["Sms:Provider"] == "msg91") builder.Services.AddHttpClient<Rbos.Api.Application.ISmsSender, Rbos.Api.Application.Msg91SmsSender>(h => h.Timeout = TimeSpan.FromSeconds(15));
 else if (builder.Environment.IsDevelopment()) builder.Services.AddSingleton<Rbos.Api.Application.ISmsSender, Rbos.Api.Application.DevSmsSender>();
 else if (!Rbos.Api.AuthOtpEndpoints.OtpEnabled(builder.Configuration)) builder.Services.AddSingleton<Rbos.Api.Application.ISmsSender, Rbos.Api.Application.DisabledSmsSender>();

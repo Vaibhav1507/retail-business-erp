@@ -147,6 +147,7 @@ public static class Endpoints
 		}).RequireAuthorization();
 
 		AuthOtpEndpoints.Map(api);
+		AuthPasswordResetEndpoints.Map(api);
 		AuthDeviceEndpoints.Map(api);
 		AuthPasskeyEndpoints.Map(api);
 

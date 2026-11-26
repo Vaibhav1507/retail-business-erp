@@ -367,6 +367,17 @@ public sealed class AuthSessionService(NpgsqlDataSource dataSource, IConfigurati
         return (browser, platform);
     }
 
+    public async Task RevokeAllSessionsAsync(Guid userId, string eventType, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "update identity.auth_session set revoked_at = coalesce(revoked_at, now()) where user_id = @user_id and revoked_at is null",
+            connection);
+        command.Parameters.AddWithValue("user_id", userId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await RecordSecurityEventAsync(userId, null, null, eventType, cancellationToken);
+    }
+
     public async Task RecordCredentialChangeAsync(
         Guid userId,
         ClaimsPrincipal? principal,
