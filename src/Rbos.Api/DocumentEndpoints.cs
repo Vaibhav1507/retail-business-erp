@@ -287,6 +287,9 @@ public static class DocumentEndpoints
                 sizeBytes = pagesReader.GetInt32(3),
                 sha256 = pagesReader.GetString(4).Trim()
             });
+        // Npgsql allows only one active reader per connection. Close the page reader
+        // before querying status history on the same tenant transaction.
+        await pagesReader.CloseAsync();
 
         await using var historyCommand = session.Command(@"
             select status, actor_user_id, occurred_at
