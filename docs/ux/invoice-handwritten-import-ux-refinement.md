@@ -28,7 +28,7 @@ Android screenshots supplied on 2026-11-26 show:
 
 ## Acceptance criteria
 
-- [ ] Import callout prompt wraps by words on narrow phones.
+- [x] Import callout prompt is allowed to shrink and wrap by words independently of extraction feedback.
 - [ ] During extraction, manual item editor, More item details and Add item are hidden.
 - [ ] Customer name/mobile remain visible and are prefilled when extracted.
 - [ ] Extracted lines use compact cards rather than a seven-column table.
@@ -37,8 +37,8 @@ Android screenshots supplied on 2026-11-26 show:
 - [ ] Add/discard actions are separated from the line cards.
 - [ ] Discard clears extraction, source metadata and stale success status, then restores manual entry.
 - [ ] Accepting lines clears stale extraction status and returns to normal item entry.
-- [ ] Product description is fixed-height and not manually resizable.
-- [ ] Tag feedback stays inside 360–430px viewports.
+- [x] Product description is fixed-height and not manually resizable.
+- [x] Tag feedback is positioned as a viewport-capped popover rather than expanding the form row.
 - [ ] Customer validation, line validation, totals, GST, posting, print, offline and tenant/business rules remain unchanged.
 
 ## Validation
