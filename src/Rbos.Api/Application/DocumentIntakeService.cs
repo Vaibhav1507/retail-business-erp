@@ -5,7 +5,7 @@ using Rbos.Api.Persistence;
 
 namespace Rbos.Api.Application;
 
-public sealed record DocumentUploadPage(string FileName, string ContentType, byte[] Content, string Sha256);
+public sealed record DocumentUploadPage(string FileName, string ContentType, int SizeBytes, string Sha256, Func<Stream> OpenReadStream);
 public sealed record DocumentUploadItem(string SourceKind, IReadOnlyList<DocumentUploadPage> Pages);
 public sealed record DocumentBatchUploadResult(Guid BatchId, bool Replayed, IReadOnlyList<DocumentUploadSummary> Documents);
 public sealed record DocumentUploadSummary(Guid Id, string Direction, string SourceKind, string Status, int PageCount, int TotalSizeBytes, DateTimeOffset CreatedAt);
@@ -68,7 +68,7 @@ public sealed class DocumentIntakeService(TenantDb tenantDb)
         foreach (var item in documents)
         {
             var documentId = Guid.NewGuid();
-            var totalBytes = item.Pages.Sum(x => x.Content.Length);
+            var totalBytes = item.Pages.Sum(x => x.SizeBytes);
             var documentHash = ComputeDocumentHash(item.Pages);
             await using (var insertDocument = session.Command(@"
                 insert into documents.business_document
@@ -92,22 +92,43 @@ public sealed class DocumentIntakeService(TenantDb tenantDb)
             for (var index = 0; index < item.Pages.Count; index++)
             {
                 var page = item.Pages[index];
-                await using var insertPage = session.Command(@"
-                    insert into documents.document_page
-                        (tenant_id, id, document_id, page_number, file_name, content_type,
-                         size_bytes, content_sha256, content)
-                    values (@tenant, @id, @document, @number, @name, @type,
-                            @size, @hash, @content)");
-                insertPage.Parameters.AddWithValue("tenant", tenantId);
-                insertPage.Parameters.AddWithValue("id", Guid.NewGuid());
-                insertPage.Parameters.AddWithValue("document", documentId);
-                insertPage.Parameters.AddWithValue("number", index + 1);
-                insertPage.Parameters.AddWithValue("name", page.FileName);
-                insertPage.Parameters.AddWithValue("type", page.ContentType);
-                insertPage.Parameters.AddWithValue("size", page.Content.Length);
-                insertPage.Parameters.AddWithValue("hash", page.Sha256);
-                insertPage.Parameters.AddWithValue("content", page.Content);
-                await insertPage.ExecuteNonQueryAsync(ct);
+                var content = new byte[page.SizeBytes];
+                try
+                {
+                    await using (var source = page.OpenReadStream())
+                    {
+                        await source.ReadExactlyAsync(content.AsMemory(), ct);
+                        if (source.ReadByte() != -1)
+                            throw new InvalidDataException("Uploaded page length changed during intake.");
+                    }
+
+                    var verifiedHash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+                    if (!CryptographicOperations.FixedTimeEquals(
+                        Encoding.ASCII.GetBytes(verifiedHash),
+                        Encoding.ASCII.GetBytes(page.Sha256)))
+                        throw new InvalidDataException("Uploaded page content changed during intake.");
+
+                    await using var insertPage = session.Command(@"
+                        insert into documents.document_page
+                            (tenant_id, id, document_id, page_number, file_name, content_type,
+                             size_bytes, content_sha256, content)
+                        values (@tenant, @id, @document, @number, @name, @type,
+                                @size, @hash, @content)");
+                    insertPage.Parameters.AddWithValue("tenant", tenantId);
+                    insertPage.Parameters.AddWithValue("id", Guid.NewGuid());
+                    insertPage.Parameters.AddWithValue("document", documentId);
+                    insertPage.Parameters.AddWithValue("number", index + 1);
+                    insertPage.Parameters.AddWithValue("name", page.FileName);
+                    insertPage.Parameters.AddWithValue("type", page.ContentType);
+                    insertPage.Parameters.AddWithValue("size", page.SizeBytes);
+                    insertPage.Parameters.AddWithValue("hash", page.Sha256);
+                    insertPage.Parameters.AddWithValue("content", content);
+                    await insertPage.ExecuteNonQueryAsync(ct);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(content);
+                }
             }
 
             await using (var enqueue = session.Command(
