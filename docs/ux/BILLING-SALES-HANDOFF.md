@@ -85,7 +85,7 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - No extraction, validation, invoice, camera/gallery, or API behaviour changes. Focused unit tests assert the feedback component wrappers; frontend CI is the implementation gate. Android screenshot review remains pending.
 
 
-## P0 — handwritten sales-bill extraction accuracy (2026-11-26)
+## P0 + P1 — handwritten sales-bill import improvement (2026-11-26)
 
 **Current implementation branch:** `feat/handwritten-sales-import-p0`  
 **Scope:** Existing synchronous Generate Invoice handwritten sales-bill import only. No worker, bulk inbox, Add Purchase, item-tag persistence or catalogue import work.
@@ -105,7 +105,7 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - Product description fields automatically grow to fit content. No manual resize handle, no fixed max height or internal scroll for long text. The normal item entry has a 76px minimum; imported descriptions use a compact minimum and grow with text.
 - No redesigned screen or worker/polling experience.
 
-### P0 implementation changes on this branch
+### P0 + P1 implementation changes on this branch
 
 - Sales extraction prompt now preserves full wrapped verbatim description and distinguishes labelled invoice number/date/customer/total fields.
 - Gemini request uses `generationConfig.responseJsonSchema` (JSON Schema nullable unions) with typed required output including the serialNumbers array.
@@ -116,6 +116,12 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 - Extracted review displays editable optional serial number(s); reviewed serials are passed into the existing sale-line serial array and checked for length/count/duplicates before add.
 - Existing Generate Invoice posting, GST/stock/customer/offline/tenant rules and current chat launcher are not intentionally changed.
 - Product descriptions in manual entry and extracted review use auto-grow textareas with no manual resizing.
+- Local OCR runs concurrently with the primary vision attempt; fallback attempts may consume OCR hints only after a short bounded wait.
+- Conservative image-preparation options are configurable within bounds; the final Gemini fallback retries the untouched original image if preprocessing was used.
+- Per-header/per-line field-confidence hints feed inline review flags; deterministic checks identify missing or invalid critical values, malformed/duplicate serials, serial-count mismatches, excessive discounts and arithmetic inconsistencies without changing the extracted data.
+- Source bill number and date are editable during review, and inline warning acknowledgement occurs when the relevant field is corrected.
+- Provider/total latency, OCR duration and a configurable 15-second target are instrumented for later pilot measurement.
+- Handwritten-sales fallback skips remaining models from a provider after a 429 response, while other invoice/item-tag flows retain their existing behaviour.
 
 ### Authoritative design/engineering notes
 
@@ -125,12 +131,12 @@ Status: branch `fix/invoice-handwritten-import-mobile-ux`; CI and Android visual
 
 ### Validation and delivery state
 
-- Focused unit/component tests have been added for JSON schema/serial preservation, sales-vs-tag provider settings, serial carry-through and auto-growing description text.
+- Focused unit/component tests have been added for JSON schema/serial preservation, sales-vs-tag provider settings, serial carry-through, auto-growing description text, confidence/review diagnostics and provider rate-limit behaviour.
 - Backend/frontend CI, full RBOS CI and focused Playwright/visual/Axe verification remain pending on this implementation branch at handoff.
 - No live AI-provider extraction against the seven original bills has been triggered from GitHub; the seven comparisons use the user-supplied app screenshots.
 - No merge, migration or production deployment has been performed. PR #111 remains parked as Draft; PR #112 remains the earlier documentation-only scope draft.
 
 
-### P0 validation scope clarification — 2026-11-26
+### P0 + P1 validation scope clarification — 2026-11-26
 
-User requested to ignore E2E/Playwright for now. Current P0 validation gate is backend build/unit tests, frontend type-check/unit tests/lint/production build and PostgreSQL integration tests. Playwright, screenshots, Axe and real-device validation are explicitly deferred (not passed). Continue with core code CI only.
+User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. The previous code CI run #1340 was green before P1; the final commit must receive a new backend/frontend/PostgreSQL CI run. Playwright, screenshots, Axe and real-device validation remain explicitly deferred (not passed). Statistical confidence calibration and actual p50/p95 latency/accuracy measurements depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.

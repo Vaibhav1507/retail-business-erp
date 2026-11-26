@@ -68,7 +68,8 @@ public static class VisionProviderFallback
         Func<JsonNode?, bool> isUsable,
         ILogger logger,
         CancellationToken ct,
-        TimeSpan? totalBudget = null)
+        TimeSpan? totalBudget = null,
+        bool skipProviderOnRateLimit = false)
     {
         var budget = totalBudget ?? TimeSpan.FromSeconds(60);
         budget = TimeSpan.FromMilliseconds(Math.Clamp(budget.TotalMilliseconds, 1000, 120_000));
@@ -134,7 +135,8 @@ public static class VisionProviderFallback
 
                 // Credential/permission/billing errors apply to every model under this provider.
                 // Do not spend the request budget repeating the same bad key on fallback models.
-                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.PaymentRequired)
+                if (e.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.PaymentRequired ||
+                    (skipProviderOnRateLimit && e.StatusCode == HttpStatusCode.TooManyRequests))
                     unavailableProviders.Add(attempt.Provider);
             }
             catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)

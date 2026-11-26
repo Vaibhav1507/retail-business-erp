@@ -84,7 +84,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
           invoiceNumber: '468', date: '2026-11-20', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 10000, taxAmount: 0, total: 10000,
           lines: [{ description: 'Samsung LED Television\nModel UA43\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'], hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
-        }, warnings: []
+        }, warnings: [], reviewIssues: [{ field: 'unitPrice', lineIndex: 0, severity: 'warning', message: 'Check the unit price against the original bill.' }]
       }), { status: 200 })
       return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
     }))
@@ -101,6 +101,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(importStatus.parentElement).toHaveClass('sales-invoice-uploader', 'invoice-feedback-flow')
     expect(container.querySelector('.invoice-import-callout')).toContainElement(importStatus)
     expect(await screen.findByRole('region', { name: 'Review detected items' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Source bill number')).toHaveValue('468')
+    expect(screen.getByLabelText('Source bill date')).toHaveValue('2026-11-20')
     const extractedDescription = screen.getByLabelText('Extracted line 1 description') as HTMLTextAreaElement
     expect(extractedDescription.tagName).toBe('TEXTAREA')
     expect(extractedDescription).toHaveValue('Samsung LED Television\nModel UA43\nS/N SN12345678')
@@ -111,6 +113,9 @@ describe('GenerateInvoice WhatsApp independence', () => {
     await waitFor(() => expect(extractedDescription.style.height).toBe('120px'))
     expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue('1')
     expect(screen.getByLabelText('Extracted line 1 unit price')).toHaveValue('10000')
+    expect(screen.getByText('Check the unit price against the original bill.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Extracted line 1 unit price'), { target: { value: '10000' } })
+    expect(screen.queryByText('Check the unit price against the original bill.')).not.toBeInTheDocument()
     expect(container.querySelector('.invoice-product-editor')).not.toHaveAttribute('hidden')
     expect(container.querySelector('#billing-prod')?.closest('.billing-field')).toHaveAttribute('hidden')
     expect(container.querySelector('.invoice-brand-model')).toHaveAttribute('hidden')

@@ -172,6 +172,42 @@ public sealed class VisionProviderFallbackTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_SalesInvoiceCanSkipProviderAfterRateLimit()
+    {
+        var secondaryGeminiAttempted = false;
+        var groqAttempted = false;
+        var attempts = new[]
+        {
+            Attempt("Gemini", "gemini-primary", _ =>
+                throw new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests)),
+            Attempt("Groq", "groq-fallback", _ =>
+            {
+                groqAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject
+                {
+                    ["lines"] = new JsonArray(new JsonObject { ["description"] = "Cable" })
+                });
+            }),
+            Attempt("Gemini", "gemini-secondary", _ =>
+            {
+                secondaryGeminiAttempted = true;
+                return Task.FromResult<JsonNode?>(new JsonObject
+                {
+                    ["lines"] = new JsonArray(new JsonObject { ["description"] = "Fallback cable" })
+                });
+            })
+        };
+
+        var result = await VisionProviderFallback.ExecuteAsync(
+            "SalesInvoiceCapture", attempts, HasLines, NullLogger.Instance, CancellationToken.None,
+            skipProviderOnRateLimit: true);
+
+        Assert.NotNull(result);
+        Assert.True(groqAttempted);
+        Assert.False(secondaryGeminiAttempted);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ContinuesToNextGeminiModelAfterRateLimit()
     {
         var secondaryGeminiAttempted = false;

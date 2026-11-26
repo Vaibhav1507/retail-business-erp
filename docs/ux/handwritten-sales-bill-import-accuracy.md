@@ -1,6 +1,6 @@
-# Handwritten sales-bill import — P0 accuracy implementation
+# Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** P0 implementation in progress on `feat/handwritten-sales-import-p0`  
+**Status:** P0 implemented; P1 engineering improvements being completed in the same PR/branch `feat/handwritten-sales-import-p0`  
 **Route:** `#/sell/bill` (Generate Invoice)  
 **API:** `POST /api/sales/invoice-image-extract`  
 **Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
@@ -102,33 +102,46 @@ This report is a full record of the seven comparisons provided so far, **not** a
 - Missing/uncertain source values remain visibly reviewable and editable.
 - Existing Generate Invoice checks remain authoritative. AI extraction must never post a sale directly.
 
-## 6. Current implementation delta
+## 6. P0 + P1 implementation delta
 
-- [x] Prompt now instructs extraction of the complete handwritten header and row text, preserves wrapped product descriptions, separates brand/model/serialNumbers, and distinguishes printed TOTAL from signatory notes.
-- [x] Sales invoice model selection has a sales-specific resolver, independent of Item Tag settings; absent dedicated settings fall back to previous Invoice model settings.
-- [x] Sales Groq fallback can be independently configured and otherwise inherits the existing Invoice fallback setting.
-- [x] Gemini request now uses `responseJsonSchema` and nullable JSON Schema unions.
-- [x] Server normalization preserves bounded verbatim descriptions, returns de-duplicated serialNumbers, supports legacy singular serialNumber results and validates scalar ranges.
-- [x] Duplicate identical warnings have been consolidated by issue category.
-- [x] Extracted line review includes optional editable serial number(s).
-- [x] Confirmed extracted serials are passed into the existing sale-line serial collection and duplicate/length/count validation is applied.
-- [x] Manual and extracted product descriptions use automatically height-adjusting textareas; no manual resize control or fixed maximum height.
-- [x] The floating chat launcher has not been modified.
+### P0 — extraction contract and review
 
-## 7. Validation plan and status
+- [x] Prompt preserves full wrapped descriptions, labelled invoice header fields, source-row mapping, model/serial separation and printed TOTAL provenance.
+- [x] Gemini uses `generationConfig.responseJsonSchema` with nullable values and structured serial arrays.
+- [x] Server normalization bounds fields, de-duplicates serials and supports the previous singular serial response for compatibility.
+- [x] Sales Gemini model and Groq fallback settings are independent of Item Tag settings, with legacy Invoice-setting fallback.
+- [x] Repeated identical warnings are consolidated by category.
+- [x] Extracted lines expose editable descriptions and optional serial numbers; confirmed serials are validated and passed to the existing sale-line serial collection.
+- [x] Manual and imported product descriptions grow automatically. No drag handle, fixed maximum height or inner scrolling.
+- [x] Floating Chat assistant remains unchanged.
 
-Automated tests added/updated:
-- [x] Contract tests for verbatim description and serial array preservation.
-- [x] Contract tests for empty/missing serials and provider singular-serial compatibility.
-- [x] Contract test for Gemini JSON Schema containing required serialNumbers array.
-- [x] Provider configuration tests proving sales model selection is separate from Item Tag and falls back to existing Invoice settings.
-- [x] GenerateInvoice UI tests for auto-growing description, editable serial and serial carry-through to the added sale item.
-- [ ] Backend build and unit tests.
-- [ ] Frontend TypeScript, unit tests, lint and production build.
-- [x] Full RBOS code CI (latest run #1339 still executing at this documentation update; earlier #1338 passed on the preceding commit).
-- [ ] Latest #1339 final status to be recorded when complete.
-- [ ] **Deferred by user for this P0 pass:** Playwright/E2E journey, responsive screenshots and Axe visual audit. Do not treat as passed; schedule after this focused extraction implementation is accepted.
-- [ ] Real Android visual/device verification remains deferred. Native camera/gallery and TalkBack require device checks.
+### P1 — extraction quality, resilience and responsiveness
+
+- [x] Local OCR runs concurrently with primary vision extraction. The primary Gemini attempt does not wait for OCR; OCR hints may be used by fallback attempts after a short bounded wait.
+- [x] OCR has a configurable, bounded timeout, emits duration/character telemetry, is non-fatal when unavailable, and is observed/cancelled before its image buffer is cleared.
+- [x] Image preparation uses conservative defaults with bounded configuration for inference dimensions, JPEG quality and re-encode threshold.
+- [x] If image preprocessing changed the uploaded image, the last configured Gemini fallback can retry the original full-resolution image to recover small handwritten text lost during optimization.
+- [x] Provider-chain execution remains synchronous and bounded by per-attempt timeout and total request budget. Existing credential-failure short-circuiting is preserved; handwritten-sales requests also skip further models from the same provider after a 429 rate-limit response. Other extraction flows retain their previous fallback semantics.
+- [x] Attempt-level, provider-chain and end-to-end durations are logged; OCR duration and configured latency target are also logged.
+- [x] Model output includes per-field handwriting/attribution hints for invoice header and line fields. Values are normalized to 0–1; out-of-range values are discarded. The UI no longer presents the old uncalibrated line-level score as a percentage.
+- [x] Field-level review flags identify low-confidence values, unreadable required header/line values, invalid date formats, malformed serials, duplicate serials across rows, serial count above quantity, discounts above line value, simple quantity × rate vs line amount mismatches, and line/subtotal or subtotal + tax/grand-total mismatches.
+- [x] Review flags are shown beside the affected fields or as a line/header warning. The relevant field warning clears when the shopkeeper edits that field. Header bill number and date remain editable in the review step.
+- [x] These checks only flag potential issues; they do not auto-correct, recalculate or overwrite what the source document says.
+- [x] Total request duration, provider-chain duration, OCR duration and a configurable latency SLO threshold are recorded. Default target is 15 seconds; provider attempt budget remains configurable and bounded.
+
+**Calibration boundary:** field-confidence values are model estimates, not calibrated probabilities. A statistically meaningful calibration curve or accuracy percentage requires a verified labelled set of handwritten fields. That evaluation must follow the user's manual source-bill validation; no accuracy result is claimed before then.
+
+## 7. Automated validation plan and status
+
+- [x] Contract tests for verbatim description, serial arrays, schema requirements and normalization bounds.
+- [x] Unit tests for field-confidence normalization, low-confidence flags, line arithmetic mismatch, duplicate serials across lines and feature-scoped rate-limit fallback.
+- [x] Frontend test for inline review warnings, editable source bill number/date and clearing a line warning after manual correction.
+- [ ] Backend build and unit tests after this P1 commit.
+- [ ] Frontend TypeScript, unit tests, lint and production build after this P1 commit.
+- [ ] PostgreSQL integration tests after this P1 commit.
+- [ ] New PR CI result on the final P0 + P1 commit.
+- [ ] **Deferred by user request:** Playwright/E2E, responsive screenshots and Axe. Deferred, not passed, and not part of the current code gate.
+- [ ] Native Android camera/gallery, keyboard and TalkBack checks remain real-device acceptance checks.
 
 ## 8. Accuracy and acceptance gate
 
@@ -143,15 +156,23 @@ No 100% machine-only reading guarantee is claimed for arbitrary handwriting. The
 
 No source-photo-to-app accuracy percentage is claimed yet. The seven-case comparison is evidence for regression coverage and failure classification, not an independently verified benchmark.
 
-## 9. Deferred items
+## 9. Remaining validation and boundaries
 
-- Remaining two Monika source bills from the original 10-image batch have not yet had their RBOS extraction outputs shared; add their comparisons when available.
-- OCR/vision parallelization, image pre-processing experiments, provider retry optimization, field-level confidence calibration and latency SLO remain later P0/P1 tuning tasks after baseline execution and measurement.
-- Supplier invoice and other import flows remain outside this work package.
+- The seven supplied app extraction runs remain comparison records, not an independently verified gold-standard transcription set. The user will manually compare source bills and extraction results after all P0 + P1 code work is complete.
+- The MONIKA-003 source amount and some model/serial characters remain ambiguous in the current report. Do not use them as ground truth until the source is checked.
+- Two of the original Monika source bills still lack matching app extraction screenshots/results in the current comparison report.
+- Actual p50/p95 latency and accuracy results require real pilot executions after deployment and user validation. Logging and an SLO threshold are instrumentation, not evidence that the target has been met.
+- Statistical confidence calibration requires verified handwritten-field labels and is intentionally not claimed as complete by model-generated confidence hints.
+- Supplier invoices, Add Purchase, item-tag uploads, catalogue import, file retention, background workers, queues, bulk inboxes and upload polling remain outside this work package.
+- No sale posting, GST/tax, stock, discounts, customer validation, payment, offline, print, tenant/security or accounting rules are intentionally changed.
 
-No merge or production deployment is implied by this branch.
+## 10. Current delivery state
 
+- P0 and P1 implementation are kept together in PR #113 and branch `feat/handwritten-sales-import-p0`.
+- The pre-P1 CI run #1340 passed before these changes; it is not evidence for the final P0 + P1 commit. New CI must pass before the user validates manually.
+- No merge or production deployment is included or implied.
+- The user requested manual validation only after the full improvement is implemented; this handoff does not ask them to validate an intermediate P0-only state.
 
-## User scope clarification — 2026-11-26
+## User validation and E2E scope clarification — 2026-11-26
 
-User explicitly asked to ignore E2E/Playwright for now. P0 gate is therefore backend build/unit tests, frontend type-check/unit tests/lint/production build, and PostgreSQL integration tests. Playwright, responsive screenshots, Axe and real-device checks are **deferred**, not passed and not a blocker for this focused P0 code review. The floating Chat assistant remains unchanged; automatic textarea growth remains required.
+User confirmed that all P1 improvements belong in the same PR and branch as P0 and that they will validate the completed implementation manually afterwards. Playwright/E2E, screenshots, Axe and real-device verification are deferred (not passed). Keep the floating Chat assistant unchanged and retain automatic description growth.

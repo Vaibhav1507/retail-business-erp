@@ -2,6 +2,13 @@ import { useState } from 'react'
 import { apiBinary } from './api'
 import { PhotoSourcePicker } from './PhotoSourcePicker'
 
+export type SalesInvoiceReviewIssue = {
+  field: string
+  lineIndex: number | null
+  message: string
+  severity: 'warning' | 'info'
+}
+
 export type ExtractedSalesInvoiceLine = {
   description: string | null
   brand: string | null
@@ -15,6 +22,7 @@ export type ExtractedSalesInvoiceLine = {
   gstRate: number | null
   gstAmount: number | null
   confidence: number | null
+  fieldConfidence?: Record<string, number | null>
 }
 
 export type ExtractedSalesInvoice = {
@@ -25,6 +33,7 @@ export type ExtractedSalesInvoice = {
   subtotal: number | null
   taxAmount: number | null
   total: number | null
+  fieldConfidence?: Record<string, number | null>
   lines: ExtractedSalesInvoiceLine[]
 }
 
@@ -32,13 +41,14 @@ type CaptureResponse = {
   status: string
   extraction: ExtractedSalesInvoice
   warnings: string[]
+  reviewIssues?: SalesInvoiceReviewIssue[]
 }
 
 export function SalesInvoiceCapture({
   disabled, onExtract
 }: {
   disabled: boolean
-  onExtract: (draft: ExtractedSalesInvoice, warnings: string[]) => void
+  onExtract: (draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[]) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
@@ -64,7 +74,7 @@ export function SalesInvoiceCapture({
     setStatus('Reading handwritten invoice…')
     try {
       const result = await apiBinary<CaptureResponse>('/sales/invoice-image-extract', file)
-      onExtract(result.extraction, result.warnings ?? [])
+      onExtract(result.extraction, result.warnings ?? [], result.reviewIssues ?? [])
       setStatus(result.status === 'NeedsAttention'
         ? 'Some details could not be read. Review the extracted fields and enter anything missing.'
         : 'Invoice details extracted. Review every field before adding the lines to your bill.')
