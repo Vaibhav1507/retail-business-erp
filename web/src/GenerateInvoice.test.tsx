@@ -148,7 +148,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
           lines: [{ description: 'Voltas Beko WM\nModel WTL8066\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: ['SN12345678'], hsn: null, quantity: 1, unitPrice: 17500, discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
         }, warnings: []
       }), { status: 200 })
-      return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
+      return new Response(JSON.stringify({ error: `not found: ${method} ${url}` }), { status: 404 })
     }))
     const { container } = render(<GenerateInvoice products={products} locations={locations} reload={vi.fn()} businessCategory="electronics_mobile" />)
     await userEvent.click(screen.getByRole('button', { name: /Import bill/ }))
