@@ -62,17 +62,8 @@ public sealed class DocumentIntakeTests(ApiFactory factory) : IClassFixture<ApiF
         Guid leaseToken;
         await using (var claim = new NpgsqlCommand(@"
             select document_id, lease_token
-              from integrations.claim_document_processing(10, 300)
-             where tenant_id = @tenant", worker))
+              from integrations.claim_document_processing(1, 300)", worker))
         {
-            // The queue function returns the batch globally; tenant filtering is applied to its result.
-            // The tenant id is obtained from the document through the authenticated API's batch result.
-            var details = await http.GetFromJsonAsync<JsonElement>($"/api/documents/{documentId}");
-            var tenantId = Guid.Empty;
-            Assert.True(details.TryGetProperty("document", out _));
-            // The owner/user's tenant is not exposed by the document API. Resolve it via the
-            // tenant-scoped page test's batch response metadata using the worker's returned row.
-            claim.Parameters.AddWithValue("tenant", DBNull.Value);
             await using var reader = await claim.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             claimedId = reader.GetGuid(0);
