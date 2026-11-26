@@ -39,6 +39,12 @@ public static class VisionProviderFallback
             cfg["Gemini:ItemTagFallbackModel"] ?? cfg["Gemini:InvoiceFallbackModel"] ?? cfg["Gemini:FallbackModel"],
             cfg["Gemini:ItemTagLastResortModel"] ?? cfg["Gemini:InvoiceLastResortModel"] ?? cfg["Gemini:LastResortModel"]);
 
+    public static IReadOnlyList<string> SalesInvoiceGeminiModels(IConfiguration cfg) =>
+        Models(
+            cfg["Gemini:SalesInvoiceModel"] ?? cfg["Gemini:InvoiceModel"] ?? cfg["Gemini:Model"],
+            cfg["Gemini:SalesInvoiceFallbackModel"] ?? cfg["Gemini:InvoiceFallbackModel"] ?? cfg["Gemini:FallbackModel"],
+            cfg["Gemini:SalesInvoiceLastResortModel"] ?? cfg["Gemini:InvoiceLastResortModel"] ?? cfg["Gemini:LastResortModel"]);
+
     static IReadOnlyList<string> Models(string? primary, string? secondary, string? tertiary)
     {
         // These old aliases appeared in the former fallback chain. Do not silently keep
