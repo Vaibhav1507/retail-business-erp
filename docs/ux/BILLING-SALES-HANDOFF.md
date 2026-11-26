@@ -185,7 +185,7 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 - Code CI #1342 passed on implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1`: backend 165 tests, frontend 234 tests, PostgreSQL integration 186 tests, plus build/lint/dependency checks.
 - Latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs in run #1343 (backend, frontend and PostgreSQL integration).
 - RBOS Visual Audit run #297 was automatically triggered by the existing invoice-import path filter, although Playwright/Axe were deferred for this phase. It failed after five minutes because the shared signup helper waited for a `Next` button while the current signup screen exposed `Continue`; this is a test-helper/signup-flow mismatch before the invoice-import journey, not an extraction assertion. The visual audit is not counted as passed.
-- No merge or production deployment has been performed. PR #111 remains parked as Draft; PR #112's scope/corpus documentation is now merged into main.
+- Main was synchronized into this feature branch by merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; the branch is now 45 commits ahead and 0 behind main, and GitHub reports it mergeable. PR #113 remains open as Draft and has not been merged. No production deployment has been performed. PR #111 remains parked as Draft; PR #112's scope/corpus documentation is merged into main.
 
 ### P0 + P1 validation scope clarification — 2026-11-26
 

@@ -1,6 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** P0 + P1 implementation complete; code CI #1342 and #1343 passed on 2026-11-26. Manual handwritten-bill validation remains the next acceptance step. Manual handwritten-bill validation is the next acceptance step.  
+**Status:** P0 + P1 implementation complete; code CI #1342 and #1343 passed on 2026-11-26. Manual handwritten-bill validation is the next acceptance step.  
 **Route:** `#/sell/bill` (Generate Invoice)  
 **API:** `POST /api/sales/invoice-image-extract`  
 **Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
@@ -139,8 +139,10 @@ This report is a full record of the seven comparisons provided so far, **not** a
 - [x] Backend Release solution build, 165 backend unit tests and deployment-container build passed in CI run #1342.
 - [x] Frontend TypeScript, 234 tests across 26 test files, lint, production build and high/critical dependency audit passed in CI run #1342.
 - [x] PostgreSQL integration build, disposable database migration and 186 integration tests passed in CI run #1342.
-- [x] Final P0 + P1 commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed all three required code-CI jobs in [run #1342](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45834679317).
+- [x] Final P0 + P1 implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed all three required code-CI jobs in [run #1342](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45834679317).
+- [x] Latest pre-merge feature head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed backend, frontend and PostgreSQL integration jobs in code CI #1343.
 - [ ] **Deferred by user request:** Playwright/E2E, responsive screenshots and Axe. Deferred, not passed, and not part of the current code gate.
+- [ ] Visual Audit #297 was auto-triggered by the existing path filter and failed before the invoice-import journey: the shared signup helper waited for `Next` while the signup screen showed `Continue`. This is a signup-test mismatch, not extraction validation; no visual/Axe acceptance is claimed.
 - [ ] Native Android camera/gallery, keyboard and TalkBack checks remain real-device acceptance checks.
 
 ## 8. Accuracy and acceptance gate
@@ -169,6 +171,7 @@ No source-photo-to-app accuracy percentage is claimed yet. The seven-case compar
 ## 10. Current delivery state
 
 - P0 and P1 implementation are kept together in PR #113 and branch `feat/handwritten-sales-import-p0`.
+- The branch was synchronized with current main using merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; current comparison is 45 commits ahead and 0 behind. GitHub now reports the PR as mergeable, but it remains Draft and unmerged.
 - Implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed code CI #1342 (backend 165, frontend 234, PostgreSQL integration 186); latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs again in #1343.
 - No merge or production deployment is included or implied.
 - The user requested manual validation only after the full improvement is implemented; this handoff does not ask them to validate an intermediate P0-only state.
