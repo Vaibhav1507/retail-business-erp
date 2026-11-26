@@ -104,24 +104,30 @@ public static class DocumentEndpoints
                 if (!AllowedContentTypes.Contains(contentType))
                     return ApiResults.Fail(415, "Choose JPEG, PNG, WebP or PDF files.");
 
-                byte[] bytes;
-                await using (var stream = file.OpenReadStream())
-                await using (var buffer = new MemoryStream())
+                var pageSize = checked((int)file.Length);
+                byte[] validationBuffer = new byte[pageSize];
+                string hash;
+                try
                 {
-                    await stream.CopyToAsync(buffer, ct);
-                    bytes = buffer.ToArray();
+                    await using var stream = file.OpenReadStream();
+                    await stream.ReadExactlyAsync(validationBuffer.AsMemory(), ct);
+                    if (stream.ReadByte() != -1 || !HasValidSignature(validationBuffer, contentType))
+                        return ApiResults.Fail(400, "A bill page is damaged or its file type does not match the content.");
+                    hash = Convert.ToHexString(SHA256.HashData(validationBuffer)).ToLowerInvariant();
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(validationBuffer);
                 }
 
-                if (bytes.Length != file.Length || !HasValidSignature(bytes, contentType))
-                    return ApiResults.Fail(400, "A bill page is damaged or its file type does not match the content.");
-
-                batchBytes += bytes.Length;
+                batchBytes += pageSize;
                 if (batchBytes > MaxBatchBytes)
                     return ApiResults.Fail(413, "A batch can contain up to 24 MB of bill pages.");
 
                 var fileName = SafeFileName(file.FileName);
-                var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-                pages.Add(new DocumentUploadPage(fileName, contentType, bytes, hash));
+                // Read the ASP.NET buffered form file again later, one page at a time,
+                // while the metadata and queue row are committed in the same transaction.
+                pages.Add(new DocumentUploadPage(fileName, contentType, pageSize, hash, file.OpenReadStream));
             }
             uploads.Add(new DocumentUploadItem(document.SourceKind, pages));
         }
