@@ -5,18 +5,40 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Rbos.Api.Application;
+using System.Collections.Concurrent;
 
 namespace Rbos.IntegrationTests;
 
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
 	public bool OpenRegistration { get; init; } = true;
+	public RecordingEmailOtpSender EmailSender { get; } = new();
 	protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
 	{
 		builder.UseEnvironment("Development");
 		builder.UseSetting("Rbos:Database", "test");
 		builder.UseSetting("Rbos:AllowOpenRegistration", OpenRegistration ? "true" : "false");
+		builder.ConfigureServices(services =>
+		{
+			services.RemoveAll<IEmailOtpSender>();
+			services.AddSingleton<IEmailOtpSender>(EmailSender);
+		});
 	}
+}
+
+public sealed class RecordingEmailOtpSender : IEmailOtpSender
+{
+    private readonly ConcurrentDictionary<string, string> codes = new(StringComparer.OrdinalIgnoreCase);
+    public bool IsConfigured => true;
+    public Task SendAsync(string email, string code, CancellationToken cancellationToken)
+    {
+        codes[email.Trim()] = code;
+        return Task.CompletedTask;
+    }
+    public string? CodeFor(string email) => codes.TryGetValue(email.Trim(), out var code) ? code : null;
 }
 
 public sealed class Client

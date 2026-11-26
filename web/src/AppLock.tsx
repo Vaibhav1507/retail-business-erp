@@ -242,7 +242,7 @@ export function AppLockGate({ email, children, onSignOut }: { email: string; chi
               onClick={() => key === 'Clear' ? clearActiveField() : key === 'Backspace' ? backspaceActiveField() : appendDigit(key)}
               disabled={busy}
             >
-              {key === 'Backspace' ? '⌫' : key}
+              {key === 'Backspace' ? 'Back' : key}
             </button>
           ))}
         </div>

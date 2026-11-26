@@ -1,6 +1,6 @@
 # RBOS Authentication & Onboarding — Pixel-Accurate Implementation Plan
 
-**Status:** Authentication/onboarding implementation merged in PR #102; device PIN single-viewport follow-up in progress  
+**Status:** Authentication/onboarding implementation merged in PR #102; email OTP password-recovery follow-up documented in docs/ux/password-recovery-email-otp.md  
 **Repository:** \`Vaibhav1507/retail-business-erp\`  
 **Base inspected:** current \`main\` (HEAD \`a97f156ce00cffb0df815560e4c3384e4d625f91\`)  
 **Working branch:** \`ux/authentication-onboarding-pixel-accurate\`  
@@ -32,8 +32,7 @@ Redesign only these existing authentication screens and their in-screen states:
 
 ### Non-goals
 
-- No changes to backend authentication, account registration, session lifetime, OTP delivery/verification, passkey/WebAuthn, CSRF, device registry, API authorization, tenant boundaries or local PIN verification.
-- No new password-reset endpoint or fabricated password-recovery action.
+- No changes to email/password sign-in, account registration, mobile OTP delivery/verification, passkey/WebAuthn, CSRF, device registry, API authorization, tenant boundaries or local PIN verification. Password recovery is a separately scoped addition documented in docs/ux/password-recovery-email-otp.md.
 - No redesign of authenticated app navigation, Home, Business Settings, device management or other onboarding/help journeys.
 - No database migrations, package additions, authentication policy changes or production configuration changes.
 - No redesign of the signed-in business-profile editor that reuses \`BusinessSetup\`; style changes must be gated to the \`signup\` path.
@@ -124,7 +123,7 @@ Do not add a remote font dependency or introduce a new font package. Match the s
 - Thin divider; “New to RBOS?” and the secondary create-account link.
 - Maintain error, busy/disabled and retry feedback without layout jumps.
 
-**Password recovery exception:** the MagicPath mock displays “Forgot password?”, but the inspected current \`Endpoints.cs\` and \`AuthOtpEndpoints.cs\` expose login, logout, registration and OTP routes, not a password-reset flow. The prototype's forgot-password handler is also demo-only. Do not ship a dead link. Keep the screen faithful to the rest of the hierarchy and treat password recovery as a separate product/API feature if later approved.
+**Password recovery:** the MagicPath mock's Forgot password action is now implemented as a separate email-OTP flow. It uses dedicated password-reset endpoints and storage, remains disabled until SMTP and a dedicated HMAC pepper are configured, and does not reuse mobile signup/login OTP. See docs/ux/password-recovery-email-otp.md. Business-account email verification remains a separate future scope.
 
 ### 4.2 Sign up — five stages
 
@@ -260,7 +259,7 @@ Do not change \`web/src/styles.css\` global tokens unless implementation evidenc
 
 ## 10. Known reference deviations / decisions
 
-- **Forgot password:** visible in the reference mock but no password-reset endpoint was found in the inspected current auth endpoint modules; do not ship a non-functional action.
+- **Forgot password:** implemented in the follow-up email-OTP recovery scope; see docs/ux/password-recovery-email-otp.md. It is not production-enabled until the documented SMTP and HMAC secrets are configured.
 - **Passkey availability:** the mock shows the passkey action unconditionally; production must continue to gate it on the backend feature flag and secure browser support.
 - **OTP:** the mock uses a simple mobile field; production must preserve the existing send/verify OTP UI when OTP is enabled.
 - **Business master data:** keep the full current category and state lists, conditional GSTIN and current profile payload; the shorter demo lists are not authoritative.

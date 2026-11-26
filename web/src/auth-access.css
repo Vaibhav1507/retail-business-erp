@@ -627,3 +627,48 @@ main.auth-access .auth-signup-flow .step-actions button.secondary {
 main.auth-access .auth-signup-flow .step-actions button:only-child {
   grid-column: 2;
 }
+
+.auth-forgot-link,
+.auth-inline-link {
+  justify-self: end;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px 0 -8px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: #065f46;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  text-align: right;
+  cursor: pointer;
+}
+
+.auth-forgot-link:focus-visible,
+.auth-inline-link:focus-visible {
+  outline: 3px solid rgba(16, 185, 129, 0.28);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.auth-field-hint {
+  margin: -8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.auth-success {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 14px;
+  line-height: 20px;
+}
