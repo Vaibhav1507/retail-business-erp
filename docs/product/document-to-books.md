@@ -1,6 +1,6 @@
 # Document-to-Books
 
-**Status:** Product direction approved for discovery and staged implementation; posting-policy gates remain open.  
+**Status:** Product direction approved; WP0 documentation and WP1 intake are merged; WP2 worker/extraction is in progress. Posting-policy gates remain open.  
 **Owner:** RBOS product owner  
 **First discovery baseline:** `main` at `92c181f6f0ba861acac954545e7d630d07f3305c` (2026-11-26). WP1 implementation baseline: `main` at `155df3af529ef8e70c8df27098451ac1a1bf9b97`.  
 **Living handoff:** [DOCUMENT-TO-BOOKS-HANDOFF.md](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md)  
@@ -128,8 +128,8 @@ An exact duplicate hash can be blocked from a second upload or linked to the exi
 | Work package | Outcome | Gate |
 |---|---|---|
 | WP0 — Discovery/specification | Current-state audit, product spec, architecture, ADR and handoff | This document set |
-| WP1 — Document foundation | Tenant-scoped registry, bounded Cloud Run pilot evidence storage, upload intake, batch/page grouping, status API and durable queue | Tenant/RLS, idempotency and backup/retention design accepted; implementation PR review |
-| WP2 — Extraction | Sales and purchase extractors with versioned schemas, handwriting support, field provenance/confidence, image preprocessing and validation | Evaluation corpus and field-level quality evidence |
+| WP1 — Document foundation | Tenant-scoped registry, bounded Cloud Run pilot evidence storage, upload intake, batch/page grouping, status API and durable queue | Merged in PR #109; verify migration 058 deployment and retention policy |
+| WP2 — Extraction | Lease-safe worker, grouped-page sales/purchase extraction, versioned review drafts, confidence/provenance and bounded retries | In progress on `feat/document-processing-worker`; verify migration 059 and high-signal flow CI |
 | WP3 — Review UX | One mobile-first inbox and document review experience for both directions | User journey and screen states documented |
 | WP4 — Posting integration | Human-approved sales and purchase posting, source links and accounting reconciliation | Walk-in cash policy and purchase bill/receipt/CA gates resolved |
 | WP5 — Batch reliability | Durable queue, retry/recovery, duplicate review, partial batch results and operational telemetry | No duplicate posting under retry/concurrency |
@@ -166,6 +166,7 @@ The full end-to-end Playwright, responsive screenshot and Axe pass is required a
 - [ADR-027](../adr/adr-027-document-to-books.md)
 - [WP0 discovery log](../implementation-log/2026-11-26-document-to-books-discovery.md)
 - [WP1 intake implementation log](../implementation-log/2026-11-26-document-intake-wp1.md)
+- [WP2 worker/extraction implementation log](../implementation-log/2026-11-26-document-processing-wp2.md)
 - [Continuation handoff](../ux/DOCUMENT-TO-BOOKS-HANDOFF.md)
 - [RBOS engineering workflow](../ux/RBOS-UI-UX-WORKFLOW.md)
 - [Existing flexible sales/handwritten capture plan](../implementation-plans/flexible-sales-and-handwritten-invoice-capture.md)
