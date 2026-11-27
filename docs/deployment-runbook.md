@@ -28,10 +28,12 @@ Set as environment variables or secrets (see `.env.example`). Never commit real 
 Do not set Gemini or SMS secrets unless explicitly approved.
 
 Optional passkeys (disabled unless explicitly configured):
-- `Auth__Passkeys__ServerDomain=<exact HTTPS application hostname>`
-- `AllowedHosts=<same exact hostname>`
+- `Auth__Passkeys__ServerDomain=<one exact canonical HTTPS application hostname>`
+- `AllowedHosts=<semicolon-separated exact host allowlist>`
 
-Set both only after the final production hostname is chosen and DNS/TLS are working. The app rejects passkey activation if the RP domain is invalid or is not included in `AllowedHosts`. Do not use `*`, a wildcard RP domain, a temporary Cloud Run URL or an unverified host. Keep both unset to leave passkeys disabled. Passkey registration requires a browser with WebAuthn support and a secure context.
+The passkey relying-party (RP) domain is a single exact hostname; it is not the same thing as the HTTP host allowlist. `AllowedHosts` may contain multiple explicitly trusted DNS hostnames (for example, the canonical custom domain plus the Cloud Run `.run.app` fallback URL), but must not contain `*`, wildcard entries, malformed hosts or an entry that omits the configured passkey RP domain. The API exposes passkey capability only when the incoming request hostname exactly matches `Auth__Passkeys__ServerDomain`; password and OTP authentication can continue on other explicitly allowed fallback hosts. WebAuthn credentials are origin/RP scoped: credentials created on the old `.run.app` hostname do not transfer to the custom domain, and passkey actions are intentionally unavailable on the fallback hostname after the RP domain is switched. Keep both settings unset to leave passkeys disabled. Passkey registration requires a browser with WebAuthn support and a secure context.
+
+For a custom-domain cutover, first deploy the host-allowlist compatibility code with both the current passkey host and the future custom hostname explicitly listed in `AllowedHosts`, while leaving `Auth__Passkeys__ServerDomain` unchanged. After the custom-domain DNS and HTTPS certificate are ready, update the RP domain to the custom hostname in a separate Cloud Run revision. Verify the exact current service URL before adding its hostname to the allowlist; do not guess or copy an old project URL.
 Do not put the migrator connection string in Cloud Run.
 
 ## 3A. Optional AI and voice configuration
