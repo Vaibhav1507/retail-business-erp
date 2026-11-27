@@ -133,7 +133,8 @@ builder.Services.AddIdentity<Microsoft.AspNetCore.Identity.IdentityUser<Guid>, M
 	o.Lockout.MaxFailedAccessAttempts = 5;
 	o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
 	o.User.RequireUniqueEmail = true;
-}).AddEntityFrameworkStores<RbosIdentityDbContext>();
+}).AddEntityFrameworkStores<RbosIdentityDbContext>()
+  .AddDefaultTokenProviders();
 builder.Services.ConfigureApplicationCookie(o =>
 {
 	o.Cookie.Name = "rbos.auth";
