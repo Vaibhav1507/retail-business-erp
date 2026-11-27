@@ -39,7 +39,7 @@ public static class PasskeyHostConfiguration
             foreach (var configuredHost in configuredHosts)
             {
                 var host = configuredHost.Trim().TrimEnd('.').ToLowerInvariant();
-                if (host == "*" || host.Contains('*', StringComparison.Ordinal))
+                if (host == "*" || host.Contains('*'))
                     throw new InvalidOperationException("When passkeys are enabled, AllowedHosts must contain only explicit DNS host names. Wildcards are not allowed.");
 
                 ValidateDnsHost(host, "AllowedHosts");
