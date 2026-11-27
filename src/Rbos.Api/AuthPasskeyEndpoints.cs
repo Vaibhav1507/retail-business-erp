@@ -143,7 +143,6 @@ public static class AuthPasskeyEndpoints
             AuthSessionService sessions,
             HttpContext context,
             IConfiguration configuration,
-            HttpContext context,
             CancellationToken ct) =>
         {
             if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
