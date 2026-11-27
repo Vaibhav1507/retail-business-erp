@@ -10,13 +10,21 @@ public sealed record PasskeyRemovalRequest(string Password);
 
 public static class AuthPasskeyEndpoints
 {
-    public static bool IsEnabled(IConfiguration configuration) =>
-        !string.IsNullOrWhiteSpace(configuration["Auth:Passkeys:ServerDomain"]);
+    public static bool IsEnabled(IConfiguration configuration, HttpContext context)
+    {
+        var serverDomain = configuration["Auth:Passkeys:ServerDomain"]?.Trim().TrimEnd('.');
+
+        // WebAuthn credentials are scoped to the configured RP domain. Keep
+        // password/OTP sign-in available on fallback hosts, but expose passkeys
+        // only when the browser is using that exact canonical hostname.
+        return !string.IsNullOrWhiteSpace(serverDomain) &&
+            string.Equals(context.Request.Host.Host, serverDomain, StringComparison.OrdinalIgnoreCase);
+    }
 
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapGet("/auth/passkeys/config", (IConfiguration configuration) =>
-            Results.Ok(new { enabled = IsEnabled(configuration) })).AllowAnonymous();
+        api.MapGet("/auth/passkeys/config", (IConfiguration configuration, HttpContext context) =>
+            Results.Ok(new { enabled = IsEnabled(configuration, context) })).AllowAnonymous();
 
         api.MapPost("/auth/passkeys/creation-options", async (
             PasskeyRegistrationStartRequest request,
@@ -24,9 +32,10 @@ public static class AuthPasskeyEndpoints
             UserManager<IdentityUser<Guid>> users,
             SignInManager<IdentityUser<Guid>> signIn,
             IConfiguration configuration,
+            HttpContext context,
             CancellationToken ct) =>
         {
-            if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
+            if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             var user = await users.GetUserAsync(principal);
             if (user is null) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(request.Password)) return Results.Unauthorized();
@@ -49,9 +58,10 @@ public static class AuthPasskeyEndpoints
             UserManager<IdentityUser<Guid>> users,
             SignInManager<IdentityUser<Guid>> signIn,
             IConfiguration configuration,
+            HttpContext context,
             CancellationToken ct) =>
         {
-            if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
+            if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             if (string.IsNullOrWhiteSpace(request.CredentialJson) || request.CredentialJson.Length > 64_000)
                 return ApiResults.Fail(400, "Invalid passkey credential payload.");
             var user = await users.GetUserAsync(principal);
@@ -76,9 +86,10 @@ public static class AuthPasskeyEndpoints
         api.MapGet("/auth/passkeys", async (
             ClaimsPrincipal principal,
             UserManager<IdentityUser<Guid>> users,
-            IConfiguration configuration) =>
+            IConfiguration configuration,
+            HttpContext context) =>
         {
-            if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
+            if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             var user = await users.GetUserAsync(principal);
             if (user is null) return Results.Unauthorized();
             var passkeys = await users.GetPasskeysAsync(user);
@@ -99,9 +110,10 @@ public static class AuthPasskeyEndpoints
             ClaimsPrincipal principal,
             UserManager<IdentityUser<Guid>> users,
             SignInManager<IdentityUser<Guid>> signIn,
-            IConfiguration configuration) =>
+            IConfiguration configuration,
+            HttpContext context) =>
         {
-            if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
+            if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             var user = await users.GetUserAsync(principal);
             if (user is null) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(request.Password)) return Results.Unauthorized();
@@ -116,9 +128,10 @@ public static class AuthPasskeyEndpoints
 
         api.MapPost("/auth/passkeys/request-options", async (
             SignInManager<IdentityUser<Guid>> signIn,
-            IConfiguration configuration) =>
+            IConfiguration configuration,
+            HttpContext context) =>
         {
-            if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
+            if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             var options = await signIn.MakePasskeyRequestOptionsAsync(user: null);
             return Results.Content(options, "application/json");
         }).AllowAnonymous();
@@ -130,9 +143,10 @@ public static class AuthPasskeyEndpoints
             AuthSessionService sessions,
             HttpContext context,
             IConfiguration configuration,
+            HttpContext context,
             CancellationToken ct) =>
         {
-            if (!IsEnabled(configuration)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
+            if (!IsEnabled(configuration, context)) return ApiResults.Fail(503, "Passkeys are not configured for this deployment.");
             if (string.IsNullOrWhiteSpace(request.CredentialJson) || request.CredentialJson.Length > 64_000)
                 return ApiResults.Fail(400, "Invalid passkey credential payload.");
 
