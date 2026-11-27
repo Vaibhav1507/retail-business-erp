@@ -50,10 +50,17 @@ public static class AuthPasswordResetEndpoints
                 return ApiResults.Fail(400, "Enter your email, six-digit code and a valid new password.");
 
             var user = await users.FindByEmailAsync(email);
-            if (user is null || !await reset.ConsumeAsync(user.Id, request.Code, cancellationToken))
+            if (user is null)
                 return ApiResults.Fail(400, "The code is incorrect or has expired. Request a new code and try again.");
 
+            // Generate the Identity token before consuming the OTP. Provider/configuration
+            // failures must not burn a valid one-time code. ConsumeAsync remains the
+            // atomic single-use gate before the password is changed, preventing replay
+            // and concurrent submissions from both resetting the password.
             var token = await users.GeneratePasswordResetTokenAsync(user);
+            if (!await reset.ConsumeAsync(user.Id, request.Code, cancellationToken))
+                return ApiResults.Fail(400, "The code is incorrect or has expired. Request a new code and try again.");
+
             var result = await users.ResetPasswordAsync(user, token, request.NewPassword);
             if (!result.Succeeded)
                 return ApiResults.Fail(400, string.Join(" ", result.Errors.Select(error => error.Description)));
