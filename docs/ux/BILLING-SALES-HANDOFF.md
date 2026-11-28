@@ -194,26 +194,44 @@ User requested that P0 and P1 remain in this same PR and branch, with manual sou
 
 ## Handwritten Sales Invoice Extraction V2 — implementation handoff (2026-11-28)
 
-Approved combined specification: [handwritten sales invoice extraction V2](./handwritten-sales-invoice-extraction-v2-design.md). The source design remains documentation-only in PR #119; implementation is isolated on `feat/handwritten-sales-invoice-extraction-v2`, based on main commit `2b981069125f1ee2be7e5537635d969dd17b6f9b`.
+Approved combined specification: [handwritten sales invoice extraction V2](./handwritten-sales-invoice-extraction-v2-design.md). Design PR #119 remains open and documentation-only. Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invoice-extraction-v2`, based on main commit `2b981069125f1ee2be7e5537635d969dd17b6f9b`.
 
-### Current increment
+### Verified implementation state
 
-- Added `src/Rbos.Api/Application/AnthropicVisionClient.cs`: direct Anthropic Messages API adapter, default model `claude-haiku-5-5`, native image/PDF source blocks, forced schema-backed tool output, usage token capture and privacy-safe failure logging.
-- Registered the typed client with a 25-second HTTP timeout in `Program.cs`.
-- Added `tests/Rbos.UnitTests/AnthropicVisionClientTests.cs` covering image/PDF request shape, forced structured tool, usage parsing, missing credentials and provider error-body non-disclosure.
-- Carried the approved V2 design into this implementation branch and updated its delivery status.
+- `AnthropicHaikuClient` is the single direct Messages API adapter for `claude-haiku-5-5`. It uses native original image/PDF content and structured JSON output. Token usage, request ID and safe error diagnostics are recorded.
+- Haiku remains gated by `Anthropic:SalesInvoiceIntegrationValidated`; default is false. Gemini 4 Hydrogen remains the temporary primary until the one secure non-production integration check passes.
+- Haiku retries transient failures once. Cloud Vision `DOCUMENT_TEXT_DETECTION` runs independently in parallel using ADC. Tesseract is degraded fallback only when Cloud Vision is unavailable.
+- Targeted Gemini Hydrogen verification is implemented for labelled invoice number/date/printed TOTAL regions. It receives only original-image crops and field labels, not Haiku's answer or OCR transcript. Its result remains a separate human-review candidate.
+- Provenance statuses and identifier candidates are normalized. AI-proposed serials do not populate the sale serial collection; operator confirmation is required. IMEI Luhn validation runs only for candidates classified as IMEI.
+- Original bills are retained by `SalesInvoiceEvidenceService` through migration-058 document/page tables without invoking `DocumentIntakeService.UploadAsync` or the generic worker.
+- Migration 060 creates the sales-document link. `SalesPosting` validates tenant/RLS-visible document ownership, Sale direction, HandwrittenBill source kind and NeedsReview status, then links and marks it Posted inside the normal sale transaction.
+- Generate Invoice now presents the retained original, source-region markers, competing readings and editable review. The normal sale confirmation remains the only posting path.
 
-### Integration gate
+### Fixes completed during continuation
 
-The earlier HTTP 400/empty-body Anthropic issue remains unresolved. No secret is available through repository access, so only mocked request-contract coverage is possible at this stage. Do not call this a live integration pass and do not route production traffic to Haiku until one secure non-production integration check succeeds. If that check cannot be made reliable, retain Gemini 4 Hydrogen as the temporary primary.
+- Removed a duplicate Anthropic client/DI registration; only `AnthropicHaikuClient` remains.
+- Fixed C# compile issues (JSON exception import, mutable review-issue list and Cloud Vision client lifecycle).
+- A null Rate with no explicit provenance is now `unreadable`; only an explicit source `not_present` is treated as a blank source cell.
+- OCR header alignment now parses values after exact labels and does not match SUBTOTAL as TOTAL. The first value after the printed TOTAL label remains distinct from nearby annotations.
+- Upload MIME/signature is validated before source evidence is persisted, avoiding orphan evidence for unsupported/corrupt files.
+- Updated field correction provenance and UI presentation of the independent verification candidate.
+- Added focused tests for OCR header extraction/comparison and null-rate provenance. Updated frontend mocks to reflect source-document IDs and operator-confirmed identifiers.
 
-### Next implementation increments
+### Validation status
 
-1. Wire Haiku into this sales route only, with at most one transient retry; add independent Cloud Vision OCR/layout using ADC and compare evidence after both reads.
-2. Restrict Tesseract to Cloud Vision degraded fallback; implement provenance, identifier candidates, row/field checks and targeted blind Hydrogen verification.
-3. Integrate original bill preview/review and synchronous migration-058 persistence; link evidence atomically during normal sale posting.
-4. Complete backend/frontend contract tests, full in-scope Playwright journeys, responsive screenshots, visual inspection and Axe. Native Android camera/gallery/keyboard/TalkBack remain separate real-device acceptance.
+The first exact-head CI run exposed compile errors and two outdated frontend test expectations. Fixes were committed. New CI and Visual Audit runs have been triggered for subsequent heads; only the latest exact-head run counts. At the time of this handoff update, the latest run is still pending, so no green CI claim is made.
+
+The earlier PR #119 Visual Audit failure was a five-minute timeout in the existing invoice-import signup helper waiting for a `Next` button while the current screen renders `Continue`; it failed before reaching the invoice import journey. It is not visual acceptance.
+
+### Remaining work
+
+1. Complete physical product-row OCR alignment, row omission/merge/extra-row detection and line-level conflict handling. The current OCR comparison is limited to labelled header fields.
+2. Extend targeted Hydrogen verification to line-level critical conflicts only where original OCR geometry supplies a grounded crop; never send proposed values or OCR text to the verifier.
+3. Add PostgreSQL integration tests for tenant-isolated evidence retrieval, atomic document-to-sale linking, discard and idempotent replay.
+4. Verify all field/candidate provenance, including user-entered versus user-corrected values.
+5. Run exact-head CI to completion, then full Generate Invoice Playwright journeys, responsive phone/tablet/landscape/desktop screenshots, visual inspection and Axe WCAG 2 A/AA.
+6. Keep native Android camera/gallery, keyboard and TalkBack checks as real-device acceptance.
 
 ### Explicit status
 
-Prototype: not applicable. Repository design specification: approved. First backend client increment: committed, awaiting CI. Automated test results: pending. Full visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised. No production GCP/IAM configuration has been changed.
+Prototype: not applicable. Repository design specification: approved. Implementation: in progress in Draft PR #120. Automated tests: pending exact-head CI. Visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised. No production GCP/IAM changes have been made.
