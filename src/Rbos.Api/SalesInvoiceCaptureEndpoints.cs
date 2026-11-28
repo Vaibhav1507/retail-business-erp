@@ -54,7 +54,7 @@ public static class SalesInvoiceCaptureEndpoints
                     try
                     {
                         sourceDocumentId = await evidence.SaveAsync(
-                            userId, tenantId.Value, mime, bytes,
+                            userId, tenantId.Value, mime!, bytes,
                             request.Headers["X-Source-File-Name"].ToString(), ct);
                     }
                     catch (InvalidDataException)
@@ -67,7 +67,7 @@ public static class SalesInvoiceCaptureEndpoints
                         return Fail(503, "The original bill could not be safely saved. No extraction was started; retry the upload.");
                     }
 
-                    var result = await service.ExtractAsync(mime, bytes, sourceDocumentId, ct);
+                    var result = await service.ExtractAsync(mime!, bytes, sourceDocumentId, ct);
                     return Reply(result);
                 }
                 finally
