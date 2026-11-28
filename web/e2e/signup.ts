@@ -61,7 +61,7 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   await page.getByLabel('Business name').fill(opts.businessName)
   await page.getByLabel('Business category').selectOption({ index: 1 })
   await page.getByLabel('Owner or contact name').fill('E2E Owner')
-  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByLabel('Business address').fill('1 Test Street')
   await page.getByLabel('City or town').fill(opts.city ?? 'Chennai')
   await page.getByLabel('State').selectOption(opts.state ?? 'Tamil Nadu')
