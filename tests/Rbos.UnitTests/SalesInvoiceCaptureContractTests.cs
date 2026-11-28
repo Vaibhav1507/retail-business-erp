@@ -227,13 +227,13 @@ public sealed class SalesInvoiceCaptureContractTests
     {
         const string digits = "123456789012345";
         Assert.False(SalesInvoiceCaptureService.IsValidImei(digits));
-        var source = JsonNode.Parse($"""
+        var source = JsonNode.Parse("""
             {
               "lines": [{
                 "description": "Device",
                 "quantity": 1,
                 "unitPrice": 100,
-                "identifierCandidates": [{ "value": "{{digits}}", "classification": "serial" }]
+                "identifierCandidates": [{ "value": "123456789012345", "classification": "serial" }]
               }]
             }
             """)!;
