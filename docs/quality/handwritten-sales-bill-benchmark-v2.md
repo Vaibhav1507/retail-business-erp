@@ -350,3 +350,11 @@ The shared prompt is the only natural-language instruction sent per provider. Av
 ### Haiku peer-assessment diagnostics
 
 The comparison result/log now includes a peer-assessment label: three_way_agreement, haiku_agrees_with_available_shadow, haiku_disagrees_with_available_shadow, haiku_differs_from_both_shadow_readers, providers_disagree, haiku_only_no_shadow_comparison, or haiku_unavailable. It also reports field paths where both shadow readers agree with each other but differ from Haiku. This is a triage signal only; it must never be described as proof that Haiku is correct or incorrect without gold-label/human verification.
+
+
+### Provider eligibility and customer-data gates
+
+- Gemini 4 Hydrogen is available as a multimodal model through the Gemini API, but confirm the exact existing API project has Free-tier model entitlement with a synthetic-image smoke test before enabling its flag. Google states that Gemini Developer API Free-tier content may be used to improve Google products; do not send unredacted customer bills until the business explicitly approves that data-use term.
+- Groq documents Qwen 3.8 27B as a vision/JSON-capable Preview model. Treat it as a pilot shadow reader, not a guaranteed permanent production dependency; revalidate its model status and Free-plan quota before every steady-state decision.
+- Groq states inference inputs/outputs are not retained by default, but may be temporarily logged for reliability/abuse investigations. Enable account-level Zero Data Retention in Groq Data Controls before sending real customer invoices; until then use redacted/synthetic images.
+- No provider smoke test, account-tier entitlement or data-control setting is assumed from the existence of an API key. Record the actual smoke-test result and account setting before activating flags.
