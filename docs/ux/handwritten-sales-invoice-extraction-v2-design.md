@@ -1,16 +1,20 @@
 # RBOS handwritten sales-invoice extraction V2 — combined final design
 
-**Status:** Final combined design decision; implementation delivered in PR #120; production rollout pending  
+> **Current source of truth:** Section 20 and the [parallel vision implementation handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md) supersede conflicting provider/OCR decisions in Sections 1–19. Earlier sections remain historical design rationale and implementation notes; do not use them to reactivate OCR or the sequential provider chain.
+
+
+**Status:** Current locked architecture; implementation in draft PR #125; no production rollout/configuration change  
 **Date:** 2026-11-28  
-**Repository main baseline:** `2b981069125f1ee2be7e5537635d969dd17b6f9b`  
+**Repository main baseline:** `7e919305097437911d6e3fc8c3644aaa5272087d` at implementation start  
 **Production baseline:** Cloud Run revision `rbos-pilot-00165-qnv` and commit `2b981069...` are reported by the Lovable investigation; they have not been independently verified against live GCP in this work.  
 **Scope:** One already-issued handwritten customer sales bill imported inside Generate Invoice (`#/sell/bill`)  
 **API:** `POST /api/sales/invoice-image-extract` (preserve synchronous response semantics)  
 **Primary model:** Claude Haiku 5.5 — `claude-haiku-5-5`  
-**Independent OCR:** Google Cloud Vision `DOCUMENT_TEXT_DETECTION`  
-**Conditional visual verifier / provider failover:** Gemini 4 Hydrogen — `gemini-4-hydrogen`  
-**Last-resort provider outage fallback:** existing Groq Vision client, always requires manual review  
-**UX contract:** Existing Generate Invoice layout and accepted handwritten-import review cards; no redesign  
+**Parallel shadow readers:** Gemini 4 Hydrogen (`gemini-4-hydrogen`) and Groq Qwen 3.8 27B (`qwen/qwen3.8-27b`)  
+**OCR:** Not used in the active sales-invoice extraction decision path during the parallel vision experiment  
+**Fallback:** Gemini, then Groq, only when Haiku fails; any backup-derived draft requires manual review  
+**UX contract:** Existing compact pre-V2 Generate Invoice review and normal sale confirmation; no redesign  
+**Current implementation handover:** [parallel vision implementation ledger](../quality/handwritten-sales-invoice-parallel-vision-handover.md)  
 **Related:** [Billing & Sales handoff](./BILLING-SALES-HANDOFF.md), [current handwritten import accuracy contract](./handwritten-sales-bill-import-accuracy.md), [handwritten import UX refinement](./invoice-handwritten-import-ux-refinement.md), [document ingestion architecture](../architecture/document-ingestion-pipeline.md)
 
 ---
@@ -80,8 +84,8 @@ Relevant current files:
 |---|---|
 | Sales extraction | `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs` |
 | Authenticated extraction endpoint | `src/Rbos.Api/SalesInvoiceCaptureEndpoints.cs` |
-| Local OCR | `src/Rbos.Api/Application/LocalOcr.cs` |
-| Provider fallback orchestration | `src/Rbos.Api/Application/VisionProviderFallback.cs` |
+| Local OCR | Not used by the active sales-invoice route; LocalOcr remains for other workflows |
+| Provider orchestration | SalesInvoiceCaptureService (parallel Haiku/Gemini/Groq) |
 | Groq vision client | `src/Rbos.Api/Application/GroqVisionClient.cs` |
 | Runtime defaults | `src/Rbos.Api/appsettings.json` |
 | Container OCR installation | `Dockerfile` |
