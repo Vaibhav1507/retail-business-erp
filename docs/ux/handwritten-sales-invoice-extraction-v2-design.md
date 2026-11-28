@@ -464,7 +464,7 @@ Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invo
 - Haiku retries transient failures at most once. Cloud Vision runs independently in parallel using ADC and `DOCUMENT_TEXT_DETECTION`; Tesseract is invoked only when Cloud Vision is unavailable.
 - Targeted Gemini Hydrogen verification sends only original-image crops plus field labels; it does not receive the first reader's answer or OCR transcript. It preserves its reading as a separate review candidate.
 - Provenance states and identifier candidates are normalized; only operator-confirmed serial/IMEI candidates enter sale lines. IMEI Luhn validation is limited to candidates classified as IMEI.
-- Original handwritten bill persistence uses the sales-specific synchronous path over migration-058 document/page storage. Migration 060 adds the tenant-scoped document-to-sale link, linked atomically in normal sale posting.
+- Original handwritten bill persistence uses the sales-specific synchronous path over migration-058 document/page storage. Migration 061 adds the tenant-scoped document-to-sale link, linked atomically in normal sale posting.
 - Generate Invoice includes original-bill preview, OCR source-region markers, competing readings, editable review and discard; the existing sale confirmation remains the only posting path.
 - The API now validates MIME and file signature before retaining evidence. A defensive check also exists in the persistence service.
 
@@ -475,7 +475,7 @@ Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invo
 - Corrected provenance fallback: a null Rate with no explicit source state is now `unreadable`, not guessed as `not_present`. Only an explicit source `not_present` remains a blank source cell.
 - Replaced substring OCR matching with exact labelled-row parsing for invoice number, date and printed TOTAL. This avoids treating SUBTOTAL as TOTAL and reads the first printed total after the label (e.g. keeps 10,020 distinct from a later 10,000 annotation).
 - Kept source `unitPrice` (the handwritten Rate column) separate from RBOS `sellingPrice`. Only an explicitly `source_read` Rate may prefill the sale price; `not_present`, `unreadable` or `ambiguous` source rates leave selling price empty and require operator entry. Sale posting uses only the confirmed RBOS selling price, never a fallback to a blank/uncertain source Rate.
-- Extended the sale-line description bound to 10,000 characters (migration 061) because the existing 240-character domain/database limit would otherwise reject a complete wrapped handwritten description after review. The original text is preserved in extraction and the posted sale-line snapshot; this does not change pricing, stock or accounting rules.
+- Extended the sale-line description bound to 10,000 characters (migration 062) because the existing 240-character domain/database limit would otherwise reject a complete wrapped handwritten description after review. The original text is preserved in extraction and the posted sale-line snapshot; this does not change pricing, stock or accounting rules.
 - Expanded the Generate Invoice Playwright journey to capture viewport and full-page screenshots at phone, tablet, landscape and desktop sizes, with keyboard-focus/scrolled states, Axe WCAG 2 A/AA, overflow, touch-target, console and server-error reporting. The synthetic bill covers the ₹10,020 printed TOTAL versus separate ₹10,000 reading and explicit header correction before sale posting.
 - Added tests for labelled OCR extraction/comparison and the null-rate provenance distinction.
 - Updated UI correction provenance for header/line edits and exposed the targeted verifier reading separately from OCR evidence.
@@ -522,7 +522,7 @@ The code keeps `Anthropic:SalesInvoiceIntegrationValidated=false` by default unt
 - The invoice-import Playwright/Axe visual audit did not pass: mobile 390 × 844 failed the serious/critical Axe assertion with `color-contrast`. The captured run did not preserve the offending node details; isolate the node and inspect screenshots before calling visual acceptance complete.
 - The Anthropic live integration gate is not passed. Mocked request-contract tests do not prove live API compatibility.
 - The feature branch is two commits behind current `main`; sync and revalidate before merge.
-- The feature branch currently names its evidence-link migration `060_sales_handwritten_invoice_evidence_link.sql`, but `main` already contains `060_password_reset_email_otp.sql`. Renumber the V2 migrations sequentially after the existing main migration before merge; current proposed sequence is 061 and 062.
+- Resolved: the evidence-link and verbatim-description migrations are now `061_sales_handwritten_invoice_evidence_link.sql` and `062_verbatim_sale_line_description_length.sql`, following `main`'s existing `060_password_reset_email_otp.sql`.
 - The 11 source bills remain provisional labels. No accuracy percentage is claimed.
 - Original evidence persistence and sale-link logic are implemented in the feature branch, but migration/application state in production has not been independently verified. No production GCP/IAM change or deployment is authorised.
 
