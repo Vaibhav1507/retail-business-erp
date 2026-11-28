@@ -106,7 +106,8 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
           fieldStates: { description: 'source_read', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'source_read', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
           hsn: '8528', quantity: 1, unitPrice: null, sellingPrice: null, sellingPriceProvenance: 'not_present',
           discount: 0, amount: 10000, gstRate: 18, gstAmount: 1800, confidence: 0.92,
-          fieldStates: { description: 'source_read', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'not_present', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
+          fieldStates: { description: 'ambiguous', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'not_present', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
+          ocrEvidence: { status: 'ambiguous', haikuOrPrimaryReading: 'Samsung LED Television model UA43', ocrCandidate: 'Samsung LED Television UA43', ocrAgrees: false, pageNumber: 1, region: { left: 0.1, top: 0.4, width: 0.8, height: 0.12 }, verificationCandidate: 'Samsung LED Television UA43', verificationStatus: 'ambiguous' },
         }],
       },
       warnings: ['Synthetic visual audit extraction: verify the handwritten total.'],
@@ -139,6 +140,9 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await expect(review.getByRole('button', { name: 'Inspect invoice number' })).toBeVisible()
   await expect(review.getByText(/Independent OCR reading: “4006”/)).toBeVisible()
   await expect(review.getByText(/Close-up reading: “HAND-468”/)).toBeVisible()
+  await expect(review.locator('.invoice-extraction-conflict')).toContainText('Independent OCR could not confidently confirm this product row.')
+  await review.getByRole('button', { name: 'Inspect product row in original bill' }).click()
+  await expect(review.locator('.invoice-source-region.active')).toBeVisible()
   await expect(review.locator('.invoice-identifier-candidates')).toContainText('SN12345678')
   await expect(review.getByRole('checkbox', { name: 'Confirm this reading' }).first()).not.toBeChecked()
   expect(invoiceUploadHeaders[0]?.['x-source-file-name']).toBe('synthetic-handwritten-bill.pdf')
