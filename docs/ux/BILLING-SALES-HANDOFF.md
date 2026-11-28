@@ -354,3 +354,8 @@ Haiku original-image read (after live integration validation) + independent Clou
 ## 2026-11-28 runtime provider credential status
 
 The user confirmed that no Anthropic configuration or Secret Manager resource has been created for this work. Treat the Anthropic secret as **not yet created**, not as an existing secret that can be reused. The next GCP setup must create a new secret, add its value securely, grant the Cloud Run runtime service account `roles/secretmanager.secretAccessor` on that secret only, and mount a pinned enabled version as `Anthropic__ApiKey`. Cloud Vision uses ADC separately; verify API enablement and billing before relying on it. Do not enable Gemini/Groq fallback flags as part of the initial Haiku setup.
+
+
+## 2026-11-28 handwritten sales review UI restored to pre-V2 baseline
+
+The user clarified that simplification alone is not sufficient: the handwritten invoice review must behave as it did before PR #120. PR #117 touched documentation/quality files only; PR #120 introduced the UI/extraction V2 implementation. The corrective branch restores the exact compact review markup from PR #120's base commit: source bill number/date, read-only handwritten total, per-line description + optional serial + Qty + one Unit price input, and existing More details disclosure. V2 provider/extraction and source-document persistence remain internal; no backend or accounting rules are changed. See [pre-V2 Generate Invoice review restoration](./handwritten-sales-invoice-review-simplification.md).
