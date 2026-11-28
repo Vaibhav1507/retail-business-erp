@@ -335,3 +335,13 @@ The 11-source corpus and seven app-output cohort remain provisional in places. D
 ### Implementation state
 
 The current code implementation and next-step ledger are maintained in [parallel vision implementation handover](./handwritten-sales-invoice-parallel-vision-handover.md). The implementation PR must pass backend unit/build tests and the repository's full CI before merge consideration. Provider live smoke tests use only synthetic/redacted data and are separate from ordinary CI. No production configuration or deployment is included.
+
+
+### Inference-token and latency controls
+
+The shared prompt is the only natural-language instruction sent per provider. Avoid separate reasoning or explanation prompts. Provider-specific inference settings are deliberately bounded for structured extraction:
+
+- Haiku uses the existing 8,192-token output cap.
+- Gemini 4 Hydrogen uses LOW thinking and an 8,192-token output cap; Hydrogen defaults to HIGH thinking, so LOW is selected for structured metadata extraction and lower latency/token use.
+- Groq Qwen 3.8 27B uses instruct mode with reasoning_effort none and an 8,192-token completion cap.
+- These settings are experimental controls, not assumed accuracy improvements. Keep them fixed during the first benchmark run, then change only with a versioned experiment and verified gold-label comparison.
