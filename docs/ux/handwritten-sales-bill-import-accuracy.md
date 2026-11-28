@@ -1,6 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** P0 + P1 implementation complete; code CI #1342 and #1343 passed on 2026-11-26. Manual handwritten-bill validation is the next acceptance step.  
+**Status:** P0 + P1 implementation merged in PR #113; main code CI #1357 passed on 2026-11-27. The next phase is the documented V2 benchmark; no independently verified accuracy score exists yet.  
 **Route:** `#/sell/bill` (Generate Invoice)  
 **API:** `POST /api/sales/invoice-image-extract`  
 **Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
@@ -170,11 +170,11 @@ No source-photo-to-app accuracy percentage is claimed yet. The seven-case compar
 
 ## 10. Current delivery state
 
-- P0 and P1 implementation are kept together in PR #113 and branch `feat/handwritten-sales-import-p0`.
-- The branch was synchronized with current main using merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; current comparison is 45 commits ahead and 0 behind. GitHub now reports the PR as mergeable, but it remains Draft and unmerged.
-- Implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1` passed code CI #1342 (backend 165, frontend 234, PostgreSQL integration 186); latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs again in #1343.
-- No merge or production deployment is included or implied.
-- The user requested manual validation only after the full improvement is implemented; this handoff does not ask them to validate an intermediate P0-only state.
+- P0 and P1 implementation were merged through [PR #113](https://github.com/Vaibhav1507/retail-business-erp/pull/113) on 2026-11-26; merge commit `965da62d980d0b7b3d6b38de53f9b67e8fdac629`. The historical implementation branch was `feat/handwritten-sales-import-p0`.
+- Historical implementation CI: run #1342 passed on implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1`; run #1343 passed on its pre-merge head `a63dbc482ddd847ca2183e48b828fc5477aa94d7`. These are pre-merge branch checks.
+- Current main was observed at `2b981069125f1ee2be7e5537635d969dd17b6f9b`; main code CI [#1357](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45965857793) passed on 2026-11-27.
+- The V2 benchmark is documented in [handwritten-sales-bill-benchmark-v2.md](../quality/handwritten-sales-bill-benchmark-v2.md). No gold labels or model-bakeoff results exist yet.
+- PR #113 is merged. This statement does not verify whether the current main commit is deployed to production; deployment status must be checked separately before any production conclusion.
 
 ## User validation and E2E scope clarification — 2026-11-26
 
@@ -186,7 +186,7 @@ User confirmed that all P1 improvements belong in the same PR and branch as P0 a
 - Provisional visual observations and uncertainty annotations: [handwritten sales-bill corpus v1](../quality/handwritten-sales-bill-corpus-v1.md).
 - The corpus note is not yet gold-standard ground truth. Amounts and descriptions are provisional visual readings; exact model/serial strings and the S10 row count/total need verification before scoring.
 - Original photos remain in the conversation attachment context and are not committed to Git. The repository stores no customer names, mobile numbers or addresses.
-- Seven app extraction runs (two Anil and five Monika) have since been recorded in the seven-case comparison. Two of the eleven tracked source bills still lack matching app extraction outputs. No accuracy/latency score is claimed.
+- Seven app extraction runs (two Anil and five Monika) have since been recorded in the seven-case comparison. Based on the recorded sample IDs, four of the eleven tracked source bills (S06–S09) still lack matching app extraction outputs. No accuracy/latency score is claimed.
 - Next step: obtain verified labels for ambiguous source text/financial fields, then run the existing synchronous importer against all eleven samples and capture stage timings.
 
 
@@ -206,3 +206,17 @@ User confirmed that all P1 improvements belong in the same PR and branch as P0 a
 - Source includes two serial/model-like identifiers (one looks like `1200 644A 76A 112258`, a separate one like `26111412945`). The review card exposes no serial/identifier field and neither value is displayed. Their exact roles must be labelled; preserve both rather than guessing.
 - Source Rate column appears blank but app populates ₹17,500 unit price. Track whether this is a source-transcribed or derived amount/quantity value.
 - The 90% confidence label did not prevent these errors and is not calibrated evidence of correctness.
+
+
+## 14. Benchmark V2 handoff — 2026-11-28
+
+The current benchmark source of truth is [handwritten-sales-bill-benchmark-v2.md](../quality/handwritten-sales-bill-benchmark-v2.md). It supersedes earlier “next manual validation” notes where they conflict with the current corpus/run count.
+
+- Benchmark branch: `docs/handwritten-bill-benchmark-v2` (documentation-only; PR is created separately).
+- Current scope remains only the synchronous handwritten sales-bill importer in Generate Invoice.
+- PR #113 is merged; main code CI #1357 passed. This says nothing about extraction accuracy, visual acceptance or production deployment.
+- Corpus: 11 source bills; seven app runs; four unmatched source samples S06–S09. None of the current labels are independently verified gold labels.
+- The shipped sequence is image prep + parallel local Tesseract for image files; first Gemini gets no OCR hint; fallback Groq/later Gemini may receive OCR hints. PDFs go natively to Gemini. The first structured “usable” gate only checks for one plausible line and is not a correctness guarantee.
+- Candidate model and OCR comparison is research-only. No provider winner is selected, no paid spend is approved and no production configuration change is authorised.
+- Original scans were not retrievable from the active Project file search during this documentation pass. No source transcription was promoted to verified ground truth. Do not put original or unredacted scans into Git.
+- Next: restore the 11 redacted source scans to the active RBOS Project/chat, verify gold labels, obtain missing S06–S09 baseline runs, smoke-test model/API eligibility and privacy terms, then run the controlled direct-vision experiment before OCR/verifier arms.
