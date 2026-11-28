@@ -349,6 +349,18 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void OcrDescriptionMatchScore_RequiresMultipleDistinctTokensAndPreservesRowIdentity()
+    {
+        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
+            "Samsung LED Television model UA43",
+            "Samsung LED Television model UA43 Qty 1 Rate blank Amount 10000") >= 0.95);
+        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
+            "Samsung LED Television model UA43",
+            "LG Washing Machine model WM900") < 0.30);
+        Assert.Equal(0, SalesInvoiceCaptureService.OcrDescriptionMatchScore("LG", "LG Electronics"));
+    }
+
+    [Fact]
     public void AnthropicSchemaAvoidsUnsupportedConstraintsAndExcessiveUnionTypes()
     {
         var schema = SalesInvoiceCaptureService.BuildAnthropicResponseJsonSchema();
