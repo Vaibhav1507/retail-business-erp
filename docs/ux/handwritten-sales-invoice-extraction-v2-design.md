@@ -596,3 +596,86 @@ No paid Gemini/Groq fallback is permitted. Haiku is the only intended paid AI mo
 The Anthropic runtime credential has **not** been created or mounted in the pilot Cloud Run service. Do not assume an existing Secret Manager resource exists. The application accepts either `Anthropic:ApiKey` or `ANTHROPIC_API_KEY`; prefer a Secret Manager-backed Cloud Run environment variable named `Anthropic__ApiKey`. The runtime service account must have `roles/secretmanager.secretAccessor` on the specific secret. Pin an enabled secret version when configuring the environment variable. Cloud Vision continues to use ADC and is independent of the Anthropic key.
 
 The client now selects the environment-variable fallback when the configured `Anthropic:ApiKey` is null, empty or whitespace. The offline integration test explicitly blanks both credential sources so CI cannot make an external Anthropic call. See the focused credential-fallback fix PR for implementation and test status.
+
+
+## 20. Parallel vision benchmark — revised locked decision (2026-11-28)
+
+**This section supersedes the earlier provider order and processing hierarchy in Sections 3, 18, and the continuation notes below.** It does not change the preserved Generate Invoice review UX, response schema, provenance rules, source-evidence lifecycle, or normal sale-confirmation path.
+
+### Locked provider behaviour
+
+For the temporary accuracy experiment, run three independent image readers concurrently on the same original uploaded image/PDF:
+
+1. **Claude Haiku 5.5 (claude-haiku-5-5)** — primary result and normal customer-facing extraction.
+2. **Gemini 4 Hydrogen (gemini-4-hydrogen)** — independent Free-tier shadow reader, using the existing Gemini:ApiKey.
+3. **Groq Qwen 3.8 27B (qwen/qwen3.8-27b)** — independent Free-plan shadow reader, using the existing Groq:ApiKey.
+
+No provider sees another provider's output. No shadow reader may overwrite Haiku's result. A model's agreement with another model is peer agreement, **not ground-truth accuracy**.
+
+The model IDs are pinned in code. Do not inherit Gemini:Model, Gemini:SalesInvoiceHydrogenModel, or Groq:Model, and do not route quota failures to a paid model or credential. A provider that is unavailable, rate-limited, out of Free quota, or returns unusable JSON is recorded as unavailable for that upload; the other readers continue.
+
+If Haiku returns a usable extraction, its values remain primary. If Haiku fails, use Gemini's usable extraction first, then Groq's usable extraction; any backup-derived draft requires operator review. If all three fail, retain the source document and allow manual entry.
+
+### Existing credentials and explicit activation
+
+Do not create duplicate sales-specific API keys. The route reuses existing server-side credentials only when its dedicated feature flag is enabled:
+
+| Feature flag | Credential read | Pinned model |
+|---|---|---|
+| Gemini:SalesInvoiceShadowEnabled=true | Gemini:ApiKey | gemini-4-hydrogen |
+| Groq:SalesInvoiceShadowEnabled=true | Groq:ApiKey | qwen/qwen3.8-27b |
+
+Both flags are false in repository appsettings.json by default. This prevents an application deploy from silently transmitting customer documents to a new provider. Enable them only after verifying the relevant provider account is Free-only, confirming model access/quota, and approving the provider's data-use terms. Google Gemini Developer API Free Tier content may be used to improve Google products; use redacted/synthetic invoices until real-customer-data use is explicitly approved. No API key values belong in source control or chat.
+
+The application cannot prove an account's billing tier from an inference request. The pinned model and existing no-payment-method Free accounts are the spend boundary; provider billing/quota/permission errors must fail closed and must never trigger a paid model.
+
+### One prompt per model
+
+All three providers receive the same single, concise, versioned visual-transcription prompt: sales-invoice-vision-v2. The prompt asks the model to understand the whole page layout, identify physical product rows, preserve wrapped/verbatim descriptions, map values to their printed columns, read labelled header fields, and distinguish not_present, unreadable, and ambiguous values without guessing.
+
+There are no sequential prompt stages, chain-of-thought requests, follow-up questions, OCR-hint prompts, or repeated classification prompts. Provider-specific structured-output schemas adapt the same semantic contract to each API. Haiku uses its schema-constrained response; Gemini uses its JSON schema; Groq uses JSON mode and the same prompt. Keep deterministic generation settings where supported.
+
+### OCR is outside the decision path
+
+During this benchmark, the sales-invoice route does not call Cloud Vision or Tesseract. It does not use OCR text, OCR row alignment, OCR candidate absence, or OCR disagreement to accept, reject, rewrite, or downgrade a vision-model result. OCR-specific reconciliation and targeted crop verification are removed from the active service implementation. OCR may be reconsidered only as a separate measured experiment after the direct vision baseline.
+
+### Parallel execution and bounded latency
+
+- Start Haiku, Gemini and Groq concurrently with independent cancellation tokens.
+- Existing Haiku transient retry remains bounded to one retry; it reuses the same prompt.
+- Gemini and Groq each have a bounded attempt timeout (AiPerformance:SalesInvoiceShadowAttemptTimeoutSeconds, default 10 seconds).
+- The total sales-invoice provider budget remains bounded by the existing request budget (code clamps it to 25 seconds).
+- Shadow quota/timeout/failure must not invalidate an already usable Haiku result.
+- Do not use fire-and-forget work or background tasks that outlive the request/source-byte lifetime.
+
+### Comparison and diagnostics
+
+The API response adds providerComparison with provider/model/status/latency and pairwise field-comparison summaries. It includes mismatch field paths and counts, not extracted values. Existing clients may ignore this additive property. The existing review UI is unchanged.
+
+Structured logs record provider attempt status, model, latency, usage metadata where available, fallback selection, peer disagreement and mismatch field names/counts. Never log source images, base64, prompts containing invoice data, customer names/phones, extracted values, full provider payloads, or API keys.
+
+Compare header fields, product-row count/order, verbatim descriptions, model/identifier candidates, quantity, source Rate, amount, tax and total. Blank Rate remains not_present; no value is inferred. A model's self-reported confidence is not calibrated accuracy. Use the verified benchmark gold labels and human corrections to calculate accuracy; do not call provider agreement accuracy.
+
+### Temporary and steady-state modes
+
+- **Temporary mode:** three parallel independent readers and field-level comparison for the verified pilot corpus.
+- **Steady state after evidence:** Haiku remains primary; Gemini and Groq remain Free-only fallbacks when Haiku fails. Retain a shadow verifier only if the benchmark demonstrates measurable incremental value and the data-use terms are approved.
+
+### Acceptance criteria
+
+- Haiku, Gemini and Groq receive the same original source and one prompt per provider.
+- Enabled calls begin concurrently; no serial provider cascade is used for comparison.
+- Existing Gemini:ApiKey and Groq:ApiKey are reused only behind the new explicit flags; no dedicated duplicate keys are required.
+- Pinned model IDs prevent accidental use of configurable paid-model alternatives.
+- Free quota, billing, permission and timeout errors fail closed without paid fallback.
+- Haiku remains authoritative whenever it returns a usable result; shadow outputs never overwrite it.
+- If Haiku fails, a backup result is a review-required draft; if all fail, manual entry remains possible.
+- OCR is not invoked by the active sales-invoice extraction path.
+- Comparison response/logs contain field paths and statuses, never extracted values or customer PII.
+- Prompt is one versioned concise prompt; no staged prompt chain or unnecessary repeated tokens.
+- Unit tests cover credential flags, pinned model IDs, comparison summaries, blank source Rate and existing normalization/schema contracts.
+- No frontend redesign, sale posting, accounting, stock, GST, payment, tenant or evidence-lifecycle change.
+
+### Implementation tracking
+
+The implementation branch is feat/sales-invoice-parallel-vision-benchmark. See [parallel vision implementation handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md) for commit-by-commit progress, exact test evidence, remaining provider smoke tests and the next action. No merge, production configuration change, migration or deployment is implied by this design decision.
