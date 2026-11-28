@@ -1,4 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
+> **Current provider implementation:** The temporary three-reader parallel vision experiment is in draft PR #125. Use the [V2 design](./handwritten-sales-invoice-extraction-v2-design.md) and [implementation handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md) for current provider, prompt, OCR and activation rules. Earlier P0/P1/OCR notes below are historical unless explicitly retained by the revised design.
+
 
 **Status:** P0 + P1 implementation merged in PR #113; handwritten sales-invoice V2 implementation merged in PR #120 on 2026-11-28. The current provider/runtime design is specified in [V2 design](./handwritten-sales-invoice-extraction-v2-design.md). No independently verified extraction-accuracy score exists yet.  
 **Route:** `#/sell/bill` (Generate Invoice)  
