@@ -146,7 +146,7 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 - All seven app extraction runs shared so far have a consolidated record: [seven-bill comparison v1](../quality/handwritten-sales-seven-bill-comparison-v1.md).
 - Cases: ANIL-001 ₹5,000; ANIL-002 ₹10,020; MONIKA-001 ₹17,500; MONIKA-002 ₹11,000; MONIKA-003 (source total needs verification); MONIKA-004 ₹17,400; MONIKA-005 ₹15,800.
 - This is seven complete comparison records for the supplied app runs, **not** a verified gold-standard dataset. Some values remain ambiguous (notably MONIKA-003 amount and specific model/serial characters); confirm before scoring accuracy.
-- Eleven handwritten source bills are tracked overall (9 Monika + 2 Anil). The remaining two Monika source bills from the initial batch do not yet have app extraction screenshots/results.
+- Eleven handwritten source bills are tracked overall (9 Monika + 2 Anil). Four Monika source bills (S06–S09) do not yet have matching app extraction screenshots/results in the seven-case comparison.
 - Original bills and customer PII are not committed to Git.
 
 ### User-approved UX constraints
@@ -185,8 +185,24 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 - Code CI #1342 passed on implementation commit `5d31061c903c3e3d8b770e9f73d399cca2ed8fb1`: backend 165 tests, frontend 234 tests, PostgreSQL integration 186 tests, plus build/lint/dependency checks.
 - Latest pre-merge branch head `a63dbc482ddd847ca2183e48b828fc5477aa94d7` passed all three code-CI jobs in run #1343 (backend, frontend and PostgreSQL integration).
 - RBOS Visual Audit run #297 was automatically triggered by the existing invoice-import path filter, although Playwright/Axe were deferred for this phase. It failed after five minutes because the shared signup helper waited for a `Next` button while the current signup screen exposed `Continue`; this is a test-helper/signup-flow mismatch before the invoice-import journey, not an extraction assertion. The visual audit is not counted as passed.
-- Main was synchronized into this feature branch by merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; the branch is now 45 commits ahead and 0 behind main, and GitHub reports it mergeable. PR #113 remains open as Draft and has not been merged. No production deployment has been performed. PR #111 remains parked as Draft; PR #112's scope/corpus documentation is merged into main.
+- Main was synchronized into this feature branch by merge commit `3e61fa51f8cc6f6c51768751de691e24e9144d6d`; the branch is now 45 commits ahead and 0 behind main, and GitHub reports it mergeable. PR #113 was merged on 2026-11-26 at `965da62d980d0b7b3d6b38de53f9b67e8fdac629`. Current main code CI #1357 passed on 2026-11-27. Production deployment of the current main commit is not verified by this handoff. PR #111 remains parked as Draft; PR #112's scope/corpus documentation is merged into main.
 
 ### P0 + P1 validation scope clarification — 2026-11-26
 
 User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. Code CI #1342 passed on the implementation commit; code CI #1343 passed on the latest pre-merge branch head. Playwright/E2E, screenshots, Axe and native Android checks remain deferred (not passed). The automatically triggered Visual Audit #297 failed in the signup helper before reaching the import flow: it expected a `Next` button, but the current signup step renders `Continue`. Do not treat this as an extraction failure or a visual acceptance pass. Statistical confidence calibration and actual p50/p95 latency/accuracy measurements still depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.
+
+
+## Current handwritten sales-bill benchmark status — 2026-11-28
+
+**This dated section supersedes earlier handwritten-bill status statements in this handoff where they conflict.**
+
+- **Scope:** only existing synchronous handwritten sales-bill import in Generate Invoice (`#/sell/bill`). Keep the current upload → extraction → editable review → existing sale posting path.
+- **Implementation:** P0/P1 work merged in [PR #113](https://github.com/Vaibhav1507/retail-business-erp/pull/113), merge SHA `965da62d980d0b7b3d6b38de53f9b67e8fdac629`.
+- **Repository baseline:** main observed at `2b981069125f1ee2be7e5537635d969dd17b6f9b`; code CI [#1357](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45965857793) passed 2026-11-27. CI does not validate extraction accuracy or user acceptance. Deployment of this exact main SHA is not verified here.
+- **Benchmark master:** [handwritten-sales-bill-benchmark-v2.md](../quality/handwritten-sales-bill-benchmark-v2.md). Supporting artifacts: [sample register](../quality/handwritten-sales-bill-benchmark-register-v1.csv), [gold-label template](../quality/handwritten-sales-bill-gold-labels-template-v1.csv), [run-results template](../quality/handwritten-sales-bill-run-results-template-v1.csv).
+- **Evidence:** 11 source bills (9 Monika + 2 Anil), seven app extraction runs (five Monika + two Anil), and four unmatched source bills S06–S09. Existing source/app notes remain provisional, not a verified gold-standard transcription. No accuracy percentage is claimed.
+- **Current pipeline:** Tesseract runs concurrently for image uploads; primary Gemini receives no OCR text; Groq/later Gemini fallback attempts may receive OCR hints; PDFs are sent natively to Gemini. The provider chain's one-line “usable” predicate is not a correctness gate. Model confidence is uncalibrated.
+- **Next steps:** restore the original 11 redacted scans to this active Project/chat; independently verify labels; run the current main importer for S06–S09; smoke-test eligible model/API endpoints and data terms; compare direct vision first, OCR-assisted only as a separate arm, and a blind conditional verifier only if evidence supports it.
+- **Not authorised:** no production provider/model change, paid provider spend, verifier budget cap, AI Gateway change, extraction redesign, merge of benchmark docs or deployment is implied by this handoff. The docs-only benchmark PR is separate from any future implementation approval.
+- **Privacy:** no original invoices or customer PII are committed to Git. Redact names, mobile numbers and addresses before external benchmark calls. Do not use free-tier services for unredacted real invoices.
+- **Visual/device state:** Playwright/E2E, responsive screenshots, Axe and native-device validation remain deferred/not passed for this accuracy phase. Historical Visual Audit #297 failed in the shared signup helper before the invoice-import journey and is not extraction evidence.
