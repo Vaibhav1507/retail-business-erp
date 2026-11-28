@@ -267,6 +267,36 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void NormalizeForReview_PreservesCompleteLongVerbatimProductDescription()
+    {
+        var description = string.Join("\n", Enumerable.Repeat(
+            "Samsung LED Television model UA43K5570 serial characters O0I1 and package specification details",
+            8));
+        var source = new JsonObject
+        {
+            ["lines"] = new JsonArray(new JsonObject
+            {
+                ["description"] = description,
+                ["quantity"] = 1,
+                ["unitPrice"] = 100,
+                ["fieldStates"] = new JsonObject
+                {
+                    ["description"] = "source_read",
+                    ["quantity"] = "source_read",
+                    ["unitPrice"] = "source_read"
+                }
+            })
+        };
+
+        var result = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])));
+        Assert.Equal(description, line["description"]!.GetValue<string>());
+        Assert.Equal(description.Length, line["description"]!.GetValue<string>().Length);
+        Assert.Equal(100m, line["sellingPrice"]!.GetValue<decimal>());
+        Assert.Equal("source_read", line["sellingPriceProvenance"]!.GetValue<string>());
+    }
+
+    [Fact]
     public void NormalizeForReview_PreservesBlankRateAsNotPresentRatherThanUnreadable()
     {
         var source = JsonNode.Parse("""
