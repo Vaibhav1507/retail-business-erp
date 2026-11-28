@@ -375,7 +375,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       !(line.sellingPrice != null && line.sellingPrice > 0) ||
       (line.discount != null && line.discount < 0))
     if (invalid >= 0) {
-      setError('Complete a description or model number, quantity and unit price for every extracted line before adding them to the bill.')
+      setError('Complete a description or model number, quantity and RBOS selling price for every extracted line before adding them to the bill.')
       return
     }
     const excessiveDiscount = salesInvoiceDraft.lines.findIndex(line =>
@@ -923,7 +923,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
                 <label>Source rate (₹) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('unitPrice', index)}</small><span className="invoice-source-rate-value">{line.unitPrice != null ? money(line.unitPrice) :
                   line.fieldStates?.unitPrice === 'not_present' ? 'Not written on source bill' :
                     line.fieldStates?.unitPrice === 'unreadable' ? 'Written but unreadable' :
-                      line.fieldStates?.unitPrice === 'ambiguous' ? 'Competing readings' : 'Not available'}</span></label>
+                      line.fieldStates?.unitPrice === 'ambiguous' ? 'Competing readings' : 'Not available'}</span>{salesInvoiceFieldIssue('unitPrice', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('unitPrice', index)}</small>}</label>
                 <label>RBOS selling price (₹) <small className="invoice-extraction-provenance">{({
                   source_read: 'Prefilled from source rate',
                   not_present: 'Enter your selling price',
@@ -932,7 +932,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
                   calculated: 'Calculated by RBOS',
                   user_entered: 'Entered by you',
                   user_corrected: 'Corrected by you'
-                } as Record<string, string>)[line.sellingPriceProvenance ?? 'not_present']}</small><input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.sellingPrice ?? ''} onChange={e => updateCapturedLine(index, 'sellingPrice', e.target.value)} />{salesInvoiceFieldIssue('unitPrice', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('unitPrice', index)}</small>}</label>
+                } as Record<string, string>)[line.sellingPriceProvenance ?? 'not_present']}</small><input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.sellingPrice ?? ''} onChange={e => updateCapturedLine(index, 'sellingPrice', e.target.value)} /></label>
               </div>
               <details className="invoice-extracted-line-details">
                 <summary>Brand, model, HSN and discount {salesInvoiceReviewIssues.some(issue => issue.lineIndex === index && ['brand', 'model', 'hsn', 'discount'].includes(issue.field)) && ' · Check details'}</summary>
