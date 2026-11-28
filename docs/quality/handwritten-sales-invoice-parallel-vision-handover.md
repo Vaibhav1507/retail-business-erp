@@ -69,7 +69,9 @@ Out of scope:
 - Added GetSalesInvoiceGeminiShadowApiKey and GetSalesInvoiceGroqShadowApiKey.
 - Reuses existing Gemini:ApiKey and Groq:ApiKey only when explicit flags are true.
 - Pinned model IDs; no model override from general configuration.
-- Added Gemini usage token logging where returned by the API.
+- Added Gemini and Groq usage token logging where returned by the APIs.
+- Set Gemini Hydrogen to LOW thinking with an 8,192-token output cap; set Groq Qwen to instruct mode with reasoning disabled and an 8,192-token completion cap. Haiku retains its 8,192-token cap.
+- Added a peer-assessment label and field paths where Gemini and Groq agree against Haiku. This is a triage signal, not ground-truth accuracy.
 
 ### Step 3 — remove OCR from the active sales path
 
@@ -82,7 +84,7 @@ Out of scope:
 
 - Updated SalesInvoiceCaptureContractTests for existing-key reuse behind explicit flags.
 - Added tests for ignoring obsolete dedicated keys and configurable paid model overrides.
-- Added tests for provider selection priority (Haiku → Gemini → Groq), comparison output privacy, unavailable comparisons and prompt version.
+- Added tests for provider selection priority (Haiku → Gemini → Groq), comparison output privacy, unavailable comparisons, prompt version, peer-consensus diagnostics and bounded low-reasoning provider request settings.
 - Added a service-level concurrency test using a barrier HTTP handler; it asserts Gemini and Groq both start before either provider response is released.
 - Added explicit handling for provider refusal responses so one reader's refusal cannot fail the complete parallel extraction.
 - Removed obsolete OCR-reconciliation-specific tests.
@@ -122,10 +124,10 @@ Before creating the PR, review these points carefully:
 | Existing key reuse and pinned models | Implemented | Unit tests added; CI pending |
 | OCR removed from active service | Implemented | Verify exact diff and DI/build |
 | Pairwise privacy-safe comparison | Implemented | Unit tests added; CI pending |
-| Provider concurrency/cancellation tests | Unit test passed | Backend unit-test step in run #1532 passed, including the barrier test proving Gemini/Groq overlap; cancellation runtime review remains |
-| Backend build/unit tests | Passed | PR CI run #1532: solution build and backend unit tests succeeded on code commit 729f694a83d4cb06d7af169ee697d93c75f1cb8b |
-| Frontend CI | Passed | PR CI run #1532: TypeScript, tests, lint, build and dependency audit all succeeded; no frontend files changed |
-| PostgreSQL integration/migrations | In progress | PR CI run #1532: disposable migrations passed; integration tests still running; no migration files changed |
+| Provider concurrency/cancellation tests | Previous code commit passed; latest run pending | Backend unit tests in run #1532 passed including Gemini/Groq overlap; latest run #1542 includes the low-reasoning and shadow-consensus tests |
+| Backend build/unit tests | Previous code commit passed; latest run pending | PR CI #1532 passed on 729f694; latest provider settings/peer diagnostics are being checked in run #1542 on code commit 83ab6d5 |
+| Frontend CI | Previous code commit passed; latest run pending | PR CI #1532 passed TypeScript, tests, lint, build and dependency audit; latest run #1542 is pending; no frontend files changed |
+| PostgreSQL integration/migrations | Previous run pending at last check; latest run pending | PR CI #1532 disposable migrations passed; integration test result pending. Latest run #1542 pending; no migration files changed |
 | Live Haiku smoke | Previously passed only on synthetic request in run 46143498825 | Do not confuse with production runtime credentials |
 | Live Gemini smoke | Pending | Synthetic/redacted image only; verify Free Tier model access |
 | Live Groq smoke | Pending | Synthetic/redacted image only; verify Free Plan quota |
@@ -138,7 +140,7 @@ Before creating the PR, review these points carefully:
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Draft PR #125 is open. CI run #1532 is validating code commit 729f694a83d4cb06d7af169ee697d93c75f1cb8b; the subsequent branch update is documentation-only. Backend build/unit tests and frontend checks have passed. PostgreSQL integration tests and the container build are still running. Grouped visual audit run #465 is also in progress. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173126985 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173127072.
+3. Draft PR #125 is open. Latest CI run #1542 validates code commit 83ab6d5908adacbe4e9c532a6126d125e1521ede; the subsequent branch update is documentation-only. Run #1532 previously passed backend build/unit tests and frontend checks, but its PostgreSQL/container/visual jobs were still running at the last check. Latest grouped visual audit run #475 is in progress. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173438236 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173438331.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
 5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
@@ -158,6 +160,13 @@ Before creating the PR, review these points carefully:
 - e71cc9107e81e881b6ad661882c474df429eea7d — add an end-to-end service unit test proving Gemini/Groq calls start concurrently.
 - 3beaf60fa925af2e7b3c0f941647e7eb68c84062 — use a typed task-completion barrier in the concurrency test.
 - 729f694a83d4cb06d7af169ee697d93c75f1cb8b — isolate provider refusal failures so shadow errors cannot fail the whole extraction.
+- 5b5f8c4a5dd1dbd22cbbbd41f54b43a672775e1a — record Groq usage tokens without logging response content.
+- b0d9957f7601f9c69329e51d88f141d121eb86c5 — use Gemini LOW thinking and bound its output tokens.
+- 37644dbd4facb1cec0e0f5d4c9daf300bcd0cf15 — use Groq instruct mode and bound its completion tokens.
+- 8c3b7cc88bc53418eb707bedcf3f747ff08ee1e2 — test the bounded low-reasoning request settings.
+- acd313a939dce89b0019374b310ccc8b6ea2db89 — add Haiku peer-assessment and shadow-consensus field diagnostics.
+- b34a5c599967a7829fd630ce48eca9cc6e044432 — test shadow-consensus diagnostics.
+- 83ab6d5908adacbe4e9c532a6126d125e1521ede — make consensus test serialization explicit.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Current PR head at the latest handover update: 723f9e22f6273c8854155d1fd9d32fc9c26125ad (documentation-only update after code commit 729f694a83d4cb06d7af169ee697d93c75f1cb8b).
+Current PR head at the latest handover update: 6c4257cc30c1fbaca1720a685ddc7f31da78e4a9 (documentation-only update after code commit 83ab6d5908adacbe4e9c532a6126d125e1521ede).
