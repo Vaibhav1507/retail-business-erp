@@ -496,3 +496,82 @@ The previously reported Anthropic HTTP 400 with an empty response body has not y
 ### Explicit status
 
 Repository design specification: approved. Implementation: in progress in Draft PR #120. Automated CI: latest exact-head run pending. Full visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised.
+
+
+## Addendum — provider order, OCR decision and mobile photo intake (2026-11-28)
+
+### Provider orchestration correction — proposed design
+
+The intended order is now **free-tier multimodal models first, Haiku as the first paid fallback, then an optional second paid model only if Haiku is unavailable or unusable**. This replaces the earlier Haiku-first ordering in this document. Haiku must not run before the configured free pool.
+
+The existing `VisionProviderFallback.SalesInvoiceGeminiModels` helper already supplies a three-model Gemini sequence, with dedicated sales settings and stable defaults:
+
+1. `gemini-4-hydrogen`
+2. `gemini-3.8-flash`
+3. `gemini-3.5-flash-lite`
+
+The defaults are also covered by `VisionProviderFallbackTests`. The current handwritten sales-invoice service does **not yet use this three-model helper**; it currently tries Haiku first when its validation flag is enabled, then only Hydrogen, then optional Groq. Implementing the corrected order remains outstanding.
+
+Recommended orchestration:
+- Start independent Cloud Vision OCR while the free-model chain begins.
+- Try configured Gemini free-tier models in priority order against the same normalized source image and the same schema. Continue to the next model when the result is empty, invalid, unusable, or fails the extraction-quality checks against independent OCR (including row recall and critical header conflicts).
+- Do not pass one model's proposal or OCR transcript into the next model. Each model must read the source independently to avoid anchoring.
+- Preserve model/field disagreements as review evidence. A syntactically valid JSON response alone is not an accuracy gate.
+- Only after the eligible free pool is exhausted or fails its quality gate may Haiku be called as the first paid fallback. Its live integration validation flag remains false until a secure non-production test succeeds.
+- A second paid provider/model is a later, separately configured tier. Its identity, budget and activation are not selected in this addendum; do not silently call it or incur cost.
+- Groq is **not classified as free by default**. Keep it disabled unless the configured account's current quota/credit terms are verified; then place it in the corresponding tier explicitly.
+- Record provider, model, attempt order, duration, quota/rate-limit/configuration failures, token usage where available, and per-invoice estimated cost without logging image bytes, prompts, OCR text, customer data or provider secrets.
+
+**Privacy gate:** Google's current Gemini Developer API pricing page distinguishes its Free and Paid tiers: Free Tier content may be used to improve Google's products, while Paid Tier content is not used for that purpose. Real shop invoices can contain customer names, mobile numbers and commercially sensitive information. Do not send unredacted pilot invoices to a free-tier endpoint unless the business owner has explicitly accepted the provider's data-use terms. The production design must either have an approved data-use basis, redact sensitive regions before free-model calls (with customer fields entered manually or handled by an approved provider), or skip that free endpoint. "Free" is a billing tier, not a privacy guarantee.
+
+### Google Cloud Vision versus Tesseract
+
+- Current code uses Google Cloud Vision `DOCUMENT_TEXT_DETECTION` as the independent OCR reader and records page/word geometry. Google explicitly documents this mode for handwriting and dense documents; its response provides page, block, paragraph, word and break structure.
+- Current code calls Tesseract only as a degraded local fallback when Cloud Vision is unavailable. This remains a reasonable offline fallback, but its output must not be treated as equivalent-quality handwriting evidence.
+- A third-party 2026 benchmark on 172 handwritten notes reported word F1 of 84.5% for Google Cloud Vision (with its English handwriting hint) versus 13.1% for Tesseract 5.5.1. The same benchmark tested 11 handwritten forms and 183 pages total. The publisher also tested its own commercial AI product, so treat the results as directional rather than independent proof for RBOS invoices.
+- These generic results do not prove row/column accuracy on Indian retail bills. RBOS still needs its own verified comparison on the 11-bill Monika/Anil corpus. Score exact characters for invoice numbers, model/serial identifiers and amounts separately from row recall; a high word-level OCR score can still hide a critical digit error.
+- Cloud Vision's published pricing currently includes the first 1,000 Document Text Detection units per month free, then $1.50 per 1,000 units at the next tier. Each PDF page is billed as an image unit. Cloud Vision is a separate OCR service, not a free VLM.
+- Keep testing Cloud Vision's optional English handwriting hint against automatic language detection. RBOS bills may mix English and Hindi; a wrong language hint can reduce recognition. Do not turn on an English-only hint globally without comparing both settings on the actual corpus.
+- OCR text and geometry are evidence, not sale data. Keep the existing manual-review and no-auto-post rules.
+
+### Mobile photo intake — current audit
+
+The current sales-invoice route is **not yet handling large mobile photos automatically**:
+
+- `SalesInvoiceCapture.tsx` accepts JPEG, PNG, WebP and PDF, and rejects an image/PDF larger than 8 MB in the browser.
+- `SalesInvoiceCaptureEndpoints` enforces the same 8 MB limit while reading the request; `SalesInvoiceEvidenceService` and the document-page database constraint also cap the retained page at 8 MB.
+- The sales flow uploads the selected file unchanged. It does not reuse the image-resizing/compression routine already present in `InvoiceUpload.tsx`.
+- The source picker does not offer HEIC/HEIF. No HEIC conversion path is implemented.
+- No sales-specific pixel-dimension limit, decode-memory guard, server-side downscale or image-orientation normalization is implemented. A compressed file under 8 MB can still have very large pixel dimensions.
+- The exact uploaded bytes are retained and passed to the provider. A camera photo over 8 MB is rejected rather than resized automatically.
+
+The supplier-invoice screen already has a reusable pattern in `InvoiceUpload.tsx`: it accepts a source image up to 24 MB, uses `createImageBitmap`, scales the longest edge to 1,800 px, encodes JPEG at quality 0.85 and requires the prepared image to fit the 8 MB transport limit. That pattern is a useful starting point, but it has not been validated for dense handwritten sales bills and it retains the prepared JPEG, not a bit-exact copy of the original camera file.
+
+### Recommended mobile image design — pending implementation
+
+1. Reuse/extract the existing browser image-preparation utility rather than introducing a second independent implementation.
+2. Accept a larger bounded raw camera/gallery photo, normalize orientation, decode under a safe pixel budget, and generate a high-quality JPEG processing/evidence copy within the existing 8 MB storage/transport limit. Compare 1,800 px with a higher long-edge option on the 11-bill corpus before locking the resize target; handwriting legibility takes priority over maximum compression.
+3. Preserve the original filename, MIME, source byte size, original dimensions, normalized dimensions and a hash/normalization marker in metadata. Be explicit that the retained file is normalized when the uploaded original cannot be stored unchanged.
+4. If exact binary retention of oversized originals is a product requirement, use a separate access-controlled object-storage path for originals and keep the normalized copy for OCR/VLM processing. Do not raise the PostgreSQL bytea or Cloud Run memory limits blindly just to accept large phone files.
+5. Add a server-side image dimension/pixel guard and a bounded sales-upload concurrency gate; retain existing signature/MIME checks and the strict post-normalization 8 MB limit.
+6. Keep PDFs on their separate bounded path; validate page count before rendering and process each page with bounded memory. Unsupported HEIC/HEIF must receive a clear user message until conversion is implemented.
+
+Acceptance criteria:
+- A normal camera photo and a large camera photo (including a raw file above 8 MB but within the agreed input cap) do not fail silently; the latter is normalized safely or receives a clear reason.
+- Portrait/landscape and EXIF-rotated photos are correctly oriented.
+- Handwritten model/serial/amount characters remain legible after normalization; corpus-level extraction does not materially regress versus the original image.
+- Corrupt signatures, unsupported MIME, extreme pixel dimensions and oversize files fail safely with actionable messages.
+- Source evidence is clearly identified as unchanged or normalized; provider calls use the bounded processing copy.
+- Memory, concurrency, failed-request and latency behaviour is measured on the Cloud Run-sized runtime before changing production limits.
+
+### New implementation increment in this continuation
+
+- Added conservative Cloud Vision row-gap detection: unmatched OCR rows bracketed by matched descriptions are returned as `possibleOmittedRows` with page coordinates and a warning. They are never turned into sale lines automatically.
+- Added source-preview region markers and review links for these possible rows.
+- Added a unit test for the conservative omitted-row predicate.
+- Fixed the sales-source discard route's explicit authorization classification and its route-policy test.
+- Fixed the optional PDF preview handler parameter order after exact-head CI exposed C# CS1737.
+
+### Latest verification snapshot
+
+At commit `1470631e`, frontend, backend and PostgreSQL CI jobs all passed. The grouped visual audit still failed on a Playwright assertion that treated an input's value as text; the test fixture shows the serial candidate is present in the textbox. The assertion has been corrected in the next commit and requires a fresh exact-head visual run. Visual acceptance is not yet passed.
