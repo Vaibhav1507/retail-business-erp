@@ -48,15 +48,35 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await description.fill('')
   await expect(description).toHaveCSS('height', '76px')
 
+  const sourceDocumentId = '11111111-2222-4333-8444-555555555555'
+  await page.route('**/api/documents/' + sourceDocumentId + '/pages/1', async route => {
+    await route.fulfill({
+      status: 200, contentType: 'application/pdf',
+      body: Buffer.from('%PDF-1.4\\n% synthetic retained handwritten bill\\n%%EOF'),
+    })
+  })
+  await page.route('**/api/sales/invoice-image-extract/' + sourceDocumentId + '/discard', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ documentId: sourceDocumentId, status: 'Cancelled' }) })
+  })
+  const invoiceUploadHeaders: Record<string, string | undefined>[] = []
   await page.route('**/api/sales/invoice-image-extract', async route => {
+    invoiceUploadHeaders.push(route.request().headers())
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-      status: 'ReadyForReview',
+      status: 'NeedsAttention',
+      sourceDocumentId,
       extraction: {
         invoiceNumber: 'HAND-468', date: '2026-11-26', customerName: 'Handwritten Customer',
         customerPhone: '9876543210', subtotal: 10000, taxAmount: 1800, total: 11800,
+        fieldStates: { invoiceNumber: 'ambiguous', date: 'source_read', customerName: 'source_read', customerPhone: 'source_read', subtotal: 'source_read', taxAmount: 'source_read', total: 'ambiguous' },
+        ocrEvidence: {
+          invoiceNumber: { status: 'ambiguous', haikuOrPrimaryReading: 'HAND-468', ocrCandidate: 'Bill No. 4006', ocrAgrees: false, pageNumber: 1, region: { left: 0.12, top: 0.1, width: 0.22, height: 0.04 }, verificationCandidate: 'HAND-468', verificationStatus: 'source_read' },
+          total: { status: 'ambiguous', haikuOrPrimaryReading: '11800', ocrCandidate: 'TOTAL 11800', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '11800', verificationStatus: 'source_read' },
+        },
         lines: [{
-          description: 'Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line',
-          brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'],
+          description: 'Samsung LED Television model UA43\\nSerial: SN12345678\\nFull handwritten model and package text preserved on this line',
+          brand: 'Samsung', model: 'UA43', serialNumbers: [],
+          identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }, { value: 'UA43', classification: 'model', confirmed: false }],
+          fieldStates: { description: 'source_read', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'source_read', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
           hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000,
           gstRate: 18, gstAmount: 1800, confidence: 0.92,
         }],
@@ -86,7 +106,14 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await expect(extractedDescription).toHaveCSS('resize', 'none')
   await expect(extractedDescription).toHaveCSS('overflow-y', 'hidden')
   await expect.poll(async () => Number((await extractedDescription.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(48)
-  await expect(review.getByLabel('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
+  await expect(review.getByLabel('Extracted line 1 serial numbers')).toHaveValue('')
+  await expect(review.getByLabel('Original handwritten bill PDF')).toBeVisible()
+  await expect(review.getByRole('button', { name: 'Inspect invoice number' })).toBeVisible()
+  await expect(review.getByText(/OCR text near the labelled field: “Bill No. 4006”/)).toBeVisible()
+  await expect(review.getByText(/Hydrogen’s separate reading: “HAND-468”/)).toBeVisible()
+  await expect(review.locator('.invoice-identifier-candidates')).toContainText('SN12345678')
+  await expect(review.getByRole('checkbox', { name: 'Confirm this reading' }).first()).not.toBeChecked()
+  expect(invoiceUploadHeaders[0]?.['x-source-file-name']).toBe('synthetic-handwritten-bill.pdf')
   await expect(review.getByLabel('Extracted line 1 quantity')).toHaveValue('1')
   await expect(review.getByLabel('Extracted line 1 unit price')).toHaveValue('10000')
   await expect(bill.locator('#billing-prod')).toBeHidden()
@@ -116,6 +143,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await importBill()
   const acceptedReview = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
   await expect(acceptedReview).toBeVisible()
+  await acceptedReview.getByRole('checkbox', { name: 'Confirm this reading' }).first().check()
   await acceptedReview.getByRole('button', { name: 'Add reviewed lines to bill' }).click()
   await expect(bill.locator('.invoice-added-item')).toContainText('Samsung LED Television model UA43')
   await expect(bill.locator('.invoice-added-item')).toContainText('Serial: SN12345678')
