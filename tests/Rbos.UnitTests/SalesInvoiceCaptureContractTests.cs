@@ -1,4 +1,8 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Rbos.Api.Application;
 
@@ -7,60 +11,233 @@ namespace Rbos.UnitTests;
 public sealed class SalesInvoiceCaptureContractTests
 {
     [Fact]
-    public void SalesInvoiceFreeTierFallbacks_IgnoreGeneralProviderCredentials()
+    public void SalesInvoiceShadowReaders_ReuseExistingKeysOnlyWhenExplicitlyEnabled()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Gemini:ApiKey"] = "general-gemini-key",
-            ["Groq:ApiKey"] = "general-groq-key",
-            ["Gemini:SalesInvoiceHydrogenModel"] = "gemini-4-argon",
+            ["Gemini:ApiKey"] = "existing-gemini-key",
+            ["Groq:ApiKey"] = "existing-groq-key",
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "obsolete-dedicated-gemini-key",
+            ["Groq:SalesInvoiceFreeTierApiKey"] = "obsolete-dedicated-groq-key",
+            ["Gemini:SalesInvoiceHydrogenModel"] = "paid-or-unapproved-model",
             ["Groq:Model"] = "paid-or-unapproved-model"
         }).Build();
 
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiShadowApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqShadowApiKey(configuration));
+
+        configuration["Gemini:SalesInvoiceShadowEnabled"] = "true";
+        configuration["Groq:SalesInvoiceShadowEnabled"] = "true";
+
+        Assert.Equal("existing-gemini-key", SalesInvoiceCaptureService.GetSalesInvoiceGeminiShadowApiKey(configuration));
+        Assert.Equal("existing-groq-key", SalesInvoiceCaptureService.GetSalesInvoiceGroqShadowApiKey(configuration));
         Assert.Equal("gemini-4-hydrogen", SalesInvoiceCaptureService.GeminiFreeTierModel);
         Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
     }
 
     [Fact]
-    public void SalesInvoiceFreeTierFallbacks_RequireBothDedicatedCredentialAndExplicitEnablement()
+    public void SalesInvoiceShadowReaders_DoNotUseLegacyDedicatedKeysOrPaidModelOverrides()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-gemini-free-key",
-            ["Groq:SalesInvoiceFreeTierApiKey"] = "dedicated-groq-free-key"
+            ["Gemini:SalesInvoiceShadowEnabled"] = "true",
+            ["Groq:SalesInvoiceShadowEnabled"] = "true",
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "legacy-gemini-key",
+            ["Groq:SalesInvoiceFreeTierApiKey"] = "legacy-groq-key",
+            ["Gemini:SalesInvoiceHydrogenModel"] = "gemini-4-argon",
+            ["Groq:Model"] = "paid-model"
         }).Build();
 
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiShadowApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqShadowApiKey(configuration));
+        Assert.Equal("gemini-4-hydrogen", SalesInvoiceCaptureService.GeminiFreeTierModel);
+        Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
+    }
 
-        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "true";
-        configuration["Groq:SalesInvoiceFreeTierEnabled"] = "true";
-
-        Assert.Equal("dedicated-gemini-free-key",
-            SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
-        Assert.Equal("dedicated-groq-free-key",
-            SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+    [Theory]
+    [InlineData(true, true, true, "Anthropic")]
+    [InlineData(false, true, true, "Gemini")]
+    [InlineData(false, false, true, "Groq")]
+    [InlineData(false, false, false, "None")]
+    public void SalesInvoiceProviderSelection_PrefersHaikuThenGeminiThenGroq(
+        bool haikuUsable, bool geminiUsable, bool groqUsable, string expected)
+    {
+        Assert.Equal(expected,
+            SalesInvoiceCaptureService.SelectSalesInvoiceProvider(haikuUsable, geminiUsable, groqUsable));
     }
 
     [Fact]
-    public void SalesInvoiceHydrogenFullDocumentFallback_RequiresExplicitFreeTierDataUseSwitch()
+    public void ProviderComparison_DoesNotCompareWhenEitherProviderHasNoUsableExtraction()
+    {
+        var usable = JsonNode.Parse("""
+            {
+              "lines": [{ "description": "Washing machine", "quantity": 1 }]
+            }
+            """)!;
+
+        var comparison = SalesInvoiceCaptureService.CompareProviderExtractions(usable, null);
+
+        Assert.Equal("not_compared", comparison["status"]!.GetValue<string>());
+        Assert.Equal(0, comparison["mismatchFieldCount"]!.GetValue<int>());
+        Assert.Empty(Assert.IsType<JsonArray>(comparison["mismatchedFields"]));
+    }
+
+    [Fact]
+    public async Task ExtractAsync_StartsGeminiAndGroqShadowReadersConcurrently()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Gemini:ApiKey"] = "general-paid-key",
-            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-free-key",
-            ["Gemini:SalesInvoiceFreeTierEnabled"] = "true"
+            ["Gemini:ApiKey"] = "test-gemini-key",
+            ["Gemini:SalesInvoiceShadowEnabled"] = "true",
+            ["Groq:ApiKey"] = "test-groq-key",
+            ["Groq:SalesInvoiceShadowEnabled"] = "true",
+            ["AiPerformance:SalesInvoiceTotalProviderBudgetSeconds"] = "10",
+            ["AiPerformance:SalesInvoiceShadowAttemptTimeoutSeconds"] = "5"
         }).Build();
+        var handler = new ParallelVisionHandler();
+        using var http = new HttpClient(handler);
+        var haiku = new AnthropicHaikuClient(
+            new HttpClient(new StubHttpMessageHandler()),
+            configuration,
+            NullLogger<AnthropicHaikuClient>.Instance);
+        var groq = new GroqVisionClient(http, configuration, NullLogger<GroqVisionClient>.Instance);
+        var service = new SalesInvoiceCaptureService(
+            http, haiku, groq, configuration, NullLogger<SalesInvoiceCaptureService>.Instance);
 
-        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+        var result = await service.ExtractAsync(
+            "image/jpeg",
+            [0xFF, 0xD8, 0xFF, 0xD9],
+            Guid.NewGuid(),
+            CancellationToken.None);
 
-        configuration["Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled"] = "true";
-        Assert.True(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+        Assert.NotNull(result.Value);
+        var responseJson = JsonSerializer.Serialize(result.Value);
+        Assert.Contains("candidateDifferences", responseJson, StringComparison.Ordinal);
+        Assert.Contains("haikuPeerAssessment", responseJson, StringComparison.Ordinal);
+        Assert.Contains("promptVersion", responseJson, StringComparison.Ordinal);
+        Assert.True(handler.BothProvidersStarted, "Gemini and Groq must both start before either response is released.");
+        Assert.True(handler.GeminiUsesLowThinking);
+        Assert.True(handler.GeminiOutputIsBounded);
+        Assert.True(handler.GroqUsesInstructMode);
+        Assert.True(handler.GroqOutputIsBounded);
+        Assert.Equal(handler.GeminiPrompt, handler.GroqPrompt);
+        Assert.Contains("Return JSON only", handler.GeminiPrompt ?? string.Empty);
+    }
 
-        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "false";
-        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+    [Fact]
+    public void ProviderCandidateDifferences_ShowMismatchedBusinessFieldsButExcludeCustomerFields()
+    {
+        var haiku = JsonNode.Parse("""
+            {
+              "customerName": "Private Customer",
+              "customerPhone": "9999999999",
+              "invoiceNumber": "00454",
+              "total": 17500,
+              "lines": [{
+                "description": "Voltas Beko WM",
+                "quantity": 1,
+                "amount": 17500
+              }]
+            }
+            """)!;
+        var gemini = JsonNode.Parse("""
+            {
+              "customerName": "Another Private Customer",
+              "customerPhone": "8888888888",
+              "invoiceNumber": "00454",
+              "total": 17000,
+              "lines": [{
+                "description": "Voltas Beko WPM",
+                "quantity": 1,
+                "amount": 17500
+              }]
+            }
+            """)!;
+
+        var differences = SalesInvoiceCaptureService.BuildProviderCandidateDifferences(haiku, gemini, null);
+        var json = differences.ToJsonString();
+
+        Assert.Contains("total", json, StringComparison.Ordinal);
+        Assert.Contains("lines[0].description", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("customerName", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("customerPhone", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private Customer", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("9999999999", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HaikuPeerAssessment_DetectsWhenBothShadowReadersAgreeAgainstHaiku()
+    {
+        static JsonObject Comparison(params string[] fields) => new()
+        {
+            ["mismatchFieldCount"] = fields.Length,
+            ["mismatchedFields"] = new JsonArray(fields.Select(field => (JsonNode?)JsonValue.Create(field)).ToArray())
+        };
+
+        var haikuGemini = Comparison("total", "lines[0].description");
+        var haikuGroq = Comparison("total", "lines[0].quantity");
+        var geminiGroq = Comparison("lines[0].description", "lines[0].quantity");
+
+        var consensus = SalesInvoiceCaptureService.FindShadowConsensusDifferences(
+            haikuGemini, haikuGroq, geminiGroq);
+        var assessment = SalesInvoiceCaptureService.GetHaikuPeerAssessment(
+            true, true, true, haikuGemini, haikuGroq, geminiGroq, consensus);
+
+        Assert.Equal(new[] { "total" }, consensus);
+        Assert.Equal("haiku_differs_from_both_shadow_readers", assessment);
+    }
+
+    [Fact]
+    public void ProviderComparison_ReportsOnlyFieldNamesAndNeverExtractedValues()
+    {
+        var haiku = JsonNode.Parse("""
+            {
+              "invoiceNumber": "00454",
+              "date": "2026-11-06",
+              "total": 17500,
+              "lines": [{
+                "description": "Voltas Beko WM",
+                "quantity": 1,
+                "unitPrice": null,
+                "amount": 17500,
+                "fieldStates": { "unitPrice": "not_present" },
+                "identifierCandidates": []
+              }]
+            }
+            """)!;
+        var groq = JsonNode.Parse("""
+            {
+              "invoiceNumber": "00454",
+              "date": "2026-11-06",
+              "total": 17000,
+              "lines": [{
+                "description": "Voltas Beko WPM",
+                "quantity": 1,
+                "unitPrice": null,
+                "amount": 17500,
+                "fieldStates": { "unitPrice": "not_present" },
+                "identifierCandidates": []
+              }]
+            }
+            """)!;
+
+        var comparison = SalesInvoiceCaptureService.CompareProviderExtractions(haiku, groq);
+
+        Assert.Equal("compared", comparison["status"]!.GetValue<string>());
+        Assert.Equal(2, comparison["mismatchFieldCount"]!.GetValue<int>());
+        var fields = Assert.IsType<JsonArray>(comparison["mismatchedFields"])
+            .Select(item => item!.GetValue<string>())
+            .ToArray();
+        Assert.Contains("total", fields);
+        Assert.Contains("lines[0].description", fields);
+        Assert.DoesNotContain("17500", comparison.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("17000", comparison.ToJsonString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SalesInvoiceExtraction_UsesOneVersionedPromptForAllVisionReaders()
+    {
+        Assert.Equal("sales-invoice-vision-v2", SalesInvoiceCaptureService.ExtractionPromptVersion);
     }
 
     [Fact]
@@ -384,15 +561,6 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Theory]
-    [InlineData("invoiceNumber", "Invoice No. 00454", "00454")]
-    [InlineData("date", "Date: 06/11/2026", "06/11/2026")]
-    [InlineData("total", "TOTAL ₹10,020 10,000", "10,020")]
-    public void OcrHeaderValue_ExtractsValueAfterExactLabel(string field, string row, string expected)
-    {
-        Assert.Equal(expected, SalesInvoiceCaptureService.ExtractOcrHeaderValue(field, row));
-    }
-
-    [Theory]
     [InlineData("\"00454\"", "00454")]
     [InlineData("10020", "10020")]
     [InlineData("10020.50", "10020.50")]
@@ -400,26 +568,6 @@ public sealed class SalesInvoiceCaptureContractTests
     {
         var value = JsonNode.Parse(json);
         Assert.Equal(expected, SalesInvoiceCaptureService.ReadFieldValueText(value));
-    }
-
-    [Fact]
-    public void OcrTotalLabel_DoesNotTreatSubtotalAsPrintedTotal()
-    {
-        Assert.False(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "SUBTOTAL ₹10,020"));
-        Assert.True(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "TOTAL ₹10,020"));
-    }
-
-    [Theory]
-    [InlineData("invoiceNumber", "00454", "00454", true)]
-    [InlineData("invoiceNumber", "00454", "454", false)]
-    [InlineData("invoiceNumber", "00454", "40054", false)]
-    [InlineData("date", "2026-11-06", "06/11/2026", true)]
-    [InlineData("date", "2026-11-06", "06/12/2026", false)]
-    [InlineData("total", "10020", "10,020", true)]
-    [InlineData("total", "10020", "10,000", false)]
-    public void OcrHeaderComparison_UsesExactNormalizedFieldValues(string field, string primary, string candidate, bool expected)
-    {
-        Assert.Equal(expected, SalesInvoiceCaptureService.CompareOcrHeaderValue(field, primary, candidate));
     }
 
     [Fact]
@@ -444,33 +592,6 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Contains(issues, issue => issue.Field == "unitPrice" &&
             issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
         Assert.DoesNotContain(issues, issue => issue.Message.Contains("source Rate cell is blank", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void OcrDescriptionMatchScore_RequiresMultipleDistinctTokensAndPreservesRowIdentity()
-    {
-        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
-            "Samsung LED Television model UA43",
-            "Samsung LED Television model UA43 Qty 1 Rate blank Amount 10000") >= 0.95);
-        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
-            "Samsung LED Television model UA43",
-            "LG Washing Machine model WM900") < 0.30);
-        Assert.Equal(0, SalesInvoiceCaptureService.OcrDescriptionMatchScore("LG", "LG Electronics"));
-    }
-
-    [Fact]
-    public void PossibleOmittedOcrRow_is_flagged_without_rewriting_or_matching_existing_lines()
-    {
-        var descriptions = new[] { "Samsung LED Television model UA43K5570" };
-
-        Assert.True(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "LG Washing Machine WM900 1 15000 15000", descriptions));
-        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "Samsung LED Television model UA43K5570 Qty 1", descriptions));
-        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "Invoice No HAND-468", descriptions));
-        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "TOTAL 10020", descriptions));
     }
 
     [Fact]
@@ -509,6 +630,65 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal("string", serialItemSchema["type"]!.GetValue<string>());
         Assert.Contains(required, item => item?.GetValue<string>() == "serialNumbers");
         Assert.Contains(required, item => item?.GetValue<string>() == "description");
+    }
+
+
+    private sealed class ParallelVisionHandler : HttpMessageHandler
+    {
+        readonly TaskCompletionSource<bool> bothStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int started;
+
+        public bool BothProvidersStarted => Volatile.Read(ref started) >= 2;
+        public bool GeminiUsesLowThinking { get; private set; }
+        public bool GeminiOutputIsBounded { get; private set; }
+        public bool GroqUsesInstructMode { get; private set; }
+        public bool GroqOutputIsBounded { get; private set; }
+        public string? GeminiPrompt { get; private set; }
+        public string? GroqPrompt { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref started) == 2)
+                bothStarted.TrySetResult(true);
+
+            await bothStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            var requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            var requestJson = JsonNode.Parse(requestBody)!;
+            var isGemini = request.RequestUri?.Host == "generativelanguage.googleapis.com";
+            if (isGemini)
+            {
+                GeminiUsesLowThinking = requestJson["generationConfig"]?["thinkingConfig"]?["thinkingLevel"]?.GetValue<string>() == "LOW";
+                GeminiOutputIsBounded = requestJson["generationConfig"]?["maxOutputTokens"]?.GetValue<int>() == 8192;
+                GeminiPrompt = requestJson["contents"]?[0]?["parts"]?[1]?["text"]?.GetValue<string>();
+            }
+            else
+            {
+                GroqUsesInstructMode = requestJson["reasoning_effort"]?.GetValue<string>() == "none";
+                GroqOutputIsBounded = requestJson["max_completion_tokens"]?.GetValue<int>() == 8192;
+                GroqPrompt = requestJson["messages"]?[0]?["content"]?[0]?["text"]?.GetValue<string>();
+            }
+            var extraction = "{\"lines\":[{\"description\":\"Test item\",\"quantity\":1,\"amount\":100}]}";
+            var body = isGemini
+                ? "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\"" +
+                    extraction.Replace("\"", "\\\"", StringComparison.Ordinal) +
+                    "\"}]}}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":14}}"
+                : "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"" +
+                    extraction.Replace("\"", "\\\"", StringComparison.Ordinal) +
+                    "\"}}]}";
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
+        }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Haiku must not be called when no Anthropic key is configured.");
     }
 
 }

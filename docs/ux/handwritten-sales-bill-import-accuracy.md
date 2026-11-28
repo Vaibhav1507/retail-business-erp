@@ -1,4 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
+> **Current provider implementation:** The temporary three-reader parallel vision experiment is in draft PR #125. Use the [V2 design](./handwritten-sales-invoice-extraction-v2-design.md) and [implementation handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md) for current provider, prompt, OCR and activation rules. Earlier P0/P1/OCR notes below are historical unless explicitly retained by the revised design.
+
 
 **Status:** P0 + P1 implementation merged in PR #113; handwritten sales-invoice V2 implementation merged in PR #120 on 2026-11-28. The current provider/runtime design is specified in [V2 design](./handwritten-sales-invoice-extraction-v2-design.md). No independently verified extraction-accuracy score exists yet.  
 **Route:** `#/sell/bill` (Generate Invoice)  
@@ -236,3 +238,17 @@ The first-pass readings remain provisional, not independently verified gold labe
 - PR [#118](https://github.com/Vaibhav1507/retail-business-erp/pull/118) adds an optional research-only Haiku/Gemini benchmark workflow. It can make up to 22 requests but requires `authorize_paid_benchmark_calls=true`, which defaults to false. No model benchmark was run by merging it.
 - The seven existing app-output cases (S01–S05, S10–S11) remain the comparison cohort for the earlier app-output records. The separate optional runner uses the 11 source images; these cohorts must not be conflated.
 - Gold labels remain provisional. No extraction accuracy percentage is claimed. Original source images/customer PII are not stored in Git.
+
+
+## 17. Revised extraction implementation — parallel direct vision (2026-11-28)
+
+This section supersedes the earlier implementation-status/provider/OCR descriptions above for the current handwritten sales-bill experiment. Historical notes remain for context.
+
+- Three direct vision readers run concurrently on the same original source: Haiku 5.5 primary, Gemini 4 Hydrogen shadow, and Groq Qwen 3.8 27B shadow.
+- Existing Gemini:ApiKey and Groq:ApiKey are reused behind Gemini:SalesInvoiceShadowEnabled and Groq:SalesInvoiceShadowEnabled. No duplicate sales-specific API keys.
+- Model IDs are pinned. Free quota, billing, permission and timeout errors fail closed; no paid-model/key fallback.
+- One concise versioned prompt (sales-invoice-vision-v2) is sent once per provider. No staged prompts or model-to-model context.
+- OCR is not called by the active sales-invoice route and cannot downgrade or overwrite a vision-model reading.
+- Haiku remains authoritative when usable. Gemini then Groq are used only as review-required fallbacks if Haiku fails.
+- Pairwise model agreement is diagnostic only, not accuracy. Accuracy is measured against verified gold labels and human corrections.
+- See [parallel vision implementation handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md) for current code, flags, tests, CI, provider smoke and continuation status.

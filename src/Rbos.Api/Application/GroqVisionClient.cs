@@ -106,7 +106,7 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
 
         var batches = images.Chunk(3).ToArray();
         var partials = await Task.WhenAll(batches.Select(batch =>
-            CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct, apiKey, model)));
+            CallAsync(batch, prompt, ct, apiKey, model)));
         return MergeInvoicePageResults(partials);
     }
 
@@ -240,6 +240,12 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
                 }
             }
         };
+        if (string.Equals(modelOverride, "qwen/qwen3.8-27b", StringComparison.Ordinal))
+        {
+            // Structured invoice transcription does not need a long reasoning trace.
+            body["max_completion_tokens"] = 8192;
+            body["reasoning_effort"] = "none";
+        }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
@@ -259,10 +265,20 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         }
 
         var root = JsonNode.Parse(responseBody);
+        var usage = root?["usage"];
+        log.LogInformation(
+            "Groq vision usage recorded. Model {Model}, prompt tokens {PromptTokens}, completion tokens {CompletionTokens}, total tokens {TotalTokens}",
+            modelOverride ?? Model,
+            ReadTokenCount(usage?["prompt_tokens"]),
+            ReadTokenCount(usage?["completion_tokens"]),
+            ReadTokenCount(usage?["total_tokens"]));
         var finishReason = root?["choices"]?[0]?["finish_reason"]?.GetValue<string>();
         if (finishReason is "content_filter" or "safety" or "refusal")
             throw new VisionProviderRefusalException("Groq declined the vision extraction request.");
         var text = root?["choices"]?[0]?["message"]?["content"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
+
+    static int? ReadTokenCount(JsonNode? value) =>
+        value is JsonValue scalar && scalar.TryGetValue<int>(out var count) ? count : null;
 }

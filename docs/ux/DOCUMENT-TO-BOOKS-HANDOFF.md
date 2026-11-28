@@ -34,7 +34,7 @@ The uploader selects Sales or Purchase before processing. The system supports a 
 ### Sales
 - `web/src/GenerateInvoice.tsx` hosts `SalesInvoiceCapture`.
 - `POST /api/sales/invoice-image-extract` accepts one image/PDF up to 8 MB.
-- `SalesInvoiceCaptureService` uses current direct Gemini/optional Groq fallback, bounded local OCR on images and native PDF input to Gemini.
+- `SalesInvoiceCaptureService` is a separate handwritten sales-bill path. Its current parallel-vision experiment uses Haiku as primary with Gemini and Groq shadow readers on the original source; OCR is not in its active extraction decision path. See the handwritten sales-invoice V2 design and parallel-vision handover. This does not change Document-to-Books purchase extraction.
 - Sales source file is processed in memory and not retained.
 - Extracted values are draft-only; accepted lines go through the existing sales posting flow.
 - Source invoice reference/date are separate from RBOS numbering.

@@ -359,3 +359,97 @@ The user confirmed that no Anthropic configuration or Secret Manager resource ha
 ## 2026-11-28 handwritten sales review UI restored to pre-V2 baseline
 
 The user clarified that simplification alone is not sufficient: the handwritten invoice review must behave as it did before PR #120. PR #117 touched documentation/quality files only; PR #120 introduced the UI/extraction V2 implementation. The corrective branch restores the exact compact review markup from PR #120's base commit: source bill number/date, read-only handwritten total, per-line description + optional serial + Qty + one Unit price input, and existing More details disclosure. V2 provider/extraction and source-document persistence remain internal; no backend or accounting rules are changed. See [pre-V2 Generate Invoice review restoration](./handwritten-sales-invoice-review-simplification.md).
+
+
+## 2026-11-28 — revised handwritten sales invoice provider implementation handoff
+
+The user approved replacing the OCR-heavy sequential provider hierarchy with a temporary three-reader parallel experiment. This decision supersedes the previous provider-order notes in this handoff and the earlier V2 provider hierarchy.
+
+### Locked direction
+
+- Haiku 5.5 is the primary reader and remains authoritative whenever it returns a usable extraction.
+- Gemini 4 Hydrogen and Groq Qwen 3.8 27B independently read the same original image in parallel as shadow readers.
+- Existing Gemini:ApiKey and Groq:ApiKey are reused behind Gemini:SalesInvoiceShadowEnabled and Groq:SalesInvoiceShadowEnabled; no duplicate sales-specific secrets.
+- Both model IDs are pinned. Quota, billing, permission, unsupported-model and timeout failures are recorded; never fall back to a paid model/key.
+- If Haiku fails, use Gemini first and Groq second as a review-required draft. Shadow results never overwrite a successful Haiku extraction.
+- One concise shared prompt (sales-invoice-vision-v2) per provider. Provider-specific output schemas adapt the same contract; no staged prompting or model-to-model context.
+- Cloud Vision and Tesseract are removed from the active sales-invoice route during this direct vision benchmark. OCR cannot downgrade or rewrite a model result.
+- Pairwise comparison reports field paths/counts only. Provider agreement is not ground-truth accuracy.
+- Existing compact pre-V2 Generate Invoice review and normal sale confirmation remain unchanged.
+
+### Privacy and Free-tier gates
+
+Both shadow flags are false in repository defaults. Enable only after checking existing account/project Free-tier status and current model access. Gemini Developer API Free Tier content may be used to improve Google products; use redacted/synthetic bills until real customer data use is explicitly approved. Do not put keys in Git, chat, logs or benchmark files.
+
+### Current implementation branch
+
+Branch: feat/sales-invoice-parallel-vision-benchmark  
+Base: main at 7e919305097437911d6e3fc8c3644aaa5272087d (PR #124 / latest main at implementation start).
+
+Implemented so far:
+- Direct Haiku, Gemini and Groq attempts start concurrently with bounded per-provider/overall request budgets.
+- Haiku remains primary; Gemini is first backup and Groq second backup only if Haiku fails.
+- New prompt version sales-invoice-vision-v2 replaces the previous long prompt plus Haiku-only suffix.
+- Existing provider keys are used behind explicit shadow flags; fixed model IDs are used.
+- OCR execution, reconciliation, row clustering, targeted Gemini crop verification and OCR-only helper code have been removed from SalesInvoiceCaptureService.
+- API response includes additive providerComparison metadata and an OCR status indicating it was not used for this experiment.
+- Structured logs record provider statuses, latencies, fallback selection, pairwise mismatch field names/counts and usage where available; no extracted values are logged.
+- Tests now cover existing-key reuse behind flags, ignoring legacy dedicated keys/model overrides, comparison output privacy and prompt version. Obsolete OCR-reconciliation tests were removed.
+
+### Configuration
+
+Repository src/Rbos.Api/appsettings.json contains:
+- Gemini:SalesInvoiceShadowEnabled=false
+- Groq:SalesInvoiceShadowEnabled=false
+- AiPerformance:SalesInvoiceShadowAttemptTimeoutSeconds=10
+
+The runtime keys remain existing secret-backed Gemini:ApiKey and Groq:ApiKey. Do not enable either feature flag in production until model smoke tests and data-use approval are complete. No production configuration has been changed.
+
+### Validation and next steps
+
+1. Review the complete branch diff for compile/runtime issues and ensure no sales-invoice OCR calls remain.
+2. Run backend unit tests/build and full GitHub CI on the exact PR head; fix all failures and record run URLs/results.
+3. Add/verify deterministic tests for provider status handling, Haiku priority, Gemini/Groq fallback, comparison field paths and timeout/cancellation behavior.
+4. Run one synthetic/redacted image smoke test per enabled provider to verify the pinned model ID, image input, JSON response, Free quota and request latency. Do not send unredacted customer invoices to Gemini Free Tier without explicit data-use approval.
+5. Compare the same verified benchmark corpus across the three providers. Do not call peer agreement accuracy.
+6. Update this handoff and the dedicated implementation log after every material change.
+7. Merge and deploy only after separate user approval. No frontend changes, database migration, production configuration update or deployment is in scope.
+
+### Delivery state at this handoff update
+
+Implementation: in progress on the branch above.  
+Automated validation: pending exact-head CI.  
+Live provider smoke tests: pending.  
+Benchmark gold labels: still provisional where recorded in the benchmark document.  
+Visual/UI acceptance: not in scope; Generate Invoice UI is unchanged.  
+Merge: not authorised. Production deployment/configuration: not authorised.
+
+The step-by-step code/test/CI continuation ledger is maintained in [handwritten sales invoice parallel vision handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md). New chats should read that handover before making further changes.
+
+
+### Inference-token and latency controls
+
+The shared prompt is the only natural-language instruction sent per provider. Avoid separate reasoning or explanation prompts. Provider-specific inference settings are deliberately bounded for structured extraction:
+
+- Haiku uses the existing 8,192-token output cap.
+- Gemini 4 Hydrogen uses LOW thinking and an 8,192-token output cap; Hydrogen defaults to HIGH thinking, so LOW is selected for structured metadata extraction and lower latency/token use.
+- Groq Qwen 3.8 27B uses instruct mode with reasoning_effort none and an 8,192-token completion cap.
+- These settings are experimental controls, not assumed accuracy improvements. Keep them fixed during the first benchmark run, then change only with a versioned experiment and verified gold-label comparison.
+
+
+### Haiku peer-assessment diagnostics
+
+The comparison result/log now includes a peer-assessment label: three_way_agreement, haiku_agrees_with_available_shadow, haiku_disagrees_with_available_shadow, haiku_differs_from_both_shadow_readers, providers_disagree, haiku_only_no_shadow_comparison, or haiku_unavailable. It also reports field paths where both shadow readers agree with each other but differ from Haiku. This is a triage signal only; it must never be described as proof that Haiku is correct or incorrect without gold-label/human verification.
+
+
+### Provider eligibility and customer-data gates
+
+- Gemini 4 Hydrogen is available as a multimodal model through the Gemini API, but confirm the exact existing API project has Free-tier model entitlement with a synthetic-image smoke test before enabling its flag. Google states that Gemini Developer API Free-tier content may be used to improve Google products; do not send unredacted customer bills until the business explicitly approves that data-use term.
+- Groq documents Qwen 3.8 27B as a vision/JSON-capable Preview model. Treat it as a pilot shadow reader, not a guaranteed permanent production dependency; revalidate its model status and Free-plan quota before every steady-state decision.
+- Groq states inference inputs/outputs are not retained by default, but may be temporarily logged for reliability/abuse investigations. Enable account-level Zero Data Retention in Groq Data Controls before sending real customer invoices; until then use redacted/synthetic images.
+- No provider smoke test, account-tier entitlement or data-control setting is assumed from the existence of an API key. Record the actual smoke-test result and account setting before activating flags.
+
+
+### Side-by-side candidate differences in the API response
+
+For engineering comparison, providerComparison includes candidateDifferences for mismatched business fields (invoice number/date, totals, product descriptions, model/identifier fields, quantities, rates and amounts). Each entry contains the available provider values and provenance states so an authorised caller can inspect exactly how the readers differed. Customer name, phone and address fields are deliberately excluded. These candidate values are returned only in the authenticated extraction response; they are not written to logs or persisted by this experiment. The existing shopkeeper UI does not render this diagnostic property. Peer agreement remains a triage signal, not accuracy.

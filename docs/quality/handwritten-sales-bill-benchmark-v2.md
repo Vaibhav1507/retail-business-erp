@@ -1,4 +1,6 @@
 # Handwritten sales-bill extraction benchmark V2
+> **Current experiment:** PR #125 implements the temporary parallel Haiku + Gemini + Groq vision comparison. Section 12 supersedes the earlier sequential provider shortlist and OCR-assisted conditions. The implementation handover is [here](./handwritten-sales-invoice-parallel-vision-handover.md). Do not treat peer agreement as accuracy.
+
 
 > **Current status:** PR #120 merged the V2 production implementation on 2026-11-28 (`1848d344c97c1527dadb2d234c08b311c12990ec`). The seven S01–S05/S10–S11 app-output comparisons documented here are distinct from the optional 11-image model runner introduced by PR #118. That runner is research-only, manually triggered, and has a required default-off paid-call authorization input. Do not use this historical note to override the V2 provider design or activate any benchmark.
 
@@ -289,3 +291,77 @@ No primary model or verifier has been selected yet.
 - [Seven-case extraction comparison](./handwritten-sales-seven-bill-comparison-v1.md)
 - [Anil Sports comparison](./anil-sports-import-comparison-v1.md)
 - [Monika Electronics comparison](./monika-sales-import-comparison-v1.md)
+
+
+## 12. Revised experiment — three-provider parallel vision comparison (2026-11-28)
+
+This section supersedes the sequential provider shortlist and run order in Section 5 and the earlier sequential execution wording in Section 6. The existing gold-label rules, seven-case pilot cohort, privacy minimisation, metric definitions and decision gates remain in force.
+
+### Providers and execution
+
+Run the same original redacted source image independently through these three providers in parallel:
+
+- Claude Haiku 5.5 (claude-haiku-5-5) using the existing Anthropic key — primary.
+- Gemini 4 Hydrogen (gemini-4-hydrogen) using the existing Gemini:ApiKey — shadow reader, Free Tier only.
+- Groq Qwen 3.8 27B (qwen/qwen3.8-27b) using the existing Groq:ApiKey — shadow reader, Free Plan only.
+
+Use one shared prompt version (sales-invoice-vision-v2) and one common semantic field contract. Provider-specific structured-output schema formatting is permitted; do not add staged prompts, ask for reasoning, or let one model see another model's answer. Pin model IDs. Never retry a Free-tier quota/billing failure through a paid model or another key.
+
+The sales-invoice feature flags are Gemini:SalesInvoiceShadowEnabled and Groq:SalesInvoiceShadowEnabled; both default false in sample appsettings. No duplicate sales-specific API keys are required. Real invoice use of Gemini Free Tier requires explicit approval of Google's data-use terms; benchmark samples must remain redacted/synthetic until approved.
+
+### OCR experiment disposition
+
+OCR is not part of this direct-VLM benchmark. The active sales-invoice route does not call Cloud Vision or Tesseract and does not use OCR to influence model results. Do not add an OCR arm until the direct three-model baseline is complete. If later tested, treat OCR hints as a separate experimental condition and compare the same model with and without them.
+
+### Runtime result policy
+
+- Haiku remains the selected draft whenever it returns a usable result.
+- Gemini and Groq are independent shadow readers; neither can rewrite Haiku.
+- If Haiku fails, use Gemini first and Groq second only as a review-required draft.
+- Record provider status, model, latency, usage where available, fallback use and pairwise field differences.
+- Pairwise agreement is not accuracy. Only verified gold labels and human-adjudicated corrections establish accuracy.
+- Log mismatch field paths/counts only; never raw extracted values, invoice images, customer PII, prompts or credentials.
+
+### Comparison outputs
+
+Report each provider independently and pairwise:
+- Header exact match for verified invoice number/date.
+- Verbatim description CER/exact match and model/identifier text.
+- Physical row count, row order, missed/extra rows.
+- Quantity, source Rate, line amount, subtotal, tax and printed TOTAL exact match.
+- Blank/unreadable handling and unsupported-value rate.
+- Critical false-accept rate, malformed output, timeouts, quota errors, latency and usage cost.
+
+The 11-source corpus and seven app-output cohort remain provisional in places. Do not publish an accuracy percentage until critical gold labels are independently verified. Model agreement, JSON validity, or a non-empty extraction must not be reported as accuracy.
+
+### Implementation state
+
+The current code implementation and next-step ledger are maintained in [parallel vision implementation handover](./handwritten-sales-invoice-parallel-vision-handover.md). The implementation PR must pass backend unit/build tests and the repository's full CI before merge consideration. Provider live smoke tests use only synthetic/redacted data and are separate from ordinary CI. No production configuration or deployment is included.
+
+
+### Inference-token and latency controls
+
+The shared prompt is the only natural-language instruction sent per provider. Avoid separate reasoning or explanation prompts. Provider-specific inference settings are deliberately bounded for structured extraction:
+
+- Haiku uses the existing 8,192-token output cap.
+- Gemini 4 Hydrogen uses LOW thinking and an 8,192-token output cap; Hydrogen defaults to HIGH thinking, so LOW is selected for structured metadata extraction and lower latency/token use.
+- Groq Qwen 3.8 27B uses instruct mode with reasoning_effort none and an 8,192-token completion cap.
+- These settings are experimental controls, not assumed accuracy improvements. Keep them fixed during the first benchmark run, then change only with a versioned experiment and verified gold-label comparison.
+
+
+### Haiku peer-assessment diagnostics
+
+The comparison result/log now includes a peer-assessment label: three_way_agreement, haiku_agrees_with_available_shadow, haiku_disagrees_with_available_shadow, haiku_differs_from_both_shadow_readers, providers_disagree, haiku_only_no_shadow_comparison, or haiku_unavailable. It also reports field paths where both shadow readers agree with each other but differ from Haiku. This is a triage signal only; it must never be described as proof that Haiku is correct or incorrect without gold-label/human verification.
+
+
+### Provider eligibility and customer-data gates
+
+- Gemini 4 Hydrogen is available as a multimodal model through the Gemini API, but confirm the exact existing API project has Free-tier model entitlement with a synthetic-image smoke test before enabling its flag. Google states that Gemini Developer API Free-tier content may be used to improve Google products; do not send unredacted customer bills until the business explicitly approves that data-use term.
+- Groq documents Qwen 3.8 27B as a vision/JSON-capable Preview model. Treat it as a pilot shadow reader, not a guaranteed permanent production dependency; revalidate its model status and Free-plan quota before every steady-state decision.
+- Groq states inference inputs/outputs are not retained by default, but may be temporarily logged for reliability/abuse investigations. Enable account-level Zero Data Retention in Groq Data Controls before sending real customer invoices; until then use redacted/synthetic images.
+- No provider smoke test, account-tier entitlement or data-control setting is assumed from the existence of an API key. Record the actual smoke-test result and account setting before activating flags.
+
+
+### Side-by-side candidate differences in the API response
+
+For engineering comparison, providerComparison includes candidateDifferences for mismatched business fields (invoice number/date, totals, product descriptions, model/identifier fields, quantities, rates and amounts). Each entry contains the available provider values and provenance states so an authorised caller can inspect exactly how the readers differed. Customer name, phone and address fields are deliberately excluded. These candidate values are returned only in the authenticated extraction response; they are not written to logs or persisted by this experiment. The existing shopkeeper UI does not render this diagnostic property. Peer agreement remains a triage signal, not accuracy.
