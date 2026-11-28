@@ -364,7 +364,7 @@ public sealed class SalesInvoiceCaptureService(
             {
                 var result = await haiku.ExtractAsync(
                     mime, original, BuildAnthropicResponseJsonSchema(),
-                    Prompt + "\\nFor this Haiku response, represent every numeric source field as a decimal string; use an empty string for absent or unreadable values. For every field, state its provenance in fieldStates. Return serialNumbers as an empty array; put all identifiers only in identifierCandidates.",
+                    Prompt + "\\nFor this Haiku response, represent every numeric source field as a decimal string; use an empty string for absent or unreadable values. For every field, state its provenance in fieldStates. Return serialNumbers as an empty array; put all identifiers only in identifierCandidates. Each identifier candidate must include fieldState using the provenance enum; mark source_read only when its exact characters are visible, otherwise unreadable or ambiguous.",
                     attemptBudget.Token);
                 if (result is not null) return result;
             }
@@ -1000,25 +1000,27 @@ public sealed class SalesInvoiceCaptureService(
     {
         var result = new JsonArray();
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var items = new List<(string Value, string Classification)>();
+        var items = new List<(string Value, string Classification, string FieldState)>();
         if (candidates is JsonArray array)
         {
             foreach (var item in array.OfType<JsonObject>())
             {
                 var value = Clip(ReadString(item["value"]), 64);
                 var classification = ReadString(item["classification"])?.ToLowerInvariant() ?? "unknown";
-                if (value is not null) items.Add((value, classification));
+                var fieldState = ReadString(item["fieldState"]);
+                if (!ProvenanceStatuses.Contains(fieldState ?? "")) fieldState = "source_read";
+                if (value is not null) items.Add((value, classification, fieldState));
             }
         }
         else
         {
             foreach (var value in CleanStringArray(legacySerials, 12, 64).Select(ReadString).Where(value => value is not null))
-                items.Add((value!, "unknown"));
+                items.Add((value!, "unknown", "source_read"));
             var single = Clip(ReadString(legacySerial), 64);
-            if (single is not null) items.Add((single, "unknown"));
+            if (single is not null) items.Add((single, "unknown", "source_read"));
         }
 
-        foreach (var (value, proposedClassification) in items.Take(20))
+        foreach (var (value, proposedClassification, fieldState) in items.Take(20))
         {
             var classification = proposedClassification switch
             {
@@ -1034,6 +1036,7 @@ public sealed class SalesInvoiceCaptureService(
             {
                 ["value"] = value,
                 ["classification"] = classification,
+                ["fieldState"] = fieldState,
                 ["confirmed"] = false,
                 ["luhnValid"] = classification == "imei" && IsValidImei(value)
             };
@@ -1304,9 +1307,14 @@ public sealed class SalesInvoiceCaptureService(
                 {
                     ["type"] = "string",
                     ["enum"] = new JsonArray("model", "serial", "imei", "barcode", "part_number", "unknown")
+                },
+                ["fieldState"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("source_read", "not_present", "unreadable", "ambiguous", "calculated", "user_entered", "user_corrected")
                 }
             },
-            ["required"] = Required("value", "classification"),
+            ["required"] = Required("value", "classification", "fieldState"),
             ["additionalProperties"] = false
         };
 
