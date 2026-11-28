@@ -134,7 +134,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   }
 
   await importBill()
-  const review = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
+  const review = bill.getByRole('region', { name: 'Review detected items', exact: true })
   await expect(review).toBeVisible()
   const extractedDescription = review.getByLabel('Extracted line 1 description')
   await expect(extractedDescription).toHaveValue(fullDescription)
@@ -189,7 +189,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await expect(bill.locator('#billing-qty')).toBeVisible()
 
   await importBill()
-  const acceptedReview = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
+  const acceptedReview = bill.getByRole('region', { name: 'Review detected items', exact: true })
   await expect(acceptedReview).toBeVisible()
   await acceptedReview.getByLabel('Source bill number').fill('HAND-468')
   await acceptedReview.locator('#invoice-source-total').fill('10020')
