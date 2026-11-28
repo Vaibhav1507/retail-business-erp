@@ -97,7 +97,7 @@ public sealed class SalesInvoiceCaptureService(
             "amount": number|null, "gstRate": number|null, "gstAmount": number|null } }] }
         """;
 
-    public async Task<ServiceResult<object>> ExtractAsync(string? mime, byte[] bytes, CancellationToken ct)
+    public async Task<ServiceResult<object>> ExtractAsync(string? mime, byte[] bytes, Guid sourceDocumentId, CancellationToken ct)
     {
         var timer = Stopwatch.StartNew();
         CancellationTokenSource? cloudBudget = null;
@@ -301,6 +301,7 @@ public sealed class SalesInvoiceCaptureService(
 
             return ServiceResult<object>.Ok(new
             {
+                sourceDocumentId,
                 status = needsAttention ? "NeedsAttention" : "ReadyForReview",
                 extraction,
                 warnings,
