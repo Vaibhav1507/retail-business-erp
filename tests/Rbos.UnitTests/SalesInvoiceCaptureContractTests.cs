@@ -50,6 +50,34 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
     }
 
+    [Theory]
+    [InlineData(true, true, true, "Anthropic")]
+    [InlineData(false, true, true, "Gemini")]
+    [InlineData(false, false, true, "Groq")]
+    [InlineData(false, false, false, "None")]
+    public void SalesInvoiceProviderSelection_PrefersHaikuThenGeminiThenGroq(
+        bool haikuUsable, bool geminiUsable, bool groqUsable, string expected)
+    {
+        Assert.Equal(expected,
+            SalesInvoiceCaptureService.SelectSalesInvoiceProvider(haikuUsable, geminiUsable, groqUsable));
+    }
+
+    [Fact]
+    public void ProviderComparison_DoesNotCompareWhenEitherProviderHasNoUsableExtraction()
+    {
+        var usable = JsonNode.Parse("""
+            {
+              "lines": [{ "description": "Washing machine", "quantity": 1 }]
+            }
+            """)!;
+
+        var comparison = SalesInvoiceCaptureService.CompareProviderExtractions(usable, null);
+
+        Assert.Equal("not_compared", comparison["status"]!.GetValue<string>());
+        Assert.Equal(0, comparison["mismatchFieldCount"]!.GetValue<int>());
+        Assert.Empty(Assert.IsType<JsonArray>(comparison["mismatchedFields"]));
+    }
+
     [Fact]
     public void ProviderComparison_ReportsOnlyFieldNamesAndNeverExtractedValues()
     {
