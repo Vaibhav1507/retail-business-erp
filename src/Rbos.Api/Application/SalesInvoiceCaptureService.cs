@@ -837,23 +837,27 @@ public sealed class SalesInvoiceCaptureService(
 
     static void ApplyVerificationCandidates(JsonObject extraction, JsonObject verification)
     {
-        if (extraction["ocrEvidence"] is not JsonObject evidence) return;
+        if (extraction["ocrEvidence"] is not JsonObject headerEvidence) return;
         foreach (var (field, value) in verification)
         {
-            if (value is not JsonObject result || evidence[field] is not JsonObject existing) continue;
+            if (value is not JsonObject result) continue;
             var reading = ReadString(result["reading"]);
             var status = ReadString(result["status"])?.ToLowerInvariant();
             if (status is not ("source_read" or "unreadable" or "ambiguous")) status = "ambiguous";
-            existing["verificationCandidate"] = reading;
-            existing["verificationStatus"] = status;
-            // Preserve the primary value and the disagreement. Verification supplies
-            // another human-review candidate, never an automatic overwrite.
+
+            // Preserve every verifier output as a separate candidate; never overwrite
+            // a primary transcription or silently resolve a disagreement.
             if (field.StartsWith("lineDescription", StringComparison.Ordinal) &&
                 int.TryParse(field["lineDescription".Length..], out var lineIndex) &&
                 extraction["lines"] is JsonArray lines &&
                 lineIndex >= 0 && lineIndex < lines.Count &&
                 lines[lineIndex] is JsonObject line)
             {
+                if (line["ocrEvidence"] is JsonObject lineEvidence)
+                {
+                    lineEvidence["verificationCandidate"] = reading;
+                    lineEvidence["verificationStatus"] = status;
+                }
                 var lineState = line["fieldStates"] as JsonObject;
                 var primaryDescription = ReadVerbatimString(line["description"]);
                 if (status != "source_read" || reading is null ||
@@ -861,8 +865,13 @@ public sealed class SalesInvoiceCaptureService(
                 {
                     if (lineState is not null) lineState["description"] = "ambiguous";
                 }
+                continue;
             }
-            else if (status != "source_read" || reading is null)
+
+            if (headerEvidence[field] is not JsonObject existing) continue;
+            existing["verificationCandidate"] = reading;
+            existing["verificationStatus"] = status;
+            if (status != "source_read" || reading is null)
                 extraction["fieldStates"]![field] = "ambiguous";
             else if (ReadString(extraction[field]) is not { } primary ||
                      !string.Equals(ComparableText(primary), ComparableText(reading), StringComparison.Ordinal))
