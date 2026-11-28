@@ -136,6 +136,16 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await importBill()
   const review = bill.getByRole('region', { name: 'Review detected items', exact: true })
   await expect(review).toBeVisible()
+  const sourceActionsOverlapAssistant = await review.locator('.invoice-source-region-jump').evaluateAll(buttons => {
+    const assistant = document.querySelector('.assistant-launcher')
+    if (!assistant) return false
+    const a = assistant.getBoundingClientRect()
+    return buttons.some(button => {
+      const b = button.getBoundingClientRect()
+      return b.width > 0 && b.height > 0 && b.right > a.left && b.left < a.right && b.bottom > a.top && b.top < a.bottom
+    })
+  })
+  expect(sourceActionsOverlapAssistant).toBe(false)
   const extractedDescription = review.getByLabel('Extracted line 1 description')
   await expect(extractedDescription).toHaveValue(fullDescription)
   await expect(extractedDescription).toHaveCSS('resize', 'none')
