@@ -16,6 +16,8 @@ public sealed record SalesInvoiceReviewIssue(string Field, int? LineIndex, strin
 /// </summary>
 public sealed class SalesInvoiceCaptureService(
     HttpClient http,
+    AnthropicHaikuClient haiku,
+    ISalesInvoiceOcrReader cloudVision,
     GroqVisionClient groq,
     LocalOcr localOcr,
     IConfiguration cfg,
@@ -84,9 +86,8 @@ public sealed class SalesInvoiceCaptureService(
     public async Task<ServiceResult<object>> ExtractAsync(string? mime, byte[] bytes, CancellationToken ct)
     {
         var timer = Stopwatch.StartNew();
-        byte[]? aiBytes = null;
-        CancellationTokenSource? ocrCancellation = null;
-        Task<string?>? ocrTask = null;
+        CancellationTokenSource? cloudBudget = null;
+        Task<SalesInvoiceOcrResult?>? cloudTask = null;
         try
         {
             if (mime is null || !Allowed.Contains(mime, StringComparer.OrdinalIgnoreCase))
@@ -94,90 +95,138 @@ public sealed class SalesInvoiceCaptureService(
             if (bytes.Length is 0 or > MaxFileBytes || !MatchesType(bytes, mime))
                 return ServiceResult<object>.Fail("The invoice is empty, larger than 8 MB, corrupt or not the type it claims to be.");
 
-            var preparationTimer = Stopwatch.StartNew();
-            string aiMime;
-            if (string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase))
-            {
-                // Gemini accepts PDF documents natively, preserving page boundaries and avoiding
-                // a lossy rasterization step. PDF input is not sent to the image-only Groq fallback.
-                aiBytes = bytes;
-                aiMime = "application/pdf";
-            }
-            else
-            {
-                aiBytes = PrepareVisionImage(bytes, mime, cfg, out aiMime);
-            }
-            preparationTimer.Stop();
-            log.LogInformation("Sales invoice document prepared in memory. MIME {Mime}, original bytes {OriginalBytes}, inference bytes {InferenceBytes}, duration {PreparationMs}ms", mime, bytes.Length, aiBytes.Length, preparationTimer.ElapsedMilliseconds);
+            using var requestBudget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            requestBudget.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(
+                cfg.GetValue("AiPerformance:SalesInvoiceTotalProviderBudgetSeconds", 25), 5, 25)));
+            var budgetToken = requestBudget.Token;
 
-            // Start local OCR concurrently with vision. The primary attempt never waits for
-            // OCR; a bounded wait is allowed only when a provider fallback is needed.
-            if (!string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase) && localOcr.Available)
-            {
-                ocrCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                ocrTask = ReadOcrHintsAsync(aiBytes!, ocrCancellation.Token);
-            }
+            // Both readers receive the untouched original. Cloud Vision never receives Haiku's
+            // proposal, and Haiku never receives OCR text. They are independent evidence sources.
+            cloudBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
+            cloudBudget.CancelAfter(TimeSpan.FromSeconds(4));
+            cloudTask = cloudVision.ReadAsync(mime, bytes, cloudBudget.Token);
 
-            var attempts = new List<VisionProviderAttempt>();
-            var apiKey = cfg["Gemini:ApiKey"];
-            var models = VisionProviderFallback.SalesInvoiceGeminiModels(cfg);
-            var attemptTimeout = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceAttemptTimeoutSeconds", 7), 5, 15);
-            if (!string.IsNullOrWhiteSpace(apiKey))
-            {
-                var primary = models[0];
-                attempts.Add(new VisionProviderAttempt("Gemini", primary,
-                    attemptTimeout,
-                    token => ExtractWithGeminiAsync(apiKey!, primary, aiMime, aiBytes!, null, token)));
-            }
+            var providerTimer = Stopwatch.StartNew();
+            JsonNode? parsed = null;
+            var providerName = "None";
+            var providerModel = "None";
+            var providerNeedsReview = false;
+            var anthropicValidated = cfg.GetValue("Anthropic:SalesInvoiceIntegrationValidated", false);
+            var useHaiku = haiku.Available && anthropicValidated;
 
-            if (!string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase) && groq.Available && cfg.GetValue("Groq:SalesInvoiceFallbackEnabled", cfg.GetValue("Groq:InvoiceFallbackEnabled", false)))
+            if (useHaiku)
             {
-                attempts.Add(new VisionProviderAttempt("Groq", groq.Model,
-                    attemptTimeout,
-                    async token =>
-                    {
-                        var hints = await GetCompletedOcrHintsAsync(ocrTask, token);
-                        return await groq.ExtractImageAsync(
-                            aiMime, Convert.ToBase64String(aiBytes!), BuildPromptWithOcrHints(hints), token);
-                    }));
-            }
-
-            if (!string.IsNullOrWhiteSpace(apiKey))
-            {
-                var fallbackIndex = 0;
-                foreach (var model in models.Skip(1))
+                var haikuResult = await ExtractWithHaikuRetryAsync(mime, bytes, budgetToken);
+                if (haikuResult is not null)
                 {
-                    var fallback = model;
-                    var isLastFallback = ++fallbackIndex == models.Skip(1).Count();
-                    var retryOriginalImage = isLastFallback && !ReferenceEquals(aiBytes, bytes);
-                    attempts.Add(new VisionProviderAttempt("Gemini", fallback,
-                        attemptTimeout,
-                        async token =>
-                        {
-                            var hints = await GetCompletedOcrHintsAsync(ocrTask, token);
-                            if (retryOriginalImage)
-                                log.LogInformation("Sales invoice fallback is retrying the original image to preserve fine handwriting. Model {Model}, original bytes {OriginalBytes}, prepared bytes {PreparedBytes}",
-                                    fallback, bytes.Length, aiBytes!.Length);
-                            return await ExtractWithGeminiAsync(
-                                apiKey!, fallback,
-                                retryOriginalImage ? mime : aiMime,
-                                retryOriginalImage ? bytes : aiBytes!,
-                                hints, token);
-                        }));
+                    parsed = haikuResult.Extraction;
+                    providerName = "Anthropic";
+                    providerModel = haikuResult.Model;
+                    log.LogInformation(
+                        "Sales invoice Haiku usage recorded. Input tokens {InputTokens}, output tokens {OutputTokens}, request {RequestId}",
+                        haikuResult.InputTokens, haikuResult.OutputTokens, haikuResult.RequestId);
                 }
             }
 
-            var providerTimer = Stopwatch.StartNew();
-            var parsed = await VisionProviderFallback.ExecuteAsync(
-                "SalesInvoiceCapture", attempts, HasUsableLines, log, ct,
-                TimeSpan.FromSeconds(Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceTotalProviderBudgetSeconds", 20), 5, 30)),
-                skipProviderOnRateLimit: true);
+            // Hydrogen remains the safe temporary primary until the one secure Anthropic
+            // integration check has been completed and marked validated. It is also the
+            // provider fallback after a Haiku outage. Do not fan out to other Gemini models.
+            if (parsed is null && !string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]))
+            {
+                var hydrogen = cfg["Gemini:SalesInvoiceHydrogenModel"] ?? "gemini-4-hydrogen";
+                try
+                {
+                    using var hydrogenBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
+                    hydrogenBudget.CancelAfter(TimeSpan.FromSeconds(8));
+                    parsed = await ExtractWithGeminiAsync(
+                        cfg["Gemini:ApiKey"]!, hydrogen, mime, bytes, null, hydrogenBudget.Token);
+                    if (parsed is not null)
+                    {
+                        providerName = "Gemini";
+                        providerModel = hydrogen;
+                    }
+                }
+                catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+                {
+                    log.LogWarning("Sales invoice Hydrogen attempt timed out. Model {Model}.", hydrogen);
+                }
+                catch (HttpRequestException error)
+                {
+                    log.LogWarning("Sales invoice Hydrogen attempt failed. HTTP {StatusCode}.", (int?)error.StatusCode);
+                }
+                catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
+                {
+                    log.LogWarning("Sales invoice Hydrogen response was invalid. Error type {ErrorType}.", error.GetType().Name);
+                }
+            }
+
+            // Groq is the last operational fallback, and its output is explicitly held for
+            // operator review. It receives only the original bill, never OCR hints/proposals.
+            var groqEnabled = cfg.GetValue("Groq:SalesInvoiceFallbackEnabled",
+                cfg.GetValue("Groq:InvoiceFallbackEnabled", false));
+            if (parsed is null && groq.Available && groqEnabled && !budgetToken.IsCancellationRequested)
+            {
+                try
+                {
+                    using var groqBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
+                    groqBudget.CancelAfter(TimeSpan.FromSeconds(6));
+                    parsed = await groq.ExtractInvoiceAsync([(mime, bytes)], Prompt, groqBudget.Token);
+                    if (parsed is not null)
+                    {
+                        providerName = "Groq";
+                        providerModel = groq.Model;
+                        providerNeedsReview = true;
+                    }
+                }
+                catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+                {
+                    log.LogWarning("Last-resort Groq sales invoice extraction timed out.");
+                }
+                catch (HttpRequestException error)
+                {
+                    log.LogWarning("Last-resort Groq sales invoice extraction failed. HTTP {StatusCode}.", (int?)error.StatusCode);
+                }
+                catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
+                {
+                    log.LogWarning("Last-resort Groq sales invoice response was invalid. Error type {ErrorType}.", error.GetType().Name);
+                }
+            }
+
             providerTimer.Stop();
+            SalesInvoiceOcrResult? independentOcr = null;
+            try
+            {
+                if (cloudTask is not null)
+                    independentOcr = await cloudTask.WaitAsync(TimeSpan.FromMilliseconds(4_100), ct);
+            }
+            catch (TimeoutException)
+            {
+                cloudBudget?.Cancel();
+                log.LogDebug("Cloud Vision exceeded the independent OCR soft budget.");
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                log.LogDebug("Cloud Vision OCR was unavailable or exceeded its soft budget.");
+            }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                log.LogWarning("Cloud Vision OCR could not complete. Error type {ErrorType}.", error.GetType().Name);
+            }
+
+            string? degradedOcrText = null;
+            if (independentOcr is null)
+            {
+                degradedOcrText = await ReadLocalOcrFallbackAsync(mime, bytes, ct);
+            }
 
             var warnings = new List<string>();
             var extraction = NormalizeForReview(parsed);
             if (parsed is null)
-                warnings.Add("The configured image providers could not read this invoice. Enter the details manually or try a clearer photo.");
+                warnings.Add("The bill could not be read automatically. Enter the details manually or try a clearer photo.");
+            if (providerNeedsReview)
+                warnings.Add("A backup reader was used. Check every extracted field against the original bill before continuing.");
+
+            ApplyIndependentOcrEvidence(extraction, independentOcr, degradedOcrText, warnings);
 
             var lines = extraction["lines"] as JsonArray ?? [];
             if (parsed is not null && lines.Count == 0)
@@ -193,9 +242,11 @@ public sealed class SalesInvoiceCaptureService(
                     hasUnreadableDescription = true;
                 if (ReadDecimal(line["quantity"]) is null)
                     hasMissingQuantity = true;
-                if (ReadDecimal(line["unitPrice"]) is null)
+                if (ReadDecimal(line["unitPrice"]) is null &&
+                    ReadString(line["fieldStates"]?["unitPrice"]) != "not_present")
                     hasMissingUnitPrice = true;
-                if (ReadDecimal(line["amount"]) is null)
+                if (ReadDecimal(line["amount"]) is null &&
+                    ReadString(line["fieldStates"]?["amount"]) != "not_present")
                     hasMissingAmount = true;
             }
 
@@ -204,105 +255,235 @@ public sealed class SalesInvoiceCaptureService(
             if (hasMissingQuantity)
                 warnings.Add("One or more line quantities are blank or unreadable. Confirm them before adding the lines.");
             if (hasMissingUnitPrice)
-                warnings.Add("One or more unit rates are blank or unreadable. The original bill may leave the Rate column empty; enter the selling price before adding those lines.");
+                warnings.Add("One or more source rate values could not be read. A blank Rate cell is recorded separately; enter the selling price required by RBOS.");
             if (hasMissingAmount)
-                warnings.Add("One or more line amounts are blank or unreadable. Confirm them against the original bill.");
+                warnings.Add("One or more line amounts could not be read. Confirm them against the original bill.");
             if (ReadDecimal(extraction["total"]) is null)
                 warnings.Add("The invoice total was not readable. Review the printed TOTAL box and confirm the bill total.");
 
             var reviewIssues = BuildReviewIssues(
                 extraction,
                 cfg.GetValue("AiPerformance:SalesInvoiceConfidenceReviewThreshold", 0.72m));
+            if (providerNeedsReview)
+                reviewIssues.Add(new SalesInvoiceReviewIssue("provider", null,
+                    "This bill was read by the backup provider. Confirm the extracted details against the original."));
             if (reviewIssues.Count > 0)
                 warnings.Add("Some extracted fields need an extra check. Review the highlighted fields against the original bill.");
 
-            var needsAttention = warnings.Count > 0 || reviewIssues.Count > 0;
-
+            var needsAttention = providerNeedsReview || warnings.Count > 0 || reviewIssues.Count > 0;
             timer.Stop();
             var latencySloMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceLatencySloMs", 15_000), 1_000, 60_000);
-            var ocrCompleted = ocrTask?.IsCompletedSuccessfully == true;
             log.LogInformation(
-                "Sales invoice extraction completed. Status {Status}, bytes {UploadedBytes}, lines {LineCount}, OCR completed {OcrCompleted}, provider latency {ProviderMs}ms, review issue count {ReviewIssueCount}, warning count {WarningCount}, total latency {TotalMs}ms, latency SLO {LatencySloMs}ms, trace {TraceId}",
-                needsAttention ? "NeedsAttention" : "ReadyForReview", bytes.Length,
-                lines.Count, ocrCompleted, providerTimer.ElapsedMilliseconds, reviewIssues.Count, warnings.Count,
+                "Sales invoice extraction completed. Status {Status}, bytes {UploadedBytes}, lines {LineCount}, primary provider {Provider}, model {Model}, OCR source {OcrSource}, OCR words {OcrWordCount}, provider latency {ProviderMs}ms, review issue count {ReviewIssueCount}, warning count {WarningCount}, total latency {TotalMs}ms, latency SLO {LatencySloMs}ms, trace {TraceId}",
+                needsAttention ? "NeedsAttention" : "ReadyForReview", bytes.Length, lines.Count,
+                providerName, providerModel,
+                independentOcr is not null ? "CloudVision" : degradedOcrText is not null ? "TesseractDegraded" : "Unavailable",
+                independentOcr?.Pages.Sum(page => page.Words.Count) ?? 0,
+                providerTimer.ElapsedMilliseconds, reviewIssues.Count, warnings.Count,
                 timer.ElapsedMilliseconds, latencySloMs, Activity.Current?.TraceId.ToString());
             if (timer.ElapsedMilliseconds > latencySloMs)
-                log.LogWarning("Sales invoice extraction exceeded its configured latency SLO. Total {TotalMs}ms, target {LatencySloMs}ms, provider {ProviderMs}ms",
-                    timer.ElapsedMilliseconds, latencySloMs, providerTimer.ElapsedMilliseconds);
+                log.LogWarning("Sales invoice extraction exceeded its configured latency SLO. Total {TotalMs}ms, target {LatencySloMs}ms",
+                    timer.ElapsedMilliseconds, latencySloMs);
 
             return ServiceResult<object>.Ok(new
             {
                 status = needsAttention ? "NeedsAttention" : "ReadyForReview",
                 extraction,
                 warnings,
-                reviewIssues
+                reviewIssues,
+                provider = new { name = providerName, model = providerModel, needsReview = providerNeedsReview },
+                ocr = new
+                {
+                    source = independentOcr is not null ? "CloudVision" : degradedOcrText is not null ? "TesseractDegraded" : "Unavailable",
+                    pages = independentOcr?.Pages.Count ?? 0
+                }
             });
         }
         finally
         {
-            // Observe/cancel OCR before clearing the in-memory image buffer it reads.
-            if (ocrCancellation is not null)
+            cloudBudget?.Cancel();
+            if (cloudTask is not null)
             {
-                ocrCancellation.Cancel();
-                if (ocrTask is not null)
+                try { await cloudTask; }
+                catch (OperationCanceledException) { }
+                catch (Exception error) when (error is not OutOfMemoryException)
                 {
-                    try { await ocrTask; }
-                    catch (OperationCanceledException) { }
-                    catch (Exception e) when (e is not OutOfMemoryException)
-                    {
-                        log.LogDebug("Optional sales-invoice OCR task ended with {ErrorType}.", e.GetType().Name);
-                    }
+                    log.LogDebug("Cloud Vision task ended with {ErrorType}.", error.GetType().Name);
                 }
-                ocrCancellation.Dispose();
             }
-            if (aiBytes is not null && !ReferenceEquals(aiBytes, bytes))
-                CryptographicOperations.ZeroMemory(aiBytes);
+            cloudBudget?.Dispose();
             CryptographicOperations.ZeroMemory(bytes);
         }
     }
 
-    async Task<string?> ReadOcrHintsAsync(byte[] image, CancellationToken ct)
+    async Task<AnthropicSalesInvoiceResult?> ExtractWithHaikuRetryAsync(
+        string mime, byte[] original, CancellationToken ct)
     {
-        var timer = Stopwatch.StartNew();
-        var timeoutMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceOcrBudgetMs", 900), 250, 1_500);
+        const int maximumAttempts = 2;
+        var timeoutSeconds = Math.Clamp(
+            cfg.GetValue("AiPerformance:SalesInvoiceHaikuAttemptTimeoutSeconds", 12), 5, 12);
+
+        for (var attempt = 1; attempt <= maximumAttempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            using var attemptBudget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            attemptBudget.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            try
+            {
+                var result = await haiku.ExtractAsync(
+                    mime, original, BuildResponseJsonSchema(), Prompt, attemptBudget.Token);
+                if (result is not null) return result;
+            }
+            catch (AnthropicApiException error)
+            {
+                log.LogWarning(
+                    "Haiku sales-invoice attempt failed. Attempt {Attempt}, HTTP {StatusCode}, request {RequestId}, transient {Transient}",
+                    attempt, (int?)error.StatusCode, error.RequestId, error.IsTransient);
+                if (!error.IsTransient || attempt == maximumAttempts) return null;
+            }
+            catch (HttpRequestException error) when (attempt < maximumAttempts &&
+                (error.StatusCode is null || (int)error.StatusCode >= 500 || (int)error.StatusCode is 408 or 425 or 429))
+            {
+                log.LogWarning("Haiku sales-invoice network attempt failed. Attempt {Attempt}, HTTP {StatusCode}.",
+                    attempt, (int?)error.StatusCode);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested && attempt < maximumAttempts)
+            {
+                log.LogWarning("Haiku sales-invoice attempt timed out. Retrying once. Attempt {Attempt}.", attempt);
+            }
+            catch (Exception error) when (error is JsonException or InvalidDataException or InvalidOperationException or FormatException)
+            {
+                log.LogWarning("Haiku sales-invoice response was unusable. Error type {ErrorType}.", error.GetType().Name);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    async Task<string?> ReadLocalOcrFallbackAsync(string mime, byte[] original, CancellationToken ct)
+    {
+        if (!localOcr.Available) return null;
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var timeoutMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceLocalOcrTimeoutMs", 1_500), 250, 1_500);
         budget.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
+        var images = new List<byte[]>();
         try
         {
-            var rows = await localOcr.ReadImageAsync(image, budget.Token);
-            var text = rows is null ? null : string.Join('\n', rows.Take(35).Select(row => string.Join(" | ", row))).Trim();
-            if (text?.Length > 5_000) text = text[..5_000];
-            timer.Stop();
-            log.LogInformation("Sales invoice local OCR completed. Duration {OcrMs}ms, characters {CharacterCount}, timeout {TimeoutMs}ms",
-                timer.ElapsedMilliseconds, text?.Length ?? 0, timeoutMs);
-            return string.IsNullOrWhiteSpace(text) ? null : text;
+            if (mime == "application/pdf")
+            {
+                var pages = PdfPageReader.Read(original);
+                if (pages is null || pages.Count is < 1 or > 6) return null;
+                foreach (var page in pages)
+                {
+                    var png = PdfPageReader.RenderPng(original, page.Page);
+                    if (png is null) return null;
+                    images.Add(png);
+                }
+            }
+            else
+            {
+                images.Add(original);
+            }
+
+            var texts = new List<string>();
+            foreach (var image in images)
+            {
+                var rows = await localOcr.ReadImageAsync(image, budget.Token);
+                if (rows is null) continue;
+                texts.Add(string.Join("\n", rows.Select(row => string.Join(" | ", row))));
+            }
+            var combined = string.Join("\n", texts).Trim();
+            if (combined.Length > 5_000) combined = combined[..5_000];
+            return string.IsNullOrWhiteSpace(combined) ? null : combined;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            timer.Stop();
-            log.LogDebug("Optional sales-invoice OCR exceeded its {TimeoutMs}ms budget; vision extraction continues.", timeoutMs);
+            log.LogDebug("Degraded local OCR exceeded its {TimeoutMs}ms bound.", timeoutMs);
             return null;
         }
-        catch (Exception e) when (e is not OperationCanceledException and not OutOfMemoryException)
+        catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException)
         {
-            timer.Stop();
-            log.LogWarning("Optional sales-invoice OCR failed; vision extraction continues. Error type {ErrorType}, duration {OcrMs}ms",
-                e.GetType().Name, timer.ElapsedMilliseconds);
+            log.LogWarning("Degraded local OCR failed. Error type {ErrorType}.", error.GetType().Name);
             return null;
+        }
+        finally
+        {
+            foreach (var image in images.Where(image => !ReferenceEquals(image, original)))
+                CryptographicOperations.ZeroMemory(image);
         }
     }
 
-    static async Task<string?> GetCompletedOcrHintsAsync(Task<string?>? ocrTask, CancellationToken ct)
+    static void ApplyIndependentOcrEvidence(
+        JsonObject extraction,
+        SalesInvoiceOcrResult? cloud,
+        string? degradedOcrText,
+        List<string> warnings)
     {
-        if (ocrTask is null) return null;
-        try { return await ocrTask.WaitAsync(TimeSpan.FromMilliseconds(150), ct); }
-        catch (TimeoutException) { return null; }
+        var fields = new JsonObject();
+        var text = cloud?.Text ?? degradedOcrText ?? "";
+        var rows = cloud is null
+            ? text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(line => new OcrEvidenceRow(0, line, null))
+                .ToArray()
+            : BuildOcrRows(cloud);
+
+        foreach (var (field, labels) in new[]
+        {
+            ("invoiceNumber", new[] { "invoice no", "invoice number", "bill no", "bill number" }),
+            ("date", new[] { "date", "dated" }),
+            ("total", new[] { "grand total", "total" })
+        })
+        {
+            var row = FindLabelledRow(rows, labels);
+            var value = ReadString(extraction[field]);
+            var agrees = value is null || row is null ||
+                ComparableText(row.Text).Contains(ComparableText(value), StringComparison.Ordinal);
+            var state = ReadString(extraction["fieldStates"]?[field]) ?? (value is null ? "unreadable" : "source_read");
+            fields[field] = new JsonObject
+            {
+                ["status"] = agrees ? state : "ambiguous",
+                ["haikuOrPrimaryReading"] = value,
+                ["ocrCandidate"] = row is null ? null : Clip(row.Text, 180),
+                ["ocrAgrees"] = row is null ? (bool?)null : agrees,
+                ["pageNumber"] = row?.PageNumber
+            };
+            if (!agrees)
+            {
+                extraction["fieldStates"]![field] = "ambiguous";
+                warnings.Add(field switch
+                {
+                    "invoiceNumber" => "The invoice-number reading does not agree with the text near the labelled bill-number field. Check it against the original.",
+                    "date" => "The date reading needs checking against the labelled Date field.",
+                    _ => "The printed TOTAL field has a competing OCR reading. Check the boxed total, not nearby annotations."
+                });
+            }
+        }
+        extraction["ocrEvidence"] = fields;
+        extraction["ocrSource"] = cloud is not null ? "CloudVision" :
+            degradedOcrText is not null ? "TesseractDegraded" : "Unavailable";
     }
 
-    static string BuildPromptWithOcrHints(string? ocrText) =>
-        string.IsNullOrWhiteSpace(ocrText)
-            ? Prompt
-            : Prompt + "\nOptional local OCR hints (may contain errors; the bill image is authoritative):\n" + ocrText;
+    sealed record OcrEvidenceRow(int PageNumber, string Text, SalesInvoiceOcrWord[]? Words);
+
+    static OcrEvidenceRow[] BuildOcrRows(SalesInvoiceOcrResult result) =>
+        result.Pages.SelectMany(page =>
+            page.Words
+                .GroupBy(word => (int)Math.Round(word.Top / 6d))
+                .OrderBy(group => group.Key)
+                .Select(group => new OcrEvidenceRow(page.PageNumber,
+                    string.Join(' ', group.OrderBy(word => word.Left).Select(word => word.Text)),
+                    group.ToArray())))
+            .ToArray();
+
+    static OcrEvidenceRow? FindLabelledRow(IEnumerable<OcrEvidenceRow> rows, IEnumerable<string> labels) =>
+        rows.FirstOrDefault(row =>
+        {
+            var normalized = ComparableText(row.Text);
+            return labels.Any(label => normalized.Contains(ComparableText(label), StringComparison.Ordinal));
+        });
+
+    static string ComparableText(string value) =>
+        new(value.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
 
     static byte[] PrepareVisionImage(byte[] original, string mime, IConfiguration cfg, out string outputMime)
     {
