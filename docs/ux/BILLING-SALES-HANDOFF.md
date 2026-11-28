@@ -215,6 +215,8 @@ Approved combined specification: [handwritten sales invoice extraction V2](./han
 - OCR header alignment now parses values after exact labels and does not match SUBTOTAL as TOTAL. The first value after the printed TOTAL label remains distinct from nearby annotations.
 - Upload MIME/signature is validated before source evidence is persisted, avoiding orphan evidence for unsupported/corrupt files.
 - Updated field correction provenance and UI presentation of the independent verification candidate.
+- Kept the handwritten source Rate separate from RBOS selling price. Only a `source_read` rate may prefill selling price; blank, unreadable or ambiguous source rates remain null and require a separate operator-entered sale price. The sale-line price now uses only `sellingPrice`, never a fallback to source `unitPrice`.
+- Expanded the in-scope Playwright journey to phone/tablet/landscape/desktop viewport and full-page captures, keyboard focus, scrolled state, Axe WCAG 2 A/AA, horizontal overflow, touch-target counts and console/server error reporting. It exercises source-bill correction and posts through the normal sale confirmation with the retained source document ID.
 - Added focused tests for OCR header extraction/comparison and null-rate provenance. Updated frontend mocks to reflect source-document IDs and operator-confirmed identifiers.
 
 ### Validation status
