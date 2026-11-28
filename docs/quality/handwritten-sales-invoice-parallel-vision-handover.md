@@ -122,23 +122,23 @@ Before creating the PR, review these points carefully:
 | Existing key reuse and pinned models | Implemented | Unit tests added; CI pending |
 | OCR removed from active service | Implemented | Verify exact diff and DI/build |
 | Pairwise privacy-safe comparison | Implemented | Unit tests added; CI pending |
-| Provider concurrency/cancellation tests | Concurrency covered | Deterministic service test proves Gemini/Groq overlap; CI and runtime cancellation review pending |
-| Backend build/unit tests | Pending | Run GitHub CI after PR creation |
-| Frontend CI | Pending | No frontend files changed; still inspect complete workflow result |
-| PostgreSQL integration/migrations | Pending | No migration changes expected; confirm CI |
+| Provider concurrency/cancellation tests | Unit test passed | Backend unit-test step in run #1532 passed, including the barrier test proving Gemini/Groq overlap; cancellation runtime review remains |
+| Backend build/unit tests | Passed | PR CI run #1532: solution build and backend unit tests succeeded on code commit 729f694a83d4cb06d7af169ee697d93c75f1cb8b |
+| Frontend CI | Passed | PR CI run #1532: TypeScript, tests, lint, build and dependency audit all succeeded; no frontend files changed |
+| PostgreSQL integration/migrations | In progress | PR CI run #1532: disposable migrations passed; integration tests still running; no migration files changed |
 | Live Haiku smoke | Previously passed only on synthetic request in run 46143498825 | Do not confuse with production runtime credentials |
 | Live Gemini smoke | Pending | Synthetic/redacted image only; verify Free Tier model access |
 | Live Groq smoke | Pending | Synthetic/redacted image only; verify Free Plan quota |
 | Verified gold labels | In progress | See handwritten-sales-bill-benchmark-v2.md |
 | Production flags | Not changed | Both shadow flags remain false in repository defaults |
-| Merge | Not authorised | Requires separate user approval |
+| Merge | Not authorised | Draft PR #125; requires separate user approval |
 | Production deployment | Not authorised | Requires separate user approval |
 
 ## 8. Next actions for the next chat
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Draft PR #125 is open. Exact-head GitHub CI run #1532 is in progress; grouped visual audit run #465 is also in progress. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173126985 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173127072.
+3. Draft PR #125 is open. CI run #1532 is validating code commit 729f694a83d4cb06d7af169ee697d93c75f1cb8b; the subsequent branch update is documentation-only. Backend build/unit tests and frontend checks have passed. PostgreSQL integration tests and the container build are still running. Grouped visual audit run #465 is also in progress. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173126985 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173127072.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
 5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
@@ -160,4 +160,4 @@ Before creating the PR, review these points carefully:
 - 729f694a83d4cb06d7af169ee697d93c75f1cb8b — isolate provider refusal failures so shadow errors cannot fail the whole extraction.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Latest code/document commit SHAs should be refreshed before the next handover; this file itself is being created in the current continuation.
+Current PR head at the latest handover update: 723f9e22f6273c8854155d1fd9d32fc9c26125ad (documentation-only update after code commit 729f694a83d4cb06d7af169ee697d93c75f1cb8b).
