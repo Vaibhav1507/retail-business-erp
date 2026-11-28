@@ -1319,3 +1319,12 @@
 .invoice-identifier-candidate>label input{width:44px;height:44px;min-width:44px;min-height:44px;accent-color:#176b49}
 .invoice-identifier-candidate>small{grid-column:1/-1}
 @media(max-width:420px){.invoice-source-evidence{padding:10px}.invoice-source-evidence-heading{flex-wrap:wrap}.invoice-source-evidence .invoice-source-region-jump{max-width:calc(100% - 56px);justify-self:start}.invoice-identifier-candidate{grid-template-columns:minmax(0,1fr)}.invoice-identifier-candidate select{grid-column:1}}
+
+/* Keep technical OCR evidence available without making it the default shopkeeper task. */
+.invoice-source-evidence-disclosure{min-width:0;border:1px solid #dce7e0;border-radius:12px;background:#f8fbf9}
+.invoice-source-evidence-disclosure>summary{min-height:44px;display:flex;align-items:center;padding:0 12px;color:#176b49;font-size:14px;font-weight:700;cursor:pointer}
+.invoice-source-evidence-disclosure[open]>summary{border-bottom:1px solid #e4ece7}
+.invoice-source-evidence-disclosure .invoice-source-evidence{border:0;background:transparent}
+.invoice-extraction-review-note{margin:0;padding:10px 12px;border-radius:10px;background:#fff7e8;color:#70511b;font-size:13px;line-height:1.45}
+.invoice-extracted-line-values label{align-content:start}
+.invoice-extraction-provenance{margin-left:0;line-height:1.4}
