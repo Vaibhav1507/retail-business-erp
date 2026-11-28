@@ -1,10 +1,49 @@
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Configuration;
 using Rbos.Api.Application;
 
 namespace Rbos.UnitTests;
 
 public sealed class SalesInvoiceCaptureContractTests
 {
+    [Fact]
+    public void SalesInvoiceFreeTierFallbacks_IgnoreGeneralProviderCredentials()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:ApiKey"] = "general-gemini-key",
+            ["Groq:ApiKey"] = "general-groq-key",
+            ["Gemini:SalesInvoiceHydrogenModel"] = "gemini-4-argon",
+            ["Groq:Model"] = "paid-or-unapproved-model"
+        }).Build();
+
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+        Assert.Equal("gemini-4-hydrogen", SalesInvoiceCaptureService.GeminiFreeTierModel);
+        Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
+    }
+
+    [Fact]
+    public void SalesInvoiceFreeTierFallbacks_RequireBothDedicatedCredentialAndExplicitEnablement()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-gemini-free-key",
+            ["Groq:SalesInvoiceFreeTierApiKey"] = "dedicated-groq-free-key"
+        }).Build();
+
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+
+        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "true";
+        configuration["Groq:SalesInvoiceFreeTierEnabled"] = "true";
+
+        Assert.Equal("dedicated-gemini-free-key",
+            SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
+        Assert.Equal("dedicated-groq-free-key",
+            SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+    }
+
     [Fact]
     public void NormalizeForReview_PreservesVerbatimDescriptionAndKeepsLegacySerialUnconfirmed()
     {
