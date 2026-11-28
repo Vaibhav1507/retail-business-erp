@@ -314,7 +314,8 @@ public static class DocumentEndpoints
         int pageNumber,
         ClaimsPrincipal principal,
         TenantDb db,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool preview = false)
     {
         if (pageNumber is < 1 or > MaxPagesPerDocument) return Results.NotFound();
         var userId = UserId(principal);
@@ -324,7 +325,7 @@ public static class DocumentEndpoints
 
         await using var session = await db.BeginAsync(userId, tenantId, ct);
         await using var command = session.Command(@"
-            select p.content, p.content_type, d.direction
+            select p.content, p.content_type, d.direction, d.source_kind
               from documents.document_page p
               join documents.business_document d
                 on d.tenant_id = p.tenant_id and d.id = p.document_id
@@ -336,7 +337,23 @@ public static class DocumentEndpoints
         if (!CanReadDirection(role, reader.GetString(2))) return Results.NotFound();
         var content = (byte[])reader[0];
         var contentType = reader.GetString(1);
-        return Results.File(content, contentType);
+        var sourceKind = reader.GetString(3);
+        await reader.CloseAsync();
+        await session.CommitAsync(ct);
+
+        // Sales review can request a visual preview of a retained PDF page. Render it
+        // with the same PdfPageReader used by OCR so the Cloud Vision word geometry
+        // maps to the displayed page; the authenticated original download stays intact.
+        if (preview && sourceKind == "HandwrittenBill" && contentType == "application/pdf")
+        {
+            var rendered = PdfPageReader.RenderPng(content, pageNumber);
+            CryptographicOperations.ZeroMemory(content);
+            return rendered is null
+                ? Results.UnprocessableEntity()
+                : Results.Bytes(rendered, "image/png");
+        }
+
+        return Results.Bytes(content, contentType);
     }
 
     static bool CanReadDirection(string? role, string direction)

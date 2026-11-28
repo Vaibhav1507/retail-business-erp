@@ -11,6 +11,7 @@ export type OfflineSaleBody = {
   payMethod: string | null
   sourceInvoiceRef?: string | null
   sourceInvoiceDate?: string | null
+  sourceDocumentId?: string | null
   payments?: { method: string; amount: number }[]
   lines: { productId: string | null; description?: string; brand?: string | null; model?: string | null; hsnCode?: string | null; quantity: number; unitPrice: number; discount: number; serials: string[]; imei1s?: string[]; imei2s?: string[]; barcode?: string | null; barcodeSymbology?: string | null }[]
   gstRate: number | null

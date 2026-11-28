@@ -40,9 +40,9 @@ public static class SalesRules
         {
             if (l.ProductId is null && string.IsNullOrWhiteSpace(l.Description) && string.IsNullOrWhiteSpace(l.Model))
                 return Fail("An unlisted sale line needs a description or model number.", out error);
-            if ((l.Description?.Trim().Length ?? 0) > 240 || (l.Brand?.Trim().Length ?? 0) > 80 ||
+            if ((l.Description?.Trim().Length ?? 0) > 10_000 || (l.Brand?.Trim().Length ?? 0) > 80 ||
                 (l.Model?.Trim().Length ?? 0) > 100 || (l.HsnCode?.Trim().Length ?? 0) > 12)
-                return Fail("Sale line description, brand, model or HSN is too long.", out error);
+                return Fail("Sale line description (max 10,000), brand, model or HSN is too long.", out error);
             if (!Quantity.TryCreate(l.Quantity, out var q, out var qe)) return Fail(qe!, out error);
             if (l.UnitPrice <= 0 || decimal.Round(l.UnitPrice, 2) != l.UnitPrice) return Fail("Unit price must be positive with at most 2 decimal places.", out error);
             var discount = l.Discount ?? 0m;

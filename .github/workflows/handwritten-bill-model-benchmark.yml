@@ -2,6 +2,11 @@ name: Handwritten sales bill model benchmark
 on:
   workflow_dispatch:
     inputs:
+      authorize_paid_benchmark_calls:
+        description: Authorize up to 22 paid model requests (11 Haiku + 11 Gemini)
+        required: true
+        type: boolean
+        default: false
       run_label:
         description: Optional label for this run
         required: false
@@ -14,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   benchmark:
+    if: ${{ inputs.authorize_paid_benchmark_calls == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

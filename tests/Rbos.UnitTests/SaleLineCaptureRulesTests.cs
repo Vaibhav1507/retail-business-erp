@@ -68,6 +68,17 @@ public sealed class SaleLineRulesTests
     }
 
     [Fact]
+    public void Long_verbatim_handwritten_description_is_preserved_on_ad_hoc_sale_line()
+    {
+        var description = string.Join("\n", Enumerable.Repeat(
+            "Samsung LED Television model UA43K5570 serial characters O0I1 and package specification details",
+            8));
+        Assert.True(Validate(new SaleLineInput(null, 1m, 100m, 0m, Description: description),
+            out var lines, out var error), error);
+        Assert.Equal(description, Assert.Single(lines).Description);
+    }
+
+    [Fact]
     public void Missing_serial_is_not_a_sale_validation_error()
     {
         Assert.True(Validate(new SaleLineInput(null, 1m, 100m, 0m, Description: "Unlisted model"),
