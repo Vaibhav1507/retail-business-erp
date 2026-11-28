@@ -32,7 +32,13 @@ def call(provider,model,path):
         rid=getattr(r,'response_id',None)
     m=re.search(r'\{.*\}',text,re.S)
     if not m: raise ValueError('Provider returned no JSON object')
-    return json.loads(m.group()),usage,round((time.perf_counter()-start)*1000),rid
+    parsed=json.loads(m.group())
+    # Strict allow-list: discard any unexpected model fields, especially customer PII.
+    header=("invoice_number","invoice_date","subtotal","printed_grand_total","currency")
+    line=("description_verbatim","model_or_identifier_verbatim","quantity","unit_rate","line_amount","discount","tax","uncertainty_note")
+    clean={k:parsed.get(k) for k in header}
+    clean["items"]=[{k:item.get(k) for k in line} for item in parsed.get("items",[]) if isinstance(item,dict)]
+    return clean,usage,round((time.perf_counter()-start)*1000),rid
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--images',type=Path,required=True); p.add_argument('--output',type=Path,required=True); a=p.parse_args()
     a.output.mkdir(parents=True,exist_ok=True); images={}
