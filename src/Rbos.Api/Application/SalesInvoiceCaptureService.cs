@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using SkiaSharp;
 
@@ -290,7 +291,7 @@ public sealed class SalesInvoiceCaptureService(
 
             var reviewIssues = BuildReviewIssues(
                 extraction,
-                cfg.GetValue("AiPerformance:SalesInvoiceConfidenceReviewThreshold", 0.72m));
+                cfg.GetValue("AiPerformance:SalesInvoiceConfidenceReviewThreshold", 0.72m)).ToList();
             if (providerNeedsReview)
                 reviewIssues.Add(new SalesInvoiceReviewIssue("provider", null,
                     "This bill was read by the backup provider. Confirm the extracted details against the original."));
@@ -919,9 +920,7 @@ public sealed class SalesInvoiceCaptureService(
             var state = ReadString(source?[field]);
             if (state is null || !ProvenanceStatuses.Contains(state))
             {
-                state = values?[field] is not null
-                    ? "source_read"
-                    : field == "unitPrice" ? "not_present" : "unreadable";
+                state = values?[field] is not null ? "source_read" : "unreadable";
             }
             result[field] = state;
         }
