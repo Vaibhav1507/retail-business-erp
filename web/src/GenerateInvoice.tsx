@@ -310,20 +310,31 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     } as Record<string, string>)[state] ?? 'Needs review'
   }
 
-  function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'serialNumbers' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
+  function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'serialNumbers' | 'hsn' | 'quantity' | 'unitPrice' | 'sellingPrice' | 'discount', value: string) {
     setSalesInvoiceReviewIssues(current => current.filter(issue => issue.lineIndex !== index || issue.field !== field))
     setSalesInvoiceDraft(current => current ? ({
       ...current,
-      lines: current.lines.map((line, lineIndex) => lineIndex !== index ? line : {
-        ...line,
-        [field]: ['quantity', 'unitPrice', 'discount'].includes(field)
-          ? (value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null)
-          : field === 'serialNumbers'
-            ? value.split(/[\r\n,;]+/).map(part => part.trim()).filter(Boolean)
-            : value,
-        fieldStates: {
-          ...(line.fieldStates ?? {}),
-          [field]: line[field] != null && String(line[field]).trim() !== '' ? 'user_corrected' : 'user_entered'
+      lines: current.lines.map((line, lineIndex) => {
+        if (lineIndex !== index) return line
+        if (field === 'sellingPrice') {
+          const parsed = value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null
+          return {
+            ...line,
+            sellingPrice: parsed,
+            sellingPriceProvenance: line.sellingPrice != null ? 'user_corrected' : 'user_entered'
+          }
+        }
+        return {
+          ...line,
+          [field]: ['quantity', 'unitPrice', 'discount'].includes(field)
+            ? (value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null)
+            : field === 'serialNumbers'
+              ? value.split(/[\\r\\n,;]+/).map(part => part.trim()).filter(Boolean)
+              : value,
+          fieldStates: {
+            ...(line.fieldStates ?? {}),
+            [field]: line[field] != null && String(line[field]).trim() !== '' ? 'user_corrected' : 'user_entered'
+          }
         }
       })
     }) : current)
@@ -361,14 +372,14 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     const invalid = salesInvoiceDraft.lines.findIndex(line =>
       !(line.description?.trim() || line.model?.trim()) ||
       !(line.quantity != null && line.quantity > 0) ||
-      !((line.sellingPrice ?? line.unitPrice) != null && (line.sellingPrice ?? line.unitPrice)! > 0) ||
+      !(line.sellingPrice != null && line.sellingPrice > 0) ||
       (line.discount != null && line.discount < 0))
     if (invalid >= 0) {
       setError('Complete a description or model number, quantity and unit price for every extracted line before adding them to the bill.')
       return
     }
     const excessiveDiscount = salesInvoiceDraft.lines.findIndex(line =>
-      line.discount != null && line.discount > line.quantity! * (line.sellingPrice ?? line.unitPrice)!)
+      line.discount != null && line.discount > line.quantity! * line.sellingPrice!)
     if (excessiveDiscount >= 0) {
       setError(`Discount cannot exceed the line amount for item ${excessiveDiscount + 1}.`)
       return
@@ -405,7 +416,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         productId: '',
         name: line.description && line.description.trim() ? line.description : line.model!.trim(),
         quantity: line.quantity!,
-        unitPrice: (line.sellingPrice ?? line.unitPrice)!,
+        unitPrice: line.sellingPrice!,
         discount: line.discount ?? 0,
         serials: [...(line.serialNumbers ?? []), ...candidates.filter(candidate => candidate.classification === 'serial' && candidate.confirmed === true).map(candidate => candidate.value.trim())],
         imei1s: confirmedImeis.slice(0, 1),
@@ -895,7 +906,10 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               </fieldset>}
               <div className="invoice-extracted-line-values">
                 <label>Qty <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('quantity', index)}</small><input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} />{salesInvoiceFieldIssue('quantity', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('quantity', index)}</small>}</label>
-                <label>Source rate (₹) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('unitPrice', index)}</small><span className="invoice-source-rate-value">{line.unitPrice != null ? money(line.unitPrice) : 'Not written on source bill'}</span></label>
+                <label>Source rate (₹) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('unitPrice', index)}</small><span className="invoice-source-rate-value">{line.unitPrice != null ? money(line.unitPrice) :
+                  line.fieldStates?.unitPrice === 'not_present' ? 'Not written on source bill' :
+                    line.fieldStates?.unitPrice === 'unreadable' ? 'Written but unreadable' :
+                      line.fieldStates?.unitPrice === 'ambiguous' ? 'Competing readings' : 'Not available'}</span></label>
                 <label>RBOS selling price (₹) <small className="invoice-extraction-provenance">{({
                   source_read: 'Prefilled from source rate',
                   not_present: 'Enter your selling price',
