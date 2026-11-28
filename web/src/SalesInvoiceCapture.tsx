@@ -32,6 +32,7 @@ export type SalesInvoiceIdentifierCandidate = {
   value: string
   classification: 'model' | 'serial' | 'imei' | 'barcode' | 'part_number' | 'unknown'
   confirmed?: boolean
+  fieldState?: SalesInvoiceFieldState
   luhnValid?: boolean | null
 }
 
