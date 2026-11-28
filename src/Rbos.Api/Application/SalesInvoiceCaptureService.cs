@@ -1117,7 +1117,7 @@ public sealed class SalesInvoiceCaptureService(
             var state = ReadString(extraction["fieldStates"]?[field]);
             if (state == "ambiguous")
                 Add(field, null, $"The {label} has competing readings. Check the original bill and choose the correct value.");
-            else if (state == "unreadable" && present)
+            else if (state == "unreadable" && (present || field is "subtotal" or "taxAmount"))
                 Add(field, null, $"The {label} is marked unreadable. Check the original bill before continuing.");
         }
 
@@ -1194,6 +1194,11 @@ public sealed class SalesInvoiceCaptureService(
                         var candidateValue = ReadString(candidate["value"]);
                         var classification = ReadString(candidate["classification"]);
                         if (candidateValue is null) continue;
+                        var candidateState = ReadString(candidate["fieldState"]);
+                        if (candidateState == "ambiguous")
+                            Add("identifierCandidates", index, $"Item {index + 1}: identifier “{candidateValue}” has uncertain characters or classification. Confirm it against the original.");
+                        else if (candidateState == "unreadable")
+                            Add("identifierCandidates", index, $"Item {index + 1}: an identifier is written but unreadable. Leave it unconfirmed or correct it manually.");
                         if (classification == "imei" && !IsValidImei(candidateValue))
                             Add("identifierCandidates", index, $"Item {index + 1}: a possible IMEI failed its check digit. Confirm the characters or change its classification; it has not been added as a serial.");
                         if (!identifierLocations.TryGetValue(candidateValue, out var occurrences))
@@ -1207,7 +1212,7 @@ public sealed class SalesInvoiceCaptureService(
                     var hasValue = line[field] is not null;
                     if (state == "ambiguous")
                         Add(field, index, $"Item {index + 1}: {field} has competing readings. Check the original bill.");
-                    else if (state == "unreadable" && hasValue)
+                    else if (state == "unreadable" && (hasValue || field is "brand" or "model" or "hsn" or "discount" or "gstRate" or "gstAmount"))
                         Add(field, index, $"Item {index + 1}: {field} is marked unreadable. Check the original bill.");
                 }
 
