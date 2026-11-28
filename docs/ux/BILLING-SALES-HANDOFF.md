@@ -190,3 +190,31 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 ### P0 + P1 validation scope clarification — 2026-11-26
 
 User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. Code CI #1342 passed on the implementation commit; code CI #1343 passed on the latest pre-merge branch head. Playwright/E2E, screenshots, Axe and native Android checks remain deferred (not passed). The automatically triggered Visual Audit #297 failed in the signup helper before reaching the import flow: it expected a `Next` button, but the current signup step renders `Continue`. Do not treat this as an extraction failure or a visual acceptance pass. Statistical confidence calibration and actual p50/p95 latency/accuracy measurements still depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.
+
+## Final handwritten sales invoice design — 2026-11-28
+
+Design contract: [handwritten-sales-invoice-extraction-v2-design.md](./handwritten-sales-invoice-extraction-v2-design.md). Branch: `design/sales-invoice-haiku-vision-v1`. Design only; implementation has not started.
+
+Decision: one direct Claude Haiku 5.5 (`claude-haiku-5-5`) multimodal read of the original sales bill. No OCR/Tesseract in the live sales path, no routine Gemini/Groq fallback, and no second AI verifier. Permit one bounded retry only for transient provider/network failures; otherwise offer retry or manual entry. Use deterministic validation and the existing editable review; never treat model confidence as calibrated accuracy or post a sale from extraction.
+
+Preserve the existing Generate Invoice design, customer name/mobile requirement, optional serials, source invoice identity separate from RBOS numbering, existing financial/stock/GST/payment rules and final sale confirmation. The original bill must be retained and tenant-safely linked to the posted sale. Use migration 058 document/page storage via a synchronous sales-specific persistence path; do not call the generic upload service because it enqueues the separate document worker. Create the source-document-to-sale link in the successful sale-post transaction. Posted/unposted retention and deletion policy still needs business/accounting approval; no legal retention term is assumed.
+
+No application code, API call, secret, GCP setting or production deployment has changed. Supplier invoices, Add Purchase, item tags, catalogue import, workers and AI Gateway remain out of scope. Implementation, complete Playwright/responsive visual review/Axe, Android checks, user acceptance, merge and deployment remain separate gates. Do not merge or deploy without approval.
+
+## Combined handwritten sales-invoice V2 decision — 2026-11-28
+
+The previous Haiku-only architecture note is superseded by [the combined V2 design](./handwritten-sales-invoice-extraction-v2-design.md). The selected processing strategy is:
+
+- **Every bill:** Claude Haiku 5.5 (claude-haiku-5-5) reads the original image/PDF, in parallel with Google Cloud Vision DOCUMENT_TEXT_DETECTION for independent text/layout evidence. This puts the purchased Anthropic API credit to work on real bill processing; no broad paid model bake-off is planned.
+- **Only on material conflict / critical uncertainty:** Gemini 4 Hydrogen reads the original full page plus a contextual high-resolution crop, without seeing the previous model/OCR answers. It is the provider fallback if Haiku is unavailable after one bounded transient retry.
+- **Degraded OCR:** local Tesseract is retained only if Cloud Vision fails/times out; do not run both OCR engines on every bill. PSM 3/4/6/11 comparison is optional offline work.
+- **Last-resort:** Groq only when the primary and Hydrogen routes are unavailable; any Groq result remains NeedsReview.
+- **Not in first release:** Gemini 4 Argon, Gemini 3.8 Flash model tournament, broad benchmark runs, worker/queue processing.
+
+All critical fields remain editable and human-reviewed. Reader agreement is corroboration, not proof. Source Rate blank remains not_present; unknown identifiers remain candidates until classified; source-read/calculated/user-entered/user-corrected provenance is explicit. No model confidence percentage auto-accepts a field.
+
+The original bill is retained using migration-058 tenant/RLS-protected storage through a sales-specific synchronous path. Do not call generic DocumentIntakeService.UploadAsync, because that enqueues the separate parked worker. Link evidence atomically to the sale only during successful normal posting. Retention/deletion period still requires business/accounting approval.
+
+**Important integration gate:** a prior Haiku API smoke request returned HTTP 400 with an empty body; the cause is unresolved. Implement the adapter, run one secure non-production integration smoke check, and do not make blind paid retries. If Haiku cannot be reached reliably, retain Gemini 4 Hydrogen as the temporary primary until the Anthropic integration issue is diagnosed—do not silently ship an unproven provider path.
+
+Current repository main remains at the baseline SHA recorded in the design. PR #119 is the documentation-only Draft PR carrying the combined design. No app code, API call, credential, GCP/IAM setting or Cloud Run production configuration has changed. Implementation, complete Playwright/responsive screenshot/Axe verification, native Android checks, user acceptance, merge and deployment remain separate gates.
