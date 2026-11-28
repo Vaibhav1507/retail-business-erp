@@ -675,7 +675,7 @@ public sealed class SalesInvoiceCaptureService(
         return (double)expected.Count(token => actual.Contains(token)) / expected.Count;
     }
 
-    public static bool IsPossibleOmittedOcrProductRow(string ocrRow, IReadOnlyList<string> extractedDescriptions)
+    public static bool IsPossibleOmittedOcrProductRow(string ocrRow, IReadOnlyList<string?> extractedDescriptions)
     {
         if (OcrTokens(ocrRow).Count < 2) return false;
         if (new[] { "invoiceNumber", "date", "total" }.Any(field => IsOcrHeaderLabelRow(field, ocrRow)))
