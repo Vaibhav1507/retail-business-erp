@@ -4,7 +4,7 @@ import './invoice.css'
 import './billing-forms.css'
 import { InvoiceDocument } from './InvoiceDocument'
 import { ItemTagCapture, type CapturedInvoiceItem } from './ItemTagCapture'
-import { SalesInvoiceCapture, type ExtractedSalesInvoice, type SalesInvoiceReviewIssue } from './SalesInvoiceCapture'
+import { SalesInvoiceCapture, type ExtractedSalesInvoice, type SalesInvoiceReviewIssue, type SalesInvoiceIdentifierCandidate } from './SalesInvoiceCapture'
 import { t as tr } from './i18n'
 import { whatsappStatusDescription, whatsappStatusLabel } from './whatsappStatus'
 import { discardOfflineSale, listOfflineSales, queueOfflineSale, syncOfflineSales, type OfflineSaleBody, type OfflineSaleItem } from './offlineSales'
@@ -17,6 +17,17 @@ type Item = { productId: string; name: string; quantity: number; unitPrice: numb
 
 const GST_RATES = [0, 3, 5, 12, 18, 28]
 const money = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const validImei = (value: string) => {
+  if (!/^\\d{15}$/.test(value)) return false
+  let sum = 0
+  for (let index = 0; index < 15; index++) {
+    let digit = Number(value[index])
+    if (index % 2 === 1) { digit *= 2; if (digit > 9) digit -= 9 }
+    sum += digit
+  }
+  return sum % 10 === 0
+}
+const sourcePageUrl = (id: string) => '/api/documents/' + encodeURIComponent(id) + '/pages/1'
 const HELD_KEY = 'rbos.heldBills'
 type Held = { id: string; label: string; data: Record<string, any> } // eslint-disable-line @typescript-eslint/no-explicit-any
 const readLegacyHeld = (): Held[] => { try { return JSON.parse(localStorage.getItem(HELD_KEY) ?? '[]') as Held[] } catch { return [] } }
@@ -98,6 +109,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [salesInvoiceCaptureKey, setSalesInvoiceCaptureKey] = useState(0)
   const [salesInvoiceWarnings, setSalesInvoiceWarnings] = useState<string[]>([])
   const [salesInvoiceReviewIssues, setSalesInvoiceReviewIssues] = useState<SalesInvoiceReviewIssue[]>([])
+  const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null)
+  const [sourceDocumentMime, setSourceDocumentMime] = useState('')
   const [sourceInvoiceRef, setSourceInvoiceRef] = useState('')
   const [sourceInvoiceDate, setSourceInvoiceDate] = useState('')
   const [brandText, setBrandText] = useState('')
@@ -253,7 +266,9 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems(current => current.filter((_, i) => i !== index))
   }
 
-  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[] = []) {
+  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[] = [], documentId: string, sourceMime: string) {
+    setSourceDocumentId(documentId)
+    setSourceDocumentMime(sourceMime)
     setSalesInvoiceDraft(draft)
     setSalesInvoiceWarnings(warnings)
     setSalesInvoiceReviewIssues(reviewIssues)
@@ -286,6 +301,23 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     }) : current)
   }
 
+  function updateCapturedIdentifier(index: number, candidateIndex: number, field: 'value' | 'classification' | 'confirmed', value: string | boolean) {
+    setSalesInvoiceDraft(current => current ? ({
+      ...current,
+      lines: current.lines.map((line, lineIndex) => lineIndex !== index ? line : ({
+        ...line,
+        identifierCandidates: (line.identifierCandidates ?? []).map((candidate, indexOfCandidate) =>
+          indexOfCandidate !== candidateIndex ? candidate : ({
+            ...candidate,
+            [field]: field === 'confirmed' ? value : value,
+            ...(field === 'value' && typeof value === 'string'
+              ? { luhnValid: candidate.classification === 'imei' ? validImei(value.trim()) : null }
+              : {})
+          }))
+      }))
+    }) : current)
+  }
+
   function addCapturedLines() {
     if (!salesInvoiceDraft?.lines.length) { setError('No invoice lines were extracted. Add the products manually.'); return }
     const invalid = salesInvoiceDraft.lines.findIndex(line =>
@@ -305,7 +337,14 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     }
     const knownSerials = new Set(items.flatMap(item => [...item.serials, ...item.imei1s, ...item.imei2s]).map(value => value.trim().toLowerCase()))
     for (const line of salesInvoiceDraft.lines) {
-      const serials = (line.serialNumbers ?? []).map(value => value.trim()).filter(Boolean)
+      const candidates = line.identifierCandidates ?? []
+      const confirmedSerials = candidates.filter(candidate => candidate.classification === 'serial' && candidate.confirmed === true).map(candidate => candidate.value.trim())
+      const confirmedImeis = candidates.filter(candidate => candidate.classification === 'imei' && candidate.confirmed === true).map(candidate => candidate.value.trim())
+      if (confirmedImeis.some(value => !validImei(value))) {
+        setError('A confirmed IMEI is not valid. Check its 15 digits and check digit, or change its classification.')
+        return
+      }
+      const serials = [...(line.serialNumbers ?? []).map(value => value.trim()).filter(Boolean), ...confirmedSerials]
       if (serials.some(value => value.length < 4 || value.length > 40 || /\s/.test(value)) || serials.length > (line.quantity ?? 0)) {
         setError('Check the extracted serial numbers. Each must be 4–40 characters and the count cannot exceed the item quantity.')
         return
@@ -319,17 +358,26 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         knownSerials.add(normalized)
       }
     }
-    const next: Item[] = salesInvoiceDraft.lines.map(line => ({
-      productId: '',
-      name: line.description?.trim() || line.model!.trim(),
-      quantity: line.quantity!,
-      unitPrice: line.unitPrice!,
-      discount: line.discount ?? 0,
-      serials: line.serialNumbers ?? [], imei1s: [], imei2s: [],
-      brand: line.brand?.trim() || undefined,
-      model: line.model?.trim() || undefined,
-      hsn: line.hsn?.trim() || undefined
-    }))
+    const next: Item[] = salesInvoiceDraft.lines.map(line => {
+      const candidates = line.identifierCandidates ?? []
+      const confirmedImeis = candidates.filter(candidate => candidate.classification === 'imei' && candidate.confirmed === true).map(candidate => candidate.value.trim())
+      const confirmedBarcodes = candidates.filter(candidate => candidate.classification === 'barcode' && candidate.confirmed === true).map(candidate => candidate.value.trim())
+      const confirmedModels = candidates.filter(candidate => candidate.classification === 'model' && candidate.confirmed === true).map(candidate => candidate.value)
+      return {
+        productId: '',
+        name: line.description && line.description.trim() ? line.description : line.model!.trim(),
+        quantity: line.quantity!,
+        unitPrice: line.unitPrice!,
+        discount: line.discount ?? 0,
+        serials: [...(line.serialNumbers ?? []), ...candidates.filter(candidate => candidate.classification === 'serial' && candidate.confirmed === true).map(candidate => candidate.value.trim())],
+        imei1s: confirmedImeis.slice(0, 1),
+        imei2s: confirmedImeis.slice(1, 2),
+        barcode: confirmedBarcodes[0] || undefined,
+        brand: line.brand?.trim() || undefined,
+        model: line.model?.trim() || confirmedModels[0] || undefined,
+        hsn: line.hsn?.trim() || undefined
+      }
+    })
     setItems(current => [...current, ...next])
     setSalesInvoiceDraft(null)
     setSalesInvoiceWarnings([])
@@ -338,7 +386,17 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setError('')
   }
 
-  function discardSalesInvoiceDraft() {
+  async function discardSalesInvoiceDraft() {
+    if (sourceDocumentId) {
+      try {
+        await api('POST', '/sales/invoice-image-extract/' + encodeURIComponent(sourceDocumentId) + '/discard', {})
+      } catch (error) {
+        setError(error instanceof Error ? 'The original bill could not be discarded. ' + error.message : 'The original bill could not be discarded. Retry before continuing.')
+        return
+      }
+    }
+    setSourceDocumentId(null)
+    setSourceDocumentMime('')
     setSalesInvoiceDraft(null)
     setSalesInvoiceWarnings([])
     setSalesInvoiceReviewIssues([])
@@ -368,16 +426,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       nextErrors.serial = 'This serial/IMEI is already present in this invoice.'
     if (serials.some(value => value.length < 4 || value.length > 40 || /\s/.test(value)) || serials.length > quantity)
       nextErrors.serial = 'Enter valid serial numbers (4–40 characters each, no more than the quantity).'
-    const validImei = (value: string) => {
-      if (!/^\\d{15}$/.test(value)) return false
-      let sum = 0
-      for (let i = 0; i < 15; i++) {
-        let digit = Number(value[i])
-        if (i % 2 === 1) { digit *= 2; if (digit > 9) digit -= 9 }
-        sum += digit
-      }
-      return sum % 10 === 0
-    }
     if ((imei1Text.trim() && !validImei(imei1Text.trim())) || (imei2Text.trim() && !validImei(imei2Text.trim())))
       nextErrors.serial = 'IMEI must contain 15 digits and pass its check digit.'
     if (Object.keys(nextErrors).length) { if (nextErrors.serial) setShowTagDetails(true); setFieldErrors(nextErrors); setError(''); return }
@@ -466,7 +514,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       const payments = credit && part2 > 0 ? [{ method: payMethod, amount: part }, { method: payMethod2, amount: part2 }].filter(x => x.amount > 0) : undefined
       if (!cid) throw new Error('Customer name and mobile number must be saved before posting this invoice.')
       saleBody = { customerId: cid, requireCustomerDetails: true, locationId: loc, saleDate: date, saleType: mode, amountPaid: credit ? part : null, payMethod: credit && part > 0 ? payMethod : null, payments, lines, gstRate: gst ? rate : null, placeOfSupply: gst && state.trim() ? state.trim() : null,
-        sourceInvoiceRef: sourceInvoiceRef.trim() || null, sourceInvoiceDate: sourceInvoiceDate || null }
+        sourceInvoiceRef: sourceInvoiceRef.trim() || null, sourceInvoiceDate: sourceInvoiceDate || null,
+        sourceDocumentId }
 
       if (offlineMode || !navigator.onLine) {
         await queueOfflineSale(ownerKey, saleBody, key)
@@ -509,13 +558,13 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setQty('1'); setPrice(''); setDisc(''); setSerialText(''); setBillDisc('')
     setTagCaptureKey(value => value + 1)
     setShowTagDetails(false)
-    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceInvoiceRef(''); setSourceInvoiceDate(''); setSalesInvoiceCaptureKey(value => value + 1)
+    setSalesInvoiceDraft(null); setSalesInvoiceWarnings([]); setSourceDocumentId(null); setSourceDocumentMime(''); setSourceInvoiceRef(''); setSourceInvoiceDate(''); setSalesInvoiceCaptureKey(value => value + 1)
     setWhatsappStatus('NotAvailable'); setCustomerId(''); setPhone(''); setName(''); setAddress(''); setCity(''); setState(''); setPin(''); setPaid(''); setPaid2(''); setMode('Cash'); setGst(false)
   }
 
   async function hold() {
     if (!items.length || !ownerKey) return
-    const data = { customerId, phone, name, address, city, state, pin, date, mode, paid, payMethod, paid2, payMethod2, gst, rate, items, billDisc, sourceInvoiceRef, sourceInvoiceDate }
+    const data = { customerId, phone, name, address, city, state, pin, date, mode, paid, payMethod, paid2, payMethod2, gst, rate, items, billDisc, sourceInvoiceRef, sourceInvoiceDate, sourceDocumentId, sourceDocumentMime }
     const label = (name.trim() || phone.trim() || 'Walk-in') + ' - ' + items.length + ' item(s)'
     const next = [{ id: crypto.randomUUID(), label, data }, ...held].slice(0, 20)
     await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next); clearForm()
@@ -532,12 +581,18 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       ...item, imei1s: item.imei1s ?? [], imei2s: item.imei2s ?? []
     })));
     setSourceInvoiceRef(d.sourceInvoiceRef ?? ''); setSourceInvoiceDate(d.sourceInvoiceDate ?? '');
+    setSourceDocumentId(d.sourceDocumentId ?? null); setSourceDocumentMime(d.sourceDocumentMime ?? '');
     setBillDisc(d.billDisc ?? '')
     const next = held.filter(x => x.id !== h.id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
   async function discardHeld(id: string) {
     if (!window.confirm('Discard this held bill?')) return
+    const heldBill = held.find(x => x.id === id)
+    if (heldBill?.data.sourceDocumentId && navigator.onLine) {
+      try { await api('POST', '/sales/invoice-image-extract/' + encodeURIComponent(heldBill.data.sourceDocumentId) + '/discard', {}) }
+      catch { setError('The held bill was removed, but its retained source file could not be marked discarded.'); return }
+    }
     const next = held.filter(x => x.id !== id); await saveOfflineRecord(ownerKey, 'held-bills', 'held-bills', 'ready', next); setHeld(next)
   }
 
