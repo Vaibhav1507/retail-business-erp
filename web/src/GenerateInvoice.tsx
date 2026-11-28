@@ -320,18 +320,6 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     }) : current)
   }
 
-  function updateCapturedHeaderNumber(field: 'subtotal' | 'taxAmount' | 'total', value: string) {
-    setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== field))
-    setSalesInvoiceDraft(current => current ? ({
-      ...current,
-      [field]: value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null,
-      fieldStates: {
-        ...(current.fieldStates ?? {}),
-        [field]: current[field] != null ? 'user_corrected' : 'user_entered'
-      }
-    }) : current)
-  }
-
   function addCapturedLines() {
     if (!salesInvoiceDraft?.lines.length) { setError('No invoice lines were extracted. Add the products manually.'); return }
     const invalid = salesInvoiceDraft.lines.findIndex(line =>
