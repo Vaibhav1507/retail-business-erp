@@ -826,7 +826,12 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               <span className="invoice-source-image-frame">
                 <img src={sourcePageUrl(sourceDocumentId) + '?preview=true'}
                   alt="Original handwritten customer sales bill, page 1" loading="lazy" />
-                {Object.entries(salesInvoiceDraft.ocrEvidence ?? {}).map(([field, evidence]) => {
+                {[
+                  ...Object.entries(salesInvoiceDraft.ocrEvidence ?? {}).map(([field, evidence]) => ({ field, evidence })),
+                  ...salesInvoiceDraft.lines.flatMap((line, index) => line.ocrEvidence
+                    ? [{ field: 'line-' + index, evidence: line.ocrEvidence }]
+                    : [])
+                ].map(({ field, evidence }) => {
                   const region = evidence.region
                   if (!region || evidence.pageNumber !== 1) return null
                   return <span key={field} className={'invoice-source-region' + (activeSourceRegionField === field ? ' active' : '')}
@@ -876,6 +881,15 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             {salesInvoiceDraft.lines.map((line, index) => <article className="invoice-extracted-line" key={index}>
               <div className="invoice-extracted-line-heading"><strong>Item {index + 1}</strong>{salesInvoiceReviewIssues.some(issue => issue.lineIndex === index) && <span>Check highlighted fields</span>}</div>
               <label>Product description (as written) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('description', index)}</small><AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' description'} className="invoice-extracted-description" value={line.description ?? ''} minHeight={48} onChange={value => updateCapturedLine(index, 'description', value)} />{salesInvoiceFieldIssue('description', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('description', index)}</small>}</label>
+              {line.ocrEvidence?.status && line.ocrEvidence.status !== 'corroborated' && <div className="invoice-extraction-conflict">
+                <strong>Independent OCR could not confidently confirm this product row.</strong>
+                {line.ocrEvidence.ocrCandidate && <small>OCR row reading: “{line.ocrEvidence.ocrCandidate}”.</small>}
+                {line.ocrEvidence.verificationCandidate && <small>Close-up reading: “{line.ocrEvidence.verificationCandidate}”.</small>}
+                {line.ocrEvidence.region && <button type="button" className="invoice-source-region-jump"
+                  onClick={() => { setActiveSourceRegionField('line-' + index); document.getElementById('invoice-source-evidence')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }}>
+                  Inspect product row in original bill
+                </button>}
+              </div>}
               <label>Serial number(s) (optional) <small className="invoice-extraction-provenance">Only values you confirm here enter the sale</small><AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' serial numbers'} className="invoice-extracted-serials" value={(line.serialNumbers ?? []).join('\n')} minHeight={44} placeholder="One serial number per line" onChange={value => updateCapturedLine(index, 'serialNumbers', value)} />{salesInvoiceFieldIssue('serialNumbers', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('serialNumbers', index)}</small>}</label>
               {(line.identifierCandidates ?? []).length > 0 && <fieldset className="invoice-identifier-candidates">
                 <legend>Possible model / serial / IMEI identifiers</legend>
