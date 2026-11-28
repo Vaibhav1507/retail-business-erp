@@ -82,7 +82,7 @@ Known unresolved source questions:
 - ANIL-002: source bill no. 468; main TOTAL box appears ₹10,020 while a separate ₹10,000 annotation is present near the authorised-signatory area. Keep those as separate observations. The visible Crown row appears source quantity 10 × ₹80 = ₹800 versus app quantity 2 / amount ₹160; verify row alignment and characters from the original.
 - S06–S09: existing corpus descriptions mention these source photos, but matching app output screenshots/runs are not in the seven-case comparison.
 
-Original source photos and app screenshots are not committed to Git. The Files search available during this documentation pass did not surface those original image attachments, so this pass could not independently re-open the scans or upgrade any provisional reading to a verified label.
+Original source photos were re-uploaded in the active conversation on 2026-11-28 and visually reviewed. A privacy-minimised provisional transcription is recorded in [source review v1](./handwritten-sales-bill-source-review-v1.md); all 11 source-photo statuses are now marked received in the register. This visual pass does not constitute independent second-person verification, so no field has been promoted to verified gold truth. Original photos and customer PII are not committed to Git.
 
 ## 4. Gold-label rules
 
@@ -237,10 +237,10 @@ No primary model or verifier has been selected yet.
 | Current main code inspected | Done | Main SHA stated above; service and fallback source reviewed |
 | PR #113 implementation merged | Done | Merge SHA `965da62d980d0b7b3d6b38de53f9b67e8fdac629` |
 | Main code CI | Done | Run #1357 success, 2026-11-27 |
-| Eleven source sample register | Done (provisional) | Register CSV; no gold labels yet |
+| Eleven source sample register | Done (provisional) | All 11 source photos received; register CSV updated |
 | Source-to-app comparison reports | Done for seven runs | Existing v1 comparison notes, not gold labels |
 | Resolve four unmatched sample runs S06–S09 | Not started | Need source and current app output for each |
-| Human gold labels | Not started | Need original scans available in the active project/chat and manual source verification |
+| First-pass source review | Done (provisional) | All 11 photos visually reviewed; see source review v1 |\n| Human gold labels | In progress / pending second review | Critical handwritten fields, especially S03 total, S01/S02 invoice refs and Anil line rows, need confirmation |
 | API eligibility smoke tests | Not started | Check image input, schema output, exact model IDs and privacy terms |
 | Direct VLM bake-off | Not started | Run experiment A |
 | OCR-assisted comparison | Not started | Run experiment B only after baseline A |
@@ -264,14 +264,14 @@ No primary model or verifier has been selected yet.
 - 2026-11-28 — Direct vision, optional OCR evidence and conditional independent verifier are separate experiment arms.
 - 2026-11-28 — Use a verifier blind to the primary output; compare outputs after both have independently extracted the image.
 - 2026-11-28 — No free-tier transmission of unredacted customer invoices.
-- 2026-11-28 — No model winner, 98% accuracy release target, monthly spend cap, merge or deployment has been approved.
+- 2026-11-28 — All 11 original source photos were re-uploaded; first-pass visual review is documented separately. Gold labels remain provisional pending independent review.\n- 2026-11-28 — No model winner, 98% accuracy release target, monthly spend cap, merge or deployment has been approved.
 
 ## References within RBOS
 
 - [RBOS UI/UX workflow](../ux/RBOS-UI-UX-WORKFLOW.md)
 - [Billing & Sales handoff](../ux/BILLING-SALES-HANDOFF.md)
 - [P0/P1 handwritten import implementation and acceptance contract](../ux/handwritten-sales-bill-import-accuracy.md)
-- [Provisional handwritten-bill corpus](./handwritten-sales-bill-corpus-v1.md)
+- [Provisional handwritten-bill corpus](./handwritten-sales-bill-corpus-v1.md)\n- [Re-uploaded source-photo review](./handwritten-sales-bill-source-review-v1.md)
 - [Seven-case extraction comparison](./handwritten-sales-seven-bill-comparison-v1.md)
 - [Anil Sports comparison](./anil-sports-import-comparison-v1.md)
 - [Monika Electronics comparison](./monika-sales-import-comparison-v1.md)
