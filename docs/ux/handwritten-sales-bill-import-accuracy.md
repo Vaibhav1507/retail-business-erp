@@ -220,3 +220,10 @@ The current benchmark source of truth is [handwritten-sales-bill-benchmark-v2.md
 - Candidate model and OCR comparison is research-only. No provider winner is selected, no paid spend is approved and no production configuration change is authorised.
 - Original scans were not retrievable from the active Project file search during this documentation pass. No source transcription was promoted to verified ground truth. Do not put original or unredacted scans into Git.
 - Next: restore the 11 redacted source scans to the active RBOS Project/chat, verify gold labels, obtain missing S06–S09 baseline runs, smoke-test model/API eligibility and privacy terms, then run the controlled direct-vision experiment before OCR/verifier arms.
+
+
+## 15. Source-photo restoration — 2026-11-28
+
+All 11 source photos have now been re-uploaded to the active conversation (nine Monika, two Anil). See [privacy-minimised source review](../quality/handwritten-sales-bill-source-review-v1.md) and [benchmark V2 master](../quality/handwritten-sales-bill-benchmark-v2.md).
+
+The first-pass readings remain provisional, not independently verified gold labels. The benchmark register marks all 11 photos received. S06–S09 still lack matching app outputs; the existing seven app runs cover S01–S05 and S10–S11. Do not calculate accuracy until uncertain source fields are reviewed and the missing baseline runs are captured.
