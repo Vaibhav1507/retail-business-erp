@@ -93,19 +93,18 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
       sourceDocumentId: sourceDocumentIds[Math.min(uploadCount++, sourceDocumentIds.length - 1)],
       extraction: {
         invoiceNumber: 'HAND-468', date: '2026-11-26', customerName: 'Handwritten Customer',
-        customerPhone: '9876543210', subtotal: 10000, taxAmount: 1800, total: 11800,
+        customerPhone: '9876543210', subtotal: 10000, taxAmount: 20, total: 10020,
         fieldStates: { invoiceNumber: 'ambiguous', date: 'source_read', customerName: 'source_read', customerPhone: 'source_read', subtotal: 'source_read', taxAmount: 'source_read', total: 'ambiguous' },
         ocrEvidence: {
           invoiceNumber: { status: 'ambiguous', haikuOrPrimaryReading: 'HAND-468', ocrCandidate: '4006', ocrAgrees: false, pageNumber: 1, region: { left: 0.12, top: 0.1, width: 0.22, height: 0.04 }, verificationCandidate: 'HAND-468', verificationStatus: 'source_read' },
-          total: { status: 'ambiguous', haikuOrPrimaryReading: '11800', ocrCandidate: '11800', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '11800', verificationStatus: 'source_read' },
+          total: { status: 'ambiguous', haikuOrPrimaryReading: '11800', ocrCandidate: '10000', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '10020', verificationStatus: 'source_read' },
         },
         lines: [{
           description: 'Samsung LED Television model UA43\\nSerial: SN12345678\\nFull handwritten model and package text preserved on this line',
           brand: 'Samsung', model: 'UA43', serialNumbers: [],
           identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }, { value: 'UA43', classification: 'model', confirmed: false }],
-          fieldStates: { description: 'source_read', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'source_read', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
           hsn: '8528', quantity: 1, unitPrice: null, sellingPrice: null, sellingPriceProvenance: 'not_present',
-          discount: 0, amount: 10000, gstRate: 18, gstAmount: 1800, confidence: 0.92,
+          discount: 0, amount: 10000, gstRate: null, gstAmount: null, confidence: 0.92,
           fieldStates: { description: 'ambiguous', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'not_present', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
           ocrEvidence: { status: 'ambiguous', haikuOrPrimaryReading: 'Samsung LED Television model UA43', ocrCandidate: 'Samsung LED Television UA43', ocrAgrees: false, pageNumber: 1, region: { left: 0.1, top: 0.4, width: 0.8, height: 0.12 }, verificationCandidate: 'Samsung LED Television UA43', verificationStatus: 'ambiguous' },
         }],
@@ -185,6 +184,10 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await importBill()
   const acceptedReview = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
   await expect(acceptedReview).toBeVisible()
+  await acceptedReview.getByLabel('Source bill number').fill('HAND-468')
+  await acceptedReview.locator('#invoice-source-total').fill('10020')
+  await acceptedReview.getByLabel('Extracted line 1 unit price').fill('10000')
+  await expect(acceptedReview.getByText('Corrected by you').first()).toBeVisible()
   await acceptedReview.getByRole('checkbox', { name: 'Confirm this reading' }).first().check()
   await acceptedReview.getByRole('button', { name: 'Add reviewed lines to bill' }).click()
   await expect(bill.locator('.invoice-added-item')).toContainText('Samsung LED Television model UA43')
