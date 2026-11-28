@@ -83,6 +83,8 @@ Out of scope:
 - Updated SalesInvoiceCaptureContractTests for existing-key reuse behind explicit flags.
 - Added tests for ignoring obsolete dedicated keys and configurable paid model overrides.
 - Added tests for provider selection priority (Haiku → Gemini → Groq), comparison output privacy, unavailable comparisons and prompt version.
+- Added a service-level concurrency test using a barrier HTTP handler; it asserts Gemini and Groq both start before either provider response is released.
+- Added explicit handling for provider refusal responses so one reader's refusal cannot fail the complete parallel extraction.
 - Removed obsolete OCR-reconciliation-specific tests.
 - appsettings.json now has Gemini:SalesInvoiceShadowEnabled=false, Groq:SalesInvoiceShadowEnabled=false and AiPerformance:SalesInvoiceShadowAttemptTimeoutSeconds=10. No secrets are committed.
 
@@ -120,7 +122,7 @@ Before creating the PR, review these points carefully:
 | Existing key reuse and pinned models | Implemented | Unit tests added; CI pending |
 | OCR removed from active service | Implemented | Verify exact diff and DI/build |
 | Pairwise privacy-safe comparison | Implemented | Unit tests added; CI pending |
-| Provider concurrency/cancellation tests | Partial | Add or validate deterministic coverage if CI/review exposes a gap |
+| Provider concurrency/cancellation tests | Concurrency covered | Deterministic service test proves Gemini/Groq overlap; CI and runtime cancellation review pending |
 | Backend build/unit tests | Pending | Run GitHub CI after PR creation |
 | Frontend CI | Pending | No frontend files changed; still inspect complete workflow result |
 | PostgreSQL integration/migrations | Pending | No migration changes expected; confirm CI |
@@ -136,12 +138,12 @@ Before creating the PR, review these points carefully:
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Check whether the current test suite compiles. If possible, run backend build/unit tests locally; otherwise open a draft PR and use GitHub Actions as the validation source.
+3. Draft PR #125 is open. Exact-head GitHub CI run #1532 is in progress; grouped visual audit run #465 is also in progress. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173126985 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173127072.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
-5. Add a deterministic concurrency/cancellation test if the current test coverage does not prove parallel start and bounded completion.
+5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
 7. Update this file and the Billing & Sales handoff with exact CI run URLs, provider smoke results, and any remaining limitations.
-8. Open/maintain a draft PR for review. Do not merge or deploy without explicit authorisation.
+8. Keep PR #125 in draft until CI and provider eligibility are understood. Do not merge or deploy without explicit authorisation.
 
 ## 9. Current branch commit trail
 
@@ -155,6 +157,7 @@ Before creating the PR, review these points carefully:
 - 7ecb626b160e9f9af0003958386bef0a896048a6 — test provider priority and unavailable comparisons.
 - e71cc9107e81e881b6ad661882c474df429eea7d — add an end-to-end service unit test proving Gemini/Groq calls start concurrently.
 - 3beaf60fa925af2e7b3c0f941647e7eb68c84062 — use a typed task-completion barrier in the concurrency test.
+- 729f694a83d4cb06d7af169ee697d93c75f1cb8b — isolate provider refusal failures so shadow errors cannot fail the whole extraction.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
 Latest code/document commit SHAs should be refreshed before the next handover; this file itself is being created in the current continuation.
