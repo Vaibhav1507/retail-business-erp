@@ -112,9 +112,17 @@ public sealed class SalesInvoiceCaptureService(
 
             // Haiku remains authoritative whenever it returns a usable extraction.
             // Gemini is the first backup; Groq is used only if Haiku and Gemini fail.
-            var selected = haikuAttempt.Extraction is not null ? haikuAttempt :
-                geminiAttempt.Extraction is not null ? geminiAttempt :
-                groqAttempt.Extraction is not null ? groqAttempt : null;
+            var selectedProvider = SelectSalesInvoiceProvider(
+                haikuAttempt.Extraction is not null,
+                geminiAttempt.Extraction is not null,
+                groqAttempt.Extraction is not null);
+            var selected = selectedProvider switch
+            {
+                "Anthropic" => haikuAttempt,
+                "Gemini" => geminiAttempt,
+                "Groq" => groqAttempt,
+                _ => null
+            };
             var parsed = selected?.Extraction;
             var providerName = selected?.Provider ?? "None";
             var providerModel = selected?.Model ?? "None";
@@ -452,6 +460,9 @@ public sealed class SalesInvoiceCaptureService(
 
     sealed record SalesInvoiceProviderAttempt(
         string Provider, string Model, string Status, JsonNode? Extraction, long LatencyMs);
+
+    public static string SelectSalesInvoiceProvider(bool haikuUsable, bool geminiUsable, bool groqUsable) =>
+        haikuUsable ? "Anthropic" : geminiUsable ? "Gemini" : groqUsable ? "Groq" : "None";
 
     /// <summary>
     /// Compares only field identity/status, never emits either provider's extracted values.
