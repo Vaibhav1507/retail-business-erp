@@ -45,6 +45,13 @@ public sealed class SalesInvoiceCaptureService(
             ? NonBlank(configuration["Groq:SalesInvoiceFreeTierApiKey"])
             : null;
 
+    // Google Free-tier requests may be used to improve Google products. Targeted verification
+    // uses isolated source crops; sending an entire customer bill requires a separate explicit
+    // data-use switch, disabled by default.
+    public static bool IsSalesInvoiceGeminiFullDocumentFallbackEnabled(IConfiguration configuration) =>
+        configuration.GetValue("Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled", false) &&
+        GetSalesInvoiceGeminiFreeTierApiKey(configuration) is not null;
+
     static string? NonBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -175,7 +182,8 @@ public sealed class SalesInvoiceCaptureService(
             // cannot reuse Gemini:ApiKey because that general key may be billed on a paid plan.
             // The dedicated key and explicit free-tier enable switch must both be configured.
             var geminiFreeTierKey = GetSalesInvoiceGeminiFreeTierApiKey(cfg);
-            if (parsed is null && geminiFreeTierKey is not null)
+            if (parsed is null && geminiFreeTierKey is not null &&
+                IsSalesInvoiceGeminiFullDocumentFallbackEnabled(cfg))
             {
                 const string hydrogen = GeminiFreeTierModel;
                 try
