@@ -223,13 +223,13 @@ Approved combined specification: [handwritten sales invoice extraction V2](./han
 
 ### Validation status
 
-The first exact-head CI run exposed compile errors and two outdated frontend test expectations. Fixes were committed. New CI and Visual Audit runs have been triggered for subsequent heads; only the latest exact-head run counts. At the time of this handoff update, the latest run is still pending, so no green CI claim is made.
+The initial exact-head run exposed compile errors and outdated frontend test expectations; those were fixed. The latest application-code head `81f0b43d05587a26c7dd8b8c228e16ee6991c714` then passed frontend, backend and PostgreSQL integration CI. Its invoice-import visual audit reached the actual review flow and failed the Axe serious/critical `color-contrast` assertion at mobile 390 × 844. This is a real unresolved accessibility failure, not the earlier signup-helper timeout.
 
-The earlier PR #119 Visual Audit failure was a five-minute timeout in the existing invoice-import signup helper waiting for a `Next` button while the current screen renders `Continue`; it failed before reaching the invoice import journey. It is not visual acceptance.
+Two documentation-only commits then reconciled this handoff and the V2 specification with the user's final Haiku-first model decision. The updated PR head is `9fbb16f6e8f31afeafea1478a3636ebcede8e3f3`; fresh code CI and Visual Audit runs #46138753177 and #46138753178 are currently in progress. The application code did not change in those documentation commits.
 
 ### Remaining work
 
-1. Add conservative detection for likely Cloud Vision product rows that the primary extraction omitted entirely. Current alignment flags extracted rows that fail to match OCR but cannot prove recall for completely omitted rows. Quantity/rate/amount/identifier-column geometry alignment also remains.
+1. Validate the conservative possible-omitted-row warnings against independently verified bills. They are implemented as review cues and never create sale lines; they do not yet establish complete product-row recall. Quantity/rate/amount/identifier-column geometry alignment also remains.
 2. Add PostgreSQL integration tests for tenant-isolated evidence retrieval, atomic document-to-sale linking, discard and idempotent replay. The initial source retention and posting path is implemented.
 3. Verify all field/candidate provenance, including user-entered versus user-corrected values, through the complete UI journey.
 4. Run exact-head CI to completion, then inspect full Generate Invoice Playwright journeys, responsive phone/tablet/landscape/desktop screenshots, scrolled/focus states and Axe WCAG 2 A/AA results.
