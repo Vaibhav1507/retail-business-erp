@@ -273,7 +273,7 @@ public sealed class SalesInvoiceCaptureService(
         {
             return new SalesInvoiceProviderAttempt("Anthropic", "claude-haiku-5-5", "timeout", null, timer.ElapsedMilliseconds);
         }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException or HttpRequestException or VisionProviderRefusalException)
+        catch (Exception error) when (error is not OutOfMemoryException && error is not OperationCanceledException)
         {
             log.LogWarning("Haiku sales-invoice extraction failed. Error type {ErrorType}.", error.GetType().Name);
             return new SalesInvoiceProviderAttempt("Anthropic", "claude-haiku-5-5", "failed", null, timer.ElapsedMilliseconds);
@@ -307,7 +307,7 @@ public sealed class SalesInvoiceCaptureService(
             log.LogWarning("Gemini sales-invoice shadow attempt failed. Status {ProviderStatus}.", status);
             return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, status, null, timer.ElapsedMilliseconds);
         }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException or VisionProviderRefusalException)
+        catch (Exception error) when (error is not OutOfMemoryException && error is not OperationCanceledException)
         {
             log.LogWarning("Gemini sales-invoice shadow response was invalid. Error type {ErrorType}.", error.GetType().Name);
             return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "invalid_response", null, timer.ElapsedMilliseconds);
@@ -341,7 +341,7 @@ public sealed class SalesInvoiceCaptureService(
             log.LogWarning("Groq sales-invoice shadow attempt failed. Status {ProviderStatus}.", status);
             return new SalesInvoiceProviderAttempt("Groq", GroqFreeTierVisionModel, status, null, timer.ElapsedMilliseconds);
         }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
+        catch (Exception error) when (error is not OutOfMemoryException && error is not OperationCanceledException)
         {
             log.LogWarning("Groq sales-invoice shadow response was invalid. Error type {ErrorType}.", error.GetType().Name);
             return new SalesInvoiceProviderAttempt("Groq", GroqFreeTierVisionModel, "invalid_response", null, timer.ElapsedMilliseconds);
