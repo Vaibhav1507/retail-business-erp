@@ -106,7 +106,7 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
 
         var batches = images.Chunk(3).ToArray();
         var partials = await Task.WhenAll(batches.Select(batch =>
-            CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct, apiKey, model)));
+            CallAsync(batch, prompt, ct, apiKey, model)));
         return MergeInvoicePageResults(partials);
     }
 
