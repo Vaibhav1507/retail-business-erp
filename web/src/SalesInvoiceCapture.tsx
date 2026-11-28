@@ -17,12 +17,37 @@ export type ExtractedSalesInvoiceLine = {
   hsn: string | null
   quantity: number | null
   unitPrice: number | null
+  sellingPrice?: number | null
+  sellingPriceProvenance?: SalesInvoiceFieldState
   discount: number | null
   amount: number | null
   gstRate: number | null
   gstAmount: number | null
   confidence: number | null
   fieldConfidence?: Record<string, number | null>
+  fieldStates?: Record<string, SalesInvoiceFieldState>
+  identifierCandidates?: SalesInvoiceIdentifierCandidate[]
+  ocrEvidence?: SalesInvoiceOcrEvidence
+}
+
+export type SalesInvoiceFieldState = 'source_read' | 'not_present' | 'unreadable' | 'ambiguous' | 'calculated' | 'user_entered' | 'user_corrected'
+export type SalesInvoiceIdentifierCandidate = {
+  value: string
+  classification: 'model' | 'serial' | 'imei' | 'barcode' | 'part_number' | 'unknown'
+  confirmed?: boolean
+  fieldState?: SalesInvoiceFieldState
+  luhnValid?: boolean | null
+}
+
+export type SalesInvoiceOcrEvidence = {
+  status: string
+  haikuOrPrimaryReading: string | null
+  ocrCandidate: string | null
+  ocrAgrees: boolean | null
+  pageNumber: number | null
+  region?: { left: number; top: number; width: number; height: number } | null
+  verificationCandidate?: string | null
+  verificationStatus?: string | null
 }
 
 export type ExtractedSalesInvoice = {
@@ -34,11 +59,15 @@ export type ExtractedSalesInvoice = {
   taxAmount: number | null
   total: number | null
   fieldConfidence?: Record<string, number | null>
+  fieldStates?: Record<string, SalesInvoiceFieldState>
+  ocrEvidence?: Record<string, SalesInvoiceOcrEvidence>
+  possibleOmittedRows?: { text: string; pageNumber: number; region: { left: number; top: number; width: number; height: number } }[]
   lines: ExtractedSalesInvoiceLine[]
 }
 
 type CaptureResponse = {
   status: string
+  sourceDocumentId: string
   extraction: ExtractedSalesInvoice
   warnings: string[]
   reviewIssues?: SalesInvoiceReviewIssue[]
@@ -48,7 +77,7 @@ export function SalesInvoiceCapture({
   disabled, onExtract
 }: {
   disabled: boolean
-  onExtract: (draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[]) => void
+  onExtract: (draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[], sourceDocumentId: string, sourceMime: string) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
@@ -73,8 +102,11 @@ export function SalesInvoiceCapture({
     setBusy(true)
     setStatus('Reading handwritten invoice…')
     try {
-      const result = await apiBinary<CaptureResponse>('/sales/invoice-image-extract', file)
-      onExtract(result.extraction, result.warnings ?? [], result.reviewIssues ?? [])
+      const result = await apiBinary<CaptureResponse>(
+        '/sales/invoice-image-extract', file, undefined, undefined,
+        { 'X-Source-File-Name': file.name })
+      if (!result.sourceDocumentId) throw new Error('The original bill was not retained. Please retry the upload.')
+      onExtract(result.extraction, result.warnings ?? [], result.reviewIssues ?? [], result.sourceDocumentId, file.type)
       setStatus(result.status === 'NeedsAttention'
         ? 'Some details could not be read. Review the extracted fields and enter anything missing.'
         : 'Invoice details extracted. Review every field before adding the lines to your bill.')

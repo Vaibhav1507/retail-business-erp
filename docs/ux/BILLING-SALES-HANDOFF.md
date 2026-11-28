@@ -218,3 +218,135 @@ The original bill is retained using migration-058 tenant/RLS-protected storage t
 **Important integration gate:** a prior Haiku API smoke request returned HTTP 400 with an empty body; the cause is unresolved. Implement the adapter, run one secure non-production integration smoke check, and do not make blind paid retries. If Haiku cannot be reached reliably, retain Gemini 4 Hydrogen as the temporary primary until the Anthropic integration issue is diagnosed—do not silently ship an unproven provider path.
 
 Current repository main remains at the baseline SHA recorded in the design. PR #119 is the documentation-only Draft PR carrying the combined design. No app code, API call, credential, GCP/IAM setting or Cloud Run production configuration has changed. Implementation, complete Playwright/responsive screenshot/Axe verification, native Android checks, user acceptance, merge and deployment remain separate gates.
+
+
+## Handwritten Sales Invoice Extraction V2 — implementation handoff (2026-11-28)
+
+Approved combined specification: [handwritten sales invoice extraction V2](./handwritten-sales-invoice-extraction-v2-design.md). Design PR #119 is merged to main at `35b9c7cf1cd688b6ae57b82e1e8b9ed12d85c870`. Implementation is in PR #120, branch `feat/handwritten-sales-invoice-extraction-v2`; the branch has been synchronized with main during this continuation.
+
+### Verified implementation state
+
+- `AnthropicHaikuClient` is the single direct Messages API adapter for `claude-haiku-5-5`. It uses native original image/PDF content and structured JSON output. Token usage, request ID and safe error diagnostics are recorded.
+- Haiku remains gated by `Anthropic:SalesInvoiceIntegrationValidated`; default is false. Gemini 4 Hydrogen remains the temporary primary until the one secure non-production integration check passes.
+- Haiku retries transient failures once. Cloud Vision `DOCUMENT_TEXT_DETECTION` runs independently in parallel using ADC. Tesseract is degraded fallback only when Cloud Vision is unavailable.
+- Targeted Gemini Hydrogen verification is implemented for labelled invoice number/date/printed TOTAL regions. It receives only original-image crops and field labels, not Haiku's answer or OCR transcript. Its result remains a separate human-review candidate.
+- Cloud Vision product-description alignment is implemented in source order, allowing up to three adjacent OCR rows for wrapped handwriting. It records match status, OCR candidate text and source geometry; low/no-match descriptions become ambiguous and can be sent for targeted blind Hydrogen verification. It does not yet prove detection of rows omitted entirely by the primary model.
+- Provenance statuses and identifier candidates are normalized. AI-proposed serials do not populate the sale serial collection; operator confirmation is required. IMEI Luhn validation runs only for candidates classified as IMEI.
+- Original bills are retained by `SalesInvoiceEvidenceService` through migration-058 document/page tables without invoking `DocumentIntakeService.UploadAsync` or the generic worker.
+- Migration 061 creates the sales-document link. `SalesPosting` validates tenant/RLS-visible document ownership, Sale direction, HandwrittenBill source kind and NeedsReview status, then links and marks it Posted inside the normal sale transaction.
+- Generate Invoice now presents the retained original, source-region markers, competing readings and editable review. The normal sale confirmation remains the only posting path.
+
+### Fixes completed during continuation
+
+- Removed a duplicate Anthropic client/DI registration; only `AnthropicHaikuClient` remains.
+- Fixed C# compile issues (JSON exception import, mutable review-issue list and Cloud Vision client lifecycle).
+- A null Rate with no explicit provenance is now `unreadable`; only an explicit source `not_present` is treated as a blank source cell.
+- OCR header alignment now parses values after exact labels and does not match SUBTOTAL as TOTAL. The first value after the printed TOTAL label remains distinct from nearby annotations.
+- Upload MIME/signature is validated before source evidence is persisted, avoiding orphan evidence for unsupported/corrupt files.
+- Updated field correction provenance and UI presentation of the independent verification candidate.
+- Kept the handwritten source Rate separate from RBOS selling price. Only a `source_read` rate may prefill selling price; blank, unreadable or ambiguous source rates remain null and require a separate operator-entered sale price. The sale-line price now uses only `sellingPrice`, never a fallback to source `unitPrice`.
+- Added migration 062 and raised the bounded sale-line description limit from 240 to 10,000 characters. Without this, the existing domain/database rule rejected long wrapped handwriting even though extraction preserved it. Unit and Playwright coverage now verifies the complete long description survives into the posted sale line; no price, stock or accounting rules changed.
+- Expanded the in-scope Playwright journey to phone/tablet/landscape/desktop viewport and full-page captures, keyboard focus, scrolled state, Axe WCAG 2 A/AA, horizontal overflow, touch-target counts and console/server error reporting. It exercises source-bill correction and posts through the normal sale confirmation with the retained source document ID.
+- Added focused tests for OCR header extraction/comparison and null-rate provenance. Updated frontend mocks to reflect source-document IDs and operator-confirmed identifiers.
+
+### Validation status
+
+Backend, frontend and PostgreSQL integration CI passed on the preceding application-code head `81f0b43d05587a26c7dd8b8c228e16ee6991c714`. The final PR head before synchronization was `d83bf0979e1832bebc5d0aebec01c71ad95e6a0a`; it includes the corrected Playwright provenance assertion (`Entered by you`) and 44px checkbox targets. Fresh functional CI after synchronization must be checked before claiming exact-head CI success. The user explicitly waived the visual CI failure for merge; visual acceptance remains unverified and is not claimed.
+
+### Remaining work
+
+1. Validate the conservative possible-omitted-row warnings against independently verified bills. They are implemented as review cues and never create sale lines; they do not yet establish complete product-row recall. Quantity/rate/amount/identifier-column geometry alignment also remains.
+2. Add PostgreSQL integration tests for tenant-isolated evidence retrieval, atomic document-to-sale linking, discard and idempotent replay. The initial source retention and posting path is implemented.
+3. Verify all field/candidate provenance, including user-entered versus user-corrected values, through the complete UI journey.
+4. Run exact-head CI to completion, then inspect full Generate Invoice Playwright journeys, responsive phone/tablet/landscape/desktop screenshots, scrolled/focus states and Axe WCAG 2 A/AA results.
+5. Keep native Android camera/gallery, keyboard and TalkBack checks as real-device acceptance.
+
+
+### Explicit status
+
+Prototype: not applicable. Repository design specification: approved. Implementation: in progress in Draft PR #120. Automated tests: pending exact-head CI. Visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised. No production GCP/IAM changes have been made.
+
+
+## 2026-11-28 continuation — final provider order and verified V2 status
+
+### Final provider decision — supersedes free-tier-first wording above
+
+Claude Haiku 5.5 is the **routine primary AI reader** for every handwritten customer sales bill. Google Cloud Vision `DOCUMENT_TEXT_DETECTION` runs independently in parallel as the OCR/layout evidence source. Haiku is not preceded by a free model and does not receive the OCR transcript.
+
+Gemini 4 Hydrogen is conditional: use a blind, targeted original-image crop only for a material conflict or uncertain critical field. It is also the first cross-provider fallback if Haiku remains unavailable after one transient retry. Tesseract is only a degraded OCR fallback when Cloud Vision is unavailable. Existing Groq Vision is the final provider fallback; its output is always held for human review.
+
+The earlier free-tier-first Gemini pool proposed in this continuation is superseded and is not the RBOS V2 architecture. Do not send real customer invoices to the public Gemini Developer API Free Tier: Google's pricing page says Free Tier content may be used to improve products, while Paid Tier content is not used for that purpose. Real invoices may contain customer PII and commercial data. Free-tier testing is limited to synthetic/de-identified material unless the business explicitly approves different data-use terms. Use approved paid terms for live documents; a local model is a separate future evaluation, not part of this release.
+
+The Haiku activation gate remains `Anthropic:SalesInvoiceIntegrationValidated=false` until one secure non-production live integration test succeeds. Thus the final design is Haiku-first, but the current safe runtime remains Hydrogen-primary until that check passes. No API keys are requested, stored or committed as part of this handoff.
+
+### Verified current repository / PR state — 2026-11-28
+
+- `main` currently points to `5758b31e464dfe62e441c11ad45c7d54bdce6e9d`. It contains the password-reset migration `060_password_reset_email_otp.sql`.
+- PR #119 remains open Draft and documentation-only, with the approved combined Haiku-first design.
+- PR #120 remains open Draft on `feat/handwritten-sales-invoice-extraction-v2`, head `81f0b43d05587a26c7dd8b8c228e16ee6991c714`; it has 29 changed files and is two commits behind current main.
+- Exact-head `rbos-ci` run #46137975138 passed frontend typecheck/tests/lint/build/dependency audit, backend build/unit tests/container build, and PostgreSQL integration/migration tests.
+- Exact-head RBOS Visual Audit run #46137975126 failed in the mobile 390 × 844 invoice-import journey. Axe reported `color-contrast` as a serious/critical violation. The audit artifact contains screenshots and trace, but its early assertion did not persist the violating node details. Visual acceptance is therefore not passed.
+- No PR merge or production deployment has been performed by this continuation. Live GCP deployment state and production migration application have not been independently verified.
+
+### Concrete issues to close in PR #120
+
+1. **Anthropic integration:** the historical HTTP 400 with empty body remains unresolved. The client and mocked request-contract tests exist, but no live non-production API check has passed. Keep the activation flag false until that single secure validation succeeds.
+2. **Migration numbering — corrected on the feature branch:** `061_sales_handwritten_invoice_evidence_link.sql` and `062_verbatim_sale_line_description_length.sql` now follow `main`'s existing `060_password_reset_email_otp.sql`. PostgreSQL integration must pass again on the resulting exact head.
+3. **Visual acceptance:** identify the exact low-contrast node from the Axe results, correct the relevant token/state, and rerun the in-scope Playwright/Axe journey. Inspect actual screenshots/contact sheets, not just CI status.
+4. **Branch freshness:** synchronize the feature branch with current main and re-run relevant checks on the new exact head.
+5. **Extraction completeness:** ordered description-to-OCR alignment and possible-omitted-row warnings exist, but row recall and quantity/rate/amount/identifier-column geometry still need verification against independently labelled bills. Never auto-create a line from an OCR-only candidate.
+6. **Evidence lifecycle:** retain the original with the sales-specific synchronous path; finish checks for authenticated retrieval, tenant isolation, atomic sale link, discard and idempotent replay. Do not select a retention period without business/accounting approval.
+7. **Ground truth:** the 11-bill source register remains provisional in places; verify MONIKA-001's final invoice digit, MONIKA-003 amount, ANIL-002's printed ₹10,020 TOTAL versus the separate ₹10,000 annotation, and ambiguous model/serial characters. Do not publish accuracy percentages until labels are independently verified.
+
+### Scope guard and release state
+
+Keep the existing synchronous upload → extraction → editable review → normal sale confirmation flow. Preserve Generate Invoice layout, floating assistant, customer requirements, GST, stock/WAC, payments, discounts, offline, print, WhatsApp, tenant and accounting behaviour. Add Purchase, supplier invoices, item-tag capture, catalogue import, central AI Gateway, PR #111 worker/queue, free-tier VLM pools and mobile photo normalization are outside this V2 scope.
+
+Automated CI: code jobs passed; visual/Axe gate failed. Live Haiku integration: not passed. Production migration/deployment state: not independently verified. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised.
+
+
+
+## 2026-11-28 continuation — Free Tier only for Hydrogen and Groq
+
+### Provider facts and caveats
+
+- Gemini 4 Hydrogen is available on the Gemini Developer API Free Tier for eligible projects, subject to model rollout and quota. It is the same model accessed under the Free Tier, not a separate 'free edition'. Google Free Tier content may be used to improve Google products.
+- Groq Qwen 3.8 27B is a text+image vision-capable model with JSON output support, currently Preview. Its published token pricing applies to the paid Developer tier; Free Tier organizations have a separate no-cost quota. Use a key from an organization verified as Free Tier, not an assumed free key.
+- Groq states inference inputs/outputs are not retained by default, with limited temporary retention possible for reliability/abuse investigations. Quota/rate-limit exhaustion remains a hard stop.
+- No paid model is permitted as a fallback or verifier. Haiku is the only intended paid AI model usage, funded by the existing Anthropic credit. Cloud Vision is a distinct OCR service and may be billable once the monthly free allowance is exhausted.
+
+### Implemented in PR #120
+
+- Sales invoice fallback/verifier calls no longer reuse general `Gemini:ApiKey` or `Groq:ApiKey` credentials.
+- Hydrogen targeted verification requires `Gemini:SalesInvoiceFreeTierEnabled=true` and dedicated secret `Gemini:SalesInvoiceFreeTierApiKey`.
+- Whole-document Hydrogen fallback also requires `Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled=true`; this is false by default due to Google's Free Tier content-use terms. Targeted source crops are the default verifier input.
+- Groq requires `Groq:SalesInvoiceFreeTierEnabled=true` and `Groq:SalesInvoiceFreeTierApiKey`; the model is pinned to `qwen/qwen3.8-27b`. It does not inherit `Groq:Model` or the legacy invoice fallback switch. All Groq results remain NeedsReview.
+- The Groq client has a dedicated-key/model overload for this sales path. Existing generic uses retain prior provider settings.
+- Tests assert that the general keys do not activate sales fallbacks; dedicated keys and flags are required; the full-document Hydrogen path requires a separate opt-in.
+- Provider billing tier cannot be forced by an API request parameter. Verify the account/project plan in the provider console before configuring the dedicated key. No production GCP settings or secrets were modified.
+- If a provider returns Free Tier quota exhaustion, rate-limit, billing or permission failure, do not switch to a paid/general key. Return the extraction as unavailable/NeedsReview for manual entry.
+
+### Current sequence
+
+Haiku original-image read (after live integration validation) + independent Cloud Vision OCR in parallel → blind targeted Hydrogen crop verification only for material critical conflicts → optional whole-bill Hydrogen outage fallback only with explicit data-use opt-in → Groq Qwen 3.8 Free Tier last resort, always NeedsReview. Tesseract remains only the degraded OCR fallback when Cloud Vision is unavailable.
+
+### Remaining release gates
+
+- Fix the Groq client compile error revealed by the first CI after adding the explicit key/model overload, while preserving supplier-invoice and other generic Groq call behaviour.
+- Capture exact Axe violating node details from the updated invoice-import visual audit; fix the actual low-contrast element and rerun full screenshots/Axe.
+- Re-run backend/frontend/PostgreSQL exact-head CI after the Groq fix.
+- Secure Anthropic integration check remains blocked because no live credential/runtime check is available through repository access; leave `Anthropic:SalesInvoiceIntegrationValidated=false` until that one check is performed securely.
+- Sync PR #120 with current `main`; validate evidence retrieval/tenant isolation, atomic link, discard/idempotent replay and remaining extraction completeness against verified source labels.
+- Real-device Android camera/gallery, keyboard and TalkBack, business retention approval and user acceptance remain separate gates. No merge or deployment is authorised.
+
+## 2026-11-28 latest continuation — compile and accessibility follow-up
+
+- Free-tier-only Hydrogen/Groq policy is recorded in this handoff and the V2 design specification. Dedicated keys and switches are mandatory; all switches are false in sample config. Whole-document Gemini Free Tier use remains separately opt-in.
+- Added a manually gated, one-request Anthropic smoke test using a generated synthetic invoice image. It runs only from the dedicated `workflow_dispatch` workflow when `authorize_single_live_call=true`, and requires the private `ANTHROPIC_API_KEY` GitHub Actions secret. Regular CI exits without making a network call. No real bill or customer data is sent.
+- First run of the smoke-test code exposed SkiaSharp 3 API incompatibility (`SKPaint.TextSize`/`Typeface` removed). Updated the synthetic image renderer to `SKFont`/new `SKCanvas.DrawText` API. This correction is included in the current branch head; exact-head CI is the verification gate.
+- Removed an unused Haiku attempt flag and made validated MIME nullability explicit in the sales endpoint.
+- The invoice visual audit exposed low-contrast helper labels, stepper labels, import prompt, extraction helper/provenance and subtotal/GST helper text. Invoice-scoped muted text colours were darkened to meet 4.5:1 on their actual light surfaces; the disabled sticky review button was also corrected to 6.04:1. The latest full visual audit must confirm all states and viewports; do not claim visual acceptance from CSS values alone.
+- Branch remains 2 commits behind current `main` (main advanced by two commits after the branch base). PR is reported mergeable, but the current connector exposes no safe PR-branch sync/merge-base operation; do not force-update the branch. Reconcile those commits before merge and rerun exact-head checks.
+- Latest exact-head CI and grouped visual audit were triggered for head `5fe8da4fef311c6c240e838ba047866443859cb3`. At handoff they were still in progress. The preceding exact-head run failed only because of the SkiaSharp API usage now corrected; its frontend job passed. Inspect the newest run results before proceeding.
+- Anthropic live integration remains unverified until the one manual synthetic-image workflow is run with the private Actions secret. Do not set `Anthropic:SalesInvoiceIntegrationValidated=true` before it passes. The user must authorize the manual paid call and ensure the secret is configured privately; never request the key in chat.
+- No merge, deployment, GCP/IAM change or retention-period decision has been made.
