@@ -660,7 +660,7 @@ public sealed class SalesInvoiceCaptureContractTests
             {
                 GeminiUsesLowThinking = requestJson["generationConfig"]?["thinkingConfig"]?["thinkingLevel"]?.GetValue<string>() == "LOW";
                 GeminiOutputIsBounded = requestJson["generationConfig"]?["maxOutputTokens"]?.GetValue<int>() == 8192;
-                GeminiPrompt = requestJson["contents"]?[0]?["parts"]?[0]?["text"]?.GetValue<string>();
+                GeminiPrompt = requestJson["contents"]?[0]?["parts"]?[1]?["text"]?.GetValue<string>();
             }
             else
             {
