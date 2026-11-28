@@ -204,8 +204,8 @@ public sealed class SalesInvoiceCaptureService(
             var latencySloMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceLatencySloMs", 15_000), 1_000, 60_000);
             var haikuFallbackRequired = haikuAttempt.Extraction is null;
             log.LogInformation(
-                "Sales invoice parallel vision comparison. Haiku {HaikuStatus} {HaikuMs}ms; Gemini {GeminiStatus} {GeminiMs}ms; Groq {GroqStatus} {GroqMs}ms; selected {SelectedProvider}; Haiku fallback required {HaikuFallbackRequired}; peer assessment {HaikuPeerAssessment}; shadow-consensus differences [{HaikuConsensusDifferences}]; peer disagreement {PeerDisagreement}; Haiku/Gemini mismatches {HaikuGeminiMismatchCount} [{HaikuGeminiMismatchFields}]; Haiku/Groq mismatches {HaikuGroqMismatchCount} [{HaikuGroqMismatchFields}]; Gemini/Groq mismatches {GeminiGroqMismatchCount} [{GeminiGroqMismatchFields}]; total {TotalMs}ms; trace {TraceId}",
-                haikuAttempt.Status, haikuAttempt.LatencyMs,
+                "Sales invoice parallel vision comparison. Prompt {PromptVersion}; Haiku {HaikuStatus} {HaikuMs}ms; Gemini {GeminiStatus} {GeminiMs}ms; Groq {GroqStatus} {GroqMs}ms; selected {SelectedProvider}; Haiku fallback required {HaikuFallbackRequired}; peer assessment {HaikuPeerAssessment}; shadow-consensus differences [{HaikuConsensusDifferences}]; peer disagreement {PeerDisagreement}; Haiku/Gemini mismatches {HaikuGeminiMismatchCount} [{HaikuGeminiMismatchFields}]; Haiku/Groq mismatches {HaikuGroqMismatchCount} [{HaikuGroqMismatchFields}]; Gemini/Groq mismatches {GeminiGroqMismatchCount} [{GeminiGroqMismatchFields}]; total {TotalMs}ms; trace {TraceId}",
+                ExtractionPromptVersion, haikuAttempt.Status, haikuAttempt.LatencyMs,
                 geminiAttempt.Status, geminiAttempt.LatencyMs,
                 groqAttempt.Status, groqAttempt.LatencyMs,
                 providerName, haikuFallbackRequired, haikuPeerAssessment, string.Join(",", haikuShadowConsensusDifferences), hasPeerDisagreement,
@@ -228,6 +228,7 @@ public sealed class SalesInvoiceCaptureService(
                 providerComparison = new
                 {
                     mode = "parallel-shadow",
+                    promptVersion = ExtractionPromptVersion,
                     accuracyNote = "Provider agreement is not ground-truth accuracy.",
                     providers = attempts.Select(attempt => new
                     {
