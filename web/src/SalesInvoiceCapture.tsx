@@ -61,6 +61,7 @@ export type ExtractedSalesInvoice = {
   fieldConfidence?: Record<string, number | null>
   fieldStates?: Record<string, SalesInvoiceFieldState>
   ocrEvidence?: Record<string, SalesInvoiceOcrEvidence>
+  possibleOmittedRows?: { text: string; pageNumber: number; region: { left: number; top: number; width: number; height: number } }[]
   lines: ExtractedSalesInvoiceLine[]
 }
 
