@@ -560,7 +560,7 @@ public sealed class SalesInvoiceCaptureContractTests
 
     private sealed class ParallelVisionHandler : HttpMessageHandler
     {
-        readonly TaskCompletionSource bothStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        readonly TaskCompletionSource<bool> bothStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int started;
 
         public bool BothProvidersStarted => Volatile.Read(ref started) >= 2;
@@ -569,7 +569,7 @@ public sealed class SalesInvoiceCaptureContractTests
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (Interlocked.Increment(ref started) == 2)
-                bothStarted.TrySetResult();
+                bothStarted.TrySetResult(true);
 
             await bothStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
             var extraction = "{\"lines\":[{\"description\":\"Test item\",\"quantity\":1,\"amount\":100}]}";
