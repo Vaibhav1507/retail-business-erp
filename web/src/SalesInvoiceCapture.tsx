@@ -17,6 +17,8 @@ export type ExtractedSalesInvoiceLine = {
   hsn: string | null
   quantity: number | null
   unitPrice: number | null
+  sellingPrice: number | null
+  sellingPriceProvenance?: SalesInvoiceFieldState
   discount: number | null
   amount: number | null
   gstRate: number | null
