@@ -109,6 +109,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [salesInvoiceWarnings, setSalesInvoiceWarnings] = useState<string[]>([])
   const [salesInvoiceReviewIssues, setSalesInvoiceReviewIssues] = useState<SalesInvoiceReviewIssue[]>([])
   const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null)
+  const [sourceDocumentMime, setSourceDocumentMime] = useState('')
   const [sourceInvoiceRef, setSourceInvoiceRef] = useState('')
   const [sourceInvoiceDate, setSourceInvoiceDate] = useState('')
   const [brandText, setBrandText] = useState('')
@@ -264,9 +265,14 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems(current => current.filter((_, i) => i !== index))
   }
 
-  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[], documentId: string, _sourceMime: string) {
+  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[], documentId: string, sourceMime: string) {
     setSourceDocumentId(documentId)
-    setSalesInvoiceDraft(draft)
+    setSourceDocumentMime(sourceMime)
+    const reviewDraft = { ...draft, lines: draft.lines.map(line => ({
+      ...line,
+      sellingPrice: line.sellingPrice ?? (line.fieldStates?.unitPrice === 'not_present' ? null : line.unitPrice ?? null)
+    })) }
+    setSalesInvoiceDraft(reviewDraft)
     setSalesInvoiceWarnings(warnings)
     setSalesInvoiceReviewIssues(reviewIssues)
     setSourceInvoiceRef(draft.invoiceNumber?.trim() ?? '')
