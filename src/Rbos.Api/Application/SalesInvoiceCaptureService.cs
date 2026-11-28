@@ -577,6 +577,8 @@ public sealed class SalesInvoiceCaptureService(
             result[key] = Clip(ReadString(source?[key]), max);
         foreach (var key in new[] { "subtotal", "taxAmount", "total" })
             result[key] = SafeNumber(source?[key], 100_000_000m);
+        result["fieldStates"] = NormalizeFieldStates(source?["fieldStates"],
+            "invoiceNumber", "date", "customerName", "customerPhone", "subtotal", "taxAmount", "total");
         result["fieldConfidence"] = NormalizeFieldConfidence(
             source?["fieldConfidence"], "invoiceNumber", "date", "customerName", "customerPhone",
             "subtotal", "taxAmount", "total");
@@ -587,24 +589,23 @@ public sealed class SalesInvoiceCaptureService(
             foreach (var item in sourceLines.OfType<JsonObject>().Take(100))
             {
                 var line = new JsonObject();
-                foreach (var (key, max) in new[]
-                {
-                    ("description", 500), ("brand", 80), ("model", 100), ("hsn", 12)
-                })
+                line["description"] = ClipVerbatim(ReadVerbatimString(item["description"]), 2_000);
+                foreach (var (key, max) in new[] { ("brand", 80), ("model", 100), ("hsn", 12) })
                     line[key] = Clip(ReadString(item[key]), max);
 
-                var serialNumbers = CleanStringArray(item["serialNumbers"], 12, 64);
-                var singleSerial = Clip(ReadString(item["serialNumber"]), 64);
-                if (singleSerial is not null && !serialNumbers.Any(value =>
-                    string.Equals(ReadString(value), singleSerial, StringComparison.OrdinalIgnoreCase)))
-                    serialNumbers.Add(singleSerial);
-                line["serialNumbers"] = serialNumbers;
+                var identifierCandidates = NormalizeIdentifierCandidates(item["identifierCandidates"], item["serialNumbers"], item["serialNumber"]);
+                line["identifierCandidates"] = identifierCandidates;
+                // Provider-suggested identifiers are candidates, never sale serials. Only
+                // a shopkeeper's explicit confirmation can populate this sale collection.
+                line["serialNumbers"] = new JsonArray();
                 foreach (var key in new[] { "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount" })
                     line[key] = SafeNumber(item[key], 100_000_000m);
+                line["fieldStates"] = NormalizeFieldStates(item["fieldStates"],
+                    "description", "brand", "model", "hsn", "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount");
                 var confidence = SafeNumber(item["confidence"], 1m);
                 line["confidence"] = confidence is >= 0 and <= 1 ? confidence : null;
                 line["fieldConfidence"] = NormalizeFieldConfidence(
-                    item["fieldConfidence"], "description", "brand", "model", "serialNumbers", "hsn",
+                    item["fieldConfidence"], "description", "brand", "model", "hsn",
                     "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount");
                 lines.Add(line);
             }
@@ -612,6 +613,105 @@ public sealed class SalesInvoiceCaptureService(
         result["lines"] = lines;
         return result;
     }
+
+    static readonly HashSet<string> ProvenanceStatuses = new(StringComparer.Ordinal)
+    {
+        "source_read", "not_present", "unreadable", "ambiguous",
+        "calculated", "user_entered", "user_corrected"
+    };
+
+    static JsonObject NormalizeFieldStates(JsonNode? source, params string[] fields)
+    {
+        var result = new JsonObject();
+        foreach (var field in fields)
+        {
+            var state = ReadString(source?[field]);
+            if (state is null || !ProvenanceStatuses.Contains(state))
+            {
+                state = field == "unitPrice" && source is null
+                    ? "not_present"
+                    : "unreadable";
+            }
+            result[field] = state;
+        }
+        return result;
+    }
+
+    static JsonArray NormalizeIdentifierCandidates(JsonNode? candidates, JsonNode? legacySerials, JsonNode? legacySerial)
+    {
+        var result = new JsonArray();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var items = new List<(string Value, string Classification)>();
+        if (candidates is JsonArray array)
+        {
+            foreach (var item in array.OfType<JsonObject>())
+            {
+                var value = Clip(ReadString(item["value"]), 64);
+                var classification = ReadString(item["classification"])?.ToLowerInvariant() ?? "unknown";
+                if (value is not null) items.Add((value, classification));
+            }
+        }
+        else
+        {
+            foreach (var value in CleanStringArray(legacySerials, 12, 64).Select(ReadString).Where(value => value is not null))
+                items.Add((value!, "unknown"));
+            var single = Clip(ReadString(legacySerial), 64);
+            if (single is not null) items.Add((single, "unknown"));
+        }
+
+        foreach (var (value, proposedClassification) in items.Take(20))
+        {
+            var classification = proposedClassification switch
+            {
+                "model" => "model",
+                "serial" => "serial",
+                "imei" => "imei",
+                "barcode" => "barcode",
+                "part_number" or "part-number" => "part_number",
+                _ => "unknown"
+            };
+            if (!seen.Add(value)) continue;
+            var candidate = new JsonObject
+            {
+                ["value"] = value,
+                ["classification"] = classification,
+                ["confirmed"] = false,
+                ["luhnValid"] = classification == "imei" && IsValidImei(value)
+            };
+            result.Add(candidate);
+        }
+        return result;
+    }
+
+    public static bool IsValidImei(string value)
+    {
+        if (value.Length != 15 || value.Any(character => !char.IsAsciiDigit(character))) return false;
+        var sum = 0;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var digit = value[index] - '0';
+            if (index % 2 == 1)
+            {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+        }
+        return sum % 10 == 0;
+    }
+
+    static string? ReadVerbatimString(JsonNode? node)
+    {
+        try
+        {
+            if (node is not JsonValue value || !value.TryGetValue<string>(out var raw)) return null;
+            return string.IsNullOrWhiteSpace(raw) ? null : raw;
+        }
+        catch (Exception error) when (error is InvalidOperationException or FormatException) { return null; }
+    }
+
+    static string? ClipVerbatim(string? value, int max) =>
+        string.IsNullOrWhiteSpace(value) ? null : value[..Math.Min(value.Length, max)];
 
     static JsonObject NormalizeFieldConfidence(JsonNode? source, params string[] fields)
     {
@@ -629,8 +729,8 @@ public sealed class SalesInvoiceCaptureService(
     {
         var threshold = Math.Clamp(lowConfidenceThreshold, 0.50m, 0.95m);
         var issues = new List<SalesInvoiceReviewIssue>();
-        void Add(string field, int? lineIndex, string message) =>
-            issues.Add(new SalesInvoiceReviewIssue(field, lineIndex, message));
+        void Add(string field, int? lineIndex, string message, string severity = "warning") =>
+            issues.Add(new SalesInvoiceReviewIssue(field, lineIndex, message, severity));
 
         static bool HasNumber(JsonNode? value) => ReadDecimal(value).HasValue;
         static bool HasText(JsonNode? value) => ReadString(value) is not null;
@@ -684,7 +784,10 @@ public sealed class SalesInvoiceCaptureService(
                     Add("description", index, $"Item {index + 1} needs a product description or model number.");
                 if (quantity is null or <= 0)
                     Add("quantity", index, $"Item {index + 1} needs a quantity greater than zero.");
-                if (unitPrice is null or <= 0)
+                var unitPriceState = ReadString(line["fieldStates"]?["unitPrice"]);
+                if (unitPrice is null && unitPriceState == "not_present")
+                    Add("unitPrice", index, $"Item {index + 1}: the source Rate cell is blank. Enter the selling price for this RBOS sale; no source rate was inferred.", "info");
+                else if (unitPrice is null or <= 0)
                     Add("unitPrice", index, $"Item {index + 1} needs a selling rate greater than zero.");
                 var discount = ReadDecimal(line["discount"]);
                 if (discount.HasValue && quantity is > 0 && unitPrice is > 0 &&
@@ -714,6 +817,16 @@ public sealed class SalesInvoiceCaptureService(
                     if (!serialLocations.TryGetValue(serial, out var occurrences))
                         serialLocations[serial] = occurrences = [];
                     occurrences.Add(index);
+                }
+
+                if (line["identifierCandidates"] is JsonArray candidates)
+                {
+                    foreach (var candidate in candidates.OfType<JsonObject>())
+                    {
+                        if (ReadString(candidate["classification"]) == "imei" &&
+                            ReadString(candidate["value"]) is { } imei && !IsValidImei(imei))
+                            Add("identifierCandidates", index, $"Item {index + 1}: a possible IMEI failed its check digit. Confirm the characters or change its classification; it has not been added as a serial.");
+                    }
                 }
 
                 // Check only simple rows. Discounts and taxes can legitimately explain differences.
@@ -781,6 +894,23 @@ public sealed class SalesInvoiceCaptureService(
             foreach (var name in names) required.Add(name);
             return required;
         }
+        static JsonObject FieldStateMap(params string[] names)
+        {
+            var properties = new JsonObject();
+            foreach (var name in names)
+                properties[name] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("source_read", "not_present", "unreadable", "ambiguous", "calculated", "user_entered", "user_corrected")
+                };
+            return new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = properties,
+                ["required"] = Required(names),
+                ["additionalProperties"] = false
+            };
+        }
         static JsonObject ConfidenceMap(params string[] names)
         {
             var properties = new JsonObject();
@@ -806,12 +936,34 @@ public sealed class SalesInvoiceCaptureService(
             ["description"] = Scalar("string", "Complete verbatim product text exactly as handwritten, including wrapped description lines and any identifiers."),
             ["brand"] = Scalar("string", "Brand exactly as written, without guessing or normalizing."),
             ["model"] = Scalar("string", "Model or part number exactly as written; do not confuse it with a serial number."),
+            ["identifierCandidates"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["maxItems"] = 20,
+                ["description"] = "All row-associated alphanumeric identifier candidates exactly as written. Never confirm a serial here. Classify each as model, serial, imei, barcode, part_number, or unknown.",
+                ["items"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["value"] = Scalar("string", "Exact candidate characters as written; preserve ambiguous characters without guessing."),
+                        ["classification"] = new JsonObject
+                        {
+                            ["type"] = "string",
+                            ["enum"] = new JsonArray("model", "serial", "imei", "barcode", "part_number", "unknown")
+                        }
+                    },
+                    ["required"] = Required("value", "classification"),
+                    ["additionalProperties"] = false
+                }
+            },
             ["serialNumbers"] = new JsonObject
             {
                 ["type"] = "array",
-                ["description"] = "Clearly identifiable per-unit serial numbers associated with this product row. Empty when uncertain or absent.",
+                ["description"] = "Always leave empty. Serial candidates are not sale serials until the shopkeeper explicitly confirms them.",
                 ["items"] = new JsonObject { ["type"] = "string" }
             },
+            ["fieldStates"] = FieldStateMap("description", "brand", "model", "hsn", "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount"),
             ["hsn"] = Scalar("string", "HSN code only when visible in the HSN column."),
             ["quantity"] = Scalar("number", "Quantity exactly as written in this row."),
             ["unitPrice"] = Scalar("number", "Rate only when explicitly written in the Rate column; null when blank."),
@@ -826,8 +978,8 @@ public sealed class SalesInvoiceCaptureService(
         {
             ["type"] = "object",
             ["properties"] = lineProperties,
-            ["required"] = Required("description", "brand", "model", "serialNumbers", "hsn",
-                "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount", "confidence", "fieldConfidence"),
+            ["required"] = Required("description", "brand", "model", "identifierCandidates", "serialNumbers", "hsn",
+                "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount", "fieldStates", "confidence", "fieldConfidence"),
             ["additionalProperties"] = false
         };
         return new JsonObject
@@ -842,6 +994,7 @@ public sealed class SalesInvoiceCaptureService(
                 ["subtotal"] = Scalar("number", "Subtotal only when explicitly visible."),
                 ["taxAmount"] = Scalar("number", "Total tax only when explicitly visible."),
                 ["total"] = Scalar("number", "Grand total from the printed TOTAL box, not signatory-area notes."),
+                ["fieldStates"] = FieldStateMap("invoiceNumber", "date", "customerName", "customerPhone", "subtotal", "taxAmount", "total"),
                 ["fieldConfidence"] = ConfidenceMap("invoiceNumber", "date", "customerName", "customerPhone", "subtotal", "taxAmount", "total"),
                 ["lines"] = new JsonObject
                 {
@@ -851,7 +1004,7 @@ public sealed class SalesInvoiceCaptureService(
                 }
             },
             ["required"] = Required("invoiceNumber", "date", "customerName", "customerPhone",
-                "subtotal", "taxAmount", "total", "fieldConfidence", "lines"),
+                "subtotal", "taxAmount", "total", "fieldStates", "fieldConfidence", "lines"),
             ["additionalProperties"] = false
         };
     }
