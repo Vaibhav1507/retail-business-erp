@@ -206,3 +206,12 @@ User requested that P0 and P1 remain in this same PR and branch, with manual sou
 - **Not authorised:** no production provider/model change, paid provider spend, verifier budget cap, AI Gateway change, extraction redesign, merge of benchmark docs or deployment is implied by this handoff. The docs-only benchmark PR is separate from any future implementation approval.
 - **Privacy:** no original invoices or customer PII are committed to Git. Redact names, mobile numbers and addresses before external benchmark calls. Do not use free-tier services for unredacted real invoices.
 - **Visual/device state:** Playwright/E2E, responsive screenshots, Axe and native-device validation remain deferred/not passed for this accuracy phase. Historical Visual Audit #297 failed in the shared signup helper before the invoice-import journey and is not extraction evidence.
+
+
+### Source-photo restoration update — 2026-11-28
+
+- User re-uploaded all 11 source photographs in the active conversation: nine Monika Electronics and two Anil Sports & Stationery.
+- First-pass privacy-minimised visual observations are recorded in [source review v1](../quality/handwritten-sales-bill-source-review-v1.md); all 11 sample register rows now show `source_photo_status=received`.
+- These are provisional observations only. No gold labels have been promoted to verified. S03 total, S01/S02 invoice references, exact model/identifier characters and Anil line-by-line row alignment still need human confirmation.
+- Seven existing app runs remain mapped to S01–S05 and S10–S11. S06–S09 still require current-main app outputs.
+- The previous statement that original photos were unavailable is superseded. Photos remain conversation attachments only and are not committed to Git.
