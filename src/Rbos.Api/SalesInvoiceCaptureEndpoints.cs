@@ -46,7 +46,10 @@ public static class SalesInvoiceCaptureEndpoints
                 try
                 {
                     var mime = request.ContentType?.Split(';')[0].Trim().ToLowerInvariant();
-                    if (mime is null) return Fail(415, "Choose a JPEG, PNG, WebP photo or PDF invoice.");
+                    if (!SalesInvoiceCaptureService.IsSupportedMime(mime))
+                        return Fail(415, "Choose a JPEG, PNG, WebP photo or PDF invoice.");
+                    if (!SalesInvoiceCaptureService.MatchesType(bytes, mime!))
+                        return Fail(400, "The invoice file is corrupt or does not match its file type.");
                     Guid sourceDocumentId;
                     try
                     {
