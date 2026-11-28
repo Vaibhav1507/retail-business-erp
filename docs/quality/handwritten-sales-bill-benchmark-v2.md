@@ -289,3 +289,49 @@ No primary model or verifier has been selected yet.
 - [Seven-case extraction comparison](./handwritten-sales-seven-bill-comparison-v1.md)
 - [Anil Sports comparison](./anil-sports-import-comparison-v1.md)
 - [Monika Electronics comparison](./monika-sales-import-comparison-v1.md)
+
+
+## 12. Revised experiment — three-provider parallel vision comparison (2026-11-28)
+
+This section supersedes the sequential provider shortlist and run order in Section 5 and the earlier sequential execution wording in Section 6. The existing gold-label rules, seven-case pilot cohort, privacy minimisation, metric definitions and decision gates remain in force.
+
+### Providers and execution
+
+Run the same original redacted source image independently through these three providers in parallel:
+
+- Claude Haiku 5.5 (claude-haiku-5-5) using the existing Anthropic key — primary.
+- Gemini 4 Hydrogen (gemini-4-hydrogen) using the existing Gemini:ApiKey — shadow reader, Free Tier only.
+- Groq Qwen 3.8 27B (qwen/qwen3.8-27b) using the existing Groq:ApiKey — shadow reader, Free Plan only.
+
+Use one shared prompt version (sales-invoice-vision-v2) and one common semantic field contract. Provider-specific structured-output schema formatting is permitted; do not add staged prompts, ask for reasoning, or let one model see another model's answer. Pin model IDs. Never retry a Free-tier quota/billing failure through a paid model or another key.
+
+The sales-invoice feature flags are Gemini:SalesInvoiceShadowEnabled and Groq:SalesInvoiceShadowEnabled; both default false in sample appsettings. No duplicate sales-specific API keys are required. Real invoice use of Gemini Free Tier requires explicit approval of Google's data-use terms; benchmark samples must remain redacted/synthetic until approved.
+
+### OCR experiment disposition
+
+OCR is not part of this direct-VLM benchmark. The active sales-invoice route does not call Cloud Vision or Tesseract and does not use OCR to influence model results. Do not add an OCR arm until the direct three-model baseline is complete. If later tested, treat OCR hints as a separate experimental condition and compare the same model with and without them.
+
+### Runtime result policy
+
+- Haiku remains the selected draft whenever it returns a usable result.
+- Gemini and Groq are independent shadow readers; neither can rewrite Haiku.
+- If Haiku fails, use Gemini first and Groq second only as a review-required draft.
+- Record provider status, model, latency, usage where available, fallback use and pairwise field differences.
+- Pairwise agreement is not accuracy. Only verified gold labels and human-adjudicated corrections establish accuracy.
+- Log mismatch field paths/counts only; never raw extracted values, invoice images, customer PII, prompts or credentials.
+
+### Comparison outputs
+
+Report each provider independently and pairwise:
+- Header exact match for verified invoice number/date.
+- Verbatim description CER/exact match and model/identifier text.
+- Physical row count, row order, missed/extra rows.
+- Quantity, source Rate, line amount, subtotal, tax and printed TOTAL exact match.
+- Blank/unreadable handling and unsupported-value rate.
+- Critical false-accept rate, malformed output, timeouts, quota errors, latency and usage cost.
+
+The 11-source corpus and seven app-output cohort remain provisional in places. Do not publish an accuracy percentage until critical gold labels are independently verified. Model agreement, JSON validity, or a non-empty extraction must not be reported as accuracy.
+
+### Implementation state
+
+The current code implementation and next-step ledger are maintained in [parallel vision implementation handover](./handwritten-sales-invoice-parallel-vision-handover.md). The implementation PR must pass backend unit/build tests and the repository's full CI before merge consideration. Provider live smoke tests use only synthetic/redacted data and are separate from ordinary CI. No production configuration or deployment is included.
