@@ -197,7 +197,7 @@ public sealed class SalesInvoiceCaptureService(
                     {
                         providerName = "Gemini";
                         providerModel = hydrogen;
-                        providerNeedsReview = haikuAttempted;
+                        providerNeedsReview = true;
                     }
                 }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested)
