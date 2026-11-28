@@ -93,16 +93,15 @@ public sealed class AnthropicHaikuLiveIntegrationTests
         using var paint = new SKPaint
         {
             Color = SKColors.Black,
-            TextSize = 38,
-            IsAntialias = true,
-            Typeface = SKTypeface.Default
+            IsAntialias = true
         };
-        canvas.DrawText("RBOS SYNTHETIC TEST BILL", 24, 62, paint);
-        paint.TextSize = 34;
-        canvas.DrawText("Invoice No: SMOKE-001", 24, 128, paint);
-        paint.TextSize = 40;
-        paint.Typeface = SKTypeface.FromFamilyName("DejaVu Sans", SKFontStyle.Bold);
-        canvas.DrawText("TOTAL: 123.45", 24, 198, paint);
+        using var regularFont = new SKFont(SKTypeface.Default, 38);
+        using var invoiceFont = new SKFont(SKTypeface.Default, 34);
+        using var totalTypeface = SKTypeface.FromFamilyName("DejaVu Sans", SKFontStyle.Bold);
+        using var totalFont = new SKFont(totalTypeface, 40);
+        canvas.DrawText("RBOS SYNTHETIC TEST BILL", 24, 62, SKTextAlign.Left, regularFont, paint);
+        canvas.DrawText("Invoice No: SMOKE-001", 24, 128, SKTextAlign.Left, invoiceFont, paint);
+        canvas.DrawText("TOTAL: 123.45", 24, 198, SKTextAlign.Left, totalFont, paint);
         using var image = SKImage.FromBitmap(bitmap);
         using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
         return encoded.ToArray();
