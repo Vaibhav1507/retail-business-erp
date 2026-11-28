@@ -112,7 +112,6 @@ builder.Services.AddHttpClient<Rbos.Api.Application.InvoiceExtractionService>(h 
 builder.Services.AddHttpClient<Rbos.Api.Application.GroqVisionClient>(h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddHttpClient<Rbos.Api.Application.ItemTagCaptureService>(h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddHttpClient<Rbos.Api.Application.SalesInvoiceCaptureService>(h => h.Timeout = TimeSpan.FromSeconds(90));
-builder.Services.AddHttpClient<Rbos.Api.Application.AnthropicVisionClient>(h => h.Timeout = TimeSpan.FromSeconds(25));
 builder.Services.AddScoped<Rbos.Api.Application.VoiceNavigationIntentService>();
 builder.Services.AddScoped<Rbos.Api.Application.ProductFileReader>();
 builder.Services.AddScoped<Rbos.Api.Application.OtpService>();
