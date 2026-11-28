@@ -321,7 +321,10 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           : field === 'serialNumbers'
             ? value.split(/[\r\n,;]+/).map(part => part.trim()).filter(Boolean)
             : value,
-        fieldStates: { ...(line.fieldStates ?? {}), [field]: 'user_corrected' }
+        fieldStates: {
+          ...(line.fieldStates ?? {}),
+          [field]: line[field] != null && String(line[field]).trim() !== '' ? 'user_corrected' : 'user_entered'
+        }
       })
     }) : current)
   }
@@ -339,6 +342,9 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               : field === 'classification'
                 ? value as SalesInvoiceIdentifierCandidate['classification']
                 : String(value),
+            fieldState: field === 'confirmed'
+              ? candidate.fieldState ?? 'source_read'
+              : candidate.value.trim() ? 'user_corrected' : 'user_entered',
             ...(field === 'value' && typeof value === 'string'
               ? { luhnValid: candidate.classification === 'imei' ? validImei(value.trim()) : null }
               : {}),
@@ -696,7 +702,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           <div className="billing-field billing-rel">
             <label htmlFor="billing-phone">Mobile number *</label>
             <input id="billing-phone" inputMode="tel" autoComplete="off" required aria-invalid={Boolean(fieldErrors.customerPhone)} aria-describedby={fieldErrors.customerPhone ? "billing-phone-error" : undefined} className={fieldErrors.customerPhone ? 'field-invalid' : ''} placeholder="Enter 10-digit mobile number" value={phone}
-              onChange={e => { setPhone(e.target.value.replace(/[^\d+ ]/g, '')); setCustomerId(''); setFieldErrors(current => ({ ...current, customerPhone: '' })); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'customerPhone')) }}
+              onChange={e => { const next = e.target.value.replace(/[^\d+ ]/g, ''); setPhone(next); setCustomerId(''); setFieldErrors(current => ({ ...current, customerPhone: '' })); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), customerPhone: current.customerPhone ? 'user_corrected' : 'user_entered' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'customerPhone')) }}
               onFocus={() => setShowFound(found.length > 0)} onBlur={() => setTimeout(() => setShowFound(false), 150)} />
             {salesInvoiceFieldIssue('customerPhone') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('customerPhone')}</small>}
             {fieldErrors.customerPhone && <small id="billing-phone-error" className="field-error">{fieldErrors.customerPhone}</small>}
@@ -706,7 +712,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           </div>
           <div className="billing-field">
             <label htmlFor="billing-name">Customer name *</label>
-            <input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} aria-describedby={fieldErrors.customerName ? "billing-name-error" : undefined} className={fieldErrors.customerName ? 'field-invalid' : ''} placeholder="Name on the bill" value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'customerName')) }} />
+            <input id="billing-name" required aria-invalid={Boolean(fieldErrors.customerName)} aria-describedby={fieldErrors.customerName ? "billing-name-error" : undefined} className={fieldErrors.customerName ? 'field-invalid' : ''} placeholder="Name on the bill" value={name} onChange={e => { setName(e.target.value); setFieldErrors(current => ({ ...current, customerName: '' })); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), customerName: current.customerName ? 'user_corrected' : 'user_entered' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'customerName')) }} />
             {fieldErrors.customerName && <small id="billing-name-error" className="field-error">{fieldErrors.customerName}</small>}
             {salesInvoiceFieldIssue('customerName') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('customerName')}</small>}
           </div>
@@ -823,18 +829,27 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
                 </a>}
           </section>}
           <div className="invoice-extraction-header-fields">
-            <label>Source bill number <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('invoiceNumber')}</small><input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), invoiceNumber: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
-            <label>Bill date <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('date')}</small><input aria-label="Source bill date" type="date" value={sourceInvoiceDate} onChange={e => { setSourceInvoiceDate(e.target.value); setDate(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), date: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'date')) }} />{salesInvoiceFieldIssue('date') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('date')}</small>}</label>
+            <label>Source bill number <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('invoiceNumber')}</small><input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), invoiceNumber: current.invoiceNumber ? 'user_corrected' : 'user_entered' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
+            <label>Bill date <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('date')}</small><input aria-label="Source bill date" type="date" value={sourceInvoiceDate} onChange={e => { setSourceInvoiceDate(e.target.value); setDate(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), date: current.date ? 'user_corrected' : 'user_entered' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'date')) }} />{salesInvoiceFieldIssue('date') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('date')}</small>}</label>
           </div>
           <p className="invoice-extraction-total">Handwritten total <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('total')}</small><strong>{salesInvoiceDraft.total != null ? `₹${money(salesInvoiceDraft.total)}` : 'Not read'}</strong><small>Compare this with the extracted line values before continuing.</small>{salesInvoiceFieldIssue('total') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('total')}</small>}</p>
           {(['invoiceNumber', 'date', 'total'] as const).map(field => {
             const evidence = salesInvoiceDraft.ocrEvidence?.[field]
-            return evidence?.ocrCandidate && evidence.ocrAgrees === false
-              ? <p className="invoice-extraction-conflict" key={field}>
-                  <strong>{field === 'invoiceNumber' ? 'Invoice number' : field === 'date' ? 'Bill date' : 'Printed total'} has competing readings.</strong>
-                  OCR text near the labelled field: “{evidence.ocrCandidate}”. {evidence.verificationCandidate && <>Hydrogen’s separate reading: “{evidence.verificationCandidate}”. </>}Check the original bill before continuing.
-                </p>
-              : null
+            const hasConflict = evidence?.ocrAgrees === false || Boolean(evidence?.verificationCandidate) ||
+              evidence?.verificationStatus === 'ambiguous' || evidence?.verificationStatus === 'unreadable'
+            if (!hasConflict) return null
+            const label = field === 'invoiceNumber' ? 'Invoice number' : field === 'date' ? 'Bill date' : 'Printed total'
+            return <div className="invoice-extraction-conflict" key={field}>
+              <strong>{label} needs your confirmation.</strong>
+              {evidence?.ocrCandidate && <small>Independent OCR reading: “{evidence.ocrCandidate}”.</small>}
+              {evidence?.verificationCandidate && <small>Close-up reading: “{evidence.verificationCandidate}”.</small>}
+              {evidence?.verificationStatus && evidence.verificationStatus !== 'source_read' &&
+                <small>The close-up reader could not resolve this field.</small>}
+              {evidence?.region && <button type="button" className="invoice-source-region-jump"
+                onClick={() => { setActiveSourceRegionField(field); document.getElementById('invoice-source-evidence')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }}>
+                Inspect this part of the original bill
+              </button>}
+            </div>
           })}
           {salesInvoiceWarnings.length > 0 && <ul className="invoice-extraction-warnings">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
           {salesInvoiceReviewIssues.some(issue => issue.lineIndex === null && !['customerName', 'customerPhone', 'invoiceNumber', 'date', 'total'].includes(issue.field)) &&
