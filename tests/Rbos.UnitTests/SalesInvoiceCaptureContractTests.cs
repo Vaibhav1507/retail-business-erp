@@ -285,6 +285,8 @@ public sealed class SalesInvoiceCaptureContractTests
 
         Assert.Null(line["unitPrice"]);
         Assert.Equal("not_present", line["fieldStates"]!["unitPrice"]!.GetValue<string>());
+        Assert.Null(line["sellingPrice"]);
+        Assert.Equal("not_present", line["sellingPriceProvenance"]!.GetValue<string>());
         Assert.Equal(17500m, line["amount"]!.GetValue<decimal>());
         var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
         Assert.Contains(issues, issue => issue.Field == "unitPrice" && issue.Severity == "info" &&
