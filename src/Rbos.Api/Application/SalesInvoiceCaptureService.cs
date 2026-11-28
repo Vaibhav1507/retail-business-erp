@@ -602,9 +602,7 @@ public sealed class SalesInvoiceCaptureService(
                 if (row.PageNumber != page) break;
                 combined.Add(row);
                 var candidateText = string.Join(' ', combined.Select(item => item.Text));
-                var candidateTokens = OcrTokens(candidateText);
-                var matches = expected.Count(token => candidateTokens.Contains(token));
-                var score = (double)matches / expected.Count;
+                var score = OcrDescriptionMatchScore(description, candidateText);
                 if (score > bestScore)
                 {
                     var words = combined.SelectMany(item => item.Words ?? []).ToArray();
@@ -618,6 +616,14 @@ public sealed class SalesInvoiceCaptureService(
         }
 
         return (bestScore >= 0.20 ? bestRow : null, bestEnd, bestScore);
+    }
+
+    public static double OcrDescriptionMatchScore(string description, string independentOcrText)
+    {
+        var expected = OcrTokens(description);
+        if (expected.Count < 2) return 0;
+        var actual = OcrTokens(independentOcrText);
+        return (double)expected.Count(token => actual.Contains(token)) / expected.Count;
     }
 
     static HashSet<string> OcrTokens(string value) =>
@@ -987,10 +993,7 @@ public sealed class SalesInvoiceCaptureService(
     static bool HasDescriptionAgreement(string? primary, string verification)
     {
         if (string.IsNullOrWhiteSpace(primary)) return false;
-        var expected = OcrTokens(primary);
-        var actual = OcrTokens(verification);
-        if (expected.Count == 0 || actual.Count == 0) return false;
-        return (double)expected.Count(token => actual.Contains(token)) / expected.Count >= 0.55;
+        return OcrDescriptionMatchScore(primary, verification) >= 0.55;
     }
 
     static string ComparableText(string value) =>
