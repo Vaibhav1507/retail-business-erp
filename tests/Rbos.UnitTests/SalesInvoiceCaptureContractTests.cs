@@ -334,6 +334,16 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal(expected, SalesInvoiceCaptureService.ExtractOcrHeaderValue(field, row));
     }
 
+    [Theory]
+    [InlineData("\"00454\"", "00454")]
+    [InlineData("10020", "10020")]
+    [InlineData("10020.50", "10020.50")]
+    public void ReadFieldValueText_PreservesStringHeadersAndSerializesNumericTotals(string json, string expected)
+    {
+        var value = JsonNode.Parse(json);
+        Assert.Equal(expected, SalesInvoiceCaptureService.ReadFieldValueText(value));
+    }
+
     [Fact]
     public void OcrTotalLabel_DoesNotTreatSubtotalAsPrintedTotal()
     {
