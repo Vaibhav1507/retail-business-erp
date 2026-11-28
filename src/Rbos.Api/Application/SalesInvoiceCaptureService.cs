@@ -346,7 +346,9 @@ public sealed class SalesInvoiceCaptureService(
             try
             {
                 var result = await haiku.ExtractAsync(
-                    mime, original, BuildResponseJsonSchema(), Prompt, attemptBudget.Token);
+                    mime, original, BuildAnthropicResponseJsonSchema(),
+                    Prompt + "\\nFor this Haiku response, represent every numeric source field as a decimal string; use an empty string for absent or unreadable values. For every field, state its provenance in fieldStates. Return serialNumbers as an empty array; put all identifiers only in identifierCandidates.",
+                    attemptBudget.Token);
                 if (result is not null) return result;
             }
             catch (AnthropicApiException error)
@@ -894,6 +896,121 @@ public sealed class SalesInvoiceCaptureService(
             if (result.Count >= maxItems) break;
         }
         return result;
+    }
+
+    public static JsonObject BuildAnthropicResponseJsonSchema()
+    {
+        static JsonObject TextField(string description) => new()
+        {
+            ["type"] = "string",
+            ["description"] = description
+        };
+        static JsonArray Required(params string[] names)
+        {
+            var result = new JsonArray();
+            foreach (var name in names) result.Add(name);
+            return result;
+        }
+        static JsonObject StateMap(params string[] names)
+        {
+            var properties = new JsonObject();
+            foreach (var name in names)
+                properties[name] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("source_read", "not_present", "unreadable", "ambiguous", "calculated", "user_entered", "user_corrected")
+                };
+            return new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = properties,
+                ["required"] = Required(names),
+                ["additionalProperties"] = false
+            };
+        }
+
+        var identifier = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["value"] = TextField("Exact candidate characters as written. Do not normalize or guess."),
+                ["classification"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray("model", "serial", "imei", "barcode", "part_number", "unknown")
+                }
+            },
+            ["required"] = Required("value", "classification"),
+            ["additionalProperties"] = false
+        };
+
+        var lineFields = new[]
+        {
+            "description", "brand", "model", "hsn", "quantity", "unitPrice",
+            "discount", "amount", "gstRate", "gstAmount"
+        };
+        var lineProperties = new JsonObject
+        {
+            ["description"] = TextField("Complete verbatim text of this physical product row, including wrapped lines and every alphanumeric character. Empty only when unreadable."),
+            ["brand"] = TextField("Brand exactly as written, or empty string."),
+            ["model"] = TextField("Model/part number exactly as written, or empty string."),
+            ["hsn"] = TextField("HSN from the HSN column only, or empty string."),
+            ["quantity"] = TextField("Quantity exactly as written as a decimal string, or empty string."),
+            ["unitPrice"] = TextField("Rate from the Rate column only as a decimal string. Empty for a blank or unreadable cell. Never copy the amount."),
+            ["discount"] = TextField("Discount exactly as written as a decimal string, or empty string."),
+            ["amount"] = TextField("Line amount from the Amount column only as a decimal string, or empty string."),
+            ["gstRate"] = TextField("GST rate exactly as written as a decimal string, or empty string."),
+            ["gstAmount"] = TextField("GST amount exactly as written as a decimal string, or empty string."),
+            ["identifierCandidates"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = identifier,
+                ["description"] = "Every row-associated alphanumeric identifier. Classify but do not confirm any as a sale serial."
+            },
+            ["serialNumbers"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = TextField("Do not populate. The shopkeeper confirms serial candidates in review.")
+            },
+            ["fieldStates"] = StateMap(lineFields)
+        };
+        var line = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = lineProperties,
+            ["required"] = Required(
+                "description", "brand", "model", "hsn", "quantity", "unitPrice",
+                "discount", "amount", "gstRate", "gstAmount",
+                "identifierCandidates", "serialNumbers", "fieldStates"),
+            ["additionalProperties"] = false
+        };
+        var headerFields = new[] { "invoiceNumber", "date", "customerName", "customerPhone", "subtotal", "taxAmount", "total" };
+        var headerProperties = new JsonObject
+        {
+            ["invoiceNumber"] = TextField("Exact text from the labelled Invoice No./Bill No. field only. Preserve leading zeroes."),
+            ["date"] = TextField("Date from the labelled Date field only in ISO YYYY-MM-DD, or empty string when absent/unreadable/ambiguous."),
+            ["customerName"] = TextField("Customer name from its labelled field only, or empty string."),
+            ["customerPhone"] = TextField("Customer mobile from its labelled field only, or empty string."),
+            ["subtotal"] = TextField("Printed subtotal as a decimal string, or empty string."),
+            ["taxAmount"] = TextField("Printed total tax as a decimal string, or empty string."),
+            ["total"] = TextField("Grand total from the printed TOTAL box only as a decimal string. Ignore nearby signatory annotations."),
+            ["fieldStates"] = StateMap(headerFields),
+            ["lines"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = line,
+                ["description"] = "Every physical product row in exact source order. Never split wrapped text or merge adjacent rows."
+            }
+        };
+        return new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = headerProperties,
+            ["required"] = Required("invoiceNumber", "date", "customerName", "customerPhone",
+                "subtotal", "taxAmount", "total", "fieldStates", "lines"),
+            ["additionalProperties"] = false
+        };
     }
 
     public static JsonObject BuildResponseJsonSchema()
