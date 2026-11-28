@@ -811,22 +811,21 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
                 onClick={() => setActiveSourceRegionField(field)}>
                 Inspect {field === 'invoiceNumber' ? 'invoice number' : field === 'date' ? 'bill date' : 'printed total'}
               </button>)}
-            {sourceDocumentMime === 'application/pdf'
-              ? <iframe title="Original handwritten bill PDF" src={sourcePageUrl(sourceDocumentId)} loading="lazy" />
-              : <a className="invoice-source-image-link" href={sourcePageUrl(sourceDocumentId)} target="_blank" rel="noreferrer">
-                  <span className="invoice-source-image-frame">
-                    <img src={sourcePageUrl(sourceDocumentId)} alt="Original handwritten customer sales bill" loading="lazy" />
-                    {Object.entries(salesInvoiceDraft.ocrEvidence ?? {}).map(([field, evidence]) => {
-                      const region = evidence.region
-                      if (!region || evidence.pageNumber !== 1) return null
-                      return <span key={field} className={'invoice-source-region' + (activeSourceRegionField === field ? ' active' : '')}
-                        style={{
-                          left: `${region.left * 100}%`, top: `${region.top * 100}%`,
-                          width: `${region.width * 100}%`, height: `${region.height * 100}%`
-                        }} aria-hidden="true" />
-                    })}
-                  </span>
-                </a>}
+            <a className="invoice-source-image-link" href={sourcePageUrl(sourceDocumentId)} target="_blank" rel="noreferrer">
+              <span className="invoice-source-image-frame">
+                <img src={sourcePageUrl(sourceDocumentId) + '?preview=true'}
+                  alt="Original handwritten customer sales bill, page 1" loading="lazy" />
+                {Object.entries(salesInvoiceDraft.ocrEvidence ?? {}).map(([field, evidence]) => {
+                  const region = evidence.region
+                  if (!region || evidence.pageNumber !== 1) return null
+                  return <span key={field} className={'invoice-source-region' + (activeSourceRegionField === field ? ' active' : '')}
+                    style={{
+                      left: `${region.left * 100}%`, top: `${region.top * 100}%`,
+                      width: `${region.width * 100}%`, height: `${region.height * 100}%`
+                    }} aria-hidden="true" />
+                })}
+              </span>
+            </a>
           </section>}
           <div className="invoice-extraction-header-fields">
             <label>Source bill number <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('invoiceNumber')}</small><input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), invoiceNumber: current.invoiceNumber ? 'user_corrected' : 'user_entered' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
