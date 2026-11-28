@@ -55,6 +55,12 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
       body: Buffer.from('%PDF-1.4\\n% synthetic retained handwritten bill\\n%%EOF'),
     })
   })
+  await page.route('**/api/documents/' + sourceDocumentId + '/pages/1?preview=true', async route => {
+    await route.fulfill({
+      status: 200, contentType: 'image/png',
+      body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/8X8AAAAASUVORK5CYII=', 'base64'),
+    })
+  })
   await page.route('**/api/sales/invoice-image-extract/' + sourceDocumentId + '/discard', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ documentId: sourceDocumentId, status: 'Cancelled' }) })
   })
@@ -107,7 +113,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await expect(extractedDescription).toHaveCSS('overflow-y', 'hidden')
   await expect.poll(async () => Number((await extractedDescription.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(48)
   await expect(review.getByLabel('Extracted line 1 serial numbers')).toHaveValue('')
-  await expect(review.getByLabel('Original handwritten bill PDF')).toBeVisible()
+  await expect(review.getByRole('img', { name: 'Original handwritten customer sales bill, page 1' })).toBeVisible()
   await expect(review.getByRole('button', { name: 'Inspect invoice number' })).toBeVisible()
   await expect(review.getByText(/OCR text near the labelled field: “Bill No. 4006”/)).toBeVisible()
   await expect(review.getByText(/Hydrogen’s separate reading: “HAND-468”/)).toBeVisible()
