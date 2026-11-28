@@ -115,7 +115,7 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.True(handler.GroqUsesInstructMode);
         Assert.True(handler.GroqOutputIsBounded);
         Assert.Equal(handler.GeminiPrompt, handler.GroqPrompt);
-        Assert.Contains("Return JSON only", handler.GeminiPrompt, StringComparison.Ordinal);
+        Assert.Contains("Return JSON only", handler.GeminiPrompt ?? string.Empty);
     }
 
     [Fact]
