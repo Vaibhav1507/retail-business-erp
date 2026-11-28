@@ -15,13 +15,17 @@ public static class SalesInvoiceCaptureEndpoints
             ClaimsPrincipal principal,
             TenantDb db,
             SalesInvoiceCaptureService service,
+            SalesInvoiceEvidenceService evidence,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
             if (request.ContentLength is <= 0 or > SalesInvoiceCaptureService.MaxFileBytes)
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
 
+            var log = loggerFactory.CreateLogger("SalesInvoiceCaptureEndpoint");
             var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            if (await db.FindTenantAsync(userId, ct) is null)
+            var tenantId = await db.FindTenantAsync(userId, ct);
+            if (tenantId is null)
                 return Fail(409, "Set up a business before extracting a sales invoice.");
 
             await using var buffer = new MemoryStream();
@@ -42,7 +46,21 @@ public static class SalesInvoiceCaptureEndpoints
                 try
                 {
                     var mime = request.ContentType?.Split(';')[0].Trim().ToLowerInvariant();
-                    var result = await service.ExtractAsync(mime, bytes, ct);
+                    if (mime is null) return Fail(415, "Choose a JPEG, PNG, WebP photo or PDF invoice.");
+                    Guid sourceDocumentId;
+                    try
+                    {
+                        sourceDocumentId = await evidence.SaveAsync(
+                            userId, tenantId.Value, mime, bytes,
+                            request.Headers["X-Source-File-Name"].ToString(), ct);
+                    }
+                    catch (Exception error) when (error is Npgsql.PostgresException or Npgsql.NpgsqlException or InvalidOperationException or ArgumentException)
+                    {
+                        log.LogError("Could not retain a handwritten sales bill. Error type {ErrorType}.", error.GetType().Name);
+                        return Fail(503, "The original bill could not be safely saved. No extraction was started; retry the upload.");
+                    }
+
+                    var result = await service.ExtractAsync(mime, bytes, sourceDocumentId, ct);
                     return Reply(result);
                 }
                 finally
@@ -56,6 +74,19 @@ public static class SalesInvoiceCaptureEndpoints
                 if (buffer.TryGetBuffer(out var internalBuffer))
                     CryptographicOperations.ZeroMemory(internalBuffer.AsSpan());
             }
+        }).RequireAuthorization();
+
+        api.MapPost("/sales/invoice-image-extract/{id:guid}/discard", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            TenantDb db,
+            SalesInvoiceEvidenceService evidence,
+            CancellationToken ct) =>
+        {
+            var userId = Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var tenantId = await db.FindTenantAsync(userId, ct);
+            if (tenantId is null) return Results.NotFound();
+            return Reply(await evidence.DiscardAsync(userId, tenantId.Value, id, ct));
         }).RequireAuthorization();
     }
 }
