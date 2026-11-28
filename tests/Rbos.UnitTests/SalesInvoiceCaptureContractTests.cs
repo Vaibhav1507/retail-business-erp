@@ -122,7 +122,7 @@ public sealed class SalesInvoiceCaptureContractTests
         static JsonObject Comparison(params string[] fields) => new()
         {
             ["mismatchFieldCount"] = fields.Length,
-            ["mismatchedFields"] = new JsonArray(fields.Select(JsonValue.Create).ToArray())
+            ["mismatchedFields"] = new JsonArray(fields.Select(field => (JsonNode?)JsonValue.Create(field)).ToArray())
         };
 
         var haikuGemini = Comparison("total", "lines[0].description");
@@ -134,7 +134,7 @@ public sealed class SalesInvoiceCaptureContractTests
         var assessment = SalesInvoiceCaptureService.GetHaikuPeerAssessment(
             true, true, true, haikuGemini, haikuGroq, geminiGroq, consensus);
 
-        Assert.Equal(["total"], consensus);
+        Assert.Equal(new[] { "total" }, consensus);
         Assert.Equal("haiku_differs_from_both_shadow_readers", assessment);
     }
 
