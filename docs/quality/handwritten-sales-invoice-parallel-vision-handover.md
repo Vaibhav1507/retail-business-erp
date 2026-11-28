@@ -128,8 +128,8 @@ Before creating the PR, review these points carefully:
 | Pairwise privacy-safe comparison | Implemented | Unit tests added; CI pending |
 | Provider concurrency/cancellation tests | Previous code commit passed; latest run pending | Backend unit tests in run #1532 passed including Gemini/Groq overlap; latest run #1542 includes the low-reasoning and shadow-consensus tests |
 | Backend build/unit tests | Previous code commit passed; latest run pending | PR CI #1532 passed on 729f694; latest provider settings/peer diagnostics are being checked in run #1542 on code commit 83ab6d5 |
-| Frontend CI | Previous code commit passed; latest run pending | PR CI #1532 passed TypeScript, tests, lint, build and dependency audit; latest run #1542 is pending; no frontend files changed |
-| PostgreSQL integration/migrations | Previous run pending at last check; latest run pending | PR CI #1532 disposable migrations passed; integration test result pending. Latest run #1542 pending; no migration files changed |
+| Frontend CI | Previous code commit passed; latest run queued | PR CI #1532 passed frontend TypeScript, tests, lint, build and dependency audit; latest run #1550 is queued; no frontend files changed |
+| PostgreSQL integration/migrations | Previous code commit passed; latest run queued | PR CI #1532 PostgreSQL integration passed; latest run #1550 queued; no migration files changed |
 | Live Haiku smoke | Previously passed only on synthetic request in run 46143498825 | Do not confuse with production runtime credentials |
 | Live Gemini smoke | Pending | Synthetic/redacted image only; verify Free Tier model access |
 | Live Groq smoke | Pending | Synthetic/redacted image only; verify Free Plan quota |
@@ -142,7 +142,7 @@ Before creating the PR, review these points carefully:
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Draft PR #125 is open. Latest CI run #1546 validates code commit a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81; the subsequent branch update is documentation-only. Run #1532 previously passed backend build/unit tests and frontend checks; latest code changes are pending validation. Latest grouped visual audit run #479 is queued. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173517044 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173517130.
+3. Draft PR #125 is open. Latest PR head is cd090f4a9455f558e5e480da8ee6dd0f5f3a206a. CI run #1550 is queued on that exact code head; run #1532 passed backend, frontend and PostgreSQL integration on the earlier code commit 729f694. Latest grouped visual audit run #483 is queued. The visual audit has a known baseline failure: run #463 on the PR #124 base commit 5e7c451 failed the same invoice-import visual test because the current UI did not render the expected accessible image named “Original handwritten customer sales bill, page 1”. The same assertion failed in our branch's run #465; its screenshot was inspected. This predates this branch and is not caused by the extraction backend change. Do not change UI scope to fix it here. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173596059 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173596069; baseline visual run: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46158997046.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
 5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
@@ -170,6 +170,7 @@ Before creating the PR, review these points carefully:
 - b34a5c599967a7829fd630ce48eca9cc6e044432 — test shadow-consensus diagnostics.
 - 83ab6d5908adacbe4e9c532a6126d125e1521ede — make consensus test serialization explicit.
 - a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81 — isolate unexpected provider exceptions while preserving external cancellation.
+- cd090f4a9455f558e5e480da8ee6dd0f5f3a206a — include prompt version in comparison response and logs.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Current PR head at the latest handover update: 3366ae8017b106b3beb810fd4f92aecb5b86fb56 (documentation-only update after code commit a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81).
+Current PR head at the latest handover update: cd090f4a9455f558e5e480da8ee6dd0f5f3a206a (code commit adds prompt-version tags to comparison logs and response metadata).
