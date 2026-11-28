@@ -10,7 +10,7 @@ namespace Rbos.Api.Application;
 
 public sealed record CustomerCommand(string? Name, string? Phone, string? Notes, bool IsActive = true, string? WhatsappConsentStatus = null);
 public sealed record SalePaymentInput(string Method, decimal Amount);
-public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null, bool RequireCustomerDetails = false);
+public sealed record SaleCommand(Guid? CustomerId, Guid LocationId, DateOnly SaleDate, string? SaleType, decimal? AmountPaid, string? PayMethod, List<SaleLineInput>? Lines, decimal? GstRate = null, List<SalePaymentInput>? Payments = null, string? PlaceOfSupply = null, string? SourceInvoiceRef = null, DateOnly? SourceInvoiceDate = null, bool RequireCustomerDetails = false, Guid? SourceDocumentId = null);
 
 /// <summary>Customers and sales (stock deduction at WAC, balanced journal, customer receivable). All amounts are recomputed server-side.</summary>
 public sealed class SalesService(TenantDb db)
@@ -267,8 +267,11 @@ public sealed class SalesService(TenantDb db)
             return ServiceResult<object>.Fail(err!);
         var splitKey = split.Count == 0 ? "" : "|" + string.Join(',', split.OrderBy(x => x.Method).Select(x => $"{x.Method}:{x.Amount.ToString(CultureInfo.InvariantCulture)}"));
         if (split.Count == 0 && paid.Amount > 0) split.Add((method!, paid.Amount));
+        var sourceDocumentKey = m.SourceDocumentId is Guid sourceDocument
+            ? "|sourceDocument:" + sourceDocument.ToString("D")
+            : "";
         var hash = Hash(string.Join('|', m.CustomerId, m.RequireCustomerDetails, m.LocationId, m.SaleDate.ToString("O"), m.SaleType, paid.Amount.ToString(CultureInfo.InvariantCulture), method,
-            string.Join(';', lines.Select(l => $"{l.ProductId?.ToString() ?? "adhoc"}:{l.Description}:{l.Brand}:{l.Model}:{l.HsnCode}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey);
+            string.Join(';', lines.Select(l => $"{l.ProductId?.ToString() ?? "adhoc"}:{l.Description}:{l.Brand}:{l.Model}:{l.HsnCode}:{l.Quantity.Value}:{l.UnitPrice}:{l.Discount}:{string.Join(',', l.Serials ?? [])}:{l.Barcode}:{l.BarcodeSymbology}:{string.Join(',', l.Imei1s ?? [])}:{string.Join(',', l.Imei2s ?? [])}"))) + splitKey + sourceDocumentKey);
         var tid = await db.FindTenantAsync(uid, ct);
         if (tid is null) return ServiceResult<object>.Fail("No business set up.", 409);
         var tenantId = tid.Value;
@@ -283,6 +286,20 @@ public sealed class SalesService(TenantDb db)
                 if (await r.ReadAsync(ct))
                     return r.GetString(1) == hash ? ServiceResult<object>.Ok(new { id = r.GetGuid(0), replayed = true }) : ServiceResult<object>.Fail("Idempotency-Key reused with a different request.", 409);
             }
+            if (m.SourceDocumentId is Guid sourceDocumentId)
+            {
+                var sourceStatus = await Scalar<string?>(s, @"
+                    select status
+                      from documents.business_document
+                     where id = @document
+                       and direction = 'Sale'
+                       and source_kind = 'HandwrittenBill'
+                     for update",
+                    ct, ("document", sourceDocumentId));
+                if (sourceStatus != "NeedsReview")
+                    return ServiceResult<object>.Fail("The original handwritten bill is missing, belongs to another document type or tenant, or is no longer available for posting.", 409);
+            }
+
             if (m.CustomerId is not null && await Scalar<Guid?>(s, "select id from sales.customer where id=@i and is_active", ct, ("i", m.CustomerId)) is null) return ServiceResult<object>.Fail("Unknown or inactive customer.");
             if (m.RequireCustomerDetails)
             {
@@ -415,6 +432,28 @@ public sealed class SalesService(TenantDb db)
             await Exec(s, ct, "insert into sales.sale(tenant_id,id,customer_id,location_id,sale_date,sale_type,total,amount_paid,pay_method,cost_total,inventory_cost_total,provisional_cost_total,source_invoice_ref,source_invoice_date,idempotency_key,request_hash,journal_entry_id,created_by,gst_rate,invoice_no,place_of_supply,is_inter_state) values (@t,@i,@cu,@l,@d,@y,@v,@pd,@pm,@ct,@ict,@pct,@sir,@sid,@k,@h,@j,@u,@g,@iv,@pos,(@pos::text is not null and exists (select 1 from core.business_profile b where b.state is not null and lower(btrim(b.state)) <> lower(btrim(@pos::text)))))",
                 ("t", tenantId), ("i", id), ("cu", m.CustomerId), ("l", m.LocationId), ("d", m.SaleDate), ("y", m.SaleType), ("v", total.Amount), ("pd", paid.Amount), ("pm", method), ("ct", costTotal.Amount), ("ict", inventoryCostTotal.Amount), ("pct", provisionalCostTotal.Amount),
                 ("sir", (object?)Blank(m.SourceInvoiceRef) ?? DBNull.Value), ("sid", (object?)m.SourceInvoiceDate ?? DBNull.Value), ("k", key), ("h", hash), ("j", entry), ("u", uid), ("g", (object?)m.GstRate ?? DBNull.Value), ("iv", await NextInvoiceNoAsync(s, tenantId, m.SaleDate, ct)), ("pos", string.IsNullOrWhiteSpace(m.PlaceOfSupply) ? DBNull.Value : m.PlaceOfSupply.Trim()));
+
+            // Link the retained source document in the same database transaction as
+            // normal sale posting. The document was locked and validated for this tenant,
+            // Sale direction, HandwrittenBill kind and NeedsReview status above.
+            if (m.SourceDocumentId is Guid postedSourceDocumentId)
+            {
+                await Exec(s, ct, @"
+                    insert into documents.sales_invoice_sale_link
+                      (tenant_id, document_id, sale_id, created_by)
+                    values (@tenant, @document, @sale, @actor)",
+                    ("tenant", tenantId), ("document", postedSourceDocumentId), ("sale", id), ("actor", uid));
+                var transitioned = await Exec(s, ct, @"
+                    update documents.business_document
+                       set status = 'Posted', updated_at = now()
+                     where id = @document
+                       and direction = 'Sale'
+                       and source_kind = 'HandwrittenBill'
+                       and status = 'NeedsReview'",
+                    ("document", postedSourceDocumentId));
+                if (transitioned != 1)
+                    throw new InvalidOperationException("The source bill could not be linked to the posted sale.");
+            }
 
             foreach (var (payMethodName, payAmount) in split)
                 await Exec(s, ct, "insert into sales.sale_payment(tenant_id,sale_id,method,amount) values (@t,@s,@m,@a)", ("t", tenantId), ("s", id), ("m", payMethodName), ("a", payAmount));
