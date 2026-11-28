@@ -156,7 +156,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await expect(review.getByRole('button', { name: 'Inspect invoice number' })).toBeVisible()
   await expect(review.getByText(/Independent OCR reading: “4006”/)).toBeVisible()
   await expect(review.getByText(/Close-up reading: “HAND-468”/)).toBeVisible()
-  await expect(review.locator('.invoice-extraction-conflict')).toContainText('Independent OCR could not confidently confirm this product row.')
+  await expect(review.locator('.invoice-extracted-line .invoice-extraction-conflict')).toContainText('Independent OCR could not confidently confirm this product row.')
   await review.getByRole('button', { name: 'Inspect product row in original bill' }).click()
   await expect(review.locator('.invoice-source-region.active')).toBeVisible()
   await expect(review.locator('.invoice-identifier-candidates')).toContainText('SN12345678')
