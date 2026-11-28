@@ -272,6 +272,30 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void NormalizeForReview_DoesNotGuessNotPresentWhenNullRateHasNoExplicitSourceState()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Voltas washing machine",
+                "quantity": 1,
+                "unitPrice": null,
+                "amount": 17500
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(extraction["lines"])));
+
+        Assert.Null(line["unitPrice"]);
+        Assert.Equal("unreadable", line["fieldStates"]!["unitPrice"]!.GetValue<string>());
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+        Assert.Contains(issues, issue => issue.Field == "unitPrice" &&
+            issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, issue => issue.Message.Contains("source Rate cell is blank", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void AnthropicSchemaAvoidsUnsupportedConstraintsAndExcessiveUnionTypes()
     {
         var schema = SalesInvoiceCaptureService.BuildAnthropicResponseJsonSchema();
