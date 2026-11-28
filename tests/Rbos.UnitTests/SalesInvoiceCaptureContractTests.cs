@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
@@ -103,12 +104,17 @@ public sealed class SalesInvoiceCaptureContractTests
         var service = new SalesInvoiceCaptureService(
             http, haiku, groq, configuration, NullLogger<SalesInvoiceCaptureService>.Instance);
 
-        await service.ExtractAsync(
+        var result = await service.ExtractAsync(
             "image/jpeg",
             [0xFF, 0xD8, 0xFF, 0xD9],
             Guid.NewGuid(),
             CancellationToken.None);
 
+        Assert.NotNull(result.Value);
+        var responseJson = JsonSerializer.Serialize(result.Value);
+        Assert.Contains("candidateDifferences", responseJson, StringComparison.Ordinal);
+        Assert.Contains("haikuPeerAssessment", responseJson, StringComparison.Ordinal);
+        Assert.Contains("promptVersion", responseJson, StringComparison.Ordinal);
         Assert.True(handler.BothProvidersStarted, "Gemini and Groq must both start before either response is released.");
         Assert.True(handler.GeminiUsesLowThinking);
         Assert.True(handler.GeminiOutputIsBounded);
