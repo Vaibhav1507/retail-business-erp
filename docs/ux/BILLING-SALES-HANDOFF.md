@@ -435,3 +435,8 @@ The shared prompt is the only natural-language instruction sent per provider. Av
 - Gemini 4 Hydrogen uses LOW thinking and an 8,192-token output cap; Hydrogen defaults to HIGH thinking, so LOW is selected for structured metadata extraction and lower latency/token use.
 - Groq Qwen 3.8 27B uses instruct mode with reasoning_effort none and an 8,192-token completion cap.
 - These settings are experimental controls, not assumed accuracy improvements. Keep them fixed during the first benchmark run, then change only with a versioned experiment and verified gold-label comparison.
+
+
+### Haiku peer-assessment diagnostics
+
+The comparison result/log now includes a peer-assessment label: three_way_agreement, haiku_agrees_with_available_shadow, haiku_disagrees_with_available_shadow, haiku_differs_from_both_shadow_readers, providers_disagree, haiku_only_no_shadow_comparison, or haiku_unavailable. It also reports field paths where both shadow readers agree with each other but differ from Haiku. This is a triage signal only; it must never be described as proof that Haiku is correct or incorrect without gold-label/human verification.
