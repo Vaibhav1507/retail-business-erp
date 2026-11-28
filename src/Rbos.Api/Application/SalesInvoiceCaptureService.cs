@@ -4,8 +4,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
-using SkiaSharp;
 
 namespace Rbos.Api.Application;
 
@@ -13,14 +11,14 @@ public sealed record SalesInvoiceReviewIssue(string Field, int? LineIndex, strin
 
 /// <summary>
 /// Extracts a customer-facing handwritten/printed sales invoice into an unposted review draft.
-/// Uses the same direct image-provider chain as the existing item-tag and supplier-invoice
-/// flows. This service must never call AiGateway or write sales/accounting records.
+/// Uses direct multimodal image extraction from Haiku with optional independent Gemini/Groq
+/// shadow readers. OCR is intentionally outside this route's extraction decision path.
+/// This service must never call AiGateway or write sales/accounting records.
 /// </summary>
 public sealed class SalesInvoiceCaptureService(
     HttpClient http,
     AnthropicHaikuClient haiku,
     GroqVisionClient groq,
-    LocalOcr localOcr,
     IConfiguration cfg,
     ILogger<SalesInvoiceCaptureService> log)
 {
@@ -43,21 +41,6 @@ public sealed class SalesInvoiceCaptureService(
         configuration.GetValue("Groq:SalesInvoiceShadowEnabled", false)
             ? NonBlank(configuration["Groq:ApiKey"])
             : null;
-
-    // Compatibility aliases for dormant targeted-verification helpers. The active extraction
-    // path does not call those helpers during the parallel-vision experiment.
-    public static string? GetSalesInvoiceGeminiFreeTierApiKey(IConfiguration configuration) =>
-        GetSalesInvoiceGeminiShadowApiKey(configuration);
-
-    public static string? GetSalesInvoiceGroqFreeTierApiKey(IConfiguration configuration) =>
-        GetSalesInvoiceGroqShadowApiKey(configuration);
-
-    // Google Free-tier requests may be used to improve Google products. Targeted verification
-    // uses isolated source crops; sending an entire customer bill requires a separate explicit
-    // data-use switch, disabled by default.
-    public static bool IsSalesInvoiceGeminiFullDocumentFallbackEnabled(IConfiguration configuration) =>
-        configuration.GetValue("Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled", false) &&
-        GetSalesInvoiceGeminiFreeTierApiKey(configuration) is not null;
 
     static string? NonBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -292,7 +275,7 @@ public sealed class SalesInvoiceCaptureService(
         try
         {
             var result = await ExtractWithGeminiAsync(
-                apiKey, GeminiFreeTierModel, mime, original, null, attemptBudget.Token);
+                apiKey, GeminiFreeTierModel, mime, original, attemptBudget.Token);
             if (!HasUsableLines(result))
                 return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "invalid_or_unusable_response", null, timer.ElapsedMilliseconds);
             return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "success", result, timer.ElapsedMilliseconds);
@@ -396,661 +379,22 @@ public sealed class SalesInvoiceCaptureService(
         return null;
     }
 
-    async Task<string?> ReadLocalOcrFallbackAsync(string mime, byte[] original, CancellationToken budgetToken, CancellationToken requestToken)
-    {
-        if (!localOcr.Available) return null;
-        using var budget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
-        var timeoutMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceLocalOcrTimeoutMs", 1_500), 250, 1_500);
-        budget.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
-        var images = new List<byte[]>();
-        try
-        {
-            if (mime == "application/pdf")
-            {
-                var pages = PdfPageReader.Read(original);
-                if (pages is null || pages.Count is < 1 or > 6) return null;
-                foreach (var page in pages)
-                {
-                    var png = PdfPageReader.RenderPng(original, page.Page);
-                    if (png is null) return null;
-                    images.Add(png);
-                }
-            }
-            else
-            {
-                images.Add(original);
-            }
-
-            var texts = new List<string>();
-            foreach (var image in images)
-            {
-                var rows = await localOcr.ReadImageAsync(image, budget.Token);
-                if (rows is null) continue;
-                texts.Add(string.Join("\n", rows.Select(row => string.Join(" | ", row))));
-            }
-            var combined = string.Join("\n", texts).Trim();
-            if (combined.Length > 5_000) combined = combined[..5_000];
-            return string.IsNullOrWhiteSpace(combined) ? null : combined;
-        }
-        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
-        {
-            log.LogDebug("Degraded local OCR exceeded its {TimeoutMs}ms bound or the total request deadline.", timeoutMs);
-            return null;
-        }
-        catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException)
-        {
-            log.LogWarning("Degraded local OCR failed. Error type {ErrorType}.", error.GetType().Name);
-            return null;
-        }
-        finally
-        {
-            foreach (var image in images.Where(image => !ReferenceEquals(image, original)))
-                CryptographicOperations.ZeroMemory(image);
-        }
-    }
-
-    static void ApplyIndependentOcrEvidence(
-        JsonObject extraction,
-        SalesInvoiceOcrResult? cloud,
-        string? degradedOcrText,
-        List<string> warnings,
-        List<SalesInvoiceVerificationTarget> verificationTargets)
-    {
-        var fields = new JsonObject();
-        var text = cloud?.Text ?? degradedOcrText ?? "";
-        var rows = cloud is null
-            ? text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(line => new OcrEvidenceRow(0, line, null, 0, 0))
-                .ToArray()
-            : BuildOcrRows(cloud);
-
-        foreach (var (field, labels) in new[]
-        {
-            ("invoiceNumber", new[] { "invoice no", "invoice number", "bill no", "bill number" }),
-            ("date", new[] { "date", "dated" }),
-            ("total", new[] { "grand total", "total" })
-        })
-        {
-            var row = FindLabelledRow(rows, labels);
-            var value = ReadFieldValueText(extraction[field]);
-            var ocrCandidate = row is null ? null : ExtractOcrHeaderValue(field, row.Text);
-            var agreement = row is null ? (bool?)null : CompareOcrHeaderValue(field, value, ocrCandidate);
-            var agrees = agreement ?? true;
-            var state = ReadString(extraction["fieldStates"]?[field]) ?? (value is null ? "unreadable" : "source_read");
-            var unresolved = row is not null && (!agrees || ocrCandidate is null || state is "ambiguous" or "unreadable");
-            var region = row is null ? null : GetNormalizedRegion(row);
-            fields[field] = new JsonObject
-            {
-                ["status"] = unresolved ? "ambiguous" : state,
-                ["haikuOrPrimaryReading"] = value,
-                ["ocrCandidate"] = ocrCandidate,
-                ["ocrLine"] = row is null ? null : Clip(row.Text, 240),
-                ["ocrAgrees"] = agreement,
-                ["pageNumber"] = row?.PageNumber,
-                ["region"] = region is null ? null : new JsonObject
-                {
-                    ["left"] = region.Left, ["top"] = region.Top,
-                    ["width"] = region.Width, ["height"] = region.Height
-                }
-            };
-            if (row is not null && row.Words is { Length: > 0 } && unresolved)
-                verificationTargets.Add(new SalesInvoiceVerificationTarget(field, field, null, row));
-            if (unresolved)
-            {
-                extraction["fieldStates"]![field] = "ambiguous";
-                warnings.Add(field switch
-                {
-                    "invoiceNumber" => "The invoice-number reading needs confirmation against the labelled bill-number field.",
-                    "date" => "The date reading needs confirmation against the labelled Date field.",
-                    _ => "The printed TOTAL field has a competing or unreadable OCR value. Check the boxed total, not nearby annotations."
-                });
-            }
-        }
-        if (cloud is not null)
-        {
-            var possibleOmittedRows = ApplyLineOcrEvidence(extraction["lines"] as JsonArray, rows, warnings, verificationTargets);
-            if (possibleOmittedRows.Count > 0)
-            {
-                extraction["possibleOmittedRows"] = possibleOmittedRows;
-                warnings.Add("Independent OCR found additional text between detected product rows. Check the highlighted source regions for a product row that may have been missed; no row has been added automatically.");
-            }
-        }
-        else if (extraction["lines"] is JsonArray degradedLines)
-        {
-            foreach (var item in degradedLines.OfType<JsonObject>())
-                item["ocrEvidence"] = new JsonObject { ["status"] = "unavailable" };
-        }
-
-        extraction["ocrEvidence"] = fields;
-        extraction["ocrSource"] = cloud is not null ? "CloudVision" :
-            degradedOcrText is not null ? "TesseractDegraded" : "Unavailable";
-    }
-
-    static JsonArray ApplyLineOcrEvidence(
-        JsonArray? lines,
-        OcrEvidenceRow[] rows,
-        List<string> warnings,
-        List<SalesInvoiceVerificationTarget> verificationTargets)
-    {
-        var possibleOmittedRows = new JsonArray();
-        if (lines is null || rows.Length == 0) return possibleOmittedRows;
-        var cursor = 0;
-        var matchedRows = new HashSet<int>();
-        var firstMatchedRow = int.MaxValue;
-        var lastMatchedRow = -1;
-        for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
-        {
-            if (lines[lineIndex] is not JsonObject line) continue;
-            var description = ReadVerbatimString(line["description"]);
-            if (string.IsNullOrWhiteSpace(description))
-            {
-                line["ocrEvidence"] = new JsonObject { ["status"] = "unreadable" };
-                continue;
-            }
-
-            var match = FindBestOcrDescriptionMatch(description, rows, cursor);
-            var candidate = match.Row;
-            if (candidate is not null && match.StartIndex >= 0)
-            {
-                firstMatchedRow = Math.Min(firstMatchedRow, match.StartIndex);
-                lastMatchedRow = Math.Max(lastMatchedRow, match.LastIndex);
-                for (var rowIndex = match.StartIndex; rowIndex <= match.LastIndex; rowIndex++)
-                    matchedRows.Add(rowIndex);
-            }
-            var corroborated = candidate is not null && match.Score >= 0.55;
-            var conflict = candidate is not null && !corroborated;
-            var region = candidate is null ? null : GetNormalizedRegion(candidate);
-            line["ocrEvidence"] = new JsonObject
-            {
-                ["status"] = corroborated ? "corroborated" : conflict ? "ambiguous" : "not_correlated",
-                ["haikuOrPrimaryReading"] = ClipVerbatim(description, 800),
-                ["ocrCandidate"] = candidate is null ? null : Clip(candidate.Text, 600),
-                ["ocrAgrees"] = candidate is null ? (bool?)null : corroborated,
-                ["matchScore"] = match.Score,
-                ["pageNumber"] = candidate?.PageNumber,
-                ["region"] = region is null ? null : new JsonObject
-                {
-                    ["left"] = region.Left, ["top"] = region.Top,
-                    ["width"] = region.Width, ["height"] = region.Height
-                }
-            };
-
-            if (candidate is not null)
-            {
-                cursor = Math.Max(cursor, match.LastIndex + 1);
-                if (conflict && candidate.Words is { Length: > 0 })
-                    verificationTargets.Add(new SalesInvoiceVerificationTarget(
-                        "lineDescription" + lineIndex,
-                        $"Product row {lineIndex + 1} description",
-                        lineIndex,
-                        candidate));
-            }
-
-            if (conflict || candidate is null)
-            {
-                var states = line["fieldStates"] as JsonObject;
-                if (states is not null) states["description"] = "ambiguous";
-                warnings.Add(candidate is null
-                    ? $"Independent OCR could not confidently align product row {lineIndex + 1}. Check the complete handwritten description against the original bill."
-                    : $"Product row {lineIndex + 1} has a competing OCR reading. Confirm the complete description and its wrapped lines.");
-            }
-        }
-
-        // Unmatched OCR rows bracketed by matched product descriptions are only candidates:
-        // they may be wrapped fragments or annotations. Never create a sale line automatically.
-        if (firstMatchedRow != int.MaxValue && lastMatchedRow > firstMatchedRow)
-        {
-            for (var rowIndex = firstMatchedRow + 1; rowIndex < lastMatchedRow && possibleOmittedRows.Count < 8; rowIndex++)
-            {
-                if (matchedRows.Contains(rowIndex)) continue;
-                var row = rows[rowIndex];
-                if (row.Words is not { Length: > 0 }) continue;
-                var descriptions = lines.OfType<JsonObject>()
-                    .Select(line => ReadVerbatimString(line["description"]))
-                    .ToArray();
-                if (!IsPossibleOmittedOcrProductRow(row.Text, descriptions)) continue;
-                var region = GetNormalizedRegion(row);
-                if (region is null) continue;
-                possibleOmittedRows.Add(new JsonObject
-                {
-                    ["text"] = ClipVerbatim(row.Text, 500),
-                    ["pageNumber"] = row.PageNumber,
-                    ["region"] = new JsonObject
-                    {
-                        ["left"] = region.Left, ["top"] = region.Top,
-                        ["width"] = region.Width, ["height"] = region.Height
-                    }
-                });
-            }
-        }
-        return possibleOmittedRows;
-    }
-
-    static (OcrEvidenceRow? Row, int StartIndex, int LastIndex, double Score) FindBestOcrDescriptionMatch(
-        string description,
-        OcrEvidenceRow[] rows,
-        int startIndex)
-    {
-        var expected = OcrTokens(description);
-        if (expected.Count == 0) return (null, -1, startIndex, 0);
-        OcrEvidenceRow? bestRow = null;
-        var bestStart = -1;
-        var bestEnd = startIndex;
-        var bestScore = 0d;
-        var searchEnd = Math.Min(rows.Length, startIndex + 40);
-
-        for (var rowIndex = Math.Max(0, startIndex); rowIndex < searchEnd; rowIndex++)
-        {
-            var page = rows[rowIndex].PageNumber;
-            var combined = new List<OcrEvidenceRow>();
-            for (var length = 1; length <= 3 && rowIndex + length <= searchEnd; length++)
-            {
-                var row = rows[rowIndex + length - 1];
-                if (row.PageNumber != page) break;
-                combined.Add(row);
-                var candidateText = string.Join(' ', combined.Select(item => item.Text));
-                var score = OcrDescriptionMatchScore(description, candidateText);
-                if (score > bestScore)
-                {
-                    var words = combined.SelectMany(item => item.Words ?? []).ToArray();
-                    bestRow = new OcrEvidenceRow(page, candidateText, words,
-                        rows[rowIndex].PageWidth, rows[rowIndex].PageHeight);
-                    bestStart = rowIndex;
-                    bestEnd = rowIndex + length - 1;
-                    bestScore = score;
-                }
-                if (bestScore >= 0.98) return (bestRow, bestStart, bestEnd, bestScore);
-            }
-        }
-
-        return (bestScore >= 0.20 ? bestRow : null, bestScore >= 0.20 ? bestStart : -1, bestEnd, bestScore);
-    }
-
-    public static double OcrDescriptionMatchScore(string description, string independentOcrText)
-    {
-        var expected = OcrTokens(description);
-        if (expected.Count < 2) return 0;
-        var actual = OcrTokens(independentOcrText);
-        return (double)expected.Count(token => actual.Contains(token)) / expected.Count;
-    }
-
-    public static bool IsPossibleOmittedOcrProductRow(string ocrRow, IReadOnlyList<string?> extractedDescriptions)
-    {
-        if (OcrTokens(ocrRow).Count < 2) return false;
-        if (new[] { "invoiceNumber", "date", "total" }.Any(field => IsOcrHeaderLabelRow(field, ocrRow)))
-            return false;
-        return !extractedDescriptions.Any(description =>
-            !string.IsNullOrWhiteSpace(description) && OcrDescriptionMatchScore(description, ocrRow) >= 0.20);
-    }
-
-
-    static HashSet<string> OcrTokens(string value) =>
-        Regex.Matches(value.ToUpperInvariant(), @"[A-Z0-9]{2,}")
-            .Select(match => match.Value)
-            .ToHashSet(StringComparer.Ordinal);
-
-
-
-    async Task<JsonObject?> VerifyCriticalFieldsAsync(
-        string apiKey,
-        string mime,
-        byte[] original,
-        IReadOnlyList<SalesInvoiceVerificationTarget> targets,
-        CancellationToken budgetToken,
-        CancellationToken requestToken)
-    {
-        var selected = targets
-            .Where(target => target.Field is "invoiceNumber" or "date" or "total" || target.LineIndex.HasValue)
-            .DistinctBy(target => target.Field)
-            .Take(5)
-            .ToArray();
-        if (selected.Length == 0) return null;
-
-        var parts = new JsonArray();
-        var includedFields = new List<string>();
-        foreach (var target in selected)
-        {
-            var crop = CreateVerificationCrop(mime, original, target.Row);
-            if (crop is null) continue;
-            try
-            {
-                parts.Add(new JsonObject
-                {
-                    ["inline_data"] = new JsonObject
-                    {
-                        ["mime_type"] = "image/jpeg",
-                        ["data"] = Convert.ToBase64String(crop)
-                    }
-                });
-                includedFields.Add(target.Field);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(crop);
-            }
-        }
-        if (includedFields.Count == 0) return null;
-
-        // This verifier sees only original-image crops and field labels. It receives no
-        // Haiku/Gemini proposal and no OCR transcript, preventing answer anchoring.
-        var fieldInstructions = string.Join("\n", includedFields.Select((field, index) =>
-            $"{index + 1}. {field}"));
-        parts.Add(new JsonObject
-        {
-            ["text"] = "Independently inspect these original sales-bill image regions. The image regions are in this exact order and correspond to the following field labels:\n" +
-                fieldInstructions +
-                "\nRead only the visible characters in each labelled field/box. Do not infer missing digits, use another bill, or use nearby signatory annotations. If characters cannot be read, return an empty reading with status unreadable; if multiple readings remain plausible, status ambiguous. Return only the requested fields."
-        });
-
-        var body = new JsonObject
-        {
-            ["contents"] = new JsonArray(new JsonObject
-            {
-                ["parts"] = parts
-            }),
-            ["generationConfig"] = new JsonObject
-            {
-                ["responseMimeType"] = "application/json",
-                ["responseJsonSchema"] = BuildTargetedVerificationSchema(includedFields),
-                ["temperature"] = 0
-            }
-        };
-
-        const string model = GeminiFreeTierModel;
-        var timer = Stopwatch.StartNew();
-        try
-        {
-            using var requestBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
-            requestBudget.CancelAfter(TimeSpan.FromSeconds(5));
-            using var request = new HttpRequestMessage(HttpMethod.Post,
-                $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
-            request.Headers.Add("x-goog-api-key", apiKey);
-            request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
-            using var response = await http.SendAsync(request, requestBudget.Token);
-            if (!response.IsSuccessStatusCode)
-            {
-                log.LogWarning("Targeted Gemini sales-invoice verification failed. HTTP {StatusCode}, model {Model}.",
-                    (int)response.StatusCode, model);
-                return null;
-            }
-
-            var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(requestBudget.Token));
-            var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
-            var blockReason = root?["promptFeedback"]?["blockReason"]?.GetValue<string>();
-            if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase) ||
-                !string.IsNullOrWhiteSpace(blockReason))
-                return null;
-            var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
-            var result = string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text) as JsonObject;
-            var usage = root?["usageMetadata"];
-            log.LogInformation(
-                "Targeted Gemini sales-invoice verification completed. Model {Model}, fields {FieldCount}, prompt tokens {PromptTokens}, output tokens {OutputTokens}, latency {LatencyMs}ms",
-                model, includedFields.Count, SafeTokenCount(usage?["promptTokenCount"]),
-                SafeTokenCount(usage?["candidatesTokenCount"]), timer.ElapsedMilliseconds);
-            return result;
-        }
-        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
-        {
-            log.LogWarning("Targeted Gemini sales-invoice verification timed out or the total request deadline expired. Model {Model}.", model);
-            return null;
-        }
-        catch (HttpRequestException error)
-        {
-            log.LogWarning("Targeted Gemini sales-invoice verification failed. HTTP {StatusCode}.", (int?)error.StatusCode);
-            return null;
-        }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
-        {
-            log.LogWarning("Targeted Gemini sales-invoice verification returned invalid output. Error type {ErrorType}.", error.GetType().Name);
-            return null;
-        }
-        finally
-        {
-            timer.Stop();
-        }
-    }
-
-    static JsonObject BuildTargetedVerificationSchema(IReadOnlyList<string> fields)
-    {
-        var properties = new JsonObject();
-        foreach (var field in fields)
-        {
-            properties[field] = new JsonObject
-            {
-                ["type"] = "object",
-                ["properties"] = new JsonObject
-                {
-                    ["reading"] = new JsonObject { ["type"] = "string" },
-                    ["status"] = new JsonObject
-                    {
-                        ["type"] = "string",
-                        ["enum"] = new JsonArray("source_read", "unreadable", "ambiguous")
-                    }
-                },
-                ["required"] = new JsonArray("reading", "status"),
-                ["additionalProperties"] = false
-            };
-        }
-        var required = new JsonArray();
-        foreach (var field in fields) required.Add(field);
-        return new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = properties,
-            ["required"] = required,
-            ["additionalProperties"] = false
-        };
-    }
-
-    static byte[]? CreateVerificationCrop(string mime, byte[] original, OcrEvidenceRow row)
-    {
-        byte[]? renderedPage = null;
-        var pageBytes = original;
-        try
-        {
-            if (mime == "application/pdf")
-            {
-                renderedPage = PdfPageReader.RenderPng(original, row.PageNumber);
-                if (renderedPage is null) return null;
-                pageBytes = renderedPage;
-            }
-            else if (row.PageNumber != 1) return null;
-
-            using var source = SKBitmap.Decode(pageBytes);
-            if (source is null || source.Width < 2 || source.Height < 2) return null;
-            var region = GetNormalizedRegion(row);
-            if (region is null) return null;
-
-            var rawLeft = (int)Math.Floor(region.Left * source.Width);
-            var rawTop = (int)Math.Floor(region.Top * source.Height);
-            var rawRight = (int)Math.Ceiling((region.Left + region.Width) * source.Width);
-            var rawBottom = (int)Math.Ceiling((region.Top + region.Height) * source.Height);
-            var marginX = Math.Max(48, (rawRight - rawLeft) / 3);
-            var marginY = Math.Max(36, (rawBottom - rawTop) * 2);
-            var left = Math.Clamp(rawLeft - marginX, 0, source.Width - 1);
-            var top = Math.Clamp(rawTop - marginY, 0, source.Height - 1);
-            var right = Math.Clamp(rawRight + marginX, left + 1, source.Width);
-            var bottom = Math.Clamp(rawBottom + marginY, top + 1, source.Height);
-            var width = right - left;
-            var height = bottom - top;
-
-            using var crop = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
-            using (var canvas = new SKCanvas(crop))
-            {
-                canvas.Clear(SKColors.White);
-                canvas.DrawBitmap(source, new SKRect(left, top, right, bottom),
-                    new SKRect(0, 0, width, height));
-                canvas.Flush();
-            }
-            using var image = crop.Encode(SKEncodedImageFormat.Jpeg, 94);
-            if (image is null) return null;
-            using var stream = new MemoryStream();
-            image.SaveTo(stream);
-            return stream.ToArray();
-        }
-        catch (Exception error) when (error is ArgumentException or InvalidOperationException or NotSupportedException)
-        {
-            return null;
-        }
-        finally
-        {
-            if (renderedPage is not null) CryptographicOperations.ZeroMemory(renderedPage);
-        }
-    }
-
-    static void ApplyVerificationCandidates(JsonObject extraction, JsonObject verification)
-    {
-        if (extraction["ocrEvidence"] is not JsonObject headerEvidence) return;
-        foreach (var (field, value) in verification)
-        {
-            if (value is not JsonObject result) continue;
-            var reading = ReadString(result["reading"]);
-            var status = ReadString(result["status"])?.ToLowerInvariant();
-            if (status is not ("source_read" or "unreadable" or "ambiguous")) status = "ambiguous";
-
-            // Preserve every verifier output as a separate candidate; never overwrite
-            // a primary transcription or silently resolve a disagreement.
-            if (field.StartsWith("lineDescription", StringComparison.Ordinal) &&
-                int.TryParse(field["lineDescription".Length..], out var lineIndex) &&
-                extraction["lines"] is JsonArray lines &&
-                lineIndex >= 0 && lineIndex < lines.Count &&
-                lines[lineIndex] is JsonObject line)
-            {
-                if (line["ocrEvidence"] is JsonObject lineEvidence)
-                {
-                    lineEvidence["verificationCandidate"] = reading;
-                    lineEvidence["verificationStatus"] = status;
-                }
-                var lineState = line["fieldStates"] as JsonObject;
-                var primaryDescription = ReadVerbatimString(line["description"]);
-                if (status != "source_read" || reading is null ||
-                    !HasDescriptionAgreement(primaryDescription, reading))
-                {
-                    if (lineState is not null) lineState["description"] = "ambiguous";
-                }
-                continue;
-            }
-
-            if (headerEvidence[field] is not JsonObject existing) continue;
-            existing["verificationCandidate"] = reading;
-            existing["verificationStatus"] = status;
-            if (status != "source_read" || reading is null)
-                extraction["fieldStates"]![field] = "ambiguous";
-            else if (ReadFieldValueText(extraction[field]) is not { } primary ||
-                     !string.Equals(ComparableText(primary), ComparableText(reading), StringComparison.Ordinal))
-                extraction["fieldStates"]![field] = "ambiguous";
-        }
-    }
-
     static int SafeTokenCount(JsonNode? value)
     {
         try { return Math.Clamp(value?.GetValue<int>() ?? 0, 0, 10_000_000); }
         catch (Exception error) when (error is InvalidOperationException or FormatException) { return 0; }
     }
 
-    sealed record OcrEvidenceRow(int PageNumber, string Text, SalesInvoiceOcrWord[]? Words, int PageWidth, int PageHeight);
-    sealed record SalesInvoiceVerificationTarget(string Field, string Label, int? LineIndex, OcrEvidenceRow Row);
-    sealed record NormalizedRegion(double Left, double Top, double Width, double Height);
-
-    static OcrEvidenceRow[] BuildOcrRows(SalesInvoiceOcrResult result) =>
-        result.Pages.SelectMany(page =>
-            page.Words
-                .GroupBy(word => (int)Math.Round(word.Top / 6d))
-                .OrderBy(group => group.Key)
-                .Select(group => new OcrEvidenceRow(page.PageNumber,
-                    string.Join(' ', group.OrderBy(word => word.Left).Select(word => word.Text)),
-                    group.ToArray(), page.Width, page.Height)))
-            .ToArray();
-
-    static NormalizedRegion? GetNormalizedRegion(OcrEvidenceRow row)
+    static bool CompareDateValues(string first, string second)
     {
-        if (row.Words is not { Length: > 0 } || row.PageWidth <= 0 || row.PageHeight <= 0) return null;
-        var left = row.Words.Min(word => word.Left);
-        var top = row.Words.Min(word => word.Top);
-        var right = row.Words.Max(word => word.Left + word.Width);
-        var bottom = row.Words.Max(word => word.Top + word.Height);
-        return new NormalizedRegion(
-            Math.Clamp((double)left / row.PageWidth, 0, 1),
-            Math.Clamp((double)top / row.PageHeight, 0, 1),
-            Math.Clamp((double)Math.Max(1, right - left) / row.PageWidth, 0, 1),
-            Math.Clamp((double)Math.Max(1, bottom - top) / row.PageHeight, 0, 1));
-    }
-
-    static OcrEvidenceRow? FindLabelledRow(IEnumerable<OcrEvidenceRow> rows, IEnumerable<string> labels) =>
-        rows.FirstOrDefault(row => labels.Any(label => IsOcrHeaderLabelRow(label, row.Text)));
-
-    public static bool IsOcrHeaderLabelRow(string fieldOrLabel, string rowText)
-    {
-        var pattern = fieldOrLabel switch
-        {
-            "invoiceNumber" or "invoice no" or "invoice number" or "bill no" or "bill number" =>
-                @"\b(?:invoice|bill)\s*(?:no\.?|number)\b",
-            "date" => @"\b(?:date|dated)\b",
-            "total" or "grand total" => @"\b(?:grand\s+)?total\b",
-            _ => @"(?!)"
-        };
-        return Regex.IsMatch(rowText, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    }
-
-    public static string? ExtractOcrHeaderValue(string field, string rowText)
-    {
-        var pattern = field switch
-        {
-            "invoiceNumber" => @"\b(?:invoice|bill)\s*(?:no\.?|number)\s*[:#\-]?\s*(?<value>[A-Z0-9][A-Z0-9/\-]*)",
-            "date" => @"\b(?:date|dated)\s*[:#\-]?\s*(?<value>(?:\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}))",
-            "total" => @"\b(?:grand\s+)?total\b\s*[:#\-]?\s*(?:₹|rs\.?\s*)?(?<value>\d[\d,]*(?:\.\d{1,2})?)",
-            _ => null
-        };
-        if (pattern is null) return null;
-        var match = Regex.Match(rowText, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        return match.Success ? match.Groups["value"].Value.Trim() : null;
-    }
-
-    public static bool? CompareOcrHeaderValue(string field, string? primary, string? ocrCandidate)
-    {
-        if (ocrCandidate is null) return null;
-        if (string.IsNullOrWhiteSpace(primary)) return false;
-
-        if (field == "date")
-        {
-            static DateOnly? ParseDate(string value)
-            {
-                var formats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "yyyy/MM/dd" };
-                return DateOnly.TryParseExact(value.Trim(), formats, CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var date) ? date : null;
-            }
-            var first = ParseDate(primary);
-            var second = ParseDate(ocrCandidate);
-            return first.HasValue && second.HasValue
-                ? first.Value == second.Value
-                : string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
-        }
-
-        if (field == "total")
-        {
-            static decimal? ParseAmount(string value)
-            {
-                var normalized = value.Replace(",", "", StringComparison.Ordinal)
-                    .Replace("₹", "", StringComparison.Ordinal)
-                    .Replace("Rs.", "", StringComparison.OrdinalIgnoreCase)
-                    .Trim();
-                return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount)
-                    ? amount : null;
-            }
-            var first = ParseAmount(primary);
-            var second = ParseAmount(ocrCandidate);
-            return first.HasValue && second.HasValue
-                ? first.Value == second.Value
-                : string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
-        }
-
-        return string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
-    }
-
-    static bool HasDescriptionAgreement(string? primary, string verification)
-    {
-        if (string.IsNullOrWhiteSpace(primary)) return false;
-        return OcrDescriptionMatchScore(primary, verification) >= 0.55;
+        var formats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "yyyy/MM/dd" };
+        var left = DateOnly.TryParseExact(first.Trim(), formats, CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var leftDate) ? leftDate : (DateOnly?)null;
+        var right = DateOnly.TryParseExact(second.Trim(), formats, CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var rightDate) ? rightDate : (DateOnly?)null;
+        return left.HasValue && right.HasValue
+            ? left.Value == right.Value
+            : string.Equals(ComparableText(first), ComparableText(second), StringComparison.Ordinal);
     }
 
     public static string? ReadFieldValueText(JsonNode? value) =>
@@ -1059,49 +403,10 @@ public sealed class SalesInvoiceCaptureService(
     static string ComparableText(string value) =>
         new(value.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
 
-    static byte[] PrepareVisionImage(byte[] original, string mime, IConfiguration cfg, out string outputMime)
-    {
-        outputMime = mime;
-        try
-        {
-            using var source = SKBitmap.Decode(original);
-            if (source is null) return original;
-            var maxDimension = Math.Max(source.Width, source.Height);
-            var maxAiDimension = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceMaxImageDimension", 3_000), 2_000, 4_096);
-            var reencodeAboveBytes = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceReencodeAboveBytes", 1_500_000), 256_000, MaxFileBytes);
-            var jpegQuality = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceJpegQuality", 92), 80, 96);
-            var resizeRequired = maxDimension > maxAiDimension;
-            var reencodeRequired = resizeRequired || !string.Equals(mime, "image/jpeg", StringComparison.OrdinalIgnoreCase)
-                || original.Length > reencodeAboveBytes;
-            if (!reencodeRequired) return original;
-
-            var scale = resizeRequired ? (double)maxAiDimension / maxDimension : 1d;
-            var width = Math.Max(1, (int)Math.Round(source.Width * scale));
-            var height = Math.Max(1, (int)Math.Round(source.Height * scale));
-            using var resized = new SKBitmap(new SKImageInfo(width, height, source.ColorType, source.AlphaType));
-            using (var canvas = new SKCanvas(resized))
-            {
-                canvas.Clear(SKColors.White);
-                canvas.DrawBitmap(source, new SKRect(0, 0, width, height));
-                canvas.Flush();
-            }
-            using var encoded = resized.Encode(SKEncodedImageFormat.Jpeg, jpegQuality);
-            if (encoded is null) return original;
-            using var stream = new MemoryStream();
-            encoded.SaveTo(stream);
-            outputMime = "image/jpeg";
-            return stream.ToArray();
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or NotSupportedException)
-        {
-            return original;
-        }
-    }
-
     async Task<JsonNode?> ExtractWithGeminiAsync(
-        string apiKey, string model, string mime, byte[] bytes, string? ocrText, CancellationToken ct)
+        string apiKey, string model, string mime, byte[] bytes, CancellationToken ct)
     {
-        var prompt = ocrText is null ? Prompt : Prompt + "\nOptional local OCR hints (may contain errors; image is authoritative):\n" + ocrText;
+        var prompt = Prompt;
         var body = new JsonObject
         {
             ["contents"] = new JsonArray(new JsonObject
@@ -1181,7 +486,7 @@ public sealed class SalesInvoiceCaptureService(
                     ? ReadDecimal(left) is { } leftNumber &&
                       ReadDecimal(right) is { } rightNumber && leftNumber == rightNumber
                     : date
-                        ? CompareOcrHeaderValue("date", leftText, rightText) == true
+                        ? CompareDateValues(leftText, rightText)
                         : string.Equals(ComparableText(leftText), ComparableText(rightText), StringComparison.Ordinal);
 
             if (equal) matched++;
