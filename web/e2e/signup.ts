@@ -67,7 +67,7 @@ export async function signUp(page: Page, opts: { email: string; businessName: st
   await page.getByLabel('State').selectOption(opts.state ?? 'Tamil Nadu')
   await page.getByLabel('PIN code').fill(opts.pin ?? '600001')
   await page.getByLabel('GST registration').selectOption('NotRegistered')
-  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByRole('button', { name: 'Review' }).click()
   await page.getByRole('button', { name: 'Create account' }).click()
   // A new browser must complete the app's local privacy-lock setup before workspace routes are available.
