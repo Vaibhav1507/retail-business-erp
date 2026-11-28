@@ -86,6 +86,13 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ documentId, status: 'Cancelled' }) })
   })
   const invoiceUploadHeaders: Record<string, string | undefined>[] = []
+  const fullDescription = [
+    'Samsung LED Television model UA43K5570',
+    'Serial: SN12345678',
+    'Full handwritten model and package text preserved on this line',
+    'Display technology, connectivity, remote control and accessory bundle details',
+    'Alphanumeric carton reference BX-0045 and installation notes must remain verbatim',
+  ].join('\n')
   await page.route('**/api/sales/invoice-image-extract', async route => {
     invoiceUploadHeaders.push(route.request().headers())
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
@@ -100,7 +107,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
           total: { status: 'ambiguous', haikuOrPrimaryReading: '10020', ocrCandidate: '10000', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '10020', verificationStatus: 'source_read' },
         },
         lines: [{
-          description: 'Samsung LED Television model UA43\\nSerial: SN12345678\\nFull handwritten model and package text preserved on this line',
+          description: fullDescription,
           brand: 'Samsung', model: 'UA43', serialNumbers: [],
           identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }, { value: 'UA43', classification: 'model', confirmed: false }],
           hsn: '8528', quantity: 1, unitPrice: null, sellingPrice: null, sellingPriceProvenance: 'not_present',
@@ -130,7 +137,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   const review = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
   await expect(review).toBeVisible()
   const extractedDescription = review.getByLabel('Extracted line 1 description')
-  await expect(extractedDescription).toHaveValue('Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line')
+  await expect(extractedDescription).toHaveValue(fullDescription)
   await expect(extractedDescription).toHaveCSS('resize', 'none')
   await expect(extractedDescription).toHaveCSS('overflow-y', 'hidden')
   await expect.poll(async () => Number((await extractedDescription.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(48)
@@ -215,6 +222,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await expect(page.getByText('Saved as INV-000123.')).toBeVisible()
   expect(postedSale?.sourceDocumentId).toBe(sourceDocumentIds[1])
   expect((postedSale?.lines as { serials: string[] }[] | undefined)?.[0]?.serials).toContain('SN12345678')
+  expect((postedSale?.lines as { description: string }[] | undefined)?.[0]?.description).toBe(fullDescription)
   await captureState(page, 'posted-invoice')
   await page.getByRole('button', { name: 'New invoice' }).click()
   await expect(bill).toBeVisible()
