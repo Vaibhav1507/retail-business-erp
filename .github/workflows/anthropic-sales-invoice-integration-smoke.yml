@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  anthopic-live-smoke:
+  anthropic-live-smoke:
     if: ${{ inputs.authorize_single_live_call == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

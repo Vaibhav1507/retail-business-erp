@@ -1,6 +1,6 @@
 # RBOS handwritten sales-invoice extraction V2 — combined final design
 
-**Status:** Final combined design decision; implementation in progress on `feat/handwritten-sales-invoice-extraction-v2`  
+**Status:** Final combined design decision; implementation delivered in PR #120; production rollout pending  
 **Date:** 2026-11-28  
 **Repository main baseline:** `2b981069125f1ee2be7e5537635d969dd17b6f9b`  
 **Production baseline:** Cloud Run revision `rbos-pilot-00165-qnv` and commit `2b981069...` are reported by the Lovable investigation; they have not been independently verified against live GCP in this work.  
@@ -112,7 +112,7 @@ The known example of a blank source Rate cell becoming a populated unit price de
 - Use strict structured output via the provider's supported schema/tool mechanism and validate the response again server-side. Do not assume prompt-only JSON is a schema guarantee.
 - Keep prompt and schema versioned. Record the exact model ID, usage token counts, latency and result state.
 - Keep the Anthropic key in Secret Manager-backed runtime configuration only. Never expose it to the browser, repo, logs or screenshots.
-- A previous direct API smoke attempt returned HTTP 400 with an empty response body even for a minimal text request. The cause remains unresolved. The Haiku adapter must pass one secure integration smoke check in CI/non-production before rollout; do not burn the credit on blind repeated attempts. This is an integration gate, not a model-comparison exercise.
+- The manually gated single-call Anthropic integration smoke test passed on 2026-11-28 using one synthetic invoice image (GitHub Actions run 46143498825). This validates the direct Messages API request/response contract and configured `claude-haiku-5-5` model for that synthetic case. Production runtime secret injection and Cloud Run configuration remain separate release steps; keep `Anthropic:SalesInvoiceIntegrationValidated=false` until the production secret binding is verified and the deployed revision is intentionally configured.
 
 Current published Haiku 5.5 Claude Platform price for prompts up to 100K tokens is $0.10 per million input tokens and $0.50 per million output tokens. Actual per-bill cost must use provider-reported token usage, including image tokens. Do not hard-code the rates as an immutable truth.
 
@@ -433,9 +433,7 @@ Release safety gates:
 
 ## 15. Delivery state
 
-The approved design was finalized in documentation-only PR #119. Implementation is being carried separately in Draft PR #120 on `feat/handwritten-sales-invoice-extraction-v2`, based on main commit `2b981069125f1ee2be7e5537635d969dd17b6f9b`. Main remains the legacy Tesseract + Gemini/optional Groq baseline; all V2 application changes belong to the implementation branch.
-
-No live Anthropic model call has been made from this work. No API secret has been exposed or committed. No production GCP IAM/service identity, Cloud Run setting, production config or deployment has been changed.
+This design is documentation only. Main still contains the existing Tesseract + Gemini/optional Groq implementation. The V2 branch must change implementation only after the design is reviewed. No Anthropic/Google/Groq model call, API secret, GCP IAM/service identity, Cloud Run setting, production config or deployment has been changed by this design update.
 
 The previous Haiku-only design is superseded by this combined design: Haiku is the routine direct reader; Cloud Vision supplies independent OCR/layout evidence; Gemini 4 Hydrogen is the conditional verifier and provider fallback; Tesseract remains a degraded OCR fallback; Argon is deferred.
 
@@ -455,7 +453,7 @@ The previous Haiku-only design is superseded by this combined design: Haiku is t
 
 ## 17. Implementation progress — 2026-11-28
 
-Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invoice-extraction-v2`. The documentation-only design PR #119 remains separate and unmerged.
+Implementation is in PR #120, branch `feat/handwritten-sales-invoice-extraction-v2`. The approved design PR #119 has been merged to main.
 
 ### Implemented in the current branch
 
@@ -480,9 +478,9 @@ Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invo
 - Added tests for labelled OCR extraction/comparison and the null-rate provenance distinction.
 - Updated UI correction provenance for header/line edits and exposed the targeted verifier reading separately from OCR evidence.
 
-### Known integration gate — not passed
+### Anthropic smoke result and production activation gate
 
-The previously reported Anthropic HTTP 400 with an empty response body has not yet been reproduced in a secure non-production runtime because no Anthropic credential is available through repository access. Mocked request-contract tests are not a live integration check. Do not set `Anthropic:SalesInvoiceIntegrationValidated=true` until one secure non-production check succeeds. If Haiku cannot be made reliable, keep Gemini 4 Hydrogen as the temporary primary.
+The one explicitly authorised synthetic-image Haiku smoke call succeeded on 2026-11-28 (GitHub Actions run `46143498825`) using model `claude-haiku-5-5`. This verifies that single synthetic Messages API request; it does not verify production Cloud Run secret injection or runtime configuration. Keep `Anthropic:SalesInvoiceIntegrationValidated=false` in production until the Anthropic key is provisioned through Secret Manager to the Cloud Run runtime identity and the production configuration is verified. Never place credentials in chat or Git.
 
 ### Remaining engineering gaps
 
@@ -520,8 +518,8 @@ The code keeps `Anthropic:SalesInvoiceIntegrationValidated=false` by default unt
 
 - Draft PR #120 head: `81f0b43d05587a26c7dd8b8c228e16ee6991c714`; backend, frontend and PostgreSQL CI passed.
 - The invoice-import Playwright/Axe visual audit did not pass: mobile 390 × 844 failed the serious/critical Axe assertion with `color-contrast`. The captured run did not preserve the offending node details; isolate the node and inspect screenshots before calling visual acceptance complete.
-- The Anthropic live integration gate is not passed. Mocked request-contract tests do not prove live API compatibility.
-- The feature branch is two commits behind current `main`; sync and revalidate before merge.
+- The single synthetic live smoke request passed (run `46143498825`); production Secret Manager binding and runtime activation remain pending.
+- The implementation branch is synchronized with the latest `main` by the merge commit created during this continuation.
 - Resolved: the evidence-link and verbatim-description migrations are now `061_sales_handwritten_invoice_evidence_link.sql` and `062_verbatim_sale_line_description_length.sql`, following `main`'s existing `060_password_reset_email_otp.sql`.
 - The 11 source bills remain provisional labels. No accuracy percentage is claimed.
 - Original evidence persistence and sale-link logic are implemented in the feature branch, but migration/application state in production has not been independently verified. No production GCP/IAM change or deployment is authorised.
@@ -536,10 +534,10 @@ The current V2 remains limited to the synchronous handwritten customer sales-bil
 2. Keep the Haiku activation flag false until that check passes; then verify Haiku-first orchestration using the existing request path.
 3. Fix the migration-number collision and synchronize the implementation branch with current `main`.
 4. Complete missing-row/geometry and provenance checks against independently verified bill labels; preserve unresolved values for human review.
-5. Fix and rerun the full Playwright/Axe journey; inspect phone, tablet, landscape and desktop screenshots/contact sheets.
+5. Visual CI failure is explicitly waived by the user for this merge. Record visual acceptance as not passed; inspect/fix the previously observed Playwright/Axe issues in a follow-up without blocking this merge.
 6. Complete authenticated evidence retrieval, tenant isolation, posting atomicity, discard and idempotent replay coverage.
 7. Keep Android camera/gallery, keyboard and TalkBack as real-device acceptance.
-8. Do not merge or deploy without explicit authorisation.
+8. Merge is explicitly authorised by the user in this continuation. Production deployment remains a separate release action and is not authorised by this note.
 
 
 
