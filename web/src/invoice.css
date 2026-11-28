@@ -781,7 +781,7 @@
   box-shadow: 0 -8px 24px rgba(30, 50, 38, .06);
 }
 .invoice-sticky-amount { display: grid; gap: 7px; min-width: 0; }
-.invoice-sticky-amount span { color: #7c8780; font-size: 15px; }
+.invoice-sticky-amount span { color: #59675f; font-size: 15px; }
 .invoice-sticky-amount strong { color: #202a25; font-size: 26px; line-height: 1; }
 .invoice-sticky-review > button {
   width: 100%;
