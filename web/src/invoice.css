@@ -415,7 +415,7 @@
 }
 .invoice-new-sale-copy p {
   margin: 8px 0 0;
-  color: #737e77;
+  color: #536158;
   font-size: 19px;
   line-height: 1.3;
 }
@@ -437,7 +437,7 @@
   margin: 4px 10px 0;
   padding: 0;
   list-style: none;
-  color: #89928c;
+  color: #56645c;
   font-size: 17px;
   font-weight: 650;
 }
@@ -522,7 +522,7 @@
 .invoice-helper,
 .invoice-section-subtitle {
   margin: 15px 0 0;
-  color: #737e77;
+  color: #536158;
   font-size: 17px;
   line-height: 1.55;
 }
@@ -579,7 +579,7 @@
 .invoice-more-details > summary small,
 .invoice-product-more-details > summary small {
   margin-left: auto;
-  color: #89928c;
+  color: #56645c;
   font-size: 15px;
   font-weight: 500;
 }
@@ -601,7 +601,7 @@
   border: 1px dashed #d6e1da;
   border-radius: 20px;
   background: #fbfdfb;
-  color: #7a857e;
+  color: #536158;
   font-size: 17px;
 }
 .invoice-import-callout .item-tag-uploader { display: flex; align-items: center; flex: 0 0 auto; }
@@ -724,7 +724,7 @@
 }
 .invoice-gst-toggle span { display: grid; gap: 7px; }
 .invoice-gst-toggle strong { color: #24322a; font-size: 19px; }
-.invoice-gst-toggle small { color: #77827b; font-size: 16px; font-weight: 400; }
+.invoice-gst-toggle small { color: #58645e; font-size: 16px; font-weight: 400; }
 .invoice-gst-rate { display: grid; gap: 4px; max-width: 110px; color: #66736b; font-size: 12px; }
 .invoice-gst-rate select { min-height: 44px !important; padding: 5px 8px !important; border-radius: 10px !important; font-size: 14px !important; }
 .invoice-summary-line {
@@ -732,7 +732,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  color: #77827b;
+  color: #58645e;
   font-size: 19px;
 }
 .invoice-summary-line strong { color: #24322a; font-size: 19px; }
@@ -1111,7 +1111,7 @@
 .invoice-extraction-meta{margin:0;color:#69766f;font-size:13px}
 .invoice-extraction-total{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 8px;margin:0;color:#59675f;font-size:14px}
 .invoice-extraction-total strong{color:#202a25;font-size:17px}
-.invoice-extraction-total small{flex:1 1 100%;color:#7a857e;font-size:12px}
+.invoice-extraction-total small{flex:1 1 100%;color:#536158;font-size:12px}
 .invoice-extraction-warnings{margin:0;padding:10px 12px 10px 30px;border-radius:10px;background:#fff7e8;color:#795b20;font-size:13px;line-height:1.45}
 .invoice-extraction-field-warning{display:block;margin-top:3px;color:#8a5b19;font-size:11px;font-weight:550;line-height:1.4;white-space:normal}
 .invoice-extraction-header-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
