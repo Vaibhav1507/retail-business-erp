@@ -290,7 +290,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'serialNumbers' | 'hsn' | 'quantity' | 'unitPrice' | 'sellingPrice' | 'discount', value: string) {
-    setSalesInvoiceReviewIssues(current => current.filter(issue => issue.lineIndex !== index || issue.field !== field))
+    const issueField = field === 'sellingPrice' ? 'unitPrice' : field
+    setSalesInvoiceReviewIssues(current => current.filter(issue => issue.lineIndex !== index || issue.field !== issueField))
     setSalesInvoiceDraft(current => current ? ({
       ...current,
       lines: current.lines.map((line, lineIndex) => {
