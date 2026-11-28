@@ -87,6 +87,11 @@ public sealed class CloudVisionSalesInvoiceOcrReader(
                 return null;
 
             var resultPages = annotations.Select(page => page!).OrderBy(page => page.PageNumber).ToArray();
+            if (resultPages.All(page => page.Words.Count == 0))
+            {
+                logger.LogWarning("Cloud Vision returned no OCR words for the handwritten sales bill; degraded local OCR may be used.");
+                return null;
+            }
             var text = string.Join("\n", resultPages.Select(page =>
                 string.Join(' ', page.Words.Select(word => word.Text))));
             logger.LogInformation(
