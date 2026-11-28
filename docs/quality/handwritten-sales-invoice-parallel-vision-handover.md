@@ -179,4 +179,4 @@ Before creating the PR, review these points carefully:
 - 738f51e20fe08d5e1da4e0cb695618ce0bc04b1b — make the shared-prompt assertion null-safe.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Current PR head at the latest handover update: f8a2032ba873002ca05a861affdf549f9b12432a (documentation-only update that triggered exact-head CI run #1562).
+Latest code commit submitted for exact-head validation: f8a2032ba873002ca05a861affdf549f9b12432a. Subsequent handover/documentation commits do not change application code; fetch the PR head to identify the current documentation tip.
