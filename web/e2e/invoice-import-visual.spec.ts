@@ -221,7 +221,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await acceptedReview.getByLabel('Source bill number').fill('HAND-468')
   await acceptedReview.locator('#invoice-source-total').fill('10020')
   await acceptedReview.getByLabel('Extracted line 1 unit price').fill('10050')
-  await expect(acceptedReview.getByText('Corrected by you').first()).toBeVisible()
+  await expect(acceptedReview.getByText('Entered by you').first()).toBeVisible()
   await acceptedReview.getByRole('checkbox', { name: 'Confirm this reading' }).first().check()
   await acceptedReview.getByRole('button', { name: 'Add reviewed lines to bill' }).click()
   await expect(bill.locator('.invoice-added-item')).toContainText('Samsung LED Television model UA43')
