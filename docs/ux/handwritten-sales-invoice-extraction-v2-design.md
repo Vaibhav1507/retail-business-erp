@@ -491,11 +491,13 @@ The previously reported Anthropic HTTP 400 with an empty response body has not y
 - Remaining OCR gap: detect likely physical product rows present in Cloud Vision but omitted entirely by the primary extraction. The current alignment can flag extracted rows that do not match OCR, but cannot yet prove recall for rows the primary model omitted. Quantity/rate/amount/identifier-column geometry alignment also remains.
 - Add integration coverage for tenant-isolated evidence retrieval, document-to-sale atomicity, discard and idempotent replay.
 - Verify candidate field provenance and correction behaviour across all extracted fields.
-- Complete exact-head code CI, full Playwright journeys, responsive screenshots/contact sheets, visual review and Axe WCAG 2 A/AA. Native Android camera/gallery/keyboard/TalkBack remain separate real-device acceptance.
+- The exact application-code head `81f0b43d05587a26c7dd8b8c228e16ee6991c714` passed backend, frontend and PostgreSQL CI. Its invoice-import visual audit failed the serious/critical Axe `color-contrast` assertion at mobile 390 × 844. New documentation-only commits have since been added to the PR; exact-head CI is running again on the updated PR head.
+- Row-gap detection now surfaces some possible omitted OCR rows as review warnings. It does not establish full row recall; validate against independently labelled bills. Quantity/rate/amount/identifier-column geometry alignment remains incomplete.
+- Native Android camera/gallery/keyboard/TalkBack remain separate real-device acceptance.
 
 ### Explicit status
 
-Repository design specification: approved. Implementation: in progress in Draft PR #120. Automated CI: latest exact-head run pending. Full visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised.
+Repository design specification: approved. Implementation: in progress in Draft PR #120. Last application-code CI: passed at `81f0b43d`. Visual/Axe acceptance: failed on `color-contrast`; fix and rerun required. Updated PR head after documentation corrections: `9fbb16f6e8f31afeafea1478a3636ebcede8e3f3`; its CI and visual audit are in progress. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised.
 
 
 ## Implementation continuation — final provider order and release gates (2026-11-28)
