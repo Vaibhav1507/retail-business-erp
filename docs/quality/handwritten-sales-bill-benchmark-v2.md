@@ -1,4 +1,6 @@
 # Handwritten sales-bill extraction benchmark V2
+> **Current experiment:** PR #125 implements the temporary parallel Haiku + Gemini + Groq vision comparison. Section 12 supersedes the earlier sequential provider shortlist and OCR-assisted conditions. The implementation handover is [here](./handwritten-sales-invoice-parallel-vision-handover.md). Do not treat peer agreement as accuracy.
+
 
 > **Current status:** PR #120 merged the V2 production implementation on 2026-11-28 (`1848d344c97c1527dadb2d234c08b311c12990ec`). The seven S01–S05/S10–S11 app-output comparisons documented here are distinct from the optional 11-image model runner introduced by PR #118. That runner is research-only, manually triggered, and has a required default-off paid-call authorization input. Do not use this historical note to override the V2 provider design or activate any benchmark.
 
