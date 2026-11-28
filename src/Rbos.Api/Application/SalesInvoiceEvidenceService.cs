@@ -109,6 +109,15 @@ public sealed class SalesInvoiceEvidenceService(TenantDb db, ILogger<SalesInvoic
         return ServiceResult<object>.Ok(new { documentId, status = "Cancelled" });
     }
 
+    static bool MatchesSignature(byte[] bytes, string mime) => mime switch
+    {
+        "image/jpeg" => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
+        "image/png" => bytes.Length >= 8 && bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
+        "image/webp" => bytes.Length >= 12 && bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) && bytes.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+        "application/pdf" => bytes.Length >= 5 && bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8),
+        _ => false
+    };
+
     static string SafeFileName(string? requested, string mime)
     {
         var fallback = mime switch
