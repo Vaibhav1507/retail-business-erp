@@ -23,8 +23,8 @@ public sealed class SalesInvoiceEvidenceService(TenantDb db, ILogger<SalesInvoic
     {
         if (original.Length is 0 or > 8 * 1024 * 1024)
             throw new ArgumentOutOfRangeException(nameof(original), "Sales source bills must be between 1 byte and 8 MB.");
-        if (mime is not ("image/jpeg" or "image/png" or "image/webp" or "application/pdf"))
-            throw new ArgumentOutOfRangeException(nameof(mime), "Unsupported sales source-bill media type.");
+        if (!SalesInvoiceCaptureService.IsSupportedMime(mime) || !SalesInvoiceCaptureService.MatchesType(original, mime))
+            throw new ArgumentException("The source bill MIME type or file signature is invalid.", nameof(mime));
 
         var documentId = Guid.NewGuid();
         var batchId = Guid.NewGuid();
