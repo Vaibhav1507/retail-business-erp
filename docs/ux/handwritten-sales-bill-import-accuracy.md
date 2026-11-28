@@ -1,6 +1,6 @@
 # Handwritten sales-bill import — complete P0 + P1 improvement
 
-**Status:** P0 + P1 implementation merged in PR #113; main code CI #1357 passed on 2026-11-27. The next phase is the documented V2 benchmark; no independently verified accuracy score exists yet.  
+**Status:** P0 + P1 implementation merged in PR #113; handwritten sales-invoice V2 implementation merged in PR #120 on 2026-11-28. The current provider/runtime design is specified in [V2 design](./handwritten-sales-invoice-extraction-v2-design.md). No independently verified extraction-accuracy score exists yet.  
 **Route:** `#/sell/bill` (Generate Invoice)  
 **API:** `POST /api/sales/invoice-image-extract`  
 **Service:** `src/Rbos.Api/Application/SalesInvoiceCaptureService.cs`  
@@ -227,3 +227,12 @@ The current benchmark source of truth is [handwritten-sales-bill-benchmark-v2.md
 All 11 source photos have now been re-uploaded to the active conversation (nine Monika, two Anil). See [privacy-minimised source review](../quality/handwritten-sales-bill-source-review-v1.md) and [benchmark V2 master](../quality/handwritten-sales-bill-benchmark-v2.md).
 
 The first-pass readings remain provisional, not independently verified gold labels. The benchmark register marks all 11 photos received. S06–S09 still lack matching app outputs; the existing seven app runs cover S01–S05 and S10–S11. Do not calculate accuracy until uncertain source fields are reviewed and the missing baseline runs are captured.
+
+
+## 16. V2 implementation and research status — 2026-11-28
+
+- The V2 application implementation is merged in PR [#120](https://github.com/Vaibhav1507/retail-business-erp/pull/120), main commit `1848d344c97c1527dadb2d234c08b311c12990ec`.
+- The combined production design and provider hierarchy are documented in [handwritten-sales-invoice-extraction-v2-design.md](./handwritten-sales-invoice-extraction-v2-design.md). That document supersedes earlier Gemini-first implementation assumptions recorded in this P0/P1 history.
+- PR [#118](https://github.com/Vaibhav1507/retail-business-erp/pull/118) adds an optional research-only Haiku/Gemini benchmark workflow. It can make up to 22 requests but requires `authorize_paid_benchmark_calls=true`, which defaults to false. No model benchmark was run by merging it.
+- The seven existing app-output cases (S01–S05, S10–S11) remain the comparison cohort for the earlier app-output records. The separate optional runner uses the 11 source images; these cohorts must not be conflated.
+- Gold labels remain provisional. No extraction accuracy percentage is claimed. Original source images/customer PII are not stored in Git.

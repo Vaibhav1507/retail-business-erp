@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Configuration;
 using Rbos.Api.Application;
 
 namespace Rbos.UnitTests;
@@ -6,7 +7,64 @@ namespace Rbos.UnitTests;
 public sealed class SalesInvoiceCaptureContractTests
 {
     [Fact]
-    public void NormalizeForReview_PreservesVerbatimDescriptionAndStructuredSerialNumbers()
+    public void SalesInvoiceFreeTierFallbacks_IgnoreGeneralProviderCredentials()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:ApiKey"] = "general-gemini-key",
+            ["Groq:ApiKey"] = "general-groq-key",
+            ["Gemini:SalesInvoiceHydrogenModel"] = "gemini-4-argon",
+            ["Groq:Model"] = "paid-or-unapproved-model"
+        }).Build();
+
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+        Assert.Equal("gemini-4-hydrogen", SalesInvoiceCaptureService.GeminiFreeTierModel);
+        Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
+    }
+
+    [Fact]
+    public void SalesInvoiceFreeTierFallbacks_RequireBothDedicatedCredentialAndExplicitEnablement()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-gemini-free-key",
+            ["Groq:SalesInvoiceFreeTierApiKey"] = "dedicated-groq-free-key"
+        }).Build();
+
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+
+        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "true";
+        configuration["Groq:SalesInvoiceFreeTierEnabled"] = "true";
+
+        Assert.Equal("dedicated-gemini-free-key",
+            SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
+        Assert.Equal("dedicated-groq-free-key",
+            SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+    }
+
+    [Fact]
+    public void SalesInvoiceHydrogenFullDocumentFallback_RequiresExplicitFreeTierDataUseSwitch()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:ApiKey"] = "general-paid-key",
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-free-key",
+            ["Gemini:SalesInvoiceFreeTierEnabled"] = "true"
+        }).Build();
+
+        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+
+        configuration["Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled"] = "true";
+        Assert.True(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+
+        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "false";
+        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+    }
+
+    [Fact]
+    public void NormalizeForReview_PreservesVerbatimDescriptionAndKeepsLegacySerialUnconfirmed()
     {
         var source = JsonNode.Parse("""
             {
@@ -31,12 +89,17 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal("00454", result["invoiceNumber"]!.GetValue<string>());
         Assert.Equal("Voltas Beko WM\nModel WTL8066\nS/N SN12345678", line["description"]!.GetValue<string>());
         Assert.Equal("WTL8066", line["model"]!.GetValue<string>());
-        Assert.Equal("SN12345678", Assert.Single(Assert.IsType<JsonArray>(line["serialNumbers"])).GetValue<string>());
+        Assert.Empty(Assert.IsType<JsonArray>(line["serialNumbers"]));
+        var candidate = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(line["identifierCandidates"])));
+        Assert.Equal("SN12345678", candidate["value"]!.GetValue<string>());
+        Assert.Equal("unknown", candidate["classification"]!.GetValue<string>());
+        Assert.Equal("ambiguous", candidate["fieldState"]!.GetValue<string>());
+        Assert.False(candidate["confirmed"]!.GetValue<bool>());
         Assert.Equal(17500m, line["amount"]!.GetValue<decimal>());
     }
 
     [Fact]
-    public void NormalizeForReview_AcceptsLegacySingleSerialAndDeduplicatesRepeatedValues()
+    public void NormalizeForReview_ConvertsLegacySerialArraysIntoUniqueUnconfirmedCandidates()
     {
         var source = JsonNode.Parse("""
             {
@@ -50,11 +113,20 @@ public sealed class SalesInvoiceCaptureContractTests
             """)!;
 
         var result = SalesInvoiceCaptureService.NormalizeForReview(source);
-        var serials = Assert.IsType<JsonArray>(Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])))["serialNumbers"]);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])));
+        var serials = Assert.IsType<JsonArray>(line["serialNumbers"]);
+        var candidates = Assert.IsType<JsonArray>(line["identifierCandidates"]);
 
-        Assert.Equal(2, serials.Count);
-        Assert.Equal("SN12345678", serials[0]!.GetValue<string>());
-        Assert.Equal("SN98765432", serials[1]!.GetValue<string>());
+        Assert.Empty(serials);
+        Assert.Equal(2, candidates.Count);
+        Assert.Equal("SN12345678", candidates[0]!["value"]!.GetValue<string>());
+        Assert.Equal("SN98765432", candidates[1]!["value"]!.GetValue<string>());
+        Assert.All(candidates, candidate =>
+        {
+            Assert.Equal("unknown", candidate!["classification"]!.GetValue<string>());
+            Assert.Equal("ambiguous", candidate["fieldState"]!.GetValue<string>());
+            Assert.False(candidate["confirmed"]!.GetValue<bool>());
+        });
     }
 
     [Fact]
@@ -67,6 +139,26 @@ public sealed class SalesInvoiceCaptureContractTests
 
         Assert.Empty(Assert.IsType<JsonArray>(line["serialNumbers"]));
     }
+    [Fact]
+    public void NormalizeForReview_DoesNotClaimSourceReadWhenProviderOmitsProvenance()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "invoiceNumber": "00454",
+              "lines": [{ "description": "Voltas washer", "quantity": 1, "serialNumbers": ["SN123456"] }]
+            }
+            """)!;
+
+        var result = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])));
+        var candidate = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(line["identifierCandidates"])));
+
+        Assert.Equal("ambiguous", result["fieldStates"]!["invoiceNumber"]!.GetValue<string>());
+        Assert.Equal("ambiguous", line["fieldStates"]!["description"]!.GetValue<string>());
+        Assert.Equal("ambiguous", candidate["fieldState"]!.GetValue<string>());
+        Assert.Equal("unreadable", result["fieldStates"]!["total"]!.GetValue<string>());
+    }
+
     [Fact]
     public void NormalizeForReview_PreservesOnlyBoundedFieldConfidenceScores()
     {
@@ -130,8 +222,8 @@ public sealed class SalesInvoiceCaptureContractTests
               "customerName": "Test Customer", "customerPhone": "9876543210",
               "total": 300,
               "lines": [
-                { "description": "Television", "quantity": 1, "unitPrice": 200, "serialNumbers": ["SN123456"] },
-                { "description": "Washer", "quantity": 1, "unitPrice": 100, "serialNumbers": ["SN123456"] }
+                { "description": "Television", "quantity": 1, "unitPrice": 200, "identifierCandidates": [{ "value": "SN123456", "classification": "serial" }] },
+                { "description": "Washer", "quantity": 1, "unitPrice": 100, "identifierCandidates": [{ "value": "SN123456", "classification": "serial" }] }
               ]
             }
             """)!;
@@ -139,9 +231,9 @@ public sealed class SalesInvoiceCaptureContractTests
 
         var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
 
-        Assert.Equal(2, issues.Count(issue => issue.Field == "serialNumbers" &&
-            issue.Message.Contains("more than one item", StringComparison.Ordinal)));
-        Assert.DoesNotContain(issues, issue => issue.Message.Contains("more serial numbers than its quantity", StringComparison.Ordinal));
+        Assert.Equal(2, issues.Count(issue => issue.Field == "identifierCandidates" &&
+            issue.Message.Contains("appears on more than one item", StringComparison.Ordinal)));
+        Assert.DoesNotContain(issues, issue => issue.Field == "serialNumbers");
     }
 
     [Fact]
@@ -175,7 +267,7 @@ public sealed class SalesInvoiceCaptureContractTests
               "total": 200,
               "lines": [{
                 "description": "Television", "quantity": 1, "unitPrice": 200,
-                "discount": 250, "serialNumbers": ["BAD SN"]
+                "discount": 250, "identifierCandidates": [{ "value": "BAD SN", "classification": "serial" }]
               }]
             }
             """)!;
@@ -184,8 +276,215 @@ public sealed class SalesInvoiceCaptureContractTests
         var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
 
         Assert.Contains(issues, issue => issue.Field == "discount" && issue.LineIndex == 0);
-        Assert.Contains(issues, issue => issue.Field == "serialNumbers" && issue.LineIndex == 0 &&
-            issue.Message.Contains("accepted format", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, issue => issue.Field == "serialNumbers");
+        Assert.DoesNotContain(issues, issue => issue.Message.Contains("IMEI", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildReviewIssues_DoesNotApplyImeiLuhnToSerialNumbers()
+    {
+        const string digits = "123456789012345";
+        Assert.False(SalesInvoiceCaptureService.IsValidImei(digits));
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Device",
+                "quantity": 1,
+                "unitPrice": 100,
+                "identifierCandidates": [{ "value": "123456789012345", "classification": "serial" }]
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+
+        Assert.DoesNotContain(issues, issue => issue.Message.Contains("IMEI", StringComparison.Ordinal));
+        Assert.Empty(Assert.IsType<JsonArray>(Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(extraction["lines"])))["serialNumbers"]));
+    }
+
+    [Fact]
+    public void BuildReviewIssues_ValidatesLuhnOnlyForPossibleImeis()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Phone",
+                "quantity": 1,
+                "unitPrice": 100,
+                "identifierCandidates": [{ "value": "123456789012345", "classification": "imei" }]
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+
+        Assert.Contains(issues, issue => issue.Field == "identifierCandidates" &&
+            issue.Message.Contains("possible IMEI failed its check digit", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NormalizeForReview_PreservesCompleteLongVerbatimProductDescription()
+    {
+        var description = string.Join("\n", Enumerable.Repeat(
+            "Samsung LED Television model UA43K5570 serial characters O0I1 and package specification details",
+            8));
+        var source = new JsonObject
+        {
+            ["lines"] = new JsonArray(new JsonObject
+            {
+                ["description"] = description,
+                ["quantity"] = 1,
+                ["unitPrice"] = 100m,
+                ["fieldStates"] = new JsonObject
+                {
+                    ["description"] = "source_read",
+                    ["quantity"] = "source_read",
+                    ["unitPrice"] = "source_read"
+                }
+            })
+        };
+
+        var result = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])));
+        Assert.Equal(description, line["description"]!.GetValue<string>());
+        Assert.Equal(description.Length, line["description"]!.GetValue<string>().Length);
+        Assert.Equal(100m, line["sellingPrice"]!.GetValue<decimal>());
+        Assert.Equal("source_read", line["sellingPriceProvenance"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void NormalizeForReview_PreservesBlankRateAsNotPresentRatherThanUnreadable()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Voltas washing machine",
+                "quantity": 1,
+                "unitPrice": "",
+                "amount": "17500",
+                "fieldStates": { "description": "source_read", "quantity": "source_read", "unitPrice": "not_present", "amount": "source_read" }
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(extraction["lines"])));
+
+        Assert.Null(line["unitPrice"]);
+        Assert.Equal("not_present", line["fieldStates"]!["unitPrice"]!.GetValue<string>());
+        Assert.Null(line["sellingPrice"]);
+        Assert.Equal("not_present", line["sellingPriceProvenance"]!.GetValue<string>());
+        Assert.Equal(17500m, line["amount"]!.GetValue<decimal>());
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+        Assert.Contains(issues, issue => issue.Field == "unitPrice" && issue.Severity == "info" &&
+            issue.Message.Contains("source Rate cell is blank", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, issue => issue.Field == "unitPrice" &&
+            issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("invoiceNumber", "Invoice No. 00454", "00454")]
+    [InlineData("date", "Date: 06/11/2026", "06/11/2026")]
+    [InlineData("total", "TOTAL ₹10,020 10,000", "10,020")]
+    public void OcrHeaderValue_ExtractsValueAfterExactLabel(string field, string row, string expected)
+    {
+        Assert.Equal(expected, SalesInvoiceCaptureService.ExtractOcrHeaderValue(field, row));
+    }
+
+    [Theory]
+    [InlineData("\"00454\"", "00454")]
+    [InlineData("10020", "10020")]
+    [InlineData("10020.50", "10020.50")]
+    public void ReadFieldValueText_PreservesStringHeadersAndSerializesNumericTotals(string json, string expected)
+    {
+        var value = JsonNode.Parse(json);
+        Assert.Equal(expected, SalesInvoiceCaptureService.ReadFieldValueText(value));
+    }
+
+    [Fact]
+    public void OcrTotalLabel_DoesNotTreatSubtotalAsPrintedTotal()
+    {
+        Assert.False(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "SUBTOTAL ₹10,020"));
+        Assert.True(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "TOTAL ₹10,020"));
+    }
+
+    [Theory]
+    [InlineData("invoiceNumber", "00454", "00454", true)]
+    [InlineData("invoiceNumber", "00454", "454", false)]
+    [InlineData("invoiceNumber", "00454", "40054", false)]
+    [InlineData("date", "2026-11-06", "06/11/2026", true)]
+    [InlineData("date", "2026-11-06", "06/12/2026", false)]
+    [InlineData("total", "10020", "10,020", true)]
+    [InlineData("total", "10020", "10,000", false)]
+    public void OcrHeaderComparison_UsesExactNormalizedFieldValues(string field, string primary, string candidate, bool expected)
+    {
+        Assert.Equal(expected, SalesInvoiceCaptureService.CompareOcrHeaderValue(field, primary, candidate));
+    }
+
+    [Fact]
+    public void NormalizeForReview_DoesNotGuessNotPresentWhenNullRateHasNoExplicitSourceState()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Voltas washing machine",
+                "quantity": 1,
+                "unitPrice": null,
+                "amount": 17500
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(extraction["lines"])));
+
+        Assert.Null(line["unitPrice"]);
+        Assert.Equal("unreadable", line["fieldStates"]!["unitPrice"]!.GetValue<string>());
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+        Assert.Contains(issues, issue => issue.Field == "unitPrice" &&
+            issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, issue => issue.Message.Contains("source Rate cell is blank", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OcrDescriptionMatchScore_RequiresMultipleDistinctTokensAndPreservesRowIdentity()
+    {
+        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
+            "Samsung LED Television model UA43",
+            "Samsung LED Television model UA43 Qty 1 Rate blank Amount 10000") >= 0.95);
+        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
+            "Samsung LED Television model UA43",
+            "LG Washing Machine model WM900") < 0.30);
+        Assert.Equal(0, SalesInvoiceCaptureService.OcrDescriptionMatchScore("LG", "LG Electronics"));
+    }
+
+    [Fact]
+    public void PossibleOmittedOcrRow_is_flagged_without_rewriting_or_matching_existing_lines()
+    {
+        var descriptions = new[] { "Samsung LED Television model UA43K5570" };
+
+        Assert.True(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "LG Washing Machine WM900 1 15000 15000", descriptions));
+        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "Samsung LED Television model UA43K5570 Qty 1", descriptions));
+        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "Invoice No HAND-468", descriptions));
+        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "TOTAL 10020", descriptions));
+    }
+
+    [Fact]
+    public void AnthropicSchemaAvoidsUnsupportedConstraintsAndExcessiveUnionTypes()
+    {
+        var schema = SalesInvoiceCaptureService.BuildAnthropicResponseJsonSchema();
+        var json = schema.ToJsonString();
+
+        Assert.DoesNotContain("\"minimum\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"maximum\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"maxItems\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"type\":[", json, StringComparison.Ordinal);
+        Assert.Contains("fieldStates", json, StringComparison.Ordinal);
+        Assert.Contains("identifierCandidates", json, StringComparison.Ordinal);
     }
 
     [Fact]

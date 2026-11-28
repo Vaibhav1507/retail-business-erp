@@ -9,28 +9,63 @@ const viewports = [
   { name: 'mobile-360x800', width: 360, height: 800 },
   { name: 'mobile-390x844', width: 390, height: 844 },
   { name: 'mobile-412x915', width: 412, height: 915 },
+  { name: 'tablet-768x1024', width: 768, height: 1024 },
+  { name: 'landscape-844x390', width: 844, height: 390 },
+  { name: 'desktop-1440x900', width: 1440, height: 900 },
 ]
 const pageErrors: string[] = []
-const audit: { state: string; viewport: string; overflowX: boolean; screenshot: string; axeViolations: string[] }[] = []
+const consoleErrors: string[] = []
+const networkFailures: string[] = []
+const serverErrors: string[] = []
+const audit: { state: string; viewport: string; overflowX: boolean; viewportScreenshot: string; fullPageScreenshot: string; axeViolations: string[]; undersizedTouchTargets: number }[] = []
 
 async function captureState(page: import('@playwright/test').Page, state: string) {
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
-    const screenshot = `${viewport.name}-${state}.png`
-    await page.screenshot({ path: `${outDir}/${screenshot}`, fullPage: true, animations: 'disabled' })
-    const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
+    const viewportScreenshot = `${viewport.name}-${state}-viewport.png`
+    const fullPageScreenshot = `${viewport.name}-${state}-full.png`
+    await page.screenshot({ path: `${outDir}/${viewportScreenshot}`, fullPage: false, animations: 'disabled' })
+    await page.screenshot({ path: `${outDir}/${fullPageScreenshot}`, fullPage: true, animations: 'disabled' })
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      undersizedTouchTargets: [...document.querySelectorAll('button, input, select, textarea')]
+        .filter(element => {
+          const rect = element.getBoundingClientRect()
+          return rect.width > 0 && rect.height > 0 && (rect.width < 40 || rect.height < 40)
+        }).length,
+    }))
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
-    audit.push({ state, viewport: viewport.name, overflowX, screenshot, axeViolations: axe.violations.map(v => v.id) })
-    expect(overflowX, `Unexpected horizontal overflow in ${state} at ${viewport.width}px`).toBe(false)
-    expect(axe.violations.filter(v => v.impact === 'critical').map(v => v.id)).toEqual([])
+    const axeDetails = axe.violations.map(violation => ({
+      id: violation.id,
+      impact: violation.impact,
+      description: violation.description,
+      help: violation.help,
+      nodes: violation.nodes.map(node => ({
+        target: node.target,
+        html: node.html,
+        failureSummary: node.failureSummary,
+        contrastChecks: [...node.any, ...node.all, ...node.none]
+          .filter(check => check.id === 'color-contrast')
+          .map(check => check.data),
+      })),
+    }))
+    audit.push({ state, viewport: viewport.name, ...layout, viewportScreenshot, fullPageScreenshot, axeViolations: axe.violations.map(v => v.id) })
+    writeFileSync(`${outDir}/${viewport.name}-${state}-axe.json`, JSON.stringify(axeDetails, null, 2))
+    const seriousAxeDetails = axeDetails.filter(violation => violation.impact === 'critical' || violation.impact === 'serious')
+    if (seriousAxeDetails.length) console.log('RBOS_A11Y_VIOLATIONS ' + JSON.stringify({ state, viewport: viewport.name, violations: seriousAxeDetails }))
+    expect(layout.overflowX, `Unexpected horizontal overflow in ${state} at ${viewport.width}px`).toBe(false)
+    expect(seriousAxeDetails.map(v => v.id)).toEqual([])
   }
-  writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, captures: audit }, null, 2))
+  writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, consoleErrors, networkFailures, serverErrors, captures: audit }, null, 2))
 }
 
-test('Create Invoice: handwritten import review and tag feedback fit mobile screens', async ({ page }) => {
-  test.setTimeout(5 * 60 * 1000)
+test('Create Invoice: handwritten evidence review, sale posting and responsive tag feedback', async ({ page }) => {
+  test.setTimeout(10 * 60 * 1000)
   mkdirSync(outDir, { recursive: true })
   page.on('pageerror', error => pageErrors.push(error.message))
+  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+  page.on('requestfailed', request => networkFailures.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? 'failed'}`))
+  page.on('response', response => { if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`) })
   await signUp(page, { email: `invoice-import-${stamp}@example.test`, businessName: `Invoice Import ${stamp}`, mobile: randomMobile() })
   setDialogHandler(page, async dialog => { if (dialog.type() === 'confirm') await dialog.accept(); else await dialog.dismiss() })
   await page.goto('/#/sell/bill')
@@ -48,17 +83,54 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await description.fill('')
   await expect(description).toHaveCSS('height', '76px')
 
+  const sourceDocumentIds = [
+    '11111111-2222-4333-8444-555555555555',
+    '22222222-3333-4444-8555-666666666666',
+  ]
+  let uploadCount = 0
+  await page.route(/\/api\/documents\/[0-9a-f-]+\/pages\/1(?:\?preview=true)?$/, async route => {
+    const isPreview = new URL(route.request().url()).searchParams.get('preview') === 'true'
+    await route.fulfill({
+      status: 200,
+      contentType: isPreview ? 'image/png' : 'application/pdf',
+      body: isPreview
+        ? Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/8X8AAAAASUVORK5CYII=', 'base64')
+        : Buffer.from('%PDF-1.4\\n% synthetic retained handwritten bill\\n%%EOF'),
+    })
+  })
+  await page.route('**/api/sales/invoice-image-extract/*/discard', async route => {
+    const documentId = route.request().url().split('/').slice(-2)[0]
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ documentId, status: 'Cancelled' }) })
+  })
+  const invoiceUploadHeaders: Record<string, string | undefined>[] = []
+  const fullDescription = [
+    'Samsung LED Television model UA43K5570',
+    'Serial: SN12345678',
+    'Full handwritten model and package text preserved on this line',
+    'Display technology, connectivity, remote control and accessory bundle details',
+    'Alphanumeric carton reference BX-0045 and installation notes must remain verbatim',
+  ].join('\n')
   await page.route('**/api/sales/invoice-image-extract', async route => {
+    invoiceUploadHeaders.push(route.request().headers())
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-      status: 'ReadyForReview',
+      status: 'NeedsAttention',
+      sourceDocumentId: sourceDocumentIds[Math.min(uploadCount++, sourceDocumentIds.length - 1)],
       extraction: {
         invoiceNumber: 'HAND-468', date: '2026-11-26', customerName: 'Handwritten Customer',
-        customerPhone: '9876543210', subtotal: 10000, taxAmount: 1800, total: 11800,
+        customerPhone: '9876543210', subtotal: 10000, taxAmount: 20, total: 10020,
+        fieldStates: { invoiceNumber: 'ambiguous', date: 'source_read', customerName: 'source_read', customerPhone: 'source_read', subtotal: 'source_read', taxAmount: 'source_read', total: 'ambiguous' },
+        ocrEvidence: {
+          invoiceNumber: { status: 'ambiguous', haikuOrPrimaryReading: 'HAND-468', ocrCandidate: '4006', ocrAgrees: false, pageNumber: 1, region: { left: 0.12, top: 0.1, width: 0.22, height: 0.04 }, verificationCandidate: 'HAND-468', verificationStatus: 'source_read' },
+          total: { status: 'ambiguous', haikuOrPrimaryReading: '10020', ocrCandidate: '10000', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '10020', verificationStatus: 'source_read' },
+        },
         lines: [{
-          description: 'Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line',
-          brand: 'Samsung', model: 'UA43', serialNumbers: ['SN12345678'],
-          hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000,
-          gstRate: 18, gstAmount: 1800, confidence: 0.92,
+          description: fullDescription,
+          brand: 'Samsung', model: 'UA43', serialNumbers: [],
+          identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }, { value: 'UA43', classification: 'model', confirmed: false }],
+          hsn: '8528', quantity: 1, unitPrice: null, sellingPrice: null, sellingPriceProvenance: 'not_present',
+          discount: 0, amount: 10000, gstRate: null, gstAmount: null, confidence: 0.92,
+          fieldStates: { description: 'ambiguous', brand: 'source_read', model: 'source_read', hsn: 'source_read', quantity: 'source_read', unitPrice: 'not_present', discount: 'source_read', amount: 'source_read', gstRate: 'source_read', gstAmount: 'source_read' },
+          ocrEvidence: { status: 'ambiguous', haikuOrPrimaryReading: 'Samsung LED Television model UA43', ocrCandidate: 'Samsung LED Television UA43', ocrAgrees: false, pageNumber: 1, region: { left: 0.1, top: 0.4, width: 0.8, height: 0.12 }, verificationCandidate: 'Samsung LED Television UA43', verificationStatus: 'ambiguous' },
         }],
       },
       warnings: ['Synthetic visual audit extraction: verify the handwritten total.'],
@@ -79,16 +151,40 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   }
 
   await importBill()
-  const review = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
+  const review = bill.getByRole('region', { name: 'Review detected items', exact: true })
   await expect(review).toBeVisible()
+  const sourceActionsOverlapAssistant = await review.locator('.invoice-source-region-jump').evaluateAll(buttons => {
+    const assistant = document.querySelector('.assistant-launcher')
+    if (!assistant) return false
+    const a = assistant.getBoundingClientRect()
+    return buttons.some(button => {
+      const b = button.getBoundingClientRect()
+      return b.width > 0 && b.height > 0 && b.right > a.left && b.left < a.right && b.bottom > a.top && b.top < a.bottom
+    })
+  })
+  expect(sourceActionsOverlapAssistant).toBe(false)
   const extractedDescription = review.getByLabel('Extracted line 1 description')
-  await expect(extractedDescription).toHaveValue('Samsung LED Television model UA43\nSerial: SN12345678\nFull handwritten model and package text preserved on this line')
+  await expect(extractedDescription).toHaveValue(fullDescription)
   await expect(extractedDescription).toHaveCSS('resize', 'none')
   await expect(extractedDescription).toHaveCSS('overflow-y', 'hidden')
   await expect.poll(async () => Number((await extractedDescription.evaluate(element => getComputedStyle(element).height)).replace('px', ''))).toBeGreaterThan(48)
-  await expect(review.getByLabel('Extracted line 1 serial numbers')).toHaveValue('SN12345678')
+  await expect(review.getByLabel('Extracted line 1 serial numbers')).toHaveValue('')
+  await expect(review.getByRole('img', { name: 'Original handwritten customer sales bill, page 1' })).toBeVisible()
+  await expect(review.getByRole('button', { name: 'Inspect invoice number' })).toBeVisible()
+  await expect(review.getByText(/Independent OCR reading: “4006”/)).toBeVisible()
+  await expect(review.getByText(/Close-up reading: “HAND-468”/)).toBeVisible()
+  await expect(review.locator('.invoice-extracted-line .invoice-extraction-conflict')).toContainText('Independent OCR could not confidently confirm this product row.')
+  await review.getByRole('button', { name: 'Inspect product row in original bill' }).click()
+  await expect(review.locator('.invoice-source-region.active')).toBeVisible()
+  await expect(review.getByLabel('Item 1 identifier candidate 1')).toHaveValue('SN12345678')
+  await expect(review.getByRole('checkbox', { name: 'Confirm this reading' }).first()).not.toBeChecked()
+  expect(invoiceUploadHeaders[0]?.['x-source-file-name']).toBe('synthetic-handwritten-bill.pdf')
   await expect(review.getByLabel('Extracted line 1 quantity')).toHaveValue('1')
-  await expect(review.getByLabel('Extracted line 1 unit price')).toHaveValue('10000')
+  await expect(review.getByText('Not written on source bill')).toBeVisible()
+  const sellingPrice = review.getByLabel('Extracted line 1 unit price')
+  await expect(sellingPrice).toHaveValue('')
+  await sellingPrice.fill('10000')
+  await expect(review.getByText('Entered by you')).toBeVisible()
   await expect(bill.locator('#billing-prod')).toBeHidden()
   await expect(bill.locator('#billing-qty')).toBeHidden()
   await expect(bill.locator('#billing-price')).toBeHidden()
@@ -105,6 +201,12 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   })
   expect(separation).toBeGreaterThanOrEqual(10)
   await captureState(page, 'extraction-review')
+  await review.getByLabel('Source bill number').focus()
+  await expect(review.getByLabel('Source bill number')).toBeFocused()
+  await captureState(page, 'extraction-review-keyboard-focus')
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await captureState(page, 'extraction-review-scrolled')
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expect(chatLauncher).toBeVisible()
 
   await review.getByRole('button', { name: 'Discard extraction' }).click()
@@ -114,13 +216,43 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await expect(bill.locator('#billing-qty')).toBeVisible()
 
   await importBill()
-  const acceptedReview = bill.getByRole('region', { name: 'Review extracted sales invoice', exact: true })
+  const acceptedReview = bill.getByRole('region', { name: 'Review detected items', exact: true })
   await expect(acceptedReview).toBeVisible()
+  await acceptedReview.getByLabel('Source bill number').fill('HAND-468')
+  await acceptedReview.locator('#invoice-source-total').fill('10020')
+  await acceptedReview.getByLabel('Extracted line 1 unit price').fill('10050')
+  await expect(acceptedReview.getByText('Entered by you').first()).toBeVisible()
+  await acceptedReview.getByRole('checkbox', { name: 'Confirm this reading' }).first().check()
   await acceptedReview.getByRole('button', { name: 'Add reviewed lines to bill' }).click()
   await expect(bill.locator('.invoice-added-item')).toContainText('Samsung LED Television model UA43')
   await expect(bill.locator('.invoice-added-item')).toContainText('Serial: SN12345678')
   await expect(bill.getByText(/Invoice details extracted/)).toHaveCount(0)
   await expect(description).toBeVisible()
+
+  const saleId = '33333333-4444-4555-8666-777777777777'
+  let postedSale: Record<string, unknown> | null = null
+  await page.route('**/api/customers', async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: '44444444-5555-4666-8777-888888888888' }) })
+  })
+  await page.route('**/api/sales', async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    postedSale = route.request().postDataJSON() as Record<string, unknown>
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: saleId, serialWarnings: [] }) })
+  })
+  await page.route('**/api/sales/' + saleId, async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sale: { number: 123, whatsappStatus: 'ConsentRequired' } }) })
+  })
+  await page.evaluate(() => { window.print = () => {} })
+  await bill.getByRole('button', { name: 'Generate invoice' }).click()
+  await page.getByRole('button', { name: 'Confirm & print' }).click()
+  await expect(page.getByText('Saved as INV-000123.')).toBeVisible()
+  expect(postedSale?.sourceDocumentId).toBe(sourceDocumentIds[1])
+  expect((postedSale?.lines as { serials: string[] }[] | undefined)?.[0]?.serials).toContain('SN12345678')
+  expect((postedSale?.lines as { description: string }[] | undefined)?.[0]?.description).toBe(fullDescription)
+  await captureState(page, 'posted-invoice')
+  await page.getByRole('button', { name: 'New invoice' }).click()
+  await expect(bill).toBeVisible()
   await page.unroute('**/api/sales/invoice-image-extract')
 
   await page.route('**/api/sales/item-tag-scan', async route => {
@@ -152,5 +284,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
   await captureState(page, 'tag-extraction-feedback')
   await expect(chatLauncher).toBeVisible()
   expect(pageErrors).toEqual([])
-  writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, captures: audit }, null, 2))
+  expect(consoleErrors).toEqual([])
+  expect(serverErrors).toEqual([])
+  writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, consoleErrors, networkFailures, serverErrors, captures: audit }, null, 2))
 })

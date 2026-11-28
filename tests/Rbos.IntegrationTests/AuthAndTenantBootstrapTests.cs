@@ -21,6 +21,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 		builder.UseEnvironment("Development");
 		builder.UseSetting("Rbos:Database", "test");
 		builder.UseSetting("Rbos:AllowOpenRegistration", OpenRegistration ? "true" : "false");
+        builder.ConfigureAppConfiguration((_, configuration) =>
+        {
+            // The integration suite exercises the offline/no-credential provider path.
+            // Do not make external Vision API calls or spend model credits from CI.
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CloudVision:Enabled"] = "false",
+                ["Anthropic:SalesInvoiceIntegrationValidated"] = "false"
+            });
+        });
 		builder.ConfigureServices(services =>
 		{
 			services.RemoveAll<IEmailOtpSender>();

@@ -1,12 +1,15 @@
 # Handwritten sales-bill extraction benchmark V2
 
-**Status as of 2026-11-28:** benchmark preparation and protocol documented; no V2 model bake-off or ground-truth accuracy result has been run. User decision: proceed with the seven existing app-output cases only; do not wait for or request S06–S09 outputs. Provider order is Claude Haiku 5.5 first, Gemini 3.8 Flash second, then remaining eligible candidates.  
+> **Current status:** PR #120 merged the V2 production implementation on 2026-11-28 (`1848d344c97c1527dadb2d234c08b311c12990ec`). The seven S01–S05/S10–S11 app-output comparisons documented here are distinct from the optional 11-image model runner introduced by PR #118. That runner is research-only, manually triggered, and has a required default-off paid-call authorization input. Do not use this historical note to override the V2 provider design or activate any benchmark.
+
+
+**Historical status (2026-11-28):** this note preserves the pre-V2 benchmark protocol and provisional handwritten-bill corpus review. It is not the current production architecture or provider chain. PR #120 has since merged the V2 implementation; the authoritative design is [V2 design](../ux/handwritten-sales-invoice-extraction-v2-design.md).  
 **Authoritative scope:** existing synchronous handwritten sales-bill import in Generate Invoice only (`#/sell/bill`).  
 **Current main baseline:** `2b981069125f1ee2be7e5537635d969dd17b6f9b`.  
 **Implementation merge:** PR [#113](https://github.com/Vaibhav1507/retail-business-erp/pull/113), merged 2026-11-26 at `965da62d980d0b7b3d6b38de53f9b67e8fdac629`.  
 **Latest main code CI observed:** run [#1357](https://github.com/Vaibhav1507/retail-business-erp/actions/runs/45965857793), success on 2026-11-27. This is code CI, not extraction accuracy or visual acceptance.
 
-This document is the single handoff for the benchmark decision, corpus status, provider research, evaluation method and next actions. Update it whenever a sample, label, provider, experiment or decision changes.
+This document is a historical quality/research record for the handwritten-bill corpus and seven existing app-output comparisons. Current V2 architecture, runtime provider rules and release status are maintained in the V2 design and Billing & Sales handoff.
 
 ## 1. Goal and scope
 
@@ -31,9 +34,9 @@ Explicit non-goals:
 - Changes to sale posting, GST/tax, stock, WAC, discount, customer, payment, offline, print, accounting or tenant rules.
 - Automatic invoice posting or trusting model confidence as proof of correctness.
 
-No implementation, provider configuration, production deployment, paid-spend cap, merge or production release is authorised by this benchmark document.
+This quality document does not authorize model calls, provider spend, production configuration changes, database migrations or deployment.
 
-## 2. Current implementation baseline (verified on main)
+## 2. Pre-V2 implementation baseline (historical snapshot before PR #120)
 
 Files and entry points:
 - API route: `POST /api/sales/invoice-image-extract` in `src/Rbos.Api/SalesInvoiceCaptureEndpoints.cs`.
@@ -275,7 +278,7 @@ No primary model or verifier has been selected yet.
 - 2026-11-28 — No free-tier transmission of unredacted customer invoices.
 - 2026-11-28 — All 11 original source photos were re-uploaded; first-pass visual review is documented separately. Gold labels remain provisional pending independent review.
 - 2026-11-28 — User elected to benchmark only the seven cases with existing app outputs (S01–S05, S10–S11); S06–S09 excluded, no further outputs requested.
-- 2026-11-28 — User-approved provider order: Claude Haiku 5.5 first, Gemini 3.8 Flash second, then other candidates sequentially.\n- 2026-11-28 — No model winner, 98% accuracy release target, monthly spend cap, merge or deployment has been approved.
+- 2026-11-28 — Historical experiment proposal: Claude Haiku 5.5 followed by Gemini 3.8 Flash. The approved V2 production design in `docs/ux/handwritten-sales-invoice-extraction-v2-design.md` supersedes this as the production provider policy.\n- 2026-11-28 — No model winner, 98% accuracy release target, monthly spend cap, merge or deployment has been approved.
 
 ## References within RBOS
 
