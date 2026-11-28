@@ -997,7 +997,7 @@ public sealed class SalesInvoiceCaptureService(
         return OcrDescriptionMatchScore(primary, verification) >= 0.55;
     }
 
-    static string? ReadFieldValueText(JsonNode? value) =>
+    public static string? ReadFieldValueText(JsonNode? value) =>
         ReadString(value) ?? ReadDecimal(value)?.ToString(CultureInfo.InvariantCulture);
 
     static string ComparableText(string value) =>
