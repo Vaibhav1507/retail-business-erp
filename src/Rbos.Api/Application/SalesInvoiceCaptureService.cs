@@ -113,13 +113,13 @@ public sealed class SalesInvoiceCaptureService(
             // Shadow readers never receive Haiku's answer and never influence its extraction.
             var geminiKey = GetSalesInvoiceGeminiShadowApiKey(cfg);
             var groqKey = GetSalesInvoiceGroqShadowApiKey(cfg);
-            var haikuTask = RunHaikuAttemptAsync(mime, bytes, budgetToken);
+            var haikuTask = RunHaikuAttemptAsync(mime, bytes, budgetToken, ct);
             var geminiTask = geminiKey is null
                 ? Task.FromResult(new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "not_enabled", null, 0))
-                : RunGeminiAttemptAsync(geminiKey, mime, bytes, budgetToken);
+                : RunGeminiAttemptAsync(geminiKey, mime, bytes, budgetToken, ct);
             var groqTask = groqKey is null
                 ? Task.FromResult(new SalesInvoiceProviderAttempt("Groq", GroqFreeTierVisionModel, "not_enabled", null, 0))
-                : RunGroqAttemptAsync(groqKey, mime, bytes, budgetToken);
+                : RunGroqAttemptAsync(groqKey, mime, bytes, budgetToken, ct);
 
             var attempts = await Task.WhenAll(haikuTask, geminiTask, groqTask);
             providerTimer.Stop();
@@ -253,7 +253,7 @@ public sealed class SalesInvoiceCaptureService(
     }
 
     async Task<SalesInvoiceProviderAttempt> RunHaikuAttemptAsync(
-        string mime, byte[] original, CancellationToken budgetToken)
+        string mime, byte[] original, CancellationToken budgetToken, CancellationToken requestToken)
     {
         if (!haiku.Available)
             return new SalesInvoiceProviderAttempt("Anthropic", "claude-haiku-5-5", "not_configured", null, 0);
@@ -270,7 +270,7 @@ public sealed class SalesInvoiceCaptureService(
                 result.InputTokens, result.OutputTokens, result.RequestId);
             return new SalesInvoiceProviderAttempt("Anthropic", result.Model, "success", result.Extraction, timer.ElapsedMilliseconds);
         }
-        catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
         {
             return new SalesInvoiceProviderAttempt("Anthropic", "claude-haiku-5-5", "timeout", null, timer.ElapsedMilliseconds);
         }
@@ -283,7 +283,7 @@ public sealed class SalesInvoiceCaptureService(
     }
 
     async Task<SalesInvoiceProviderAttempt> RunGeminiAttemptAsync(
-        string apiKey, string mime, byte[] original, CancellationToken budgetToken)
+        string apiKey, string mime, byte[] original, CancellationToken budgetToken, CancellationToken requestToken)
     {
         var timer = Stopwatch.StartNew();
         using var attemptBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
@@ -297,7 +297,7 @@ public sealed class SalesInvoiceCaptureService(
                 return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "invalid_or_unusable_response", null, timer.ElapsedMilliseconds);
             return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "success", result, timer.ElapsedMilliseconds);
         }
-        catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
         {
             return new SalesInvoiceProviderAttempt("Gemini", GeminiFreeTierModel, "timeout", null, timer.ElapsedMilliseconds);
         }
@@ -317,7 +317,7 @@ public sealed class SalesInvoiceCaptureService(
     }
 
     async Task<SalesInvoiceProviderAttempt> RunGroqAttemptAsync(
-        string apiKey, string mime, byte[] original, CancellationToken budgetToken)
+        string apiKey, string mime, byte[] original, CancellationToken budgetToken, CancellationToken requestToken)
     {
         var timer = Stopwatch.StartNew();
         using var attemptBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
@@ -331,7 +331,7 @@ public sealed class SalesInvoiceCaptureService(
                 return new SalesInvoiceProviderAttempt("Groq", GroqFreeTierVisionModel, "invalid_or_unusable_response", null, timer.ElapsedMilliseconds);
             return new SalesInvoiceProviderAttempt("Groq", GroqFreeTierVisionModel, "success", result, timer.ElapsedMilliseconds);
         }
-        catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
         {
             return new SalesInvoiceProviderAttempt("Groq", GroqFreeTierVisionModel, "timeout", null, timer.ElapsedMilliseconds);
         }
