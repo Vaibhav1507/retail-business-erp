@@ -1,0 +1,46 @@
+name: Anthropic Sales Invoice V2 Integration Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_single_live_call:
+        description: Authorize exactly one live Anthropic API call using a synthetic invoice image
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  anthropic-live-smoke:
+    if: ${{ inputs.authorize_single_live_call == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Require private Anthropic Actions secret
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::Add ANTHROPIC_API_KEY as a repository Actions secret before running this one-call check."
+            exit 1
+          fi
+
+      - name: Run one synthetic Haiku image request
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RBOS_ENABLE_ANTHROPIC_LIVE_SMOKE: "true"
+        run: >-
+          dotnet test tests/Rbos.UnitTests/Rbos.UnitTests.csproj
+          --configuration Release
+          --filter FullyQualifiedName~AnthropicHaikuLiveIntegrationTests
+          --logger "console;verbosity=detailed"
