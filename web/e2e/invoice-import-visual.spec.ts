@@ -42,7 +42,7 @@ async function captureState(page: import('@playwright/test').Page, state: string
   writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, consoleErrors, networkFailures, serverErrors, captures: audit }, null, 2))
 }
 
-test('Create Invoice: handwritten import review and tag feedback fit mobile screens', async ({ page }) => {
+test('Create Invoice: handwritten evidence review, sale posting and responsive tag feedback', async ({ page }) => {
   test.setTimeout(10 * 60 * 1000)
   mkdirSync(outDir, { recursive: true })
   page.on('pageerror', error => pageErrors.push(error.message))
