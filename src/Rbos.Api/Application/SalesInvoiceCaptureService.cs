@@ -234,6 +234,10 @@ public sealed class SalesInvoiceCaptureService(
                     mode = "parallel-shadow",
                     promptVersion = ExtractionPromptVersion,
                     accuracyNote = "Provider agreement is not ground-truth accuracy.",
+                    haikuPeerAssessment,
+                    haikuShadowConsensusDifferences,
+                    customerFieldsExcludedFromCandidateDifferences = true,
+                    candidateDifferences,
                     providers = attempts.Select(attempt => new
                     {
                         name = attempt.Provider,
