@@ -164,7 +164,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '454', date: '2026-11-06', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 17500, taxAmount: null, total: 17500,
-          lines: [{ description: 'Voltas Beko WM\nModel WTL8066\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }], hsn: null, quantity: 1, unitPrice: 17500, sellingPrice: 17500, sellingPriceProvenance: 'source_read', discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
+          lines: [{ description: 'Voltas Beko WM\nModel WTL8066\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'unknown', confirmed: false }], hsn: null, quantity: 1, unitPrice: 17500, sellingPrice: 17500, sellingPriceProvenance: 'source_read', discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
         }, warnings: []
       }), { status: 200 })
       return new Response(JSON.stringify({ error: `not found: ${method} ${url}` }), { status: 404 })
@@ -174,9 +174,13 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const inputs = container.querySelectorAll('.sales-invoice-uploader input[type="file"]')
     const file = new File([new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9])], 'monika-bill.jpg', { type: 'image/jpeg' })
     fireEvent.change(inputs[1] as HTMLInputElement, { target: { files: [file] } })
-    expect(await screen.findByLabelText('Item 1 identifier candidate 1')).toHaveValue('SN12345678')
-    expect(screen.getByLabelText('Confirm this reading')).not.toBeChecked()
-    await userEvent.click(screen.getByLabelText('Confirm this reading'))
+    expect(screen.queryByLabelText(/identifier candidate/)).not.toBeInTheDocument()
+    const moreDetails = container.querySelector('.invoice-extracted-line-details') as HTMLDetailsElement
+    expect(moreDetails.open).toBe(false)
+    await userEvent.click(moreDetails.querySelector('summary') as HTMLElement)
+    const serialInput = screen.getByLabelText('Extracted line 1 serial numbers')
+    expect(serialInput).toHaveValue('')
+    await userEvent.type(serialInput, 'SN12345678')
     await userEvent.click(screen.getByRole('button', { name: 'Add reviewed lines to bill' }))
     await waitFor(() => expect(container.querySelector('.invoice-added-item strong')?.textContent).toContain('Voltas Beko WM'))
     expect(container.querySelector('.invoice-added-item')?.textContent).toContain('Serial: SN12345678')
