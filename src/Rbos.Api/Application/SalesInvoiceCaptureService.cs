@@ -50,35 +50,49 @@ public sealed class SalesInvoiceCaptureService(
           or paraphrase the product. Keep all source text here even when also assigning structured fields.
         - brand and model are separate fields. Copy model/part-number characters exactly; do not
           replace uncertain characters with a plausible catalogue model.
-        - serialNumbers is an array containing only per-unit serial numbers clearly associated with
-          this row. Electronics bills may write a serial/unique identifier on a separate line below
-          the model without an explicit 'Serial' label. Use the layout and identifier context, but do
-          not mistake a model/part number, invoice number, date, barcode or unrelated note for a
-          serial. When uncertain, leave serialNumbers empty and preserve the characters in description.
+        - Preserve all alphanumeric identifier candidates exactly as written and classify each as
+          model, serial, imei, barcode, part_number or unknown. Do not guess a classification when
+          the source context is insufficient. Never assume a numeric identifier is a serial.
+        - Keep serialNumbers empty. The shopkeeper, not the model, confirms a serial candidate before
+          it can enter RBOS's sale serial collection.
+        - For a possible IMEI only, classify it as imei; RBOS will validate the 15-digit Luhn check.
+          Never apply IMEI validation to model, serial, barcode or part-number candidates.
         - Do not discard any other handwritten alphanumeric text from description.
         - Extract HSN, quantity, unit rate, discount, line amount, GST rate/amount only when visible
           in the corresponding column. Do not calculate a missing unit price or amount and do not
-          copy the grand total into a line amount. A blank Rate cell must remain null.
+          copy the line amount or grand total into the unit price. A genuinely blank Rate cell must
+          be null with fieldStates.unitPrice = "not_present". When a value is written but illegible,
+          return null with status "unreadable"; when two readings are plausible, use "ambiguous".
         - If the amount column has a long drawn cancellation/continuation stroke, do not interpret it
           as another amount or product row.
+        - Use exactly these provenance values for every field in fieldStates:
+          source_read, not_present, unreadable, ambiguous, calculated, user_entered, user_corrected.
+          AI must not label inferred or calculated values source_read. Never calculate missing source
+          amounts, rates or totals; RBOS will calculate separately after shopkeeper review.
+        - Header fieldStates must cover invoiceNumber, date, customerName, customerPhone, subtotal,
+          taxAmount and total. Each line fieldStates must cover description, brand, model, hsn,
+          quantity, unitPrice, discount, amount, gstRate and gstAmount.
 
         Return numeric values as numbers, invoiceNumber as a string (preserve leading zeroes), and
-        null/empty arrays for absent or unreadable fields. Return all detected rows.
-        fieldConfidence contains rough 0..1 estimates of handwriting legibility and field attribution;
-        use null for absent/unreadable values. These are model hints, not calibrated probabilities.
-        A low value means the shopkeeper should check that field against the original bill. Return JSON:
+        null for absent or unreadable scalar values. Return every physical row in source order.
+        fieldConfidence contains rough 0..1 estimates of legibility/attribution only; it is not proof.
+        Return JSON:
         { "invoiceNumber": string|null, "date": string|null, "customerName": string|null,
           "customerPhone": string|null, "subtotal": number|null, "taxAmount": number|null,
           "total": number|null,
+          "fieldStates": { "invoiceNumber": "source_read|not_present|unreadable|ambiguous|calculated|user_entered|user_corrected", "date": "...", "customerName": "...", "customerPhone": "...", "subtotal": "...", "taxAmount": "...", "total": "..." },
           "fieldConfidence": { "invoiceNumber": number|null, "date": number|null,
             "customerName": number|null, "customerPhone": number|null, "subtotal": number|null,
             "taxAmount": number|null, "total": number|null },
           "lines": [{ "description": string|null, "brand": string|null, "model": string|null,
-          "serialNumbers": string[], "hsn": string|null, "quantity": number|null,
+          "identifierCandidates": [{ "value": string, "classification": "model|serial|imei|barcode|part_number|unknown" }],
+          "serialNumbers": [], "hsn": string|null, "quantity": number|null,
           "unitPrice": number|null, "discount": number|null, "amount": number|null,
-          "gstRate": number|null, "gstAmount": number|null, "confidence": number|null,
+          "gstRate": number|null, "gstAmount": number|null,
+          "fieldStates": { "description": "...", "brand": "...", "model": "...", "hsn": "...", "quantity": "...", "unitPrice": "...", "discount": "...", "amount": "...", "gstRate": "...", "gstAmount": "..." },
+          "confidence": number|null,
           "fieldConfidence": { "description": number|null, "brand": number|null,
-            "model": number|null, "serialNumbers": number|null, "hsn": number|null,
+            "model": number|null, "hsn": number|null,
             "quantity": number|null, "unitPrice": number|null, "discount": number|null,
             "amount": number|null, "gstRate": number|null, "gstAmount": number|null } }] }
         """;
@@ -577,7 +591,7 @@ public sealed class SalesInvoiceCaptureService(
             result[key] = Clip(ReadString(source?[key]), max);
         foreach (var key in new[] { "subtotal", "taxAmount", "total" })
             result[key] = SafeNumber(source?[key], 100_000_000m);
-        result["fieldStates"] = NormalizeFieldStates(source?["fieldStates"],
+        result["fieldStates"] = NormalizeFieldStates(source?["fieldStates"], source,
             "invoiceNumber", "date", "customerName", "customerPhone", "subtotal", "taxAmount", "total");
         result["fieldConfidence"] = NormalizeFieldConfidence(
             source?["fieldConfidence"], "invoiceNumber", "date", "customerName", "customerPhone",
@@ -600,7 +614,7 @@ public sealed class SalesInvoiceCaptureService(
                 line["serialNumbers"] = new JsonArray();
                 foreach (var key in new[] { "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount" })
                     line[key] = SafeNumber(item[key], 100_000_000m);
-                line["fieldStates"] = NormalizeFieldStates(item["fieldStates"],
+                line["fieldStates"] = NormalizeFieldStates(item["fieldStates"], item,
                     "description", "brand", "model", "hsn", "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount");
                 var confidence = SafeNumber(item["confidence"], 1m);
                 line["confidence"] = confidence is >= 0 and <= 1 ? confidence : null;
@@ -620,7 +634,7 @@ public sealed class SalesInvoiceCaptureService(
         "calculated", "user_entered", "user_corrected"
     };
 
-    static JsonObject NormalizeFieldStates(JsonNode? source, params string[] fields)
+    static JsonObject NormalizeFieldStates(JsonNode? source, JsonNode? values, params string[] fields)
     {
         var result = new JsonObject();
         foreach (var field in fields)
@@ -628,9 +642,9 @@ public sealed class SalesInvoiceCaptureService(
             var state = ReadString(source?[field]);
             if (state is null || !ProvenanceStatuses.Contains(state))
             {
-                state = field == "unitPrice" && source is null
-                    ? "not_present"
-                    : "unreadable";
+                state = values?[field] is not null
+                    ? "source_read"
+                    : field == "unitPrice" ? "not_present" : "unreadable";
             }
             result[field] = state;
         }
