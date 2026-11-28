@@ -111,6 +111,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   const [salesInvoiceReviewIssues, setSalesInvoiceReviewIssues] = useState<SalesInvoiceReviewIssue[]>([])
   const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null)
   const [sourceDocumentMime, setSourceDocumentMime] = useState('')
+  const [activeSourceRegionField, setActiveSourceRegionField] = useState<string | null>(null)
   const [sourceInvoiceRef, setSourceInvoiceRef] = useState('')
   const [sourceInvoiceDate, setSourceInvoiceDate] = useState('')
   const [brandText, setBrandText] = useState('')
@@ -287,9 +288,13 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
   }
 
   function salesInvoiceFieldState(field: string, lineIndex: number | null = null) {
-    if (lineIndex !== null)
-      return salesInvoiceDraft?.lines[lineIndex]?.fieldStates?.[field] ?? (salesInvoiceDraft?.lines[lineIndex]?.[field as keyof typeof salesInvoiceDraft.lines[number]] != null ? 'source_read' : 'unreadable')
-    return salesInvoiceDraft?.fieldStates?.[field] ?? (salesInvoiceDraft?.[field as keyof ExtractedSalesInvoice] != null ? 'source_read' : 'unreadable')
+    if (lineIndex !== null) {
+      const line = salesInvoiceDraft?.lines[lineIndex]
+      const value = line as unknown as Record<string, unknown> | undefined
+      return line?.fieldStates?.[field] ?? (value?.[field] != null ? 'source_read' : 'unreadable')
+    }
+    const value = salesInvoiceDraft as unknown as Record<string, unknown> | null
+    return salesInvoiceDraft?.fieldStates?.[field] ?? (value?.[field] != null ? 'source_read' : 'unreadable')
   }
 
   function salesInvoiceStateLabel(field: string, lineIndex: number | null = null) {
@@ -315,7 +320,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           ? (value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null)
           : field === 'serialNumbers'
             ? value.split(/[\r\n,;]+/).map(part => part.trim()).filter(Boolean)
-            : value
+            : value,
+        fieldStates: { ...(line.fieldStates ?? {}), [field]: 'user_corrected' }
       })
     }) : current)
   }
@@ -789,15 +795,31 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <div><p className="invoice-extraction-eyebrow">HANDWRITTEN BILL</p><h3 id="invoice-extraction-title">Review detected items</h3></div>
             <span className="invoice-extraction-count">{salesInvoiceDraft.lines.length} {salesInvoiceDraft.lines.length === 1 ? 'item' : 'items'}</span>
           </header>
-          {sourceDocumentId && <section className="invoice-source-evidence" aria-label="Original handwritten bill">
+          {sourceDocumentId && <section className="invoice-source-evidence" id="invoice-source-evidence" aria-label="Original handwritten bill">
             <div className="invoice-source-evidence-heading">
               <div><strong>Original bill</strong><small>Retained securely. It will be attached to the sale after confirmation.</small></div>
               <a href={sourcePageUrl(sourceDocumentId)} target="_blank" rel="noreferrer">Open original</a>
             </div>
+            {Object.entries(salesInvoiceDraft.ocrEvidence ?? {}).filter(([, evidence]) => evidence.region)
+              .map(([field]) => <button key={field} type="button" className="invoice-source-region-jump"
+                onClick={() => setActiveSourceRegionField(field)}>
+                Inspect {field === 'invoiceNumber' ? 'invoice number' : field === 'date' ? 'bill date' : 'printed total'}
+              </button>)}
             {sourceDocumentMime === 'application/pdf'
               ? <iframe title="Original handwritten bill PDF" src={sourcePageUrl(sourceDocumentId)} loading="lazy" />
               : <a className="invoice-source-image-link" href={sourcePageUrl(sourceDocumentId)} target="_blank" rel="noreferrer">
-                  <img src={sourcePageUrl(sourceDocumentId)} alt="Original handwritten customer sales bill" loading="lazy" />
+                  <span className="invoice-source-image-frame">
+                    <img src={sourcePageUrl(sourceDocumentId)} alt="Original handwritten customer sales bill" loading="lazy" />
+                    {Object.entries(salesInvoiceDraft.ocrEvidence ?? {}).map(([field, evidence]) => {
+                      const region = evidence.region
+                      if (!region || evidence.pageNumber !== 1) return null
+                      return <span key={field} className={'invoice-source-region' + (activeSourceRegionField === field ? ' active' : '')}
+                        style={{
+                          left: `${region.left * 100}%`, top: `${region.top * 100}%`,
+                          width: `${region.width * 100}%`, height: `${region.height * 100}%`
+                        }} aria-hidden="true" />
+                    })}
+                  </span>
                 </a>}
           </section>}
           <div className="invoice-extraction-header-fields">
@@ -809,8 +831,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             const evidence = salesInvoiceDraft.ocrEvidence?.[field]
             return evidence?.ocrCandidate && evidence.ocrAgrees === false
               ? <p className="invoice-extraction-conflict" key={field}>
-                  **{field === 'invoiceNumber' ? 'Invoice number' : field === 'date' ? 'Bill date' : 'Printed total'} has competing readings.**
-                  OCR text near the labelled field: “{evidence.ocrCandidate}”. Check the original bill before continuing.
+                  <strong>{field === 'invoiceNumber' ? 'Invoice number' : field === 'date' ? 'Bill date' : 'Printed total'} has competing readings.</strong>
+                  OCR text near the labelled field: “{evidence.ocrCandidate}”. {evidence.verificationCandidate && <>Hydrogen’s separate reading: “{evidence.verificationCandidate}”. </>}Check the original bill before continuing.
                 </p>
               : null
           })}
