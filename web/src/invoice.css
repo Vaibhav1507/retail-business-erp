@@ -715,10 +715,11 @@
 }
 .invoice-gst-toggle { display: flex; align-items: center; gap: 18px; min-width: 0; cursor: pointer; }
 .invoice-gst-toggle input {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   margin: 0;
   accent-color: #0b7b50;
 }
@@ -1315,6 +1316,6 @@
 .invoice-identifier-candidate{display:grid;grid-template-columns:minmax(0,1fr) minmax(112px,.7fr);gap:7px;min-width:0;padding-top:8px;border-top:1px solid #edf1ee}
 .invoice-identifier-candidate input:not([type=checkbox]),.invoice-identifier-candidate select{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:8px;border:1px solid #d8e1dc;border-radius:8px;background:#fff;color:#202a25;font:inherit;font-size:13px}
 .invoice-identifier-candidate>label{grid-column:1/-1;display:flex;align-items:center;gap:8px;color:#3b4a41;font-size:12px}
-.invoice-identifier-candidate>label input{width:18px;height:18px;min-width:18px;min-height:18px;accent-color:#176b49}
+.invoice-identifier-candidate>label input{width:44px;height:44px;min-width:44px;min-height:44px;accent-color:#176b49}
 .invoice-identifier-candidate>small{grid-column:1/-1}
 @media(max-width:420px){.invoice-source-evidence{padding:10px}.invoice-source-evidence-heading{flex-wrap:wrap}.invoice-source-evidence .invoice-source-region-jump{max-width:calc(100% - 56px);justify-self:start}.invoice-identifier-candidate{grid-template-columns:minmax(0,1fr)}.invoice-identifier-candidate select{grid-column:1}}
