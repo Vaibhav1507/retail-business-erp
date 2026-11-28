@@ -448,7 +448,7 @@ public sealed class SalesInvoiceCaptureService(
         var text = cloud?.Text ?? degradedOcrText ?? "";
         var rows = cloud is null
             ? text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(line => new OcrEvidenceRow(0, line, null))
+                .Select(line => new OcrEvidenceRow(0, line, null, 0, 0))
                 .ToArray()
             : BuildOcrRows(cloud);
 
@@ -495,6 +495,240 @@ public sealed class SalesInvoiceCaptureService(
         extraction["ocrEvidence"] = fields;
         extraction["ocrSource"] = cloud is not null ? "CloudVision" :
             degradedOcrText is not null ? "TesseractDegraded" : "Unavailable";
+    }
+
+    async Task<JsonObject?> VerifyCriticalFieldsAsync(
+        string mime,
+        byte[] original,
+        IReadOnlyList<SalesInvoiceVerificationTarget> targets,
+        CancellationToken cancellationToken)
+    {
+        var apiKey = cfg["Gemini:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+        var selected = targets
+            .Where(target => target.Field is "invoiceNumber" or "date" or "total")
+            .DistinctBy(target => target.Field)
+            .Take(3)
+            .ToArray();
+        if (selected.Length == 0) return null;
+
+        var parts = new JsonArray();
+        var includedFields = new List<string>();
+        foreach (var target in selected)
+        {
+            var crop = CreateVerificationCrop(mime, original, target.Row);
+            if (crop is null) continue;
+            try
+            {
+                parts.Add(new JsonObject
+                {
+                    ["inline_data"] = new JsonObject
+                    {
+                        ["mime_type"] = "image/jpeg",
+                        ["data"] = Convert.ToBase64String(crop)
+                    }
+                });
+                includedFields.Add(target.Field);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(crop);
+            }
+        }
+        if (includedFields.Count == 0) return null;
+
+        // This verifier sees only original-image crops and field labels. It receives no
+        // Haiku/Gemini proposal and no OCR transcript, preventing answer anchoring.
+        var fieldInstructions = string.Join("\n", includedFields.Select((field, index) =>
+            $"{index + 1}. {field}"));
+        parts.Add(new JsonObject
+        {
+            ["text"] = "Independently inspect these original sales-bill image regions. The image regions are in this exact order and correspond to the following field labels:\n" +
+                fieldInstructions +
+                "\nRead only the visible characters in each labelled field/box. Do not infer missing digits, use another bill, or use nearby signatory annotations. If characters cannot be read, return an empty reading with status unreadable; if multiple readings remain plausible, status ambiguous. Return only the requested fields."
+        });
+
+        var body = new JsonObject
+        {
+            ["contents"] = new JsonArray(new JsonObject
+            {
+                ["parts"] = parts
+            }),
+            ["generationConfig"] = new JsonObject
+            {
+                ["responseMimeType"] = "application/json",
+                ["responseJsonSchema"] = BuildTargetedVerificationSchema(includedFields),
+                ["temperature"] = 0
+            }
+        };
+
+        var model = cfg["Gemini:SalesInvoiceHydrogenModel"] ?? "gemini-4-hydrogen";
+        var timer = Stopwatch.StartNew();
+        try
+        {
+            using var requestBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            requestBudget.CancelAfter(TimeSpan.FromSeconds(5));
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
+            request.Headers.Add("x-goog-api-key", apiKey);
+            request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+            using var response = await http.SendAsync(request, requestBudget.Token);
+            if (!response.IsSuccessStatusCode)
+            {
+                log.LogWarning("Targeted Gemini sales-invoice verification failed. HTTP {StatusCode}, model {Model}.",
+                    (int)response.StatusCode, model);
+                return null;
+            }
+
+            var root = JsonNode.Parse(await response.Content.ReadAsStringAsync(requestBudget.Token));
+            var finishReason = root?["candidates"]?[0]?["finishReason"]?.GetValue<string>();
+            var blockReason = root?["promptFeedback"]?["blockReason"]?.GetValue<string>();
+            if (string.Equals(finishReason, "SAFETY", StringComparison.OrdinalIgnoreCase) ||
+                !string.IsNullOrWhiteSpace(blockReason))
+                return null;
+            var text = root?["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.GetValue<string>();
+            var result = string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text) as JsonObject;
+            var usage = root?["usageMetadata"];
+            log.LogInformation(
+                "Targeted Gemini sales-invoice verification completed. Model {Model}, fields {FieldCount}, prompt tokens {PromptTokens}, output tokens {OutputTokens}, latency {LatencyMs}ms",
+                model, includedFields.Count, SafeTokenCount(usage?["promptTokenCount"]),
+                SafeTokenCount(usage?["candidatesTokenCount"]), timer.ElapsedMilliseconds);
+            return result;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            log.LogWarning("Targeted Gemini sales-invoice verification timed out. Model {Model}.", model);
+            return null;
+        }
+        catch (HttpRequestException error)
+        {
+            log.LogWarning("Targeted Gemini sales-invoice verification failed. HTTP {StatusCode}.", (int?)error.StatusCode);
+            return null;
+        }
+        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
+        {
+            log.LogWarning("Targeted Gemini sales-invoice verification returned invalid output. Error type {ErrorType}.", error.GetType().Name);
+            return null;
+        }
+        finally
+        {
+            timer.Stop();
+        }
+    }
+
+    static JsonObject BuildTargetedVerificationSchema(IReadOnlyList<string> fields)
+    {
+        var properties = new JsonObject();
+        foreach (var field in fields)
+        {
+            properties[field] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["reading"] = new JsonObject { ["type"] = "string" },
+                    ["status"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["enum"] = new JsonArray("source_read", "unreadable", "ambiguous")
+                    }
+                },
+                ["required"] = new JsonArray("reading", "status"),
+                ["additionalProperties"] = false
+            };
+        }
+        var required = new JsonArray();
+        foreach (var field in fields) required.Add(field);
+        return new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = properties,
+            ["required"] = required,
+            ["additionalProperties"] = false
+        };
+    }
+
+    static byte[]? CreateVerificationCrop(string mime, byte[] original, OcrEvidenceRow row)
+    {
+        byte[]? renderedPage = null;
+        var pageBytes = original;
+        try
+        {
+            if (mime == "application/pdf")
+            {
+                renderedPage = PdfPageReader.RenderPng(original, row.PageNumber);
+                if (renderedPage is null) return null;
+                pageBytes = renderedPage;
+            }
+            else if (row.PageNumber != 1) return null;
+
+            using var source = SKBitmap.Decode(pageBytes);
+            if (source is null || source.Width < 2 || source.Height < 2) return null;
+            var region = GetNormalizedRegion(row);
+            if (region is null) return null;
+
+            var rawLeft = (int)Math.Floor(region.Left * source.Width);
+            var rawTop = (int)Math.Floor(region.Top * source.Height);
+            var rawRight = (int)Math.Ceiling((region.Left + region.Width) * source.Width);
+            var rawBottom = (int)Math.Ceiling((region.Top + region.Height) * source.Height);
+            var marginX = Math.Max(48, (rawRight - rawLeft) / 3);
+            var marginY = Math.Max(36, (rawBottom - rawTop) * 2);
+            var left = Math.Clamp(rawLeft - marginX, 0, source.Width - 1);
+            var top = Math.Clamp(rawTop - marginY, 0, source.Height - 1);
+            var right = Math.Clamp(rawRight + marginX, left + 1, source.Width);
+            var bottom = Math.Clamp(rawBottom + marginY, top + 1, source.Height);
+            var width = right - left;
+            var height = bottom - top;
+
+            using var crop = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+            using (var canvas = new SKCanvas(crop))
+            {
+                canvas.Clear(SKColors.White);
+                canvas.DrawBitmap(source, new SKRect(left, top, right, bottom),
+                    new SKRect(0, 0, width, height));
+                canvas.Flush();
+            }
+            using var image = crop.Encode(SKEncodedImageFormat.Jpeg, 94);
+            if (image is null) return null;
+            using var stream = new MemoryStream();
+            image.SaveTo(stream);
+            return stream.ToArray();
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            return null;
+        }
+        finally
+        {
+            if (renderedPage is not null) CryptographicOperations.ZeroMemory(renderedPage);
+        }
+    }
+
+    static void ApplyVerificationCandidates(JsonObject extraction, JsonObject verification)
+    {
+        if (extraction["ocrEvidence"] is not JsonObject evidence) return;
+        foreach (var (field, value) in verification)
+        {
+            if (value is not JsonObject result || evidence[field] is not JsonObject existing) continue;
+            var reading = ReadString(result["reading"]);
+            var status = ReadString(result["status"])?.ToLowerInvariant();
+            if (status is not ("source_read" or "unreadable" or "ambiguous")) status = "ambiguous";
+            existing["verificationCandidate"] = reading;
+            existing["verificationStatus"] = status;
+            // Preserve the primary value and the disagreement. Verification supplies
+            // another human-review candidate, never an automatic overwrite.
+            if (status != "source_read" || reading is null)
+                extraction["fieldStates"]![field] = "ambiguous";
+            else if (ReadString(extraction[field]) is not { } primary ||
+                     !string.Equals(ComparableText(primary), ComparableText(reading), StringComparison.Ordinal))
+                extraction["fieldStates"]![field] = "ambiguous";
+        }
+    }
+
+    static int SafeTokenCount(JsonNode? value)
+    {
+        try { return Math.Clamp(value?.GetValue<int>() ?? 0, 0, 10_000_000); }
+        catch (Exception error) when (error is InvalidOperationException or FormatException) { return 0; }
     }
 
     sealed record OcrEvidenceRow(int PageNumber, string Text, SalesInvoiceOcrWord[]? Words, int PageWidth, int PageHeight);
