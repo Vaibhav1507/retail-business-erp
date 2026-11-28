@@ -26,9 +26,27 @@ public sealed class SalesInvoiceCaptureService(
     ILogger<SalesInvoiceCaptureService> log)
 {
     public const int MaxFileBytes = 8 * 1024 * 1024;
+    public const string GeminiFreeTierModel = "gemini-4-hydrogen";
+    public const string GroqFreeTierVisionModel = "qwen/qwen3.8-27b";
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
     public static bool IsSupportedMime(string? mime) => mime is not null && Allowed.Contains(mime, StringComparer.OrdinalIgnoreCase);
+
+    // Sales extraction never reuses the general Gemini/Groq credentials: those keys may
+    // belong to paid plans used by other RBOS features. A dedicated key and an explicit
+    // Free-tier enable switch are both required before a sales fallback can make a request.
+    public static string? GetSalesInvoiceGeminiFreeTierApiKey(IConfiguration configuration) =>
+        configuration.GetValue("Gemini:SalesInvoiceFreeTierEnabled", false)
+            ? NonBlank(configuration["Gemini:SalesInvoiceFreeTierApiKey"])
+            : null;
+
+    public static string? GetSalesInvoiceGroqFreeTierApiKey(IConfiguration configuration) =>
+        configuration.GetValue("Groq:SalesInvoiceFreeTierEnabled", false)
+            ? NonBlank(configuration["Groq:SalesInvoiceFreeTierApiKey"])
+            : null;
+
+    static string? NonBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     const string Prompt = """
         Read this already-issued customer sales bill for an Indian retail shop. It may be handwritten,
@@ -153,19 +171,20 @@ public sealed class SalesInvoiceCaptureService(
                 }
             }
 
-            // Hydrogen remains the safe temporary primary until the one secure Anthropic
-            // integration check has been completed and marked validated. It is also the
-            // provider fallback after a Haiku outage. Do not fan out to other Gemini models.
-            if (parsed is null && !string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]))
+            // Hydrogen is a free-tier-only fallback for sales invoices. It deliberately
+            // cannot reuse Gemini:ApiKey because that general key may be billed on a paid plan.
+            // The dedicated key and explicit free-tier enable switch must both be configured.
+            var geminiFreeTierKey = GetSalesInvoiceGeminiFreeTierApiKey(cfg);
+            if (parsed is null && geminiFreeTierKey is not null)
             {
-                var hydrogen = cfg["Gemini:SalesInvoiceHydrogenModel"] ?? "gemini-4-hydrogen";
+                const string hydrogen = GeminiFreeTierModel;
                 try
                 {
                     using var hydrogenBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
                     hydrogenBudget.CancelAfter(TimeSpan.FromSeconds(8));
                     if (budgetToken.IsCancellationRequested) throw new OperationCanceledException(budgetToken);
                     parsed = await ExtractWithGeminiAsync(
-                        cfg["Gemini:ApiKey"]!, hydrogen, mime, bytes, null, hydrogenBudget.Token);
+                        geminiFreeTierKey, hydrogen, mime, bytes, null, hydrogenBudget.Token);
                     if (parsed is not null)
                     {
                         providerName = "Gemini";
@@ -187,21 +206,21 @@ public sealed class SalesInvoiceCaptureService(
                 }
             }
 
-            // Groq is the last operational fallback, and its output is explicitly held for
-            // operator review. It receives only the original bill, never OCR hints/proposals.
-            var groqEnabled = cfg.GetValue("Groq:SalesInvoiceFallbackEnabled",
-                cfg.GetValue("Groq:InvoiceFallbackEnabled", false));
-            if (parsed is null && groq.Available && groqEnabled && !budgetToken.IsCancellationRequested)
+            // Groq is the last operational fallback, and its output always requires review.
+            // Never reuse Groq:ApiKey: that credential may be on its paid Developer tier.
+            var groqFreeTierKey = GetSalesInvoiceGroqFreeTierApiKey(cfg);
+            if (parsed is null && groqFreeTierKey is not null && !budgetToken.IsCancellationRequested)
             {
                 try
                 {
                     using var groqBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
                     groqBudget.CancelAfter(TimeSpan.FromSeconds(6));
-                    parsed = await groq.ExtractInvoiceAsync([(mime, bytes)], Prompt, groqBudget.Token);
+                    parsed = await groq.ExtractInvoiceAsync(
+                        [(mime, bytes)], Prompt, groqFreeTierKey, GroqFreeTierVisionModel, groqBudget.Token);
                     if (parsed is not null)
                     {
                         providerName = "Groq";
-                        providerModel = groq.Model;
+                        providerModel = GroqFreeTierVisionModel;
                         providerNeedsReview = true;
                     }
                 }
@@ -255,9 +274,11 @@ public sealed class SalesInvoiceCaptureService(
 
             var verificationTargets = new List<SalesInvoiceVerificationTarget>();
             ApplyIndependentOcrEvidence(extraction, independentOcr, degradedOcrText, warnings, verificationTargets);
-            if (verificationTargets.Count > 0 && !string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]))
+            var verifierFreeTierKey = GetSalesInvoiceGeminiFreeTierApiKey(cfg);
+            if (verificationTargets.Count > 0 && verifierFreeTierKey is not null)
             {
-                var verification = await VerifyCriticalFieldsAsync(mime, bytes, verificationTargets, budgetToken, ct);
+                var verification = await VerifyCriticalFieldsAsync(
+                    verifierFreeTierKey, mime, bytes, verificationTargets, budgetToken, ct);
                 if (verification is not null)
                     ApplyVerificationCandidates(extraction, verification);
             }
@@ -693,14 +714,13 @@ public sealed class SalesInvoiceCaptureService(
 
 
     async Task<JsonObject?> VerifyCriticalFieldsAsync(
+        string apiKey,
         string mime,
         byte[] original,
         IReadOnlyList<SalesInvoiceVerificationTarget> targets,
         CancellationToken budgetToken,
         CancellationToken requestToken)
     {
-        var apiKey = cfg["Gemini:ApiKey"];
-        if (string.IsNullOrWhiteSpace(apiKey)) return null;
         var selected = targets
             .Where(target => target.Field is "invoiceNumber" or "date" or "total" || target.LineIndex.HasValue)
             .DistinctBy(target => target.Field)
@@ -758,7 +778,7 @@ public sealed class SalesInvoiceCaptureService(
             }
         };
 
-        var model = cfg["Gemini:SalesInvoiceHydrogenModel"] ?? "gemini-4-hydrogen";
+        const string model = GeminiFreeTierModel;
         var timer = Stopwatch.StartNew();
         try
         {
