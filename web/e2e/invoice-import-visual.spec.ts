@@ -71,7 +71,7 @@ test('Create Invoice: handwritten import review and tag feedback fit mobile scre
     '22222222-3333-4444-8555-666666666666',
   ]
   let uploadCount = 0
-  await page.route(/\\/api\\/documents\\/[0-9a-f-]+\\/pages\\/1(?:\\?preview=true)?$/, async route => {
+  await page.route(/\/api\/documents\/[0-9a-f-]+\/pages\/1(?:\?preview=true)?$/, async route => {
     const isPreview = new URL(route.request().url()).searchParams.get('preview') === 'true'
     await route.fulfill({
       status: 200,
