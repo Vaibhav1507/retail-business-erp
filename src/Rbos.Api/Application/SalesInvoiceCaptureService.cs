@@ -156,11 +156,9 @@ public sealed class SalesInvoiceCaptureService(
             var providerNeedsReview = false;
             var anthropicValidated = cfg.GetValue("Anthropic:SalesInvoiceIntegrationValidated", false);
             var useHaiku = haiku.Available && anthropicValidated;
-            var haikuAttempted = false;
 
             if (useHaiku)
             {
-                haikuAttempted = true;
                 AnthropicSalesInvoiceResult? haikuResult = null;
                 try { haikuResult = await ExtractWithHaikuRetryAsync(mime, bytes, budgetToken); }
                 catch (OperationCanceledException) when (!ct.IsCancellationRequested && budgetToken.IsCancellationRequested)
