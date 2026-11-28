@@ -87,7 +87,7 @@ public sealed class AnthropicHaikuClient(
                 ["format"] = new JsonObject
                 {
                     ["type"] = "json_schema",
-                    ["schema"] = responseSchema.DeepClone()
+                    ["schema"] = RemoveUnsupportedSchemaConstraints(responseSchema)
                 }
             }
         };
@@ -165,6 +165,30 @@ public sealed class AnthropicHaikuClient(
             Model, inputTokens, outputTokens, requestId);
 
         return new AnthropicSalesInvoiceResult(extraction, Model, inputTokens, outputTokens, requestId);
+    }
+
+    static JsonObject RemoveUnsupportedSchemaConstraints(JsonObject schema)
+    {
+        var clone = (JsonObject)schema.DeepClone();
+        StripUnsupportedConstraints(clone);
+        return clone;
+    }
+
+    static void StripUnsupportedConstraints(JsonNode node)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (var key in new[] { "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+                         "multipleOf", "minLength", "maxLength", "patternProperties", "maxItems", "uniqueItems" })
+                obj.Remove(key);
+            foreach (var child in obj.ToArray())
+                if (child.Value is not null) StripUnsupportedConstraints(child.Value);
+        }
+        else if (node is JsonArray array)
+        {
+            foreach (var child in array)
+                if (child is not null) StripUnsupportedConstraints(child);
+        }
     }
 
     static int SafeTokenCount(JsonNode? value)
