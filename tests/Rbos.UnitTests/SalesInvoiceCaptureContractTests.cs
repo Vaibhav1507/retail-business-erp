@@ -288,7 +288,8 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Theory]
-    [InlineData("invoiceNumber", "00454", "454", true)]
+    [InlineData("invoiceNumber", "00454", "00454", true)]
+    [InlineData("invoiceNumber", "00454", "454", false)]
     [InlineData("invoiceNumber", "00454", "40054", false)]
     [InlineData("date", "2026-11-06", "06/11/2026", true)]
     [InlineData("date", "2026-11-06", "06/12/2026", false)]
