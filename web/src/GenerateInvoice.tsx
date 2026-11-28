@@ -340,6 +340,18 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     }) : current)
   }
 
+  function updateCapturedHeaderNumber(field: 'subtotal' | 'taxAmount' | 'total', value: string) {
+    setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== field))
+    setSalesInvoiceDraft(current => current ? ({
+      ...current,
+      [field]: value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null,
+      fieldStates: {
+        ...(current.fieldStates ?? {}),
+        [field]: current[field] != null ? 'user_corrected' : 'user_entered'
+      }
+    }) : current)
+  }
+
   function updateCapturedIdentifier(index: number, candidateIndex: number, field: 'value' | 'classification' | 'confirmed', value: string | boolean) {
     setSalesInvoiceDraft(current => current ? ({
       ...current,
