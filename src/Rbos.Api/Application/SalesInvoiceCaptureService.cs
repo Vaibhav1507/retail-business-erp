@@ -605,13 +605,11 @@ public sealed class SalesInvoiceCaptureService(
             {
                 if (matchedRows.Contains(rowIndex)) continue;
                 var row = rows[rowIndex];
-                if (OcrTokens(row.Text).Count < 2 || row.Words is not { Length: > 0 }) continue;
-                if (new[] { "invoiceNumber", "date", "total" }.Any(field => IsOcrHeaderLabelRow(field, row.Text))) continue;
-                var represented = lines.OfType<JsonObject>()
+                if (row.Words is not { Length: > 0 }) continue;
+                var descriptions = lines.OfType<JsonObject>()
                     .Select(line => ReadVerbatimString(line["description"]))
-                    .Where(description => !string.IsNullOrWhiteSpace(description))
-                    .Any(description => OcrDescriptionMatchScore(description!, row.Text) >= 0.20);
-                if (represented) continue;
+                    .ToArray();
+                if (!IsPossibleOmittedOcrProductRow(row.Text, descriptions)) continue;
                 var region = GetNormalizedRegion(row);
                 if (region is null) continue;
                 possibleOmittedRows.Add(new JsonObject
@@ -675,6 +673,15 @@ public sealed class SalesInvoiceCaptureService(
         if (expected.Count < 2) return 0;
         var actual = OcrTokens(independentOcrText);
         return (double)expected.Count(token => actual.Contains(token)) / expected.Count;
+    }
+
+    public static bool IsPossibleOmittedOcrProductRow(string ocrRow, IReadOnlyList<string> extractedDescriptions)
+    {
+        if (OcrTokens(ocrRow).Count < 2) return false;
+        if (new[] { "invoiceNumber", "date", "total" }.Any(field => IsOcrHeaderLabelRow(field, ocrRow)))
+            return false;
+        return !extractedDescriptions.Any(description =>
+            !string.IsNullOrWhiteSpace(description) && OcrDescriptionMatchScore(description, ocrRow) >= 0.20);
     }
 
 
