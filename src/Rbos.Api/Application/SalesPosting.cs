@@ -443,15 +443,15 @@ public sealed class SalesService(TenantDb db)
                       (tenant_id, document_id, sale_id, created_by)
                     values (@tenant, @document, @sale, @actor)",
                     ("tenant", tenantId), ("document", postedSourceDocumentId), ("sale", id), ("actor", uid));
-                var transitioned = await Exec(s, ct, @"
+                await using var updateSourceStatus = s.Command(@"
                     update documents.business_document
                        set status = 'Posted', updated_at = now()
                      where id = @document
                        and direction = 'Sale'
                        and source_kind = 'HandwrittenBill'
-                       and status = 'NeedsReview'",
-                    ("document", postedSourceDocumentId));
-                if (transitioned != 1)
+                       and status = 'NeedsReview'");
+                updateSourceStatus.Parameters.AddWithValue("document", postedSourceDocumentId);
+                if (await updateSourceStatus.ExecuteNonQueryAsync(ct) != 1)
                     throw new InvalidOperationException("The source bill could not be linked to the posted sale.");
             }
 
