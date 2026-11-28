@@ -626,6 +626,18 @@ public sealed class SalesInvoiceCaptureService(
         return (double)expected.Count(token => actual.Contains(token)) / expected.Count;
     }
 
+    [Fact]
+    public void OcrDescriptionMatchScore_RequiresMultipleDistinctTokensAndPreservesRowIdentity()
+    {
+        Assert.True(OcrDescriptionMatchScore(
+            "Samsung LED Television model UA43",
+            "Samsung LED Television model UA43 Qty 1 Rate blank Amount 10000") >= 0.95);
+        Assert.True(OcrDescriptionMatchScore(
+            "Samsung LED Television model UA43",
+            "LG Washing Machine model WM900") < 0.30);
+        Assert.Equal(0, OcrDescriptionMatchScore("LG", "LG Electronics"));
+    }
+
     static HashSet<string> OcrTokens(string value) =>
         Regex.Matches(value.ToUpperInvariant(), @"[A-Z0-9]{2,}")
             .Select(match => match.Value)
