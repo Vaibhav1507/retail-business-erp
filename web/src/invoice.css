@@ -795,7 +795,7 @@
 }
 .invoice-sticky-review > button:disabled {
   background: #bdc9c2;
-  color: #fff;
+  color: #34443b;
   opacity: 1;
   cursor: not-allowed;
   box-shadow: none;
