@@ -153,5 +153,8 @@ Before creating the PR, review these points carefully:
 - d4e680cc4e8aefdf8581da9bafea1967aab97fa7 — remove obsolete OCR reconciliation tests.
 - b3873a21f487f27daaa3d622e4c85b48af8a31ea — make provider selection priority explicit and testable.
 - 7ecb626b160e9f9af0003958386bef0a896048a6 — test provider priority and unavailable comparisons.
+- e71cc9107e81e881b6ad661882c474df429eea7d — add an end-to-end service unit test proving Gemini/Groq calls start concurrently.
+- 3beaf60fa925af2e7b3c0f941647e7eb68c84062 — use a typed task-completion barrier in the concurrency test.
+- Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
 Latest code/document commit SHAs should be refreshed before the next handover; this file itself is being created in the current continuation.
