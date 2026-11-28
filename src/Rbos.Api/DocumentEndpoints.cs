@@ -312,10 +312,10 @@ public static class DocumentEndpoints
     static async Task<IResult> GetPage(
         Guid id,
         int pageNumber,
-        bool preview = false,
         ClaimsPrincipal principal,
         TenantDb db,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool preview = false)
     {
         if (pageNumber is < 1 or > MaxPagesPerDocument) return Results.NotFound();
         var userId = UserId(principal);
