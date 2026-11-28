@@ -423,3 +423,5 @@ Live provider smoke tests: pending.
 Benchmark gold labels: still provisional where recorded in the benchmark document.  
 Visual/UI acceptance: not in scope; Generate Invoice UI is unchanged.  
 Merge: not authorised. Production deployment/configuration: not authorised.
+
+The step-by-step code/test/CI continuation ledger is maintained in [handwritten sales invoice parallel vision handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md). New chats should read that handover before making further changes.
