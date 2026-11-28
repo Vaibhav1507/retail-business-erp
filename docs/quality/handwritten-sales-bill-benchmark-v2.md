@@ -1,6 +1,6 @@
 # Handwritten sales-bill extraction benchmark V2
 
-**Status as of 2026-11-28:** benchmark preparation and protocol documented; no V2 model bake-off or ground-truth accuracy result has been run.  
+**Status as of 2026-11-28:** benchmark preparation and protocol documented; no V2 model bake-off or ground-truth accuracy result has been run. User decision: proceed with the seven existing app-output cases only; do not wait for or request S06–S09 outputs. Provider order is Claude Haiku 5.5 first, Gemini 3.8 Flash second, then remaining eligible candidates.  
 **Authoritative scope:** existing synchronous handwritten sales-bill import in Generate Invoice only (`#/sell/bill`).  
 **Current main baseline:** `2b981069125f1ee2be7e5537635d969dd17b6f9b`.  
 **Implementation merge:** PR [#113](https://github.com/Vaibhav1507/retail-business-erp/pull/113), merged 2026-11-26 at `965da62d980d0b7b3d6b38de53f9b67e8fdac629`.  
@@ -69,8 +69,8 @@ Run result template: [handwritten-sales-bill-run-results-template-v1.csv](./hand
 
 Current source corpus record:
 - 11 photos/bills: S01–S09 Monika Electronics; S10–S11 Anil Sports & Stationery.
-- Seven app extraction comparisons: MONIKA-001 through MONIKA-005, and ANIL-001 / ANIL-002.
-- By the IDs recorded in the corpus and comparison documents, the seven runs map to S01–S05, S10 and S11. **S06–S09 are therefore four samples without a matching app run in the seven-case comparison.** This corrects older handoff text that said only two samples were unmatched.
+- Seven app extraction comparisons: MONIKA-001 through MONIKA-005, and ANIL-001 / ANIL-002. These seven are the complete benchmark cohort for this phase, by user decision.
+- By the IDs recorded in the corpus and comparison documents, the seven runs map to S01–S05, S10 and S11. S06–S09 are explicitly excluded from this benchmark phase; no further outputs are requested.
 - The current comparison notes are provisional visual observations. They are not independent gold labels and must not be used to claim a numeric accuracy result.
 
 Known unresolved source questions:
@@ -112,13 +112,21 @@ Do not commit original or unredacted customer invoices to Git. Keep redacted tes
 
 ## 5. Model and OCR candidate shortlist (research snapshot: 2026-11-28)
 
+### User-approved provider order
+
+1. Claude Haiku 5.5 (`claude-haiku-5-5`) — first smoke test and first seven-case run.
+2. Gemini 3.8 Flash (`gemini-3.8-flash`) — second provider, after the Haiku run is recorded.
+3. Groq Qwen 3.8 27B, Mistral Small 4 and the premium challenger — only after the first two have comparable results. Do not run providers in parallel; preserve cost control and comparable evidence.
+
+The user has chosen the sequence, not declared Haiku the accuracy winner. The same seven available app-output samples, redacted images, prompt, schema and scoring rules must be used for each eligible model.
+
 These are candidates for a controlled test, **not a quality ranking**. Verify each model ID, endpoint availability, structured-output behaviour, limits and terms again immediately before running the bake-off.
 
 | Candidate | Why it is included | Published price snapshot (USD) | Benchmark disposition |
 |---|---|---:|---|
-| Gemini 3.8 Flash (`gemini-3.8-flash`) | Lower-cost direct vision candidate; current Google API pricing page lists the model and multimodal input | Standard: $0.75/M input and $3.75/M output through 2026-12-31; $1.50/$7.50 from 2027-01-01 | Include in direct-image smoke test and bake-off. Google states Free tier content may be used to improve products; Paid tier content is not used for product improvement. Do not send real unredacted invoices to Free tier. |
+| Gemini 3.8 Flash (`gemini-3.8-flash`) | User-selected second candidate; direct multimodal image input | Standard: $0.75/M input and $3.75/M output through 2026-12-31; $1.50/$7.50 from 2027-01-01 | **Run second.** Create AI Studio API key. Prefer Paid tier for any customer-derived data; Free tier content may be used to improve products. Keep test data redacted. |
 | Qwen 3.8 27B via Groq (`qwen/qwen3.8-27b`) | Existing RBOS fallback family; Groq explicitly lists image input, vision and JSON Schema mode | $0.80/M input and $4.00/M output; Groq documents 2,048 input tokens per image | Include. Record actual usage tokens/cost returned by each call; image token billing and output size make per-bill cost variable. |
-| Claude Haiku 5.5 (`claude-haiku-5-5`) | Low published token price and Claude API vision support | $0.10/M input and $0.50/M output for prompts up to 100K tokens | Include. Verify structured JSON/schema constraint support on the exact model and API version. Anthropic's vision docs state image content is not used to train models; review current retention and commercial terms before real customer data. |
+| Claude Haiku 5.5 (`claude-haiku-5-5`) | User-selected first candidate; low published token price and Claude API vision support | $0.10/M input and $0.50/M output for prompts up to 100K tokens | **Run first.** Create Claude Console API key, confirm API billing/credits, and smoke-test image input and JSON output. Keep test data redacted. |
 | Mistral Small 4 (`mistral-small-2603`) | Low-cost multimodal model with structured outputs | $0.15/M input and $0.60/M output | Conditional only: model docs say multimodal input, but the current Mistral Vision guide's recommended image-model list does not explicitly include Small 4. Run an image-input API smoke test before treating it as an eligible direct-VLM candidate. |
 | Mistral OCR 4.1 (`mistral-ocr-4-1`) | Document OCR baseline, not a direct VLM peer | $4 per 1,000 pages; $5 per 1,000 annotated pages | Optional separate OCR condition, only if direct VLM + local Tesseract comparisons leave an evidence gap. |
 | Gemini 4 Argon (`gemini-4-argon`) | Expensive reasoning upper-bound challenger, not the default first choice for OCR | $2/M input and $10/M output through 2026-11-30; $4/$20 from 2026-12-01 | Defer unless the cheaper candidates fail or cannot read the difficult cases. No free tier. |
@@ -239,10 +247,10 @@ No primary model or verifier has been selected yet.
 | Main code CI | Done | Run #1357 success, 2026-11-27 |
 | Eleven source sample register | Done (provisional) | All 11 source photos received; register CSV updated |
 | Source-to-app comparison reports | Done for seven runs | Existing v1 comparison notes, not gold labels |
-| Resolve four unmatched sample runs S06–S09 | Not started | Need source and current app output for each |
+| S06–S09 | Excluded by user | Do not request or wait for these outputs in this phase |
 | First-pass source review | Done (provisional) | All 11 photos visually reviewed; see source review v1 |\n| Human gold labels | In progress / pending second review | Critical handwritten fields, especially S03 total, S01/S02 invoice refs and Anil line rows, need confirmation |
-| API eligibility smoke tests | Not started | Check image input, schema output, exact model IDs and privacy terms |
-| Direct VLM bake-off | Not started | Run experiment A |
+| API eligibility smoke tests | Next | Claude Haiku first, then Gemini Flash; verify image input, JSON output, limits, key and billing |
+| Direct VLM bake-off | Next | Run seven available cases sequentially: Haiku first, Gemini Flash second |
 | OCR-assisted comparison | Not started | Run experiment B only after baseline A |
 | Conditional verifier experiment | Not started | Run C after primary baseline |
 | Model/pipeline selection | Not started | Decide from measured accuracy, false acceptance, latency, cost and privacy |
@@ -250,12 +258,13 @@ No primary model or verifier has been selected yet.
 
 ## 12. Next exact action
 
-1. Restore access to the 11 original source bill photos (S01–S11) in the active RBOS project/chat. The previous chat's attachment context was not available through the current Files search, so this pass did not inspect images or create ground-truth labels.
-2. Manually fill [gold-label template](./handwritten-sales-bill-gold-labels-template-v1.csv), keeping uncertain characters unscored and customer PII excluded.
-3. Obtain the missing S06–S09 app runs from the current main build so all 11 samples have a baseline output; record their provider/model IDs and timing.
-4. Run one non-sensitive image-input smoke test for Gemini 3.8 Flash, Groq Qwen 3.8 27B and Claude Haiku 5.5; test Mistral Small 4 only if image input is accepted by its API.
-5. Freeze prompt/schema and conduct experiment A before paying for OCR or a verifier.
-6. Update this document with the actual run IDs, outputs, scores, p50/p95, costs and decision. Do not change production settings until the user authorises it.
+1. Use only the seven existing app-output cases (S01–S05, S10–S11). S06–S09 are excluded; do not ask the user for their app outputs.
+2. Complete and second-review gold labels for the seven selected cases, keeping uncertain characters unscored and customer PII excluded.
+3. Set up a Claude Console API key and billing/credits; store the key locally or in a secret manager, never in Git, chat, browser code or committed config.
+4. Run a non-sensitive Claude Haiku 5.5 image-input and JSON-output smoke test, then the seven-case direct-vision baseline. Record model ID, request IDs, latency, usage and actual cost.
+5. Only after Haiku results are recorded, create/enable Gemini AI Studio API access and run Gemini 3.8 Flash against the same seven cases.
+6. Continue to Groq Qwen 3.8 27B and other candidates only after comparing the first two. Keep OCR and verifier arms separate and deferred.
+7. Update this document with actual outputs, scores, p50/p95, costs and decisions. Do not change production settings until the user authorises it.
 
 ## 13. Decision log
 
@@ -264,7 +273,9 @@ No primary model or verifier has been selected yet.
 - 2026-11-28 — Direct vision, optional OCR evidence and conditional independent verifier are separate experiment arms.
 - 2026-11-28 — Use a verifier blind to the primary output; compare outputs after both have independently extracted the image.
 - 2026-11-28 — No free-tier transmission of unredacted customer invoices.
-- 2026-11-28 — All 11 original source photos were re-uploaded; first-pass visual review is documented separately. Gold labels remain provisional pending independent review.\n- 2026-11-28 — No model winner, 98% accuracy release target, monthly spend cap, merge or deployment has been approved.
+- 2026-11-28 — All 11 original source photos were re-uploaded; first-pass visual review is documented separately. Gold labels remain provisional pending independent review.
+- 2026-11-28 — User elected to benchmark only the seven cases with existing app outputs (S01–S05, S10–S11); S06–S09 excluded, no further outputs requested.
+- 2026-11-28 — User-approved provider order: Claude Haiku 5.5 first, Gemini 3.8 Flash second, then other candidates sequentially.\n- 2026-11-28 — No model winner, 98% accuracy release target, monthly spend cap, merge or deployment has been approved.
 
 ## References within RBOS
 
