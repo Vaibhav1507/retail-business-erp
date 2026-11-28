@@ -240,6 +240,12 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
                 }
             }
         };
+        if (string.Equals(modelOverride, "qwen/qwen3.8-27b", StringComparison.Ordinal))
+        {
+            // Structured invoice transcription does not need a long reasoning trace.
+            body["max_completion_tokens"] = 8192;
+            body["reasoning_effort"] = "none";
+        }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
