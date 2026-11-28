@@ -154,8 +154,9 @@ public sealed class SalesInvoiceCaptureService(
             var providerName = "None";
             var providerModel = "None";
             var providerNeedsReview = false;
-            var anthropicValidated = cfg.GetValue("Anthropic:SalesInvoiceIntegrationValidated", false);
-            var useHaiku = haiku.Available && anthropicValidated;
+            // Haiku is the primary reader whenever its Secret Manager-backed credential is available.
+            // Provider availability is the only activation condition; no manual validation flag is required.
+            var useHaiku = haiku.Available;
 
             if (useHaiku)
             {
