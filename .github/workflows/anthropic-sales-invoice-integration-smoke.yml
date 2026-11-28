@@ -38,6 +38,7 @@ jobs:
       - name: Run one synthetic Haiku image request
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          RBOS_ENABLE_ANTHROPIC_LIVE_SMOKE: "true"
         run: >-
           dotnet test tests/Rbos.UnitTests/Rbos.UnitTests.csproj
           --configuration Release
