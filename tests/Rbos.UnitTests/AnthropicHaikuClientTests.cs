@@ -13,9 +13,11 @@ public sealed class AnthropicHaikuClientTests
     public async Task Sends_original_image_with_messages_schema_and_parses_usage()
     {
         HttpRequestMessage? sent = null;
+        string? sentBody = null;
         var handler = new TestHandler(async request =>
         {
             sent = request;
+            sentBody = await request.Content!.ReadAsStringAsync();
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
@@ -47,7 +49,7 @@ public sealed class AnthropicHaikuClientTests
         Assert.Equal("https://api.anthropic.com/v1/messages", sent!.RequestUri!.ToString());
         Assert.Equal("test-anthropic-key", sent.Headers.GetValues("x-api-key").Single());
         Assert.Equal("2023-06-01", sent.Headers.GetValues("anthropic-version").Single());
-        var json = JsonNode.Parse(await sent.Content!.ReadAsStringAsync())!;
+        var json = JsonNode.Parse(sentBody!)!;
         Assert.Equal("claude-haiku-5-5", json["model"]!.GetValue<string>());
         Assert.Equal("json_schema", json["output_config"]!["format"]!["type"]!.GetValue<string>());
         Assert.Null(json["output_config"]!["format"]!["schema"]!["properties"]!["amount"]!["minimum"]);
@@ -66,15 +68,17 @@ public sealed class AnthropicHaikuClientTests
     public async Task Sends_pdf_as_a_document_block_without_image_mime_rewriting()
     {
         HttpRequestMessage? sent = null;
-        var handler = new TestHandler(request =>
+        string? sentBody = null;
+        var handler = new TestHandler(async request =>
         {
             sent = request;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            sentBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
                     """{"stop_reason":"end_turn","content":[{"type":"text","text":"{}"}],"usage":{"input_tokens":1,"output_tokens":1}}""",
                     Encoding.UTF8, "application/json")
-            });
+            };
         });
         using var http = new HttpClient(handler);
         var client = Client(http);
@@ -82,7 +86,7 @@ public sealed class AnthropicHaikuClientTests
         await client.ExtractAsync("application/pdf", Encoding.ASCII.GetBytes("%PDF-1.7"), new JsonObject(),
             "Read PDF.", CancellationToken.None);
 
-        var json = JsonNode.Parse(await sent!.Content!.ReadAsStringAsync())!;
+        var json = JsonNode.Parse(sentBody!)!;
         Assert.Equal("document", json["messages"]![0]!["content"]![0]!["type"]!.GetValue<string>());
         Assert.Equal("application/pdf", json["messages"]![0]!["content"]![0]!["source"]!["media_type"]!.GetValue<string>());
     }
