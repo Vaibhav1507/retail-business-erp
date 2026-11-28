@@ -834,7 +834,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
                 onClick={() => setActiveSourceRegionField(field)}>
                 Inspect {field === 'invoiceNumber' ? 'invoice number' : field === 'date' ? 'bill date' : 'printed total'}
               </button>)}
-            {salesInvoiceDraft.possibleOmittedRows?.map((row, index) => <button key={'possible-row-' + index}
+            {salesInvoiceDraft.possibleOmittedRows?.map((_, index) => <button key={'possible-row-' + index}
               type="button" className="invoice-source-region-jump"
               onClick={() => setActiveSourceRegionField('possible-row-' + index)}>
               Inspect possible additional row {index + 1}
