@@ -1116,8 +1116,9 @@ public sealed class SalesInvoiceCaptureService(
                 // The source Rate and RBOS selling price have different provenance.
                 // A blank source Rate stays null/not_present; the operator enters the
                 // selling price separately in the existing invoice flow.
-                line["sellingPrice"] = ReadDecimal(line["unitPrice"]);
-                line["sellingPriceProvenance"] = ReadString(line["fieldStates"]?["unitPrice"]) ?? "unreadable";
+                var sourceRateState = ReadString(line["fieldStates"]?["unitPrice"]) ?? "unreadable";
+                line["sellingPrice"] = sourceRateState == "source_read" ? ReadDecimal(line["unitPrice"]) : null;
+                line["sellingPriceProvenance"] = sourceRateState;
                 var confidence = SafeNumber(item["confidence"], 1m);
                 line["confidence"] = confidence is >= 0 and <= 1 ? confidence : null;
                 line["fieldConfidence"] = NormalizeFieldConfidence(
