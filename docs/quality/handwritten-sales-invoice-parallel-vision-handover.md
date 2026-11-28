@@ -75,7 +75,7 @@ Out of scope:
 
 ### Step 3 — remove OCR from the active sales path
 
-- Removed Cloud Vision injection from SalesInvoiceCaptureService.
+- Removed Cloud Vision injection from SalesInvoiceCaptureService and removed its unused Program.cs DI registration.
 - Removed the active OCR read, Tesseract fallback, OCR row alignment, header reconciliation and targeted Gemini crop verification implementation from this service.
 - The API keeps an OCR status property for response compatibility, set to DisabledForParallelVisionBenchmark.
 - OCR may be evaluated later as a separate measured intervention, not as a gate in this experiment.
@@ -142,7 +142,7 @@ Before creating the PR, review these points carefully:
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Draft PR #125 is open. Latest PR head is cd090f4a9455f558e5e480da8ee6dd0f5f3a206a. CI run #1550 is queued on that exact code head; run #1532 passed backend, frontend and PostgreSQL integration on the earlier code commit 729f694. Latest grouped visual audit run #483 is queued. The visual audit has a known baseline failure: run #463 on the PR #124 base commit 5e7c451 failed the same invoice-import visual test because the current UI did not render the expected accessible image named “Original handwritten customer sales bill, page 1”. The same assertion failed in our branch's run #465; its screenshot was inspected. This predates this branch and is not caused by the extraction backend change. Do not change UI scope to fix it here. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173596059 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173596069; baseline visual run: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46158997046.
+3. Draft PR #125 is open. Latest PR head is cde2d7ed233884cea022024f3ede1ded56fa32fa (documentation-only after code commit f72563e250b4cbb042f3a4c185bbb8b07afee667). CI run #1552 is queued on that exact code commit; run #1532 passed backend, frontend and PostgreSQL integration on an earlier code commit. Latest grouped visual audit run #485 is in progress. The visual audit has a known baseline failure: run #463 on the PR #124 base commit 5e7c451 failed the same invoice-import visual test because the current UI did not render the expected accessible image named “Original handwritten customer sales bill, page 1”. The same assertion failed in our branch's run #465; its screenshot was inspected. This predates this branch and is not caused by the extraction backend change. Do not change UI scope to fix it here. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173764389 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173764317; baseline visual run: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46158997046.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
 5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
@@ -171,6 +171,7 @@ Before creating the PR, review these points carefully:
 - 83ab6d5908adacbe4e9c532a6126d125e1521ede — make consensus test serialization explicit.
 - a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81 — isolate unexpected provider exceptions while preserving external cancellation.
 - cd090f4a9455f558e5e480da8ee6dd0f5f3a206a — include prompt version in comparison response and logs.
+- f72563e250b4cbb042f3a4c185bbb8b07afee667 — remove the now-unused Cloud Vision sales reader DI registration.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Current PR head at the latest handover update: cd090f4a9455f558e5e480da8ee6dd0f5f3a206a (code commit adds prompt-version tags to comparison logs and response metadata).
+Current PR head at the latest handover update: cde2d7ed233884cea022024f3ede1ded56fa32fa (documentation-only update after code commit f72563e250b4cbb042f3a4c185bbb8b07afee667).
