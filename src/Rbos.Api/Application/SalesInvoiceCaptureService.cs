@@ -473,7 +473,7 @@ public sealed class SalesInvoiceCaptureService(
         })
         {
             var row = FindLabelledRow(rows, labels);
-            var value = ReadString(extraction[field]);
+            var value = ReadFieldValueText(extraction[field]);
             var ocrCandidate = row is null ? null : ExtractOcrHeaderValue(field, row.Text);
             var agreement = row is null ? (bool?)null : CompareOcrHeaderValue(field, value, ocrCandidate);
             var agrees = agreement ?? true;
@@ -880,7 +880,7 @@ public sealed class SalesInvoiceCaptureService(
             existing["verificationStatus"] = status;
             if (status != "source_read" || reading is null)
                 extraction["fieldStates"]![field] = "ambiguous";
-            else if (ReadString(extraction[field]) is not { } primary ||
+            else if (ReadFieldValueText(extraction[field]) is not { } primary ||
                      !string.Equals(ComparableText(primary), ComparableText(reading), StringComparison.Ordinal))
                 extraction["fieldStates"]![field] = "ambiguous";
         }
@@ -996,6 +996,9 @@ public sealed class SalesInvoiceCaptureService(
         if (string.IsNullOrWhiteSpace(primary)) return false;
         return OcrDescriptionMatchScore(primary, verification) >= 0.55;
     }
+
+    static string? ReadFieldValueText(JsonNode? value) =>
+        ReadString(value) ?? ReadDecimal(value)?.ToString(CultureInfo.InvariantCulture);
 
     static string ComparableText(string value) =>
         new(value.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
