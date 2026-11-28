@@ -35,9 +35,26 @@ async function captureState(page: import('@playwright/test').Page, state: string
         }).length,
     }))
     const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+    const axeDetails = axe.violations.map(violation => ({
+      id: violation.id,
+      impact: violation.impact,
+      description: violation.description,
+      help: violation.help,
+      nodes: violation.nodes.map(node => ({
+        target: node.target,
+        html: node.html,
+        failureSummary: node.failureSummary,
+        contrastChecks: [...node.any, ...node.all, ...node.none]
+          .filter(check => check.id === 'color-contrast')
+          .map(check => check.data),
+      })),
+    }))
     audit.push({ state, viewport: viewport.name, ...layout, viewportScreenshot, fullPageScreenshot, axeViolations: axe.violations.map(v => v.id) })
+    writeFileSync(`${outDir}/${viewport.name}-${state}-axe.json`, JSON.stringify(axeDetails, null, 2))
+    const seriousAxeDetails = axeDetails.filter(violation => violation.impact === 'critical' || violation.impact === 'serious')
+    if (seriousAxeDetails.length) console.log('RBOS_A11Y_VIOLATIONS ' + JSON.stringify({ state, viewport: viewport.name, violations: seriousAxeDetails }))
     expect(layout.overflowX, `Unexpected horizontal overflow in ${state} at ${viewport.width}px`).toBe(false)
-    expect(axe.violations.filter(v => v.impact === 'critical' || v.impact === 'serious').map(v => v.id)).toEqual([])
+    expect(seriousAxeDetails.map(v => v.id)).toEqual([])
   }
   writeFileSync(`${outDir}/report.json`, JSON.stringify({ scope: 'invoice-import', pageErrors, consoleErrors, networkFailures, serverErrors, captures: audit }, null, 2))
 }
