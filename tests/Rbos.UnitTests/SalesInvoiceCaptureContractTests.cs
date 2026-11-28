@@ -87,7 +87,7 @@ public sealed class SalesInvoiceCaptureContractTests
         var source = JsonNode.Parse("""
             {
               "invoiceNumber": "00454",
-              "lines": [{ "description": "Voltas washer", "quantity": 1 }]
+              "lines": [{ "description": "Voltas washer", "quantity": 1, "serialNumbers": ["SN123456"] }]
             }
             """)!;
 
