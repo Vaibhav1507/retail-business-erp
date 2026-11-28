@@ -508,7 +508,14 @@ public sealed class SalesInvoiceCaptureService(
             }
         }
         if (cloud is not null)
-            ApplyLineOcrEvidence(extraction["lines"] as JsonArray, rows, warnings, verificationTargets);
+        {
+            var possibleOmittedRows = ApplyLineOcrEvidence(extraction["lines"] as JsonArray, rows, warnings, verificationTargets);
+            if (possibleOmittedRows.Count > 0)
+            {
+                extraction["possibleOmittedRows"] = possibleOmittedRows;
+                warnings.Add("Independent OCR found additional text between detected product rows. Check the highlighted source regions for a product row that may have been missed; no row has been added automatically.");
+            }
+        }
         else if (extraction["lines"] is JsonArray degradedLines)
         {
             foreach (var item in degradedLines.OfType<JsonObject>())
@@ -520,14 +527,18 @@ public sealed class SalesInvoiceCaptureService(
             degradedOcrText is not null ? "TesseractDegraded" : "Unavailable";
     }
 
-    static void ApplyLineOcrEvidence(
+    static JsonArray ApplyLineOcrEvidence(
         JsonArray? lines,
         OcrEvidenceRow[] rows,
         List<string> warnings,
         List<SalesInvoiceVerificationTarget> verificationTargets)
     {
-        if (lines is null || rows.Length == 0) return;
+        var possibleOmittedRows = new JsonArray();
+        if (lines is null || rows.Length == 0) return possibleOmittedRows;
         var cursor = 0;
+        var matchedRows = new HashSet<int>();
+        var firstMatchedRow = int.MaxValue;
+        var lastMatchedRow = -1;
         for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
         {
             if (lines[lineIndex] is not JsonObject line) continue;
@@ -540,6 +551,13 @@ public sealed class SalesInvoiceCaptureService(
 
             var match = FindBestOcrDescriptionMatch(description, rows, cursor);
             var candidate = match.Row;
+            if (candidate is not null && match.StartIndex >= 0)
+            {
+                firstMatchedRow = Math.Min(firstMatchedRow, match.StartIndex);
+                lastMatchedRow = Math.Max(lastMatchedRow, match.LastIndex);
+                for (var rowIndex = match.StartIndex; rowIndex <= match.LastIndex; rowIndex++)
+                    matchedRows.Add(rowIndex);
+            }
             var corroborated = candidate is not null && match.Score >= 0.55;
             var conflict = candidate is not null && !corroborated;
             var region = candidate is null ? null : GetNormalizedRegion(candidate);
@@ -578,16 +596,48 @@ public sealed class SalesInvoiceCaptureService(
                     : $"Product row {lineIndex + 1} has a competing OCR reading. Confirm the complete description and its wrapped lines.");
             }
         }
+
+        // Unmatched OCR rows bracketed by matched product descriptions are only candidates:
+        // they may be wrapped fragments or annotations. Never create a sale line automatically.
+        if (firstMatchedRow != int.MaxValue && lastMatchedRow > firstMatchedRow)
+        {
+            for (var rowIndex = firstMatchedRow + 1; rowIndex < lastMatchedRow && possibleOmittedRows.Count < 8; rowIndex++)
+            {
+                if (matchedRows.Contains(rowIndex)) continue;
+                var row = rows[rowIndex];
+                if (OcrTokens(row.Text).Count < 2 || row.Words is not { Length: > 0 }) continue;
+                if (new[] { "invoiceNumber", "date", "total" }.Any(field => IsOcrHeaderLabelRow(field, row.Text))) continue;
+                var represented = lines.OfType<JsonObject>()
+                    .Select(line => ReadVerbatimString(line["description"]))
+                    .Where(description => !string.IsNullOrWhiteSpace(description))
+                    .Any(description => OcrDescriptionMatchScore(description!, row.Text) >= 0.20);
+                if (represented) continue;
+                var region = GetNormalizedRegion(row);
+                if (region is null) continue;
+                possibleOmittedRows.Add(new JsonObject
+                {
+                    ["text"] = ClipVerbatim(row.Text, 500),
+                    ["pageNumber"] = row.PageNumber,
+                    ["region"] = new JsonObject
+                    {
+                        ["left"] = region.Left, ["top"] = region.Top,
+                        ["width"] = region.Width, ["height"] = region.Height
+                    }
+                });
+            }
+        }
+        return possibleOmittedRows;
     }
 
-    static (OcrEvidenceRow? Row, int LastIndex, double Score) FindBestOcrDescriptionMatch(
+    static (OcrEvidenceRow? Row, int StartIndex, int LastIndex, double Score) FindBestOcrDescriptionMatch(
         string description,
         OcrEvidenceRow[] rows,
         int startIndex)
     {
         var expected = OcrTokens(description);
-        if (expected.Count == 0) return (null, startIndex, 0);
+        if (expected.Count == 0) return (null, -1, startIndex, 0);
         OcrEvidenceRow? bestRow = null;
+        var bestStart = -1;
         var bestEnd = startIndex;
         var bestScore = 0d;
         var searchEnd = Math.Min(rows.Length, startIndex + 40);
@@ -608,14 +658,15 @@ public sealed class SalesInvoiceCaptureService(
                     var words = combined.SelectMany(item => item.Words ?? []).ToArray();
                     bestRow = new OcrEvidenceRow(page, candidateText, words,
                         rows[rowIndex].PageWidth, rows[rowIndex].PageHeight);
+                    bestStart = rowIndex;
                     bestEnd = rowIndex + length - 1;
                     bestScore = score;
                 }
-                if (bestScore >= 0.98) return (bestRow, bestEnd, bestScore);
+                if (bestScore >= 0.98) return (bestRow, bestStart, bestEnd, bestScore);
             }
         }
 
-        return (bestScore >= 0.20 ? bestRow : null, bestEnd, bestScore);
+        return (bestScore >= 0.20 ? bestRow : null, bestScore >= 0.20 ? bestStart : -1, bestEnd, bestScore);
     }
 
     public static double OcrDescriptionMatchScore(string description, string independentOcrText)
