@@ -190,3 +190,30 @@ The initial inventory note has been corrected: the first ten-photo batch contain
 ### P0 + P1 validation scope clarification — 2026-11-26
 
 User requested that P0 and P1 remain in this same PR and branch, with manual source-bill validation only after all improvements are implemented. Code CI #1342 passed on the implementation commit; code CI #1343 passed on the latest pre-merge branch head. Playwright/E2E, screenshots, Axe and native Android checks remain deferred (not passed). The automatically triggered Visual Audit #297 failed in the signup helper before reaching the import flow: it expected a `Next` button, but the current signup step renders `Continue`. Do not treat this as an extraction failure or a visual acceptance pass. Statistical confidence calibration and actual p50/p95 latency/accuracy measurements still depend on verified source labels and pilot use. No merge or deployment is authorised by this handoff.
+
+
+## Handwritten Sales Invoice Extraction V2 — implementation handoff (2026-11-28)
+
+Approved combined specification: [handwritten sales invoice extraction V2](./handwritten-sales-invoice-extraction-v2-design.md). The source design remains documentation-only in PR #119; implementation is isolated on `feat/handwritten-sales-invoice-extraction-v2`, based on main commit `2b981069125f1ee2be7e5537635d969dd17b6f9b`.
+
+### Current increment
+
+- Added `src/Rbos.Api/Application/AnthropicVisionClient.cs`: direct Anthropic Messages API adapter, default model `claude-haiku-5-5`, native image/PDF source blocks, forced schema-backed tool output, usage token capture and privacy-safe failure logging.
+- Registered the typed client with a 25-second HTTP timeout in `Program.cs`.
+- Added `tests/Rbos.UnitTests/AnthropicVisionClientTests.cs` covering image/PDF request shape, forced structured tool, usage parsing, missing credentials and provider error-body non-disclosure.
+- Carried the approved V2 design into this implementation branch and updated its delivery status.
+
+### Integration gate
+
+The earlier HTTP 400/empty-body Anthropic issue remains unresolved. No secret is available through repository access, so only mocked request-contract coverage is possible at this stage. Do not call this a live integration pass and do not route production traffic to Haiku until one secure non-production integration check succeeds. If that check cannot be made reliable, retain Gemini 4 Hydrogen as the temporary primary.
+
+### Next implementation increments
+
+1. Wire Haiku into this sales route only, with at most one transient retry; add independent Cloud Vision OCR/layout using ADC and compare evidence after both reads.
+2. Restrict Tesseract to Cloud Vision degraded fallback; implement provenance, identifier candidates, row/field checks and targeted blind Hydrogen verification.
+3. Integrate original bill preview/review and synchronous migration-058 persistence; link evidence atomically during normal sale posting.
+4. Complete backend/frontend contract tests, full in-scope Playwright journeys, responsive screenshots, visual inspection and Axe. Native Android camera/gallery/keyboard/TalkBack remain separate real-device acceptance.
+
+### Explicit status
+
+Prototype: not applicable. Repository design specification: approved. First backend client increment: committed, awaiting CI. Automated test results: pending. Full visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised. No production GCP/IAM configuration has been changed.
