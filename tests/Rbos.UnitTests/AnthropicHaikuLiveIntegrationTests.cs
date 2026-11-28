@@ -16,6 +16,15 @@ public sealed class AnthropicHaikuLiveIntegrationTests
     [Trait("Category", "AnthropicLiveIntegration")]
     public async Task Reads_one_synthetic_invoice_image_with_the_live_messages_api_once()
     {
+        // Never make paid API calls during normal unit/PR CI, even if the secret exists.
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("RBOS_ENABLE_ANTHROPIC_LIVE_SMOKE"),
+                "true", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Skipped: this paid integration check runs only from its explicit manual workflow.");
+            return;
+        }
+
         var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
         Assert.False(string.IsNullOrWhiteSpace(apiKey),
             "Set the GitHub Actions secret ANTHROPIC_API_KEY and trigger the manual smoke workflow.");
