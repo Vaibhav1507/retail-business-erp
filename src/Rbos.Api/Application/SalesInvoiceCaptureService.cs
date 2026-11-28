@@ -429,7 +429,10 @@ public sealed class SalesInvoiceCaptureService(
             {
                 ["responseMimeType"] = "application/json",
                 ["responseJsonSchema"] = BuildResponseJsonSchema(),
-                ["temperature"] = 0
+                ["maxOutputTokens"] = 8192,
+                // Hydrogen defaults to HIGH thinking. LOW is intended for high-throughput
+                // structured metadata extraction and avoids spending tokens on long reasoning.
+                ["thinkingConfig"] = new JsonObject { ["thinkingLevel"] = "LOW" }
             }
         };
         using var request = new HttpRequestMessage(HttpMethod.Post,
