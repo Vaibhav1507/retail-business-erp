@@ -27,6 +27,8 @@ public sealed class SalesInvoiceCaptureService(
     public const int MaxFileBytes = 8 * 1024 * 1024;
     static readonly string[] Allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
+    public static bool IsSupportedMime(string? mime) => mime is not null && Allowed.Contains(mime, StringComparer.OrdinalIgnoreCase);
+
     const string Prompt = """
         Read this already-issued customer sales bill for an Indian retail shop. It may be handwritten,
         printed, mixed Hindi/English, abbreviated, photographed at an angle, or contain several lines
@@ -1465,7 +1467,7 @@ public sealed class SalesInvoiceCaptureService(
     static string? Clip(string? value, int max) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim()[..Math.Min(value.Trim().Length, max)];
 
-    static bool MatchesType(byte[] bytes, string mime) => mime switch
+    public static bool MatchesType(byte[] bytes, string mime) => mime switch
     {
         "image/jpeg" => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
         "image/png" => bytes.Length >= 8 && bytes.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
