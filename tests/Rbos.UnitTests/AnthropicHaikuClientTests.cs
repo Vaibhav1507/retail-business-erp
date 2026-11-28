@@ -29,7 +29,17 @@ public sealed class AnthropicHaikuClientTests
         var result = await client.ExtractAsync(
             "image/jpeg",
             [0xFF, 0xD8, 0xFF, 0xD9],
-            new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() },
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["amount"] = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 1000 },
+                    ["lines"] = new JsonObject { ["type"] = "array", ["maxItems"] = 10, ["items"] = new JsonObject { ["type"] = "string" } }
+                },
+                ["required"] = new JsonArray("amount", "lines"),
+                ["additionalProperties"] = false
+            },
             "Read the original sales bill. Return the schema fields.",
             CancellationToken.None);
 
@@ -40,6 +50,9 @@ public sealed class AnthropicHaikuClientTests
         var json = JsonNode.Parse(await sent.Content!.ReadAsStringAsync())!;
         Assert.Equal("claude-haiku-5-5", json["model"]!.GetValue<string>());
         Assert.Equal("json_schema", json["output_config"]!["format"]!["type"]!.GetValue<string>());
+        Assert.Null(json["output_config"]!["format"]!["schema"]!["properties"]!["amount"]!["minimum"]);
+        Assert.Null(json["output_config"]!["format"]!["schema"]!["properties"]!["amount"]!["maximum"]);
+        Assert.Null(json["output_config"]!["format"]!["schema"]!["properties"]!["lines"]!["maxItems"]);
         Assert.Equal("image", json["messages"]![0]!["content"]![0]!["type"]!.GetValue<string>());
         Assert.Equal("image/jpeg", json["messages"]![0]!["content"]![0]!["source"]!["media_type"]!.GetValue<string>());
         Assert.Equal("Read the original sales bill. Return the schema fields.",
