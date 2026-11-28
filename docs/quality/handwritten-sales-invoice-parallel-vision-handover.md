@@ -95,6 +95,8 @@ Out of scope:
 - Both shadow flags are false by default. This is intentional; no production environment configuration has been changed.
 - Existing runtime secrets must be confirmed to be the intended Free-tier accounts before enabling the flags.
 - Google Gemini Developer API Free Tier content may be used to improve Google products. Do not send real customer invoices/PII to Gemini Free Tier until the business explicitly approves the data-use terms. Use redacted/synthetic test images until then.
+- Groq says inference inputs/outputs are not retained by default but may be temporarily logged for reliability/abuse investigations. Enable account-level ZDR in Groq Data Controls before real customer invoices; until then use redacted/synthetic samples.
+- Groq currently lists Qwen 3.8 27B as a Preview model. Revalidate model status/quota before treating it as a long-term production fallback.
 - Groq Free Plan quota/rate limits are not guaranteed. A quota or billing error is a skipped shadow attempt, never a reason to use a paid model.
 - Do not request or paste provider keys into chat, GitHub files or logs.
 - The application cannot verify a provider account's billing tier from the inference API. The pinned model and account plan must be checked in provider consoles.
@@ -140,7 +142,7 @@ Before creating the PR, review these points carefully:
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Draft PR #125 is open. Latest CI run #1542 validates code commit 83ab6d5908adacbe4e9c532a6126d125e1521ede; the subsequent branch update is documentation-only. Run #1532 previously passed backend build/unit tests and frontend checks, but its PostgreSQL/container/visual jobs were still running at the last check. Latest grouped visual audit run #475 is in progress. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173438236 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173438331.
+3. Draft PR #125 is open. Latest CI run #1546 validates code commit a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81; the subsequent branch update is documentation-only. Run #1532 previously passed backend build/unit tests and frontend checks; latest code changes are pending validation. Latest grouped visual audit run #479 is queued. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173517044 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173517130.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
 5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
@@ -167,6 +169,7 @@ Before creating the PR, review these points carefully:
 - acd313a939dce89b0019374b310ccc8b6ea2db89 — add Haiku peer-assessment and shadow-consensus field diagnostics.
 - b34a5c599967a7829fd630ce48eca9cc6e044432 — test shadow-consensus diagnostics.
 - 83ab6d5908adacbe4e9c532a6126d125e1521ede — make consensus test serialization explicit.
+- a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81 — isolate unexpected provider exceptions while preserving external cancellation.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Current PR head at the latest handover update: 6c4257cc30c1fbaca1720a685ddc7f31da78e4a9 (documentation-only update after code commit 83ab6d5908adacbe4e9c532a6126d125e1521ede).
+Current PR head at the latest handover update: 3366ae8017b106b3beb810fd4f92aecb5b86fb56 (documentation-only update after code commit a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81).
