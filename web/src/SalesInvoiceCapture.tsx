@@ -27,6 +27,7 @@ export type ExtractedSalesInvoiceLine = {
   fieldConfidence?: Record<string, number | null>
   fieldStates?: Record<string, SalesInvoiceFieldState>
   identifierCandidates?: SalesInvoiceIdentifierCandidate[]
+  ocrEvidence?: SalesInvoiceOcrEvidence
 }
 
 export type SalesInvoiceFieldState = 'source_read' | 'not_present' | 'unreadable' | 'ambiguous' | 'calculated' | 'user_entered' | 'user_corrected'
