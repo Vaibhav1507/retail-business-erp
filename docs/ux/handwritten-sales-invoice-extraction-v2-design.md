@@ -458,7 +458,7 @@ Implementation is in PR #120, branch `feat/handwritten-sales-invoice-extraction-
 ### Implemented in the current branch
 
 - `AnthropicHaikuClient`: direct Anthropic Messages API integration for `claude-haiku-5-5`, original image/PDF input, structured JSON output using `output_config.format`, token usage and request ID telemetry, safe error diagnostics.
-- Haiku remains gated by `Anthropic:SalesInvoiceIntegrationValidated` (false unless explicitly validated); Gemini 4 Hydrogen remains the temporary primary until the one secure non-production integration check passes.
+- Haiku is the primary whenever the Anthropic API credential is available through runtime configuration; no manual validation flag is required. If the credential is absent, the service proceeds to the configured fallback/manual path.
 - Haiku retries transient failures at most once. Cloud Vision runs independently in parallel using ADC and `DOCUMENT_TEXT_DETECTION`; Tesseract is invoked only when Cloud Vision is unavailable.
 - Targeted Gemini Hydrogen verification sends only original-image crops plus field labels; it does not receive the first reader's answer or OCR transcript. It preserves its reading as a separate review candidate.
 - Provenance states and identifier candidates are normalized; only operator-confirmed serial/IMEI candidates enter sale lines. IMEI Luhn validation is limited to candidates classified as IMEI.
