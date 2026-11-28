@@ -861,8 +861,10 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
               evidence?.verificationStatus === 'ambiguous' || evidence?.verificationStatus === 'unreadable'
             if (!hasConflict) return null
             const label = field === 'invoiceNumber' ? 'Invoice number' : field === 'date' ? 'Bill date' : 'Printed total'
+            const fieldState = salesInvoiceDraft.fieldStates?.[field]
+            const correctedByUser = fieldState === 'user_corrected' || fieldState === 'user_entered'
             return <div className="invoice-extraction-conflict" key={field}>
-              <strong>{label} needs your confirmation.</strong>
+              <strong>{correctedByUser ? label + ' was reviewed and corrected.' : label + ' needs your confirmation.'}</strong>
               {evidence?.ocrCandidate && <small>Independent OCR reading: “{evidence.ocrCandidate}”.</small>}
               {evidence?.verificationCandidate && <small>Close-up reading: “{evidence.verificationCandidate}”.</small>}
               {evidence?.verificationStatus && evidence.verificationStatus !== 'source_read' &&
