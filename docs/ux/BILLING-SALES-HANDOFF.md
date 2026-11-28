@@ -354,3 +354,10 @@ Haiku original-image read (after live integration validation) + independent Clou
 ## 2026-11-28 runtime provider credential status
 
 The user confirmed that no Anthropic configuration or Secret Manager resource has been created for this work. Treat the Anthropic secret as **not yet created**, not as an existing secret that can be reused. The next GCP setup must create a new secret, add its value securely, grant the Cloud Run runtime service account `roles/secretmanager.secretAccessor` on that secret only, and mount a pinned enabled version as `Anthropic__ApiKey`. Cloud Vision uses ADC separately; verify API enablement and billing before relying on it. Do not enable Gemini/Groq fallback flags as part of the initial Haiku setup.
+
+
+## 2026-11-28 handwritten sales review UX correction
+
+The user's Android screenshots show that the PR #120 review surface exposed too much technical OCR evidence for the intended small-shop operator. A focused corrective branch restores the compact review-card contract. The original bill is retained behind a collapsed disclosure, primary line fields are description/quantity/selling price, optional serial entry and supplementary fields sit under More details, and OCR candidate classification/provenance diagnostics are removed from the default UI. Provider behaviour, APIs, prompts, schemas, evidence persistence, sale validation and accounting rules are unchanged. See [handwritten sales bill review simplification](./handwritten-sales-invoice-review-simplification.md).
+
+Provider use for any specific production upload must be checked in Cloud Run logs. The presence of an Anthropic Secret Manager binding alone does not prove which provider served that request. Check the `Sales invoice extraction completed` log entry for primary provider, model and OCR source.
