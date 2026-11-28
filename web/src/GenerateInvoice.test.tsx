@@ -139,7 +139,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
 
 
   it('carries extracted serial numbers into the added sale item and final sale request', async () => {
-    let postedSale: { lines: { serials: string[] }[]; sourceDocumentId?: string } | null = null
+    const postedSales: { lines: { serials: string[] }[]; sourceDocumentId?: string }[] = []
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
       calls.push({ url, method })
@@ -148,13 +148,13 @@ describe('GenerateInvoice WhatsApp independence', () => {
       if (url === '/api/products') return new Response(JSON.stringify(products))
       if (url.endsWith('/customers') && method === 'POST') return new Response(JSON.stringify({ id: 'customer-1' }), { status: 200 })
       if (url.endsWith('/sales') && method === 'POST') {
-        postedSale = JSON.parse(String(init?.body)) as { lines: { serials: string[] }[]; sourceDocumentId?: string }
+        postedSales.push(JSON.parse(String(init?.body)) as { lines: { serials: string[] }[]; sourceDocumentId?: string })
         return new Response(JSON.stringify({ id: 'sale-1' }), { status: 200 })
       }
       if (url.endsWith('/sales/sale-1')) return new Response(JSON.stringify({ sale: { number: 1, whatsappStatus: 'ConsentRequired' } }), { status: 200 })
       if (url.endsWith('/customers') && method === 'POST') return new Response(JSON.stringify({ id: 'customer-1' }), { status: 200 })
       if (url.endsWith('/sales') && method === 'POST') {
-        postedSale = JSON.parse(String(init?.body)) as { lines: { serials: string[] }[] }
+        postedSales.push(JSON.parse(String(init?.body)) as { lines: { serials: string[] }[] })
         return new Response(JSON.stringify({ id: 'sale-1' }), { status: 200 })
       }
       if (url.endsWith('/sales/sale-1')) return new Response(JSON.stringify({ sale: { number: 1, whatsappStatus: 'ConsentRequired' } }), { status: 200 })
@@ -183,8 +183,8 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(screen.queryByRole('region', { name: 'Review detected items' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Review bill/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Confirm & print' }))
-    await waitFor(() => expect(postedSale?.lines[0]?.serials).toEqual(['SN12345678']))
-    expect(postedSale?.sourceDocumentId).toBe('00000000-0000-0000-0000-000000000002')
+    await waitFor(() => expect(postedSales[0]?.lines[0]?.serials).toEqual(['SN12345678']))
+    expect(postedSales[0]?.sourceDocumentId).toBe('00000000-0000-0000-0000-000000000002')
   })
 
   it('keeps model and serial in optional details for non-electronics businesses', async () => {
