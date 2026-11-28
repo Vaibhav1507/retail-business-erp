@@ -35,6 +35,17 @@ export type SalesInvoiceIdentifierCandidate = {
   luhnValid?: boolean | null
 }
 
+export type SalesInvoiceOcrEvidence = {
+  status: string
+  haikuOrPrimaryReading: string | null
+  ocrCandidate: string | null
+  ocrAgrees: boolean | null
+  pageNumber: number | null
+  region?: { left: number; top: number; width: number; height: number } | null
+  verificationCandidate?: string | null
+  verificationStatus?: string | null
+}
+
 export type ExtractedSalesInvoice = {
   invoiceNumber: string | null
   date: string | null
@@ -45,6 +56,7 @@ export type ExtractedSalesInvoice = {
   total: number | null
   fieldConfidence?: Record<string, number | null>
   fieldStates?: Record<string, SalesInvoiceFieldState>
+  ocrEvidence?: Record<string, SalesInvoiceOcrEvidence>
   lines: ExtractedSalesInvoiceLine[]
 }
 
