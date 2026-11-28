@@ -40,9 +40,12 @@ public sealed class AnthropicHaikuClient(
         configuration["Anthropic:Model"] ??
         "claude-haiku-5-5";
 
-    public bool Available =>
-        !string.IsNullOrWhiteSpace(configuration["Anthropic:ApiKey"]) ||
-        !string.IsNullOrWhiteSpace(configuration["ANTHROPIC_API_KEY"]);
+    private string? ConfiguredApiKey =>
+        !string.IsNullOrWhiteSpace(configuration["Anthropic:ApiKey"])
+            ? configuration["Anthropic:ApiKey"]
+            : configuration["ANTHROPIC_API_KEY"];
+
+    public bool Available => !string.IsNullOrWhiteSpace(ConfiguredApiKey);
 
     public async Task<AnthropicSalesInvoiceResult?> ExtractAsync(
         string mime,
@@ -51,7 +54,7 @@ public sealed class AnthropicHaikuClient(
         string extractionPrompt,
         CancellationToken cancellationToken)
     {
-        var apiKey = configuration["Anthropic:ApiKey"] ?? configuration["ANTHROPIC_API_KEY"];
+        var apiKey = ConfiguredApiKey;
         if (string.IsNullOrWhiteSpace(apiKey)) return null;
         if (originalDocument.Length is 0 or > 8 * 1024 * 1024)
             throw new ArgumentOutOfRangeException(nameof(originalDocument), "The source document must be between 1 byte and 8 MB.");

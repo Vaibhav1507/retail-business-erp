@@ -512,7 +512,7 @@ The approved product decision is **Claude Haiku 5.5 as the routine primary AI re
 
 Do not fan out across several multimodal models for each invoice. Do not call a free model before Haiku. Do not use an unapproved free-tier cloud model on real customer invoices. Google's Gemini Developer API pricing currently says Free Tier content may be used to improve Google products, whereas Paid Tier content is not used for that purpose. Real RBOS invoices can contain customer names, phone numbers and commercial information. For real documents, use provider terms approved for this data; a free API tier is only eligible for synthetic/de-identified development data after the data-use decision is accepted. A locally hosted model may be assessed separately in a future scope, not inserted into this V2 chain.
 
-The code uses Haiku whenever `Anthropic:ApiKey` is available; there is no manual validation flag. After that validation, Haiku becomes the routine primary. Until then, Gemini 4 Hydrogen remains the temporary runtime primary; this safety gate does not change the final architecture.
+The code uses Haiku whenever a non-blank `Anthropic:ApiKey` or `ANTHROPIC_API_KEY` is available; there is no manual validation flag. The live Cloud Run service currently has no Anthropic credential configured (confirmed by the user's latest update), so Haiku remains unavailable there until the user creates and mounts the secret. Until then, the route follows its configured fallback/manual-review behaviour. Repository code changes do not create credentials or change Cloud Run configuration.
 
 ### Current engineering status at the verified PR #120 head
 
@@ -589,3 +589,10 @@ Groq Qwen 3.8 27B Vision is a multimodal text+image model with JSON output suppo
 6. Tesseract is only the degraded OCR fallback when Cloud Vision is unavailable.
 
 No paid Gemini/Groq fallback is permitted. Haiku is the only intended paid AI model usage. Cloud Vision can become billable after its free monthly allowance; track that separately.
+
+
+## 19. Runtime credential setup status — 2026-11-28
+
+The Anthropic runtime credential has **not** been created or mounted in the pilot Cloud Run service. Do not assume an existing Secret Manager resource exists. The application accepts either `Anthropic:ApiKey` or `ANTHROPIC_API_KEY`; prefer a Secret Manager-backed Cloud Run environment variable named `Anthropic__ApiKey`. The runtime service account must have `roles/secretmanager.secretAccessor` on the specific secret. Pin an enabled secret version when configuring the environment variable. Cloud Vision continues to use ADC and is independent of the Anthropic key.
+
+The client now selects the environment-variable fallback when the configured `Anthropic:ApiKey` is null, empty or whitespace. The offline integration test explicitly blanks both credential sources so CI cannot make an external Anthropic call. See the focused credential-fallback fix PR for implementation and test status.

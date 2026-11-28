@@ -112,6 +112,39 @@ public sealed class AnthropicHaikuClientTests
         Assert.DoesNotContain("private data", error.Message, StringComparison.Ordinal);
     }
 
+
+    [Fact]
+    public async Task Falls_back_to_environment_key_when_configured_key_is_blank()
+    {
+        string? sentApiKey = null;
+        var handler = new TestHandler(request =>
+        {
+            sentApiKey = request.Headers.GetValues("x-api-key").Single();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"stop_reason":"end_turn","content":[{"type":"text","text":"{}"}],"usage":{"input_tokens":1,"output_tokens":1}}""",
+                    Encoding.UTF8, "application/json")
+            });
+        });
+        using var http = new HttpClient(handler);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Anthropic:ApiKey"] = "   ",
+                ["ANTHROPIC_API_KEY"] = "fallback-anthropic-key"
+            })
+            .Build();
+        var client = new AnthropicHaikuClient(http, configuration, NullLogger<AnthropicHaikuClient>.Instance);
+
+        Assert.True(client.Available);
+        var result = await client.ExtractAsync(
+            "image/jpeg", [0xFF, 0xD8, 0xFF], new JsonObject(), "Read the bill.", CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("fallback-anthropic-key", sentApiKey);
+    }
+
     [Fact]
     public void Missing_secret_keeps_haiku_provider_unavailable()
     {

@@ -227,7 +227,7 @@ Approved combined specification: [handwritten sales invoice extraction V2](./han
 ### Verified implementation state
 
 - `AnthropicHaikuClient` is the single direct Messages API adapter for `claude-haiku-5-5`. It uses native original image/PDF content and structured JSON output. Token usage, request ID and safe error diagnostics are recorded.
-- Haiku remains gated by `Anthropic:SalesInvoiceIntegrationValidated`; default is false. Gemini 4 Hydrogen remains the temporary primary until the one secure non-production integration check passes.
+- Haiku is selected whenever a non-blank `Anthropic:ApiKey` or `ANTHROPIC_API_KEY` is configured; there is no `Anthropic:SalesInvoiceIntegrationValidated` gate in current code. The pilot Cloud Run service currently has no Anthropic credential configured, so Haiku is unavailable there until the user creates and mounts the secret. Do not infer runtime activation from repository code.
 - Haiku retries transient failures once. Cloud Vision `DOCUMENT_TEXT_DETECTION` runs independently in parallel using ADC. Tesseract is degraded fallback only when Cloud Vision is unavailable.
 - Targeted Gemini Hydrogen verification is implemented for labelled invoice number/date/printed TOTAL regions. It receives only original-image crops and field labels, not Haiku's answer or OCR transcript. Its result remains a separate human-review candidate.
 - Cloud Vision product-description alignment is implemented in source order, allowing up to three adjacent OCR rows for wrapped handwriting. It records match status, OCR candidate text and source geometry; low/no-match descriptions become ambiguous and can be sent for targeted blind Hydrogen verification. It does not yet prove detection of rows omitted entirely by the primary model.
@@ -277,7 +277,7 @@ Gemini 4 Hydrogen is conditional: use a blind, targeted original-image crop only
 
 The earlier free-tier-first Gemini pool proposed in this continuation is superseded and is not the RBOS V2 architecture. Do not send real customer invoices to the public Gemini Developer API Free Tier: Google's pricing page says Free Tier content may be used to improve products, while Paid Tier content is not used for that purpose. Real invoices may contain customer PII and commercial data. Free-tier testing is limited to synthetic/de-identified material unless the business explicitly approves different data-use terms. Use approved paid terms for live documents; a local model is a separate future evaluation, not part of this release.
 
-The Haiku activation gate remains `Anthropic:SalesInvoiceIntegrationValidated=false` until one secure non-production live integration test succeeds. Thus the final design is Haiku-first, but the current safe runtime remains Hydrogen-primary until that check passes. No API keys are requested, stored or committed as part of this handoff.
+There is no manual Haiku activation flag in current code. Haiku is available only when a non-blank `Anthropic:ApiKey` or `ANTHROPIC_API_KEY` is supplied. The pilot Cloud Run service currently has no Anthropic credential configured, so the model cannot run there until the user creates and mounts the secret. No API keys are requested, stored or committed as part of this handoff.
 
 ### Verified current repository / PR state — 2026-11-28
 
@@ -335,7 +335,7 @@ Haiku original-image read (after live integration validation) + independent Clou
 - Fix the Groq client compile error revealed by the first CI after adding the explicit key/model overload, while preserving supplier-invoice and other generic Groq call behaviour.
 - Capture exact Axe violating node details from the updated invoice-import visual audit; fix the actual low-contrast element and rerun full screenshots/Axe.
 - Re-run backend/frontend/PostgreSQL exact-head CI after the Groq fix.
-- Secure Anthropic integration check remains blocked because no live credential/runtime check is available through repository access; leave `Anthropic:SalesInvoiceIntegrationValidated=false` until that one check is performed securely.
+- Runtime Anthropic activation remains pending because no Anthropic secret/configuration has been created or mounted in Cloud Run. After the user creates the secret and grants secret-level access, deploy/configure the Cloud Run revision and verify the runtime path with a synthetic bill.
 - Sync PR #120 with current `main`; validate evidence retrieval/tenant isolation, atomic link, discard/idempotent replay and remaining extraction completeness against verified source labels.
 - Real-device Android camera/gallery, keyboard and TalkBack, business retention approval and user acceptance remain separate gates. No merge or deployment is authorised.
 
@@ -348,5 +348,9 @@ Haiku original-image read (after live integration validation) + independent Clou
 - The invoice visual audit exposed low-contrast helper labels, stepper labels, import prompt, extraction helper/provenance and subtotal/GST helper text. Invoice-scoped muted text colours were darkened to meet 4.5:1 on their actual light surfaces; the disabled sticky review button was also corrected to 6.04:1. The latest full visual audit must confirm all states and viewports; do not claim visual acceptance from CSS values alone.
 - Branch remains 2 commits behind current `main` (main advanced by two commits after the branch base). PR is reported mergeable, but the current connector exposes no safe PR-branch sync/merge-base operation; do not force-update the branch. Reconcile those commits before merge and rerun exact-head checks.
 - Latest exact-head CI and grouped visual audit were triggered for head `5fe8da4fef311c6c240e838ba047866443859cb3`. At handoff they were still in progress. The preceding exact-head run failed only because of the SkiaSharp API usage now corrected; its frontend job passed. Inspect the newest run results before proceeding.
-- Anthropic live integration remains unverified until the one manual synthetic-image workflow is run with the private Actions secret. Do not set `Anthropic:SalesInvoiceIntegrationValidated=true` before it passes. The user must authorize the manual paid call and ensure the secret is configured privately; never request the key in chat.
+- The one synthetic Anthropic Messages API smoke test passed in GitHub Actions (run `46143498825`), but that does not configure production credentials. The user has confirmed no Anthropic runtime secret/configuration has been created for this work. Do not add credentials to source control or request the key in chat.
 - No merge, deployment, GCP/IAM change or retention-period decision has been made.
+
+## 2026-11-28 runtime provider credential status
+
+The user confirmed that no Anthropic configuration or Secret Manager resource has been created for this work. Treat the Anthropic secret as **not yet created**, not as an existing secret that can be reused. The next GCP setup must create a new secret, add its value securely, grant the Cloud Run runtime service account `roles/secretmanager.secretAccessor` on that secret only, and mount a pinned enabled version as `Anthropic__ApiKey`. Cloud Vision uses ADC separately; verify API enablement and billing before relying on it. Do not enable Gemini/Groq fallback flags as part of the initial Haiku setup.
