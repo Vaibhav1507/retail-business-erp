@@ -163,6 +163,7 @@ public static class ApiRouteAccess
         new("POST", "/api/sales", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("POST", "/api/sales/item-tag-scan", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("POST", "/api/sales/invoice-image-extract", ApiAccessKind.Permission, Permissions.SalesCreate),
+        new("POST", "/api/sales/invoice-image-extract/{id:guid}/discard", ApiAccessKind.Permission, Permissions.SalesCreate),
         new("POST", "/api/customers", ApiAccessKind.Permission, Permissions.CustomersManage),
         new("PUT",  "/api/customers/{id:guid}", ApiAccessKind.Permission, Permissions.CustomersManage),
         new("POST", "/api/customer-payments", ApiAccessKind.Permission, Permissions.CustomersManage),
