@@ -28,7 +28,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["CloudVision:Enabled"] = "false",
-                ["Anthropic:SalesInvoiceIntegrationValidated"] = "false"
+                // Explicitly suppress both supported credential sources so CI never calls Anthropic.
+                ["Anthropic:ApiKey"] = "",
+                ["ANTHROPIC_API_KEY"] = ""
             });
         });
 		builder.ConfigureServices(services =>
