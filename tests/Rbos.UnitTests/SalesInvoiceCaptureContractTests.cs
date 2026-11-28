@@ -7,60 +7,100 @@ namespace Rbos.UnitTests;
 public sealed class SalesInvoiceCaptureContractTests
 {
     [Fact]
-    public void SalesInvoiceFreeTierFallbacks_IgnoreGeneralProviderCredentials()
+    public void SalesInvoiceShadowReaders_ReuseExistingKeysOnlyWhenExplicitlyEnabled()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Gemini:ApiKey"] = "general-gemini-key",
-            ["Groq:ApiKey"] = "general-groq-key",
-            ["Gemini:SalesInvoiceHydrogenModel"] = "gemini-4-argon",
+            ["Gemini:ApiKey"] = "existing-gemini-key",
+            ["Groq:ApiKey"] = "existing-groq-key",
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "obsolete-dedicated-gemini-key",
+            ["Groq:SalesInvoiceFreeTierApiKey"] = "obsolete-dedicated-groq-key",
+            ["Gemini:SalesInvoiceHydrogenModel"] = "paid-or-unapproved-model",
             ["Groq:Model"] = "paid-or-unapproved-model"
         }).Build();
 
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiShadowApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqShadowApiKey(configuration));
+
+        configuration["Gemini:SalesInvoiceShadowEnabled"] = "true";
+        configuration["Groq:SalesInvoiceShadowEnabled"] = "true";
+
+        Assert.Equal("existing-gemini-key", SalesInvoiceCaptureService.GetSalesInvoiceGeminiShadowApiKey(configuration));
+        Assert.Equal("existing-groq-key", SalesInvoiceCaptureService.GetSalesInvoiceGroqShadowApiKey(configuration));
         Assert.Equal("gemini-4-hydrogen", SalesInvoiceCaptureService.GeminiFreeTierModel);
         Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
     }
 
     [Fact]
-    public void SalesInvoiceFreeTierFallbacks_RequireBothDedicatedCredentialAndExplicitEnablement()
+    public void SalesInvoiceShadowReaders_DoNotUseLegacyDedicatedKeysOrPaidModelOverrides()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-gemini-free-key",
-            ["Groq:SalesInvoiceFreeTierApiKey"] = "dedicated-groq-free-key"
+            ["Gemini:SalesInvoiceShadowEnabled"] = "true",
+            ["Groq:SalesInvoiceShadowEnabled"] = "true",
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "legacy-gemini-key",
+            ["Groq:SalesInvoiceFreeTierApiKey"] = "legacy-groq-key",
+            ["Gemini:SalesInvoiceHydrogenModel"] = "gemini-4-argon",
+            ["Groq:Model"] = "paid-model"
         }).Build();
 
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
-        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
-
-        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "true";
-        configuration["Groq:SalesInvoiceFreeTierEnabled"] = "true";
-
-        Assert.Equal("dedicated-gemini-free-key",
-            SalesInvoiceCaptureService.GetSalesInvoiceGeminiFreeTierApiKey(configuration));
-        Assert.Equal("dedicated-groq-free-key",
-            SalesInvoiceCaptureService.GetSalesInvoiceGroqFreeTierApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGeminiShadowApiKey(configuration));
+        Assert.Null(SalesInvoiceCaptureService.GetSalesInvoiceGroqShadowApiKey(configuration));
+        Assert.Equal("gemini-4-hydrogen", SalesInvoiceCaptureService.GeminiFreeTierModel);
+        Assert.Equal("qwen/qwen3.8-27b", SalesInvoiceCaptureService.GroqFreeTierVisionModel);
     }
 
     [Fact]
-    public void SalesInvoiceHydrogenFullDocumentFallback_RequiresExplicitFreeTierDataUseSwitch()
+    public void ProviderComparison_ReportsOnlyFieldNamesAndNeverExtractedValues()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Gemini:ApiKey"] = "general-paid-key",
-            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-free-key",
-            ["Gemini:SalesInvoiceFreeTierEnabled"] = "true"
-        }).Build();
+        var haiku = JsonNode.Parse("""
+            {
+              "invoiceNumber": "00454",
+              "date": "2026-11-06",
+              "total": 17500,
+              "lines": [{
+                "description": "Voltas Beko WM",
+                "quantity": 1,
+                "unitPrice": null,
+                "amount": 17500,
+                "fieldStates": { "unitPrice": "not_present" },
+                "identifierCandidates": []
+              }]
+            }
+            """)!;
+        var groq = JsonNode.Parse("""
+            {
+              "invoiceNumber": "00454",
+              "date": "2026-11-06",
+              "total": 17000,
+              "lines": [{
+                "description": "Voltas Beko WPM",
+                "quantity": 1,
+                "unitPrice": null,
+                "amount": 17500,
+                "fieldStates": { "unitPrice": "not_present" },
+                "identifierCandidates": []
+              }]
+            }
+            """)!;
 
-        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+        var comparison = SalesInvoiceCaptureService.CompareProviderExtractions(haiku, groq);
 
-        configuration["Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled"] = "true";
-        Assert.True(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+        Assert.Equal("compared", comparison["status"]!.GetValue<string>());
+        Assert.Equal(2, comparison["mismatchFieldCount"]!.GetValue<int>());
+        var fields = Assert.IsType<JsonArray>(comparison["mismatchedFields"])
+            .Select(item => item!.GetValue<string>())
+            .ToArray();
+        Assert.Contains("total", fields);
+        Assert.Contains("lines[0].description", fields);
+        Assert.DoesNotContain("17500", comparison.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("17000", comparison.ToJsonString(), StringComparison.Ordinal);
+    }
 
-        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "false";
-        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+    [Fact]
+    public void SalesInvoiceExtraction_UsesOneVersionedPromptForAllVisionReaders()
+    {
+        Assert.Equal("sales-invoice-vision-v2", SalesInvoiceCaptureService.ExtractionPromptVersion);
     }
 
     [Fact]
