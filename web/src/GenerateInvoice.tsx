@@ -881,7 +881,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             {salesInvoiceDraft.lines.map((line, index) => <article className="invoice-extracted-line" key={index}>
               <div className="invoice-extracted-line-heading"><strong>Item {index + 1}</strong>{salesInvoiceReviewIssues.some(issue => issue.lineIndex === index) && <span>Check highlighted fields</span>}</div>
               <label>Product description (as written) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('description', index)}</small><AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' description'} className="invoice-extracted-description" value={line.description ?? ''} minHeight={48} onChange={value => updateCapturedLine(index, 'description', value)} />{salesInvoiceFieldIssue('description', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('description', index)}</small>}</label>
-              {line.ocrEvidence?.status && line.ocrEvidence.status !== 'corroborated' && <div className="invoice-extraction-conflict">
+              {line.ocrEvidence?.status && ['ambiguous', 'not_correlated'].includes(line.ocrEvidence.status) && <div className="invoice-extraction-conflict">
                 <strong>Independent OCR could not confidently confirm this product row.</strong>
                 {line.ocrEvidence.ocrCandidate && <small>OCR row reading: “{line.ocrEvidence.ocrCandidate}”.</small>}
                 {line.ocrEvidence.verificationCandidate && <small>Close-up reading: “{line.ocrEvidence.verificationCandidate}”.</small>}
