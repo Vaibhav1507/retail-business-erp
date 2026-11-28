@@ -286,6 +286,25 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
       .join(' ')
   }
 
+  function salesInvoiceFieldState(field: string, lineIndex: number | null = null) {
+    if (lineIndex !== null)
+      return salesInvoiceDraft?.lines[lineIndex]?.fieldStates?.[field] ?? (salesInvoiceDraft?.lines[lineIndex]?.[field as keyof typeof salesInvoiceDraft.lines[number]] != null ? 'source_read' : 'unreadable')
+    return salesInvoiceDraft?.fieldStates?.[field] ?? (salesInvoiceDraft?.[field as keyof ExtractedSalesInvoice] != null ? 'source_read' : 'unreadable')
+  }
+
+  function salesInvoiceStateLabel(field: string, lineIndex: number | null = null) {
+    const state = salesInvoiceFieldState(field, lineIndex)
+    return ({
+      source_read: 'Read from bill',
+      not_present: 'Not present on source bill',
+      unreadable: 'Written but unreadable',
+      ambiguous: 'More than one reading',
+      calculated: 'Calculated by RBOS',
+      user_entered: 'Entered by you',
+      user_corrected: 'Corrected by you'
+    } as Record<string, string>)[state] ?? 'Needs review'
+  }
+
   function updateCapturedLine(index: number, field: 'description' | 'brand' | 'model' | 'serialNumbers' | 'hsn' | 'quantity' | 'unitPrice' | 'discount', value: string) {
     setSalesInvoiceReviewIssues(current => current.filter(issue => issue.lineIndex !== index || issue.field !== field))
     setSalesInvoiceDraft(current => current ? ({
@@ -770,11 +789,31 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <div><p className="invoice-extraction-eyebrow">HANDWRITTEN BILL</p><h3 id="invoice-extraction-title">Review detected items</h3></div>
             <span className="invoice-extraction-count">{salesInvoiceDraft.lines.length} {salesInvoiceDraft.lines.length === 1 ? 'item' : 'items'}</span>
           </header>
+          {sourceDocumentId && <section className="invoice-source-evidence" aria-label="Original handwritten bill">
+            <div className="invoice-source-evidence-heading">
+              <div><strong>Original bill</strong><small>Retained securely. It will be attached to the sale after confirmation.</small></div>
+              <a href={sourcePageUrl(sourceDocumentId)} target="_blank" rel="noreferrer">Open original</a>
+            </div>
+            {sourceDocumentMime === 'application/pdf'
+              ? <iframe title="Original handwritten bill PDF" src={sourcePageUrl(sourceDocumentId)} loading="lazy" />
+              : <a className="invoice-source-image-link" href={sourcePageUrl(sourceDocumentId)} target="_blank" rel="noreferrer">
+                  <img src={sourcePageUrl(sourceDocumentId)} alt="Original handwritten customer sales bill" loading="lazy" />
+                </a>}
+          </section>}
           <div className="invoice-extraction-header-fields">
-            <label>Source bill number<input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), invoiceNumber: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
-            <label>Bill date<input aria-label="Source bill date" type="date" value={sourceInvoiceDate} onChange={e => { setSourceInvoiceDate(e.target.value); setDate(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), date: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'date')) }} />{salesInvoiceFieldIssue('date') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('date')}</small>}</label>
+            <label>Source bill number <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('invoiceNumber')}</small><input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), invoiceNumber: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
+            <label>Bill date <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('date')}</small><input aria-label="Source bill date" type="date" value={sourceInvoiceDate} onChange={e => { setSourceInvoiceDate(e.target.value); setDate(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), date: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'date')) }} />{salesInvoiceFieldIssue('date') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('date')}</small>}</label>
           </div>
-          <p className="invoice-extraction-total">Handwritten total <strong>{salesInvoiceDraft.total != null ? `₹${money(salesInvoiceDraft.total)}` : 'Not read'}</strong><small>Compare this with the extracted line values before continuing.</small>{salesInvoiceFieldIssue('total') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('total')}</small>}</p>
+          <p className="invoice-extraction-total">Handwritten total <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('total')}</small><strong>{salesInvoiceDraft.total != null ? `₹${money(salesInvoiceDraft.total)}` : 'Not read'}</strong><small>Compare this with the extracted line values before continuing.</small>{salesInvoiceFieldIssue('total') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('total')}</small>}</p>
+          {(['invoiceNumber', 'date', 'total'] as const).map(field => {
+            const evidence = salesInvoiceDraft.ocrEvidence?.[field]
+            return evidence?.ocrCandidate && evidence.ocrAgrees === false
+              ? <p className="invoice-extraction-conflict" key={field}>
+                  **{field === 'invoiceNumber' ? 'Invoice number' : field === 'date' ? 'Bill date' : 'Printed total'} has competing readings.**
+                  OCR text near the labelled field: “{evidence.ocrCandidate}”. Check the original bill before continuing.
+                </p>
+              : null
+          })}
           {salesInvoiceWarnings.length > 0 && <ul className="invoice-extraction-warnings">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
           {salesInvoiceReviewIssues.some(issue => issue.lineIndex === null && !['customerName', 'customerPhone', 'invoiceNumber', 'date', 'total'].includes(issue.field)) &&
             <ul className="invoice-extraction-warnings">{salesInvoiceReviewIssues.filter(issue => issue.lineIndex === null && !['customerName', 'customerPhone', 'invoiceNumber', 'date', 'total'].includes(issue.field)).map((issue, index) => <li key={index}>{issue.message}</li>)}</ul>}
@@ -782,11 +821,31 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
           {salesInvoiceDraft.lines.length > 0 && <div className="invoice-extraction-lines">
             {salesInvoiceDraft.lines.map((line, index) => <article className="invoice-extracted-line" key={index}>
               <div className="invoice-extracted-line-heading"><strong>Item {index + 1}</strong>{salesInvoiceReviewIssues.some(issue => issue.lineIndex === index) && <span>Check highlighted fields</span>}</div>
-              <label>Product description (as written)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' description'} className="invoice-extracted-description" value={line.description ?? ''} minHeight={48} onChange={value => updateCapturedLine(index, 'description', value)} />{salesInvoiceFieldIssue('description', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('description', index)}</small>}</label>
-              <label>Serial number(s) (optional)<AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' serial numbers'} className="invoice-extracted-serials" value={(line.serialNumbers ?? []).join('\n')} minHeight={44} placeholder="One serial number per line" onChange={value => updateCapturedLine(index, 'serialNumbers', value)} />{salesInvoiceFieldIssue('serialNumbers', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('serialNumbers', index)}</small>}</label>
+              <label>Product description (as written) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('description', index)}</small><AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' description'} className="invoice-extracted-description" value={line.description ?? ''} minHeight={48} onChange={value => updateCapturedLine(index, 'description', value)} />{salesInvoiceFieldIssue('description', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('description', index)}</small>}</label>
+              <label>Serial number(s) (optional) <small className="invoice-extraction-provenance">Only values you confirm here enter the sale</small><AutoGrowTextarea ariaLabel={'Extracted line ' + (index + 1) + ' serial numbers'} className="invoice-extracted-serials" value={(line.serialNumbers ?? []).join('\n')} minHeight={44} placeholder="One serial number per line" onChange={value => updateCapturedLine(index, 'serialNumbers', value)} />{salesInvoiceFieldIssue('serialNumbers', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('serialNumbers', index)}</small>}</label>
+              {(line.identifierCandidates ?? []).length > 0 && <fieldset className="invoice-identifier-candidates">
+                <legend>Possible model / serial / IMEI identifiers</legend>
+                <p>AI has not confirmed these as serial numbers. Check the characters and choose the correct type.</p>
+                {(line.identifierCandidates ?? []).map((candidate, candidateIndex) => <div className="invoice-identifier-candidate" key={candidateIndex}>
+                  <input aria-label={`Item ${index + 1} identifier candidate ${candidateIndex + 1}`} value={candidate.value}
+                    onChange={event => updateCapturedIdentifier(index, candidateIndex, 'value', event.target.value)} />
+                  <select aria-label={`Item ${index + 1} identifier type ${candidateIndex + 1}`} value={candidate.classification}
+                    onChange={event => updateCapturedIdentifier(index, candidateIndex, 'classification', event.target.value)}>
+                    <option value="unknown">Not sure</option><option value="model">Model</option><option value="serial">Serial number</option>
+                    <option value="imei">IMEI</option><option value="barcode">Barcode</option><option value="part_number">Part number</option>
+                  </select>
+                  <label><input type="checkbox" checked={candidate.confirmed === true}
+                    onChange={event => updateCapturedIdentifier(index, candidateIndex, 'confirmed', event.target.checked)} />
+                    Confirm this reading</label>
+                  {candidate.classification === 'imei' && candidate.confirmed === true &&
+                    <small className={candidate.luhnValid === false || !validImei(candidate.value.trim()) ? 'invoice-extraction-field-warning' : 'invoice-extraction-provenance'}>
+                      {validImei(candidate.value.trim()) ? 'IMEI check digit valid' : 'Possible IMEI failed its check digit'}
+                    </small>}
+                </div>)}
+              </fieldset>}
               <div className="invoice-extracted-line-values">
-                <label>Qty<input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} />{salesInvoiceFieldIssue('quantity', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('quantity', index)}</small>}</label>
-                <label>Unit price (₹)<input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} />{salesInvoiceFieldIssue('unitPrice', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('unitPrice', index)}</small>}</label>
+                <label>Qty <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('quantity', index)}</small><input aria-label={'Extracted line ' + (index + 1) + ' quantity'} inputMode="decimal" value={line.quantity ?? ''} onChange={e => updateCapturedLine(index, 'quantity', e.target.value)} />{salesInvoiceFieldIssue('quantity', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('quantity', index)}</small>}</label>
+                <label>Unit price (₹) <small className="invoice-extraction-provenance">{salesInvoiceStateLabel('unitPrice', index)}</small><input aria-label={'Extracted line ' + (index + 1) + ' unit price'} inputMode="decimal" value={line.unitPrice ?? ''} onChange={e => updateCapturedLine(index, 'unitPrice', e.target.value)} />{salesInvoiceFieldIssue('unitPrice', index) && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('unitPrice', index)}</small>}</label>
               </div>
               <details className="invoice-extracted-line-details">
                 <summary>Brand, model, HSN and discount {salesInvoiceReviewIssues.some(issue => issue.lineIndex === index && ['brand', 'model', 'hsn', 'discount'].includes(issue.field)) && ' · Check details'}</summary>
