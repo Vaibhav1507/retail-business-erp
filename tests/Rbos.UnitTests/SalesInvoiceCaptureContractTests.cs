@@ -117,6 +117,28 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void HaikuPeerAssessment_DetectsWhenBothShadowReadersAgreeAgainstHaiku()
+    {
+        static JsonObject Comparison(params string[] fields) => new()
+        {
+            ["mismatchFieldCount"] = fields.Length,
+            ["mismatchedFields"] = new JsonArray(fields.Select(JsonValue.Create).ToArray())
+        };
+
+        var haikuGemini = Comparison("total", "lines[0].description");
+        var haikuGroq = Comparison("total", "lines[0].quantity");
+        var geminiGroq = Comparison("lines[0].description", "lines[0].quantity");
+
+        var consensus = SalesInvoiceCaptureService.FindShadowConsensusDifferences(
+            haikuGemini, haikuGroq, geminiGroq);
+        var assessment = SalesInvoiceCaptureService.GetHaikuPeerAssessment(
+            true, true, true, haikuGemini, haikuGroq, geminiGroq, consensus);
+
+        Assert.Equal(["total"], consensus);
+        Assert.Equal("haiku_differs_from_both_shadow_readers", assessment);
+    }
+
+    [Fact]
     public void ProviderComparison_ReportsOnlyFieldNamesAndNeverExtractedValues()
     {
         var haiku = JsonNode.Parse("""
