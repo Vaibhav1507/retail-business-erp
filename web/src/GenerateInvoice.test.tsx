@@ -84,7 +84,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '468', date: '2026-11-20', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 10000, taxAmount: 0, total: 10000,
-          lines: [{ description: 'Samsung LED Television\nModel UA43\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }], hsn: '8528', quantity: 1, unitPrice: 10000, discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
+          lines: [{ description: 'Samsung LED Television\nModel UA43\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }], hsn: '8528', quantity: 1, unitPrice: 10000, sellingPrice: 10000, sellingPriceProvenance: 'source_read', discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
         }, warnings: [], reviewIssues: [{ field: 'unitPrice', lineIndex: 0, severity: 'warning', message: 'Check the unit price against the original bill.' }]
       }), { status: 200 })
       if (url === '/api/sales/invoice-image-extract/00000000-0000-0000-0000-000000000001/discard' && method === 'POST') return new Response(JSON.stringify({ documentId: '00000000-0000-0000-0000-000000000001', status: 'Cancelled' }), { status: 200 })
@@ -121,7 +121,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
     const unitPriceInput = screen.getByLabelText('Extracted line 1 unit price')
     await userEvent.clear(unitPriceInput)
     await userEvent.type(unitPriceInput, '10000')
-    await waitFor(() => expect(screen.queryByText('Check the unit price against the original bill.')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Check the unit price against the original bill.')).toBeInTheDocument())
     expect(container.querySelector('.invoice-product-editor')).not.toHaveAttribute('hidden')
     expect(container.querySelector('#billing-prod')?.closest('.billing-field')).toHaveAttribute('hidden')
     expect(container.querySelector('.invoice-brand-model')).toHaveAttribute('hidden')
@@ -164,7 +164,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '454', date: '2026-11-06', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 17500, taxAmount: null, total: 17500,
-          lines: [{ description: 'Voltas Beko WM\nModel WTL8066\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }], hsn: null, quantity: 1, unitPrice: 17500, discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
+          lines: [{ description: 'Voltas Beko WM\nModel WTL8066\nS/N SN12345678', brand: 'Voltas Beko', model: 'WTL8066', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }], hsn: null, quantity: 1, unitPrice: 17500, sellingPrice: 17500, sellingPriceProvenance: 'source_read', discount: null, amount: 17500, gstRate: null, gstAmount: null, confidence: 0.8 }]
         }, warnings: []
       }), { status: 200 })
       return new Response(JSON.stringify({ error: `not found: ${method} ${url}` }), { status: 404 })
