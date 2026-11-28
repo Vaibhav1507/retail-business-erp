@@ -159,7 +159,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
   await expect(review.locator('.invoice-extracted-line .invoice-extraction-conflict')).toContainText('Independent OCR could not confidently confirm this product row.')
   await review.getByRole('button', { name: 'Inspect product row in original bill' }).click()
   await expect(review.locator('.invoice-source-region.active')).toBeVisible()
-  await expect(review.locator('.invoice-identifier-candidates')).toContainText('SN12345678')
+  await expect(review.getByLabel('Item 1 identifier candidate 1')).toHaveValue('SN12345678')
   await expect(review.getByRole('checkbox', { name: 'Confirm this reading' }).first()).not.toBeChecked()
   expect(invoiceUploadHeaders[0]?.['x-source-file-name']).toBe('synthetic-handwritten-bill.pdf')
   await expect(review.getByLabel('Extracted line 1 quantity')).toHaveValue('1')
