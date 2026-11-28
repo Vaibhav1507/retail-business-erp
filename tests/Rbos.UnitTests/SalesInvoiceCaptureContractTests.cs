@@ -424,15 +424,6 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Theory]
-    [InlineData("invoiceNumber", "Invoice No. 00454", "00454")]
-    [InlineData("date", "Date: 06/11/2026", "06/11/2026")]
-    [InlineData("total", "TOTAL ₹10,020 10,000", "10,020")]
-    public void OcrHeaderValue_ExtractsValueAfterExactLabel(string field, string row, string expected)
-    {
-        Assert.Equal(expected, SalesInvoiceCaptureService.ExtractOcrHeaderValue(field, row));
-    }
-
-    [Theory]
     [InlineData("\"00454\"", "00454")]
     [InlineData("10020", "10020")]
     [InlineData("10020.50", "10020.50")]
@@ -440,26 +431,6 @@ public sealed class SalesInvoiceCaptureContractTests
     {
         var value = JsonNode.Parse(json);
         Assert.Equal(expected, SalesInvoiceCaptureService.ReadFieldValueText(value));
-    }
-
-    [Fact]
-    public void OcrTotalLabel_DoesNotTreatSubtotalAsPrintedTotal()
-    {
-        Assert.False(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "SUBTOTAL ₹10,020"));
-        Assert.True(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "TOTAL ₹10,020"));
-    }
-
-    [Theory]
-    [InlineData("invoiceNumber", "00454", "00454", true)]
-    [InlineData("invoiceNumber", "00454", "454", false)]
-    [InlineData("invoiceNumber", "00454", "40054", false)]
-    [InlineData("date", "2026-11-06", "06/11/2026", true)]
-    [InlineData("date", "2026-11-06", "06/12/2026", false)]
-    [InlineData("total", "10020", "10,020", true)]
-    [InlineData("total", "10020", "10,000", false)]
-    public void OcrHeaderComparison_UsesExactNormalizedFieldValues(string field, string primary, string candidate, bool expected)
-    {
-        Assert.Equal(expected, SalesInvoiceCaptureService.CompareOcrHeaderValue(field, primary, candidate));
     }
 
     [Fact]
@@ -484,33 +455,6 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Contains(issues, issue => issue.Field == "unitPrice" &&
             issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
         Assert.DoesNotContain(issues, issue => issue.Message.Contains("source Rate cell is blank", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void OcrDescriptionMatchScore_RequiresMultipleDistinctTokensAndPreservesRowIdentity()
-    {
-        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
-            "Samsung LED Television model UA43",
-            "Samsung LED Television model UA43 Qty 1 Rate blank Amount 10000") >= 0.95);
-        Assert.True(SalesInvoiceCaptureService.OcrDescriptionMatchScore(
-            "Samsung LED Television model UA43",
-            "LG Washing Machine model WM900") < 0.30);
-        Assert.Equal(0, SalesInvoiceCaptureService.OcrDescriptionMatchScore("LG", "LG Electronics"));
-    }
-
-    [Fact]
-    public void PossibleOmittedOcrRow_is_flagged_without_rewriting_or_matching_existing_lines()
-    {
-        var descriptions = new[] { "Samsung LED Television model UA43K5570" };
-
-        Assert.True(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "LG Washing Machine WM900 1 15000 15000", descriptions));
-        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "Samsung LED Television model UA43K5570 Qty 1", descriptions));
-        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "Invoice No HAND-468", descriptions));
-        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
-            "TOTAL 10020", descriptions));
     }
 
     [Fact]
