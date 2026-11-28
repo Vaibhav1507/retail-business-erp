@@ -6,7 +6,7 @@ namespace Rbos.UnitTests;
 public sealed class SalesInvoiceCaptureContractTests
 {
     [Fact]
-    public void NormalizeForReview_PreservesVerbatimDescriptionAndStructuredSerialNumbers()
+    public void NormalizeForReview_PreservesVerbatimDescriptionAndKeepsLegacySerialUnconfirmed()
     {
         var source = JsonNode.Parse("""
             {
@@ -31,12 +31,16 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal("00454", result["invoiceNumber"]!.GetValue<string>());
         Assert.Equal("Voltas Beko WM\nModel WTL8066\nS/N SN12345678", line["description"]!.GetValue<string>());
         Assert.Equal("WTL8066", line["model"]!.GetValue<string>());
-        Assert.Equal("SN12345678", Assert.Single(Assert.IsType<JsonArray>(line["serialNumbers"])).GetValue<string>());
+        Assert.Empty(Assert.IsType<JsonArray>(line["serialNumbers"]));
+        var candidate = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(line["identifierCandidates"])));
+        Assert.Equal("SN12345678", candidate["value"]!.GetValue<string>());
+        Assert.Equal("unknown", candidate["classification"]!.GetValue<string>());
+        Assert.False(candidate["confirmed"]!.GetValue<bool>());
         Assert.Equal(17500m, line["amount"]!.GetValue<decimal>());
     }
 
     [Fact]
-    public void NormalizeForReview_AcceptsLegacySingleSerialAndDeduplicatesRepeatedValues()
+    public void NormalizeForReview_ConvertsLegacySerialArraysIntoUniqueUnconfirmedCandidates()
     {
         var source = JsonNode.Parse("""
             {
@@ -50,11 +54,19 @@ public sealed class SalesInvoiceCaptureContractTests
             """)!;
 
         var result = SalesInvoiceCaptureService.NormalizeForReview(source);
-        var serials = Assert.IsType<JsonArray>(Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])))["serialNumbers"]);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])));
+        var serials = Assert.IsType<JsonArray>(line["serialNumbers"]);
+        var candidates = Assert.IsType<JsonArray>(line["identifierCandidates"]);
 
-        Assert.Equal(2, serials.Count);
-        Assert.Equal("SN12345678", serials[0]!.GetValue<string>());
-        Assert.Equal("SN98765432", serials[1]!.GetValue<string>());
+        Assert.Empty(serials);
+        Assert.Equal(2, candidates.Count);
+        Assert.Equal("SN12345678", candidates[0]!["value"]!.GetValue<string>());
+        Assert.Equal("SN98765432", candidates[1]!["value"]!.GetValue<string>());
+        Assert.All(candidates, candidate =>
+        {
+            Assert.Equal("unknown", candidate!["classification"]!.GetValue<string>());
+            Assert.False(candidate["confirmed"]!.GetValue<bool>());
+        });
     }
 
     [Fact]
@@ -130,8 +142,8 @@ public sealed class SalesInvoiceCaptureContractTests
               "customerName": "Test Customer", "customerPhone": "9876543210",
               "total": 300,
               "lines": [
-                { "description": "Television", "quantity": 1, "unitPrice": 200, "serialNumbers": ["SN123456"] },
-                { "description": "Washer", "quantity": 1, "unitPrice": 100, "serialNumbers": ["SN123456"] }
+                { "description": "Television", "quantity": 1, "unitPrice": 200, "identifierCandidates": [{ "value": "SN123456", "classification": "serial" }] },
+                { "description": "Washer", "quantity": 1, "unitPrice": 100, "identifierCandidates": [{ "value": "SN123456", "classification": "serial" }] }
               ]
             }
             """)!;
@@ -139,9 +151,9 @@ public sealed class SalesInvoiceCaptureContractTests
 
         var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
 
-        Assert.Equal(2, issues.Count(issue => issue.Field == "serialNumbers" &&
-            issue.Message.Contains("more than one item", StringComparison.Ordinal)));
-        Assert.DoesNotContain(issues, issue => issue.Message.Contains("more serial numbers than its quantity", StringComparison.Ordinal));
+        Assert.Equal(2, issues.Count(issue => issue.Field == "identifierCandidates" &&
+            issue.Message.Contains("appears on more than one item", StringComparison.Ordinal)));
+        Assert.DoesNotContain(issues, issue => issue.Field == "serialNumbers");
     }
 
     [Fact]
@@ -175,7 +187,7 @@ public sealed class SalesInvoiceCaptureContractTests
               "total": 200,
               "lines": [{
                 "description": "Television", "quantity": 1, "unitPrice": 200,
-                "discount": 250, "serialNumbers": ["BAD SN"]
+                "discount": 250, "identifierCandidates": [{ "value": "BAD SN", "classification": "serial" }]
               }]
             }
             """)!;
@@ -184,8 +196,93 @@ public sealed class SalesInvoiceCaptureContractTests
         var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
 
         Assert.Contains(issues, issue => issue.Field == "discount" && issue.LineIndex == 0);
-        Assert.Contains(issues, issue => issue.Field == "serialNumbers" && issue.LineIndex == 0 &&
-            issue.Message.Contains("accepted format", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, issue => issue.Field == "serialNumbers");
+        Assert.DoesNotContain(issues, issue => issue.Message.Contains("IMEI", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BuildReviewIssues_DoesNotApplyImeiLuhnToSerialNumbers()
+    {
+        const string digits = "123456789012345";
+        Assert.False(SalesInvoiceCaptureService.IsValidImei(digits));
+        var source = JsonNode.Parse($"""
+            {
+              "lines": [{
+                "description": "Device",
+                "quantity": 1,
+                "unitPrice": 100,
+                "identifierCandidates": [{ "value": "{{digits}}", "classification": "serial" }]
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+
+        Assert.DoesNotContain(issues, issue => issue.Message.Contains("IMEI", StringComparison.Ordinal));
+        Assert.Empty(Assert.IsType<JsonArray>(Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(extraction["lines"])))["serialNumbers"]));
+    }
+
+    [Fact]
+    public void BuildReviewIssues_ValidatesLuhnOnlyForPossibleImeis()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Phone",
+                "quantity": 1,
+                "unitPrice": 100,
+                "identifierCandidates": [{ "value": "123456789012345", "classification": "imei" }]
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+
+        Assert.Contains(issues, issue => issue.Field == "identifierCandidates" &&
+            issue.Message.Contains("possible IMEI failed its check digit", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NormalizeForReview_PreservesBlankRateAsNotPresentRatherThanUnreadable()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "lines": [{
+                "description": "Voltas washing machine",
+                "quantity": 1,
+                "unitPrice": "",
+                "amount": "17500",
+                "fieldStates": { "description": "source_read", "quantity": "source_read", "unitPrice": "not_present", "amount": "source_read" }
+              }]
+            }
+            """)!;
+        var extraction = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(extraction["lines"])));
+
+        Assert.Null(line["unitPrice"]);
+        Assert.Equal("not_present", line["fieldStates"]!["unitPrice"]!.GetValue<string>());
+        Assert.Equal(17500m, line["amount"]!.GetValue<decimal>());
+        var issues = SalesInvoiceCaptureService.BuildReviewIssues(extraction);
+        Assert.Contains(issues, issue => issue.Field == "unitPrice" && issue.Severity == "info" &&
+            issue.Message.Contains("source Rate cell is blank", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, issue => issue.Field == "unitPrice" &&
+            issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnthropicSchemaAvoidsUnsupportedConstraintsAndExcessiveUnionTypes()
+    {
+        var schema = SalesInvoiceCaptureService.BuildAnthropicResponseJsonSchema();
+        var json = schema.ToJsonString();
+
+        Assert.DoesNotContain("\"minimum\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"maximum\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"maxItems\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"type\":[", json, StringComparison.Ordinal);
+        Assert.Contains("fieldStates", json, StringComparison.Ordinal);
+        Assert.Contains("identifierCandidates", json, StringComparison.Ordinal);
     }
 
     [Fact]
