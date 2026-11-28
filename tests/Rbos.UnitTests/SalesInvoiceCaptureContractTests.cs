@@ -401,6 +401,21 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void PossibleOmittedOcrRow_is_flagged_without_rewriting_or_matching_existing_lines()
+    {
+        var descriptions = new[] { "Samsung LED Television model UA43K5570" };
+
+        Assert.True(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "LG Washing Machine WM900 1 15000 15000", descriptions));
+        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "Samsung LED Television model UA43K5570 Qty 1", descriptions));
+        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "Invoice No HAND-468", descriptions));
+        Assert.False(SalesInvoiceCaptureService.IsPossibleOmittedOcrProductRow(
+            "TOTAL 10020", descriptions));
+    }
+
+    [Fact]
     public void AnthropicSchemaAvoidsUnsupportedConstraintsAndExcessiveUnionTypes()
     {
         var schema = SalesInvoiceCaptureService.BuildAnthropicResponseJsonSchema();
