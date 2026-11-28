@@ -151,6 +151,102 @@ public sealed class SalesInvoiceCaptureTests(ApiFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task Extract_retains_original_bill_and_retrieval_is_tenant_scoped()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+
+        var response = await client.SendBytes(
+            "/sales/invoice-image-extract", Jpeg, "image/jpeg", Guid.NewGuid().ToString("N"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var documentId = body.RootElement.GetProperty("sourceDocumentId").GetGuid();
+
+        var document = await client.GetJson("/documents/" + documentId);
+        Assert.Equal("Sale", document.GetProperty("document").GetProperty("direction").GetString());
+        Assert.Equal("HandwrittenBill", document.GetProperty("document").GetProperty("sourceKind").GetString());
+        Assert.Equal("NeedsReview", document.GetProperty("document").GetProperty("status").GetString());
+
+        var page = await client.Send(HttpMethod.Get, "/documents/" + documentId + "/pages/1", null);
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Equal(Jpeg, await page.Content.ReadAsByteArrayAsync());
+
+        var otherTenant = new Client(factory);
+        await otherTenant.SignUpAndBootstrap();
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await otherTenant.Send(HttpMethod.Get, "/documents/" + documentId, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await otherTenant.Send(HttpMethod.Get, "/documents/" + documentId + "/pages/1", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Normal_sale_posting_links_source_bill_atomically_and_replay_is_idempotent()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+        var locationId = await client.Location();
+
+        var upload = await client.SendBytes(
+            "/sales/invoice-image-extract", Jpeg, "image/jpeg", Guid.NewGuid().ToString("N"));
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        using var uploadBody = JsonDocument.Parse(await upload.Content.ReadAsStringAsync());
+        var documentId = uploadBody.RootElement.GetProperty("sourceDocumentId").GetGuid();
+
+        var key = Guid.NewGuid().ToString("N");
+        var saleRequest = new
+        {
+            customerId = (Guid?)null,
+            locationId,
+            saleDate = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+            saleType = "Cash",
+            amountPaid = 100m,
+            payMethod = "Cash",
+            sourceDocumentId = documentId,
+            lines = new[]
+            {
+                new { productId = (Guid?)null, quantity = 1m, unitPrice = 100m, discount = 0m, description = "Manually entered item" }
+            }
+        };
+
+        var posted = await client.Send(HttpMethod.Post, "/sales", saleRequest, key);
+        Assert.Equal(HttpStatusCode.OK, posted.StatusCode);
+        using var postedBody = JsonDocument.Parse(await posted.Content.ReadAsStringAsync());
+        var saleId = postedBody.RootElement.GetProperty("id").GetGuid();
+
+        var documentAfterPost = await client.GetJson("/documents/" + documentId);
+        Assert.Equal("Posted", documentAfterPost.GetProperty("document").GetProperty("status").GetString());
+
+        var replay = await client.Send(HttpMethod.Post, "/sales", saleRequest, key);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        using var replayBody = JsonDocument.Parse(await replay.Content.ReadAsStringAsync());
+        Assert.True(replayBody.RootElement.GetProperty("replayed").GetBoolean());
+        Assert.Equal(saleId, replayBody.RootElement.GetProperty("id").GetGuid());
+        Assert.Single((await client.GetJson("/sales")).EnumerateArray());
+
+        var secondPost = await client.Send(HttpMethod.Post, "/sales", saleRequest, Guid.NewGuid().ToString("N"));
+        Assert.Equal(HttpStatusCode.Conflict, secondPost.StatusCode);
+    }
+
+    [Fact]
+    public async Task Discarding_unposted_source_bill_marks_only_that_tenant_document_cancelled()
+    {
+        var client = new Client(factory);
+        await client.SignUpAndBootstrap();
+
+        var upload = await client.SendBytes(
+            "/sales/invoice-image-extract", Jpeg, "image/jpeg", Guid.NewGuid().ToString("N"));
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        using var body = JsonDocument.Parse(await upload.Content.ReadAsStringAsync());
+        var documentId = body.RootElement.GetProperty("sourceDocumentId").GetGuid();
+
+        var discarded = await client.Send(HttpMethod.Post,
+            "/sales/invoice-image-extract/" + documentId + "/discard", new { });
+        Assert.Equal(HttpStatusCode.OK, discarded.StatusCode);
+        var document = await client.GetJson("/documents/" + documentId);
+        Assert.Equal("Cancelled", document.GetProperty("document").GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task Extract_requires_authentication()
     {
         var client = new Client(factory);
