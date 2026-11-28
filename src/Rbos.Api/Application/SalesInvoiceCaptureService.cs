@@ -989,7 +989,7 @@ public sealed class SalesInvoiceCaptureService(
             var state = ReadString(source?[field]);
             if (state is null || !ProvenanceStatuses.Contains(state))
             {
-                state = values?[field] is not null ? "source_read" : "unreadable";
+                state = values?[field] is not null ? "ambiguous" : "unreadable";
             }
             result[field] = state;
         }
@@ -1008,16 +1008,16 @@ public sealed class SalesInvoiceCaptureService(
                 var value = Clip(ReadString(item["value"]), 64);
                 var classification = ReadString(item["classification"])?.ToLowerInvariant() ?? "unknown";
                 var fieldState = ReadString(item["fieldState"]);
-                if (!ProvenanceStatuses.Contains(fieldState ?? "")) fieldState = "source_read";
+                if (!ProvenanceStatuses.Contains(fieldState ?? "")) fieldState = "ambiguous";
                 if (value is not null) items.Add((value, classification, fieldState));
             }
         }
         else
         {
             foreach (var value in CleanStringArray(legacySerials, 12, 64).Select(ReadString).Where(value => value is not null))
-                items.Add((value!, "unknown", "source_read"));
+                items.Add((value!, "unknown", "ambiguous"));
             var single = Clip(ReadString(legacySerial), 64);
-            if (single is not null) items.Add((single, "unknown", "source_read"));
+            if (single is not null) items.Add((single, "unknown", "ambiguous"));
         }
 
         foreach (var (value, proposedClassification, fieldState) in items.Take(20))
