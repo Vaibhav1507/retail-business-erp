@@ -1,4 +1,7 @@
+using System.Net;
+using System.Text;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Rbos.Api.Application;
 
@@ -76,6 +79,37 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal("not_compared", comparison["status"]!.GetValue<string>());
         Assert.Equal(0, comparison["mismatchFieldCount"]!.GetValue<int>());
         Assert.Empty(Assert.IsType<JsonArray>(comparison["mismatchedFields"]));
+    }
+
+    [Fact]
+    public async Task ExtractAsync_StartsGeminiAndGroqShadowReadersConcurrently()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:ApiKey"] = "test-gemini-key",
+            ["Gemini:SalesInvoiceShadowEnabled"] = "true",
+            ["Groq:ApiKey"] = "test-groq-key",
+            ["Groq:SalesInvoiceShadowEnabled"] = "true",
+            ["AiPerformance:SalesInvoiceTotalProviderBudgetSeconds"] = "10",
+            ["AiPerformance:SalesInvoiceShadowAttemptTimeoutSeconds"] = "5"
+        }).Build();
+        var handler = new ParallelVisionHandler();
+        using var http = new HttpClient(handler);
+        var haiku = new AnthropicHaikuClient(
+            new HttpClient(new StubHttpMessageHandler()),
+            configuration,
+            NullLogger<AnthropicHaikuClient>.Instance);
+        var groq = new GroqVisionClient(http, configuration, NullLogger<GroqVisionClient>.Instance);
+        var service = new SalesInvoiceCaptureService(
+            http, haiku, groq, configuration, NullLogger<SalesInvoiceCaptureService>.Instance);
+
+        await service.ExtractAsync(
+            "image/jpeg",
+            [0xFF, 0xD8, 0xFF, 0xD9],
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(handler.BothProvidersStarted, "Gemini and Groq must both start before either response is released.");
     }
 
     [Fact]
@@ -521,6 +555,44 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.Equal("string", serialItemSchema["type"]!.GetValue<string>());
         Assert.Contains(required, item => item?.GetValue<string>() == "serialNumbers");
         Assert.Contains(required, item => item?.GetValue<string>() == "description");
+    }
+
+
+    private sealed class ParallelVisionHandler : HttpMessageHandler
+    {
+        readonly TaskCompletionSource bothStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int started;
+
+        public bool BothProvidersStarted => Volatile.Read(ref started) >= 2;
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref started) == 2)
+                bothStarted.TrySetResult();
+
+            await bothStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            var extraction = "{\"lines\":[{\"description\":\"Test item\",\"quantity\":1,\"amount\":100}]}";
+            var body = request.RequestUri?.Host == "generativelanguage.googleapis.com"
+                ? "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\"" +
+                    extraction.Replace("\"", "\\\"", StringComparison.Ordinal) +
+                    "\"}]}}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":14}}"
+                : "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"" +
+                    extraction.Replace("\"", "\\\"", StringComparison.Ordinal) +
+                    "\"}}]}";
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
+        }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Haiku must not be called when no Anthropic key is configured.");
     }
 
 }
