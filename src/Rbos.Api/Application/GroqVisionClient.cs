@@ -259,10 +259,20 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         }
 
         var root = JsonNode.Parse(responseBody);
+        var usage = root?["usage"];
+        log.LogInformation(
+            "Groq vision usage recorded. Model {Model}, prompt tokens {PromptTokens}, completion tokens {CompletionTokens}, total tokens {TotalTokens}",
+            modelOverride ?? Model,
+            ReadTokenCount(usage?["prompt_tokens"]),
+            ReadTokenCount(usage?["completion_tokens"]),
+            ReadTokenCount(usage?["total_tokens"]));
         var finishReason = root?["choices"]?[0]?["finish_reason"]?.GetValue<string>();
         if (finishReason is "content_filter" or "safety" or "refusal")
             throw new VisionProviderRefusalException("Groq declined the vision extraction request.");
         var text = root?["choices"]?[0]?["message"]?["content"]?.GetValue<string>();
         return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
     }
+
+    static int? ReadTokenCount(JsonNode? value) =>
+        value is JsonValue scalar && scalar.TryGetValue<int>(out var count) ? count : null;
 }
