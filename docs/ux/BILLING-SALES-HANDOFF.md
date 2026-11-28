@@ -448,3 +448,8 @@ The comparison result/log now includes a peer-assessment label: three_way_agreem
 - Groq documents Qwen 3.8 27B as a vision/JSON-capable Preview model. Treat it as a pilot shadow reader, not a guaranteed permanent production dependency; revalidate its model status and Free-plan quota before every steady-state decision.
 - Groq states inference inputs/outputs are not retained by default, but may be temporarily logged for reliability/abuse investigations. Enable account-level Zero Data Retention in Groq Data Controls before sending real customer invoices; until then use redacted/synthetic images.
 - No provider smoke test, account-tier entitlement or data-control setting is assumed from the existence of an API key. Record the actual smoke-test result and account setting before activating flags.
+
+
+### Side-by-side candidate differences in the API response
+
+For engineering comparison, providerComparison includes candidateDifferences for mismatched business fields (invoice number/date, totals, product descriptions, model/identifier fields, quantities, rates and amounts). Each entry contains the available provider values and provenance states so an authorised caller can inspect exactly how the readers differed. Customer name, phone and address fields are deliberately excluded. These candidate values are returned only in the authenticated extraction response; they are not written to logs or persisted by this experiment. The existing shopkeeper UI does not render this diagnostic property. Peer agreement remains a triage signal, not accuracy.
