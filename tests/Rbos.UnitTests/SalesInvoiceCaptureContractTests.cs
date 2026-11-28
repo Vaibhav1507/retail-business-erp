@@ -114,6 +114,8 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.True(handler.GeminiOutputIsBounded);
         Assert.True(handler.GroqUsesInstructMode);
         Assert.True(handler.GroqOutputIsBounded);
+        Assert.Equal(handler.GeminiPrompt, handler.GroqPrompt);
+        Assert.Contains("Return JSON only", handler.GeminiPrompt, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -594,6 +596,8 @@ public sealed class SalesInvoiceCaptureContractTests
         public bool GeminiOutputIsBounded { get; private set; }
         public bool GroqUsesInstructMode { get; private set; }
         public bool GroqOutputIsBounded { get; private set; }
+        public string? GeminiPrompt { get; private set; }
+        public string? GroqPrompt { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
@@ -609,11 +613,13 @@ public sealed class SalesInvoiceCaptureContractTests
             {
                 GeminiUsesLowThinking = requestJson["generationConfig"]?["thinkingConfig"]?["thinkingLevel"]?.GetValue<string>() == "LOW";
                 GeminiOutputIsBounded = requestJson["generationConfig"]?["maxOutputTokens"]?.GetValue<int>() == 8192;
+                GeminiPrompt = requestJson["contents"]?[0]?["parts"]?[0]?["text"]?.GetValue<string>();
             }
             else
             {
                 GroqUsesInstructMode = requestJson["reasoning_effort"]?.GetValue<string>() == "none";
                 GroqOutputIsBounded = requestJson["max_completion_tokens"]?.GetValue<int>() == 8192;
+                GroqPrompt = requestJson["messages"]?[0]?["content"]?[0]?["text"]?.GetValue<string>();
             }
             var extraction = "{\"lines\":[{\"description\":\"Test item\",\"quantity\":1,\"amount\":100}]}";
             var body = isGemini
