@@ -1,0 +1,51 @@
+name: Handwritten sales bill model benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      run_label:
+        description: Optional label for this run
+        required: false
+        type: string
+        default: haiku-vs-gemini-11-bills
+permissions:
+  contents: read
+concurrency:
+  group: handwritten-bill-model-benchmark
+  cancel-in-progress: false
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install pinned dependencies
+        run: python -m pip install -r experiments/handwritten-bill-benchmark/requirements.txt
+      - name: Download private redacted image bundle
+        env:
+          DATA_URL: ${{ secrets.HANDWRITTEN_BILLS_ARCHIVE_URL }}
+        run: |
+          test -n "$DATA_URL" || { echo 'Missing HANDWRITTEN_BILLS_ARCHIVE_URL secret'; exit 1; }
+          curl --fail --silent --show-error --location --max-time 180 "$DATA_URL" --output /tmp/handwritten-bills.zip
+          python experiments/handwritten-bill-benchmark/prepare_dataset.py /tmp/handwritten-bills.zip /tmp/handwritten-bills
+      - name: Run Haiku then Gemini sequentially
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BENCHMARK_LABEL: ${{ inputs.run_label }}
+        run: python experiments/handwritten-bill-benchmark/run_benchmark.py --images /tmp/handwritten-bills --output results/handwritten-bill-benchmark
+      - name: Add summary to Actions run
+        if: always()
+        run: |
+          if [ -f results/handwritten-bill-benchmark/summary.md ]; then cat results/handwritten-bill-benchmark/summary.md >> "$GITHUB_STEP_SUMMARY"; else echo 'No summary produced; inspect failed step.' >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload extracted fields and metrics (no source images)
+        if: always() && hashFiles('results/handwritten-bill-benchmark/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: handwritten-bill-haiku-gemini-${{ github.run_id }}
+          path: results/handwritten-bill-benchmark/
+          if-no-files-found: error
+          retention-days: 7
