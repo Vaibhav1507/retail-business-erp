@@ -278,3 +278,37 @@ Keep the existing synchronous upload → extraction → editable review → norm
 
 Automated CI: code jobs passed; visual/Axe gate failed. Live Haiku integration: not passed. Production migration/deployment state: not independently verified. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised.
 
+
+
+## 2026-11-28 continuation — Free Tier only for Hydrogen and Groq
+
+### Provider facts and caveats
+
+- Gemini 4 Hydrogen is available on the Gemini Developer API Free Tier for eligible projects, subject to model rollout and quota. It is the same model accessed under the Free Tier, not a separate 'free edition'. Google Free Tier content may be used to improve Google products.
+- Groq Qwen 3.8 27B is a text+image vision-capable model with JSON output support, currently Preview. Its published token pricing applies to the paid Developer tier; Free Tier organizations have a separate no-cost quota. Use a key from an organization verified as Free Tier, not an assumed free key.
+- Groq states inference inputs/outputs are not retained by default, with limited temporary retention possible for reliability/abuse investigations. Quota/rate-limit exhaustion remains a hard stop.
+- No paid model is permitted as a fallback or verifier. Haiku is the only intended paid AI model usage, funded by the existing Anthropic credit. Cloud Vision is a distinct OCR service and may be billable once the monthly free allowance is exhausted.
+
+### Implemented in PR #120
+
+- Sales invoice fallback/verifier calls no longer reuse general `Gemini:ApiKey` or `Groq:ApiKey` credentials.
+- Hydrogen targeted verification requires `Gemini:SalesInvoiceFreeTierEnabled=true` and dedicated secret `Gemini:SalesInvoiceFreeTierApiKey`.
+- Whole-document Hydrogen fallback also requires `Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled=true`; this is false by default due to Google's Free Tier content-use terms. Targeted source crops are the default verifier input.
+- Groq requires `Groq:SalesInvoiceFreeTierEnabled=true` and `Groq:SalesInvoiceFreeTierApiKey`; the model is pinned to `qwen/qwen3.8-27b`. It does not inherit `Groq:Model` or the legacy invoice fallback switch. All Groq results remain NeedsReview.
+- The Groq client has a dedicated-key/model overload for this sales path. Existing generic uses retain prior provider settings.
+- Tests assert that the general keys do not activate sales fallbacks; dedicated keys and flags are required; the full-document Hydrogen path requires a separate opt-in.
+- Provider billing tier cannot be forced by an API request parameter. Verify the account/project plan in the provider console before configuring the dedicated key. No production GCP settings or secrets were modified.
+- If a provider returns Free Tier quota exhaustion, rate-limit, billing or permission failure, do not switch to a paid/general key. Return the extraction as unavailable/NeedsReview for manual entry.
+
+### Current sequence
+
+Haiku original-image read (after live integration validation) + independent Cloud Vision OCR in parallel → blind targeted Hydrogen crop verification only for material critical conflicts → optional whole-bill Hydrogen outage fallback only with explicit data-use opt-in → Groq Qwen 3.8 Free Tier last resort, always NeedsReview. Tesseract remains only the degraded OCR fallback when Cloud Vision is unavailable.
+
+### Remaining release gates
+
+- Fix the Groq client compile error revealed by the first CI after adding the explicit key/model overload, while preserving supplier-invoice and other generic Groq call behaviour.
+- Capture exact Axe violating node details from the updated invoice-import visual audit; fix the actual low-contrast element and rerun full screenshots/Axe.
+- Re-run backend/frontend/PostgreSQL exact-head CI after the Groq fix.
+- Secure Anthropic integration check remains blocked because no live credential/runtime check is available through repository access; leave `Anthropic:SalesInvoiceIntegrationValidated=false` until that one check is performed securely.
+- Sync PR #120 with current `main`; validate evidence retrieval/tenant isolation, atomic link, discard/idempotent replay and remaining extraction completeness against verified source labels.
+- Real-device Android camera/gallery, keyboard and TalkBack, business retention approval and user acceptance remain separate gates. No merge or deployment is authorised.
