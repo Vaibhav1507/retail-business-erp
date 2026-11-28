@@ -130,7 +130,12 @@ public sealed class SalesInvoiceCaptureService(
 
             if (useHaiku)
             {
-                var haikuResult = await ExtractWithHaikuRetryAsync(mime, bytes, budgetToken);
+                AnthropicSalesInvoiceResult? haikuResult = null;
+                try { haikuResult = await ExtractWithHaikuRetryAsync(mime, bytes, budgetToken); }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested && budgetToken.IsCancellationRequested)
+                {
+                    log.LogWarning("Sales invoice total provider budget was exhausted during Haiku extraction.");
+                }
                 if (haikuResult is not null)
                 {
                     parsed = haikuResult.Extraction;
@@ -152,6 +157,7 @@ public sealed class SalesInvoiceCaptureService(
                 {
                     using var hydrogenBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
                     hydrogenBudget.CancelAfter(TimeSpan.FromSeconds(8));
+                    if (budgetToken.IsCancellationRequested) throw new OperationCanceledException(budgetToken);
                     parsed = await ExtractWithGeminiAsync(
                         cfg["Gemini:ApiKey"]!, hydrogen, mime, bytes, null, hydrogenBudget.Token);
                     if (parsed is not null)
@@ -160,9 +166,9 @@ public sealed class SalesInvoiceCaptureService(
                         providerModel = hydrogen;
                     }
                 }
-                catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
-                    log.LogWarning("Sales invoice Hydrogen attempt timed out. Model {Model}.", hydrogen);
+                    log.LogWarning("Sales invoice Hydrogen attempt timed out or the total provider budget expired. Model {Model}.", hydrogen);
                 }
                 catch (HttpRequestException error)
                 {
@@ -192,9 +198,9 @@ public sealed class SalesInvoiceCaptureService(
                         providerNeedsReview = true;
                     }
                 }
-                catch (OperationCanceledException) when (!budgetToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                 {
-                    log.LogWarning("Last-resort Groq sales invoice extraction timed out.");
+                    log.LogWarning("Last-resort Groq sales invoice extraction timed out or the total provider budget expired.");
                 }
                 catch (HttpRequestException error)
                 {
@@ -230,7 +236,7 @@ public sealed class SalesInvoiceCaptureService(
             string? degradedOcrText = null;
             if (independentOcr is null)
             {
-                degradedOcrText = await ReadLocalOcrFallbackAsync(mime, bytes, ct);
+                degradedOcrText = await ReadLocalOcrFallbackAsync(mime, bytes, budgetToken);
             }
 
             var warnings = new List<string>();
@@ -244,7 +250,7 @@ public sealed class SalesInvoiceCaptureService(
             ApplyIndependentOcrEvidence(extraction, independentOcr, degradedOcrText, warnings, verificationTargets);
             if (verificationTargets.Count > 0 && !string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]))
             {
-                var verification = await VerifyCriticalFieldsAsync(mime, bytes, verificationTargets, ct);
+                var verification = await VerifyCriticalFieldsAsync(mime, bytes, verificationTargets, budgetToken);
                 if (verification is not null)
                     ApplyVerificationCandidates(extraction, verification);
             }
