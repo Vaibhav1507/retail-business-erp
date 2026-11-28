@@ -433,7 +433,9 @@ Release safety gates:
 
 ## 15. Delivery state
 
-This design is documentation only. Main still contains the existing Tesseract + Gemini/optional Groq implementation. The V2 branch must change implementation only after the design is reviewed. No Anthropic/Google/Groq model call, API secret, GCP IAM/service identity, Cloud Run setting, production config or deployment has been changed by this design update.
+The approved design was finalized in documentation-only PR #119. Implementation is being carried separately in Draft PR #120 on `feat/handwritten-sales-invoice-extraction-v2`, based on main commit `2b981069125f1ee2be7e5537635d969dd17b6f9b`. Main remains the legacy Tesseract + Gemini/optional Groq baseline; all V2 application changes belong to the implementation branch.
+
+No live Anthropic model call has been made from this work. No API secret has been exposed or committed. No production GCP IAM/service identity, Cloud Run setting, production config or deployment has been changed.
 
 The previous Haiku-only design is superseded by this combined design: Haiku is the routine direct reader; Cloud Vision supplies independent OCR/layout evidence; Gemini 4 Hydrogen is the conditional verifier and provider fallback; Tesseract remains a degraded OCR fallback; Argon is deferred.
 
@@ -453,28 +455,40 @@ The previous Haiku-only design is superseded by this combined design: Haiku is t
 
 ## 17. Implementation progress — 2026-11-28
 
-Implementation is being developed on a focused branch from the verified main baseline. The documentation-only design PR #119 remains open and is not the implementation branch.
+Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invoice-extraction-v2`. The documentation-only design PR #119 remains separate and unmerged.
 
-### First increment delivered to the branch
+### Implemented in the current branch
 
-- Added `AnthropicVisionClient`, a direct server-side Messages API adapter using the exact `claude-haiku-5-5` model ID by default.
-- The adapter sends the original image or PDF as a native image/document content block and forces a typed tool response using the versioned sales extraction JSON schema.
-- Captures provider-reported input/output token counts for later cost telemetry.
-- Uses the documented Anthropic API version and server-side API key header; does not expose credentials or log document/provider content.
-- Provider error handling logs only status code and model; it deliberately does not log provider response bodies.
-- Registered the typed client with a 25-second HTTP timeout.
-- Added request-contract unit tests for image/PDF blocks, schema tool choice, usage parsing, missing credentials and safe provider errors.
+- `AnthropicHaikuClient`: direct Anthropic Messages API integration for `claude-haiku-5-5`, original image/PDF input, structured JSON output using `output_config.format`, token usage and request ID telemetry, safe error diagnostics.
+- Haiku remains gated by `Anthropic:SalesInvoiceIntegrationValidated` (false unless explicitly validated); Gemini 4 Hydrogen remains the temporary primary until the one secure non-production integration check passes.
+- Haiku retries transient failures at most once. Cloud Vision runs independently in parallel using ADC and `DOCUMENT_TEXT_DETECTION`; Tesseract is invoked only when Cloud Vision is unavailable.
+- Targeted Gemini Hydrogen verification sends only original-image crops plus field labels; it does not receive the first reader's answer or OCR transcript. It preserves its reading as a separate review candidate.
+- Provenance states and identifier candidates are normalized; only operator-confirmed serial/IMEI candidates enter sale lines. IMEI Luhn validation is limited to candidates classified as IMEI.
+- Original handwritten bill persistence uses the sales-specific synchronous path over migration-058 document/page storage. Migration 060 adds the tenant-scoped document-to-sale link, linked atomically in normal sale posting.
+- Generate Invoice includes original-bill preview, OCR source-region markers, competing readings, editable review and discard; the existing sale confirmation remains the only posting path.
+- The API now validates MIME and file signature before retaining evidence. A defensive check also exists in the persistence service.
 
-### Known gate — not yet passed
+### Review corrections made during this continuation
 
-The previously reported HTTP 400 with an empty response body has not yet been reproduced or diagnosed from a secure non-production runtime because no Anthropic credential is available through repository access. The adapter's request contract is covered by mocked unit tests, but this is **not** the required live integration check. Do not route production traffic to Haiku until one secure non-production check succeeds. If the integration cannot be verified, keep Gemini 4 Hydrogen as the temporary primary as specified in this design.
+- Removed a duplicate Anthropic adapter and its duplicate DI registration; the existing `AnthropicHaikuClient` is the single provider implementation.
+- Fixed compile errors in JSON exception handling, review-issue list mutation and the Cloud Vision client lifecycle API.
+- Corrected provenance fallback: a null Rate with no explicit source state is now `unreadable`, not guessed as `not_present`. Only an explicit source `not_present` remains a blank source cell.
+- Replaced substring OCR matching with exact labelled-row parsing for invoice number, date and printed TOTAL. This avoids treating SUBTOTAL as TOTAL and reads the first printed total after the label (e.g. keeps 10,020 distinct from a later 10,000 annotation).
+- Added tests for labelled OCR extraction/comparison and the null-rate provenance distinction.
+- Updated UI correction provenance for header/line edits and exposed the targeted verifier reading separately from OCR evidence.
 
-### Still outstanding
+### Known integration gate — not passed
 
-- Wire Haiku into the sales-only extraction orchestration and implement one transient retry.
-- Implement Cloud Vision OCR/layout using ADC, independent parallel execution, and post-extraction evidence alignment.
-- Keep Tesseract strictly as Cloud Vision degraded fallback.
-- Implement provenance, identifier candidates, targeted blind Hydrogen verification and unresolved conflict handling.
-- Implement synchronous original-document persistence and atomic sale evidence linking.
-- Update frontend review without redesigning Generate Invoice.
-- Complete CI, full Playwright/Axe and responsive visual acceptance. No merge or deployment is authorised.
+The previously reported Anthropic HTTP 400 with an empty response body has not yet been reproduced in a secure non-production runtime because no Anthropic credential is available through repository access. Mocked request-contract tests are not a live integration check. Do not set `Anthropic:SalesInvoiceIntegrationValidated=true` until one secure non-production check succeeds. If Haiku cannot be made reliable, keep Gemini 4 Hydrogen as the temporary primary.
+
+### Remaining engineering gaps
+
+- OCR alignment currently covers labelled invoice number/date/total header rows; physical product-row alignment, row omission/merge/extra-row detection and line-level OCR disagreement handling still need implementation.
+- Targeted Hydrogen verification currently covers the three critical header fields; line-level critical conflicts need a grounded crop/label strategy before being enabled.
+- Add integration coverage for tenant-isolated evidence retrieval, document-to-sale atomicity, discard and idempotent replay.
+- Verify candidate field provenance and correction behaviour across all extracted fields.
+- Complete exact-head code CI, full Playwright journeys, responsive screenshots/contact sheets, visual review and Axe WCAG 2 A/AA. Native Android camera/gallery/keyboard/TalkBack remain separate real-device acceptance.
+
+### Explicit status
+
+Repository design specification: approved. Implementation: in progress in Draft PR #120. Automated CI: latest exact-head run pending. Full visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised.
