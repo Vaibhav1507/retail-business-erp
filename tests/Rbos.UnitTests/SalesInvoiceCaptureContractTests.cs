@@ -110,6 +110,10 @@ public sealed class SalesInvoiceCaptureContractTests
             CancellationToken.None);
 
         Assert.True(handler.BothProvidersStarted, "Gemini and Groq must both start before either response is released.");
+        Assert.True(handler.GeminiUsesLowThinking);
+        Assert.True(handler.GeminiOutputIsBounded);
+        Assert.True(handler.GroqUsesInstructMode);
+        Assert.True(handler.GroqOutputIsBounded);
     }
 
     [Fact]
@@ -564,6 +568,10 @@ public sealed class SalesInvoiceCaptureContractTests
         int started;
 
         public bool BothProvidersStarted => Volatile.Read(ref started) >= 2;
+        public bool GeminiUsesLowThinking { get; private set; }
+        public bool GeminiOutputIsBounded { get; private set; }
+        public bool GroqUsesInstructMode { get; private set; }
+        public bool GroqOutputIsBounded { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
@@ -572,8 +580,21 @@ public sealed class SalesInvoiceCaptureContractTests
                 bothStarted.TrySetResult(true);
 
             await bothStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            var requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            var requestJson = JsonNode.Parse(requestBody)!;
+            var isGemini = request.RequestUri?.Host == "generativelanguage.googleapis.com";
+            if (isGemini)
+            {
+                GeminiUsesLowThinking = requestJson["generationConfig"]?["thinkingConfig"]?["thinkingLevel"]?.GetValue<string>() == "LOW";
+                GeminiOutputIsBounded = requestJson["generationConfig"]?["maxOutputTokens"]?.GetValue<int>() == 8192;
+            }
+            else
+            {
+                GroqUsesInstructMode = requestJson["reasoning_effort"]?.GetValue<string>() == "none";
+                GroqOutputIsBounded = requestJson["max_completion_tokens"]?.GetValue<int>() == 8192;
+            }
             var extraction = "{\"lines\":[{\"description\":\"Test item\",\"quantity\":1,\"amount\":100}]}";
-            var body = request.RequestUri?.Host == "generativelanguage.googleapis.com"
+            var body = isGemini
                 ? "{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":[{\"text\":\"" +
                     extraction.Replace("\"", "\\\"", StringComparison.Ordinal) +
                     "\"}]}}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":14}}"
