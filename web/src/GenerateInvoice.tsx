@@ -905,7 +905,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
                     <option value="imei">IMEI</option><option value="barcode">Barcode</option><option value="part_number">Part number</option>
                   </select>
                   <small className="invoice-extraction-provenance">
-                    {candidate.fieldState === 'source_read' ? 'Read from bill' :
+                    {candidate.confirmed ? 'Confirmed by you' :
+                      candidate.fieldState === 'source_read' ? 'Read from bill' :
                       candidate.fieldState === 'user_entered' ? 'Entered by you' :
                       candidate.fieldState === 'user_corrected' ? 'Corrected by you' :
                       candidate.fieldState === 'not_present' ? 'Not present on source bill' :
