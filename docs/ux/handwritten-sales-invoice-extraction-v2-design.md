@@ -486,8 +486,9 @@ The previously reported Anthropic HTTP 400 with an empty response body has not y
 
 ### Remaining engineering gaps
 
-- OCR alignment currently covers labelled invoice number/date/total header rows; physical product-row alignment, row omission/merge/extra-row detection and line-level OCR disagreement handling still need implementation.
-- Targeted Hydrogen verification currently covers the three critical header fields; line-level critical conflicts need a grounded crop/label strategy before being enabled.
+- OCR alignment now covers labelled invoice number/date/printed TOTAL fields and ordered product-description matching against Cloud Vision rows, including up to three wrapped OCR rows, normalized token overlap, source geometry and per-line conflict warnings.
+- Targeted Hydrogen verification covers critical header fields and matched product-description conflicts using original-image crops only; the verifier receives field labels but no primary proposal or OCR transcript. Verification is bounded to five distinct targets per invoice.
+- Remaining OCR gap: detect likely physical product rows present in Cloud Vision but omitted entirely by the primary extraction. The current alignment can flag extracted rows that do not match OCR, but cannot yet prove recall for rows the primary model omitted. Quantity/rate/amount/identifier-column geometry alignment also remains.
 - Add integration coverage for tenant-isolated evidence retrieval, document-to-sale atomicity, discard and idempotent replay.
 - Verify candidate field provenance and correction behaviour across all extracted fields.
 - Complete exact-head code CI, full Playwright journeys, responsive screenshots/contact sheets, visual review and Axe WCAG 2 A/AA. Native Android camera/gallery/keyboard/TalkBack remain separate real-device acceptance.
