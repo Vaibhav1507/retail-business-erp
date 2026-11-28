@@ -271,6 +271,34 @@ public sealed class SalesInvoiceCaptureContractTests
             issue.Message.Contains("needs a selling rate greater than zero", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("invoiceNumber", "Invoice No. 00454", "00454")]
+    [InlineData("date", "Date: 06/11/2026", "06/11/2026")]
+    [InlineData("total", "TOTAL ₹10,020 10,000", "10,020")]
+    public void OcrHeaderValue_ExtractsValueAfterExactLabel(string field, string row, string expected)
+    {
+        Assert.Equal(expected, SalesInvoiceCaptureService.ExtractOcrHeaderValue(field, row));
+    }
+
+    [Fact]
+    public void OcrTotalLabel_DoesNotTreatSubtotalAsPrintedTotal()
+    {
+        Assert.False(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "SUBTOTAL ₹10,020"));
+        Assert.True(SalesInvoiceCaptureService.IsOcrHeaderLabelRow("total", "TOTAL ₹10,020"));
+    }
+
+    [Theory]
+    [InlineData("invoiceNumber", "00454", "454", true)]
+    [InlineData("invoiceNumber", "00454", "40054", false)]
+    [InlineData("date", "2026-11-06", "06/11/2026", true)]
+    [InlineData("date", "2026-11-06", "06/12/2026", false)]
+    [InlineData("total", "10020", "10,020", true)]
+    [InlineData("total", "10020", "10,000", false)]
+    public void OcrHeaderComparison_UsesExactNormalizedFieldValues(string field, string primary, string candidate, bool expected)
+    {
+        Assert.Equal(expected, SalesInvoiceCaptureService.CompareOcrHeaderValue(field, primary, candidate));
+    }
+
     [Fact]
     public void NormalizeForReview_DoesNotGuessNotPresentWhenNullRateHasNoExplicitSourceState()
     {
