@@ -240,7 +240,14 @@ public sealed class SalesInvoiceCaptureService(
             if (providerNeedsReview)
                 warnings.Add("A backup reader was used. Check every extracted field against the original bill before continuing.");
 
-            ApplyIndependentOcrEvidence(extraction, independentOcr, degradedOcrText, warnings);
+            var verificationTargets = new List<SalesInvoiceVerificationTarget>();
+            ApplyIndependentOcrEvidence(extraction, independentOcr, degradedOcrText, warnings, verificationTargets);
+            if (verificationTargets.Count > 0 && !string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]))
+            {
+                var verification = await VerifyCriticalFieldsAsync(mime, bytes, verificationTargets, ct);
+                if (verification is not null)
+                    ApplyVerificationCandidates(extraction, verification);
+            }
 
             var lines = extraction["lines"] as JsonArray ?? [];
             if (parsed is not null && lines.Count == 0)
@@ -434,7 +441,8 @@ public sealed class SalesInvoiceCaptureService(
         JsonObject extraction,
         SalesInvoiceOcrResult? cloud,
         string? degradedOcrText,
-        List<string> warnings)
+        List<string> warnings,
+        List<SalesInvoiceVerificationTarget> verificationTargets)
     {
         var fields = new JsonObject();
         var text = cloud?.Text ?? degradedOcrText ?? "";
@@ -456,14 +464,23 @@ public sealed class SalesInvoiceCaptureService(
             var agrees = value is null || row is null ||
                 ComparableText(row.Text).Contains(ComparableText(value), StringComparison.Ordinal);
             var state = ReadString(extraction["fieldStates"]?[field]) ?? (value is null ? "unreadable" : "source_read");
+            var region = row is null ? null : GetNormalizedRegion(row);
             fields[field] = new JsonObject
             {
                 ["status"] = agrees ? state : "ambiguous",
                 ["haikuOrPrimaryReading"] = value,
                 ["ocrCandidate"] = row is null ? null : Clip(row.Text, 180),
                 ["ocrAgrees"] = row is null ? (bool?)null : agrees,
-                ["pageNumber"] = row?.PageNumber
+                ["pageNumber"] = row?.PageNumber,
+                ["region"] = region is null ? null : new JsonObject
+                {
+                    ["left"] = region.Left, ["top"] = region.Top,
+                    ["width"] = region.Width, ["height"] = region.Height
+                }
             };
+            if (row is not null && row.Words is { Length: > 0 } &&
+                (!agrees || state is "ambiguous" or "unreadable"))
+                verificationTargets.Add(new SalesInvoiceVerificationTarget(field, row));
             if (!agrees)
             {
                 extraction["fieldStates"]![field] = "ambiguous";
@@ -480,7 +497,9 @@ public sealed class SalesInvoiceCaptureService(
             degradedOcrText is not null ? "TesseractDegraded" : "Unavailable";
     }
 
-    sealed record OcrEvidenceRow(int PageNumber, string Text, SalesInvoiceOcrWord[]? Words);
+    sealed record OcrEvidenceRow(int PageNumber, string Text, SalesInvoiceOcrWord[]? Words, int PageWidth, int PageHeight);
+    sealed record SalesInvoiceVerificationTarget(string Field, OcrEvidenceRow Row);
+    sealed record NormalizedRegion(double Left, double Top, double Width, double Height);
 
     static OcrEvidenceRow[] BuildOcrRows(SalesInvoiceOcrResult result) =>
         result.Pages.SelectMany(page =>
@@ -489,8 +508,22 @@ public sealed class SalesInvoiceCaptureService(
                 .OrderBy(group => group.Key)
                 .Select(group => new OcrEvidenceRow(page.PageNumber,
                     string.Join(' ', group.OrderBy(word => word.Left).Select(word => word.Text)),
-                    group.ToArray())))
+                    group.ToArray(), page.Width, page.Height)))
             .ToArray();
+
+    static NormalizedRegion? GetNormalizedRegion(OcrEvidenceRow row)
+    {
+        if (row.Words is not { Length: > 0 } || row.PageWidth <= 0 || row.PageHeight <= 0) return null;
+        var left = row.Words.Min(word => word.Left);
+        var top = row.Words.Min(word => word.Top);
+        var right = row.Words.Max(word => word.Left + word.Width);
+        var bottom = row.Words.Max(word => word.Top + word.Height);
+        return new NormalizedRegion(
+            Math.Clamp((double)left / row.PageWidth, 0, 1),
+            Math.Clamp((double)top / row.PageHeight, 0, 1),
+            Math.Clamp((double)Math.Max(1, right - left) / row.PageWidth, 0, 1),
+            Math.Clamp((double)Math.Max(1, bottom - top) / row.PageHeight, 0, 1));
+    }
 
     static OcrEvidenceRow? FindLabelledRow(IEnumerable<OcrEvidenceRow> rows, IEnumerable<string> labels) =>
         rows.FirstOrDefault(row =>
