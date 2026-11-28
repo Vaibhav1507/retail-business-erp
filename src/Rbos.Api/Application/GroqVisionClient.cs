@@ -53,13 +53,34 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
 
         var batches = images.Chunk(3).ToArray();
         var partials = await Task.WhenAll(batches.Select(batch =>
-            CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct)));
+            CallAsync(batch, prompt + " These are consecutive pages from the same invoice. Extract all line items visible in these pages. The final page may contain the grand total.", ct, apiKey, model)));
         return MergeInvoicePageResults(partials);
     }
 
-    public async Task<JsonNode?> ExtractInvoiceAsync(IReadOnlyList<(string Mime, byte[] Bytes)> pages, string prompt, CancellationToken ct)
+    public Task<JsonNode?> ExtractInvoiceAsync(
+        IReadOnlyList<(string Mime, byte[] Bytes)> pages, string prompt, CancellationToken ct) =>
+        ExtractInvoiceCoreAsync(pages, prompt, cfg["Groq:ApiKey"], Model, ct);
+
+    /// <summary>
+    /// Explicit-credential overload used by the handwritten sales-invoice free-tier fallback.
+    /// It cannot accidentally fall back to the general Groq:ApiKey or a different model.
+    /// </summary>
+    public Task<JsonNode?> ExtractInvoiceAsync(
+        IReadOnlyList<(string Mime, byte[] Bytes)> pages,
+        string prompt,
+        string freeTierApiKey,
+        string freeTierModel,
+        CancellationToken ct) =>
+        ExtractInvoiceCoreAsync(pages, prompt, freeTierApiKey, freeTierModel, ct);
+
+    async Task<JsonNode?> ExtractInvoiceCoreAsync(
+        IReadOnlyList<(string Mime, byte[] Bytes)> pages,
+        string prompt,
+        string? apiKey,
+        string model,
+        CancellationToken ct)
     {
-        if (!Available || pages.Count is 0 or > 6) return null;
+        if (string.IsNullOrWhiteSpace(apiKey) || pages.Count is 0 or > 6) return null;
         var images = new List<string>();
         foreach (var (mime, bytes) in pages)
         {
@@ -185,9 +206,14 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
         }
     }
 
-    async Task<JsonNode?> CallAsync(IReadOnlyList<string> images, string prompt, CancellationToken ct)
+    async Task<JsonNode?> CallAsync(
+        IReadOnlyList<string> images,
+        string prompt,
+        CancellationToken ct,
+        string? apiKeyOverride = null,
+        string? modelOverride = null)
     {
-        var key = cfg["Groq:ApiKey"];
+        var key = apiKeyOverride ?? cfg["Groq:ApiKey"];
         if (string.IsNullOrWhiteSpace(key)) return null;
 
         var content = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = prompt } };
@@ -202,7 +228,7 @@ public sealed class GroqVisionClient(HttpClient http, IConfiguration cfg, ILogge
 
         var body = new JsonObject
         {
-            ["model"] = Model,
+            ["model"] = modelOverride ?? Model,
             ["temperature"] = 0,
             ["response_format"] = new JsonObject { ["type"] = "json_object" },
             ["messages"] = new JsonArray
