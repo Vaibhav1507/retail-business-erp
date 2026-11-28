@@ -950,10 +950,10 @@ public sealed class SalesInvoiceCaptureService(
         var lines = new JsonArray();
         if (source?["lines"] is JsonArray sourceLines)
         {
-            foreach (var item in sourceLines.OfType<JsonObject>().Take(100))
+            foreach (var item in sourceLines.OfType<JsonObject>())
             {
                 var line = new JsonObject();
-                line["description"] = ClipVerbatim(ReadVerbatimString(item["description"]), 2_000);
+                line["description"] = ClipVerbatim(ReadVerbatimString(item["description"]), 10_000);
                 foreach (var (key, max) in new[] { ("brand", 80), ("model", 100), ("hsn", 12) })
                     line[key] = Clip(ReadString(item[key]), max);
 
@@ -966,6 +966,11 @@ public sealed class SalesInvoiceCaptureService(
                     line[key] = SafeNumber(item[key], 100_000_000m);
                 line["fieldStates"] = NormalizeFieldStates(item["fieldStates"], item,
                     "description", "brand", "model", "hsn", "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount");
+                // The source Rate and RBOS selling price have different provenance.
+                // A blank source Rate stays null/not_present; the operator enters the
+                // selling price separately in the existing invoice flow.
+                line["sellingPrice"] = ReadDecimal(line["unitPrice"]);
+                line["sellingPriceProvenance"] = ReadString(line["fieldStates"]?["unitPrice"]) ?? "unreadable";
                 var confidence = SafeNumber(item["confidence"], 1m);
                 line["confidence"] = confidence is >= 0 and <= 1 ? confidence : null;
                 line["fieldConfidence"] = NormalizeFieldConfidence(
