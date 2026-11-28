@@ -278,7 +278,7 @@ public sealed class SalesInvoiceCaptureContractTests
             {
                 ["description"] = description,
                 ["quantity"] = 1,
-                ["unitPrice"] = 100,
+                ["unitPrice"] = 100m,
                 ["fieldStates"] = new JsonObject
                 {
                     ["description"] = "source_read",
