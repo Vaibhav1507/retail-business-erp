@@ -236,7 +236,7 @@ public sealed class SalesInvoiceCaptureService(
             string? degradedOcrText = null;
             if (independentOcr is null)
             {
-                degradedOcrText = await ReadLocalOcrFallbackAsync(mime, bytes, budgetToken);
+                degradedOcrText = await ReadLocalOcrFallbackAsync(mime, bytes, budgetToken, ct);
             }
 
             var warnings = new List<string>();
@@ -250,7 +250,7 @@ public sealed class SalesInvoiceCaptureService(
             ApplyIndependentOcrEvidence(extraction, independentOcr, degradedOcrText, warnings, verificationTargets);
             if (verificationTargets.Count > 0 && !string.IsNullOrWhiteSpace(cfg["Gemini:ApiKey"]))
             {
-                var verification = await VerifyCriticalFieldsAsync(mime, bytes, verificationTargets, budgetToken);
+                var verification = await VerifyCriticalFieldsAsync(mime, bytes, verificationTargets, budgetToken, ct);
                 if (verification is not null)
                     ApplyVerificationCandidates(extraction, verification);
             }
@@ -390,10 +390,10 @@ public sealed class SalesInvoiceCaptureService(
         return null;
     }
 
-    async Task<string?> ReadLocalOcrFallbackAsync(string mime, byte[] original, CancellationToken ct)
+    async Task<string?> ReadLocalOcrFallbackAsync(string mime, byte[] original, CancellationToken budgetToken, CancellationToken requestToken)
     {
         if (!localOcr.Available) return null;
-        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
         var timeoutMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceLocalOcrTimeoutMs", 1_500), 250, 1_500);
         budget.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
         var images = new List<byte[]>();
@@ -426,9 +426,9 @@ public sealed class SalesInvoiceCaptureService(
             if (combined.Length > 5_000) combined = combined[..5_000];
             return string.IsNullOrWhiteSpace(combined) ? null : combined;
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
         {
-            log.LogDebug("Degraded local OCR exceeded its {TimeoutMs}ms bound.", timeoutMs);
+            log.LogDebug("Degraded local OCR exceeded its {TimeoutMs}ms bound or the total request deadline.", timeoutMs);
             return null;
         }
         catch (Exception error) when (error is not OperationCanceledException and not OutOfMemoryException)
@@ -507,7 +507,8 @@ public sealed class SalesInvoiceCaptureService(
         string mime,
         byte[] original,
         IReadOnlyList<SalesInvoiceVerificationTarget> targets,
-        CancellationToken cancellationToken)
+        CancellationToken budgetToken,
+        CancellationToken requestToken)
     {
         var apiKey = cfg["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey)) return null;
@@ -572,7 +573,7 @@ public sealed class SalesInvoiceCaptureService(
         var timer = Stopwatch.StartNew();
         try
         {
-            using var requestBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var requestBudget = CancellationTokenSource.CreateLinkedTokenSource(budgetToken);
             requestBudget.CancelAfter(TimeSpan.FromSeconds(5));
             using var request = new HttpRequestMessage(HttpMethod.Post,
                 $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model)}:generateContent");
@@ -601,9 +602,9 @@ public sealed class SalesInvoiceCaptureService(
                 SafeTokenCount(usage?["candidatesTokenCount"]), timer.ElapsedMilliseconds);
             return result;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
         {
-            log.LogWarning("Targeted Gemini sales-invoice verification timed out. Model {Model}.", model);
+            log.LogWarning("Targeted Gemini sales-invoice verification timed out or the total request deadline expired. Model {Model}.", model);
             return null;
         }
         catch (HttpRequestException error)
