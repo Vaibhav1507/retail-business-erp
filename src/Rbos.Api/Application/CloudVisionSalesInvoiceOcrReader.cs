@@ -32,7 +32,7 @@ public interface ISalesInvoiceOcrReader
 /// </summary>
 public sealed class CloudVisionSalesInvoiceOcrReader(
     IConfiguration configuration,
-    ILogger<CloudVisionSalesInvoiceOcrReader> logger) : ISalesInvoiceOcrReader, IDisposable
+    ILogger<CloudVisionSalesInvoiceOcrReader> logger) : ISalesInvoiceOcrReader
 {
     readonly Lazy<ImageAnnotatorClient> client = new(ImageAnnotatorClient.Create);
     readonly int maxPages = Math.Clamp(configuration.GetValue("CloudVision:SalesInvoiceMaxPages", 6), 1, 6);
@@ -139,8 +139,4 @@ public sealed class CloudVisionSalesInvoiceOcrReader(
         return new SalesInvoiceOcrPage(pageNumber, page.Width, page.Height, words);
     }
 
-    public void Dispose()
-    {
-        if (client.IsValueCreated) client.Value.Dispose();
-    }
 }
