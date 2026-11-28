@@ -57,6 +57,10 @@ public static class SalesInvoiceCaptureEndpoints
                             userId, tenantId.Value, mime, bytes,
                             request.Headers["X-Source-File-Name"].ToString(), ct);
                     }
+                    catch (InvalidDataException)
+                    {
+                        return Fail(400, "The uploaded file does not match its image or PDF format.");
+                    }
                     catch (Exception error) when (error is Npgsql.PostgresException or Npgsql.NpgsqlException or InvalidOperationException or ArgumentException)
                     {
                         log.LogError("Could not retain a handwritten sales bill. Error type {ErrorType}.", error.GetType().Name);
