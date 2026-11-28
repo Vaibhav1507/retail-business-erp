@@ -541,3 +541,53 @@ The current V2 remains limited to the synchronous handwritten customer sales-bil
 7. Keep Android camera/gallery, keyboard and TalkBack as real-device acceptance.
 8. Do not merge or deploy without explicit authorisation.
 
+
+
+## 18. Free-tier-only fallback policy — final decision (2026-11-28)
+
+### Model and billing hierarchy
+
+Claude Haiku 5.5 remains the routine primary AI reader for every bill, using the already purchased Anthropic credit after its secure integration gate passes. **No paid model may be used as a verifier or provider fallback.** Cloud Vision remains independent OCR and has its own free monthly allowance, with potential charges if that allowance is exceeded.
+
+| Role | Provider/model | Billing policy | Required guard |
+|---|---|---|---|
+| Primary reader | Claude Haiku 5.5 | Existing Anthropic credit / paid API | Haiku live-integration gate; one transient retry |
+| Independent OCR | Google Cloud Vision DOCUMENT_TEXT_DETECTION | First 1,000 document-text units/month free; then billable | Bounded pages, timeout and usage telemetry |
+| Conditional verifier | Gemini 4 Hydrogen | Gemini Developer API Free Tier project only | Dedicated key and enable switch; targeted source crops by default |
+| Haiku outage fallback | Gemini 4 Hydrogen | Same Free Tier project only | Whole-document use requires a separate privacy opt-in, disabled by default |
+| Last-resort AI fallback | Groq Qwen 3.8 27B Vision | Groq Free Tier organization only | Dedicated key, explicit enable switch; always NeedsReview |
+| Degraded OCR | Local Tesseract | Local execution; no model-token fee | Only when Cloud Vision is unavailable |
+
+Hydrogen and Qwen 3.8 are not separate 'free model editions'; the model is accessed under a provider account/project's Free Tier quotas and limits. The API does not guarantee no-charge use if a key belongs to a paid Developer project/account. Provider account tier must be verified in the console before a dedicated Free Tier key is placed in Secret Manager.
+
+Google's Gemini Developer API Free Tier may use submitted content to improve Google products. Targeted Hydrogen verification therefore receives only the minimum original-image region and field label, not Haiku's reading or the OCR transcript. The whole-document Hydrogen fallback is separately controlled by `Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled`, false by default; enable it only after the business owner explicitly accepts the Free Tier data-use terms. Do not include customer name/mobile fields in targeted crops when the source-region geometry permits excluding them.
+
+Groq Qwen 3.8 27B Vision is a multimodal text+image model with JSON output support, but is a Preview/last-resort path. The published per-token rate applies to the billed Developer tier, not the no-cost Free Tier quota. Groq Free Tier calls must use a key from a Groq Free Tier organization; quota/rate-limit exhaustion is a hard stop. Groq reports inference inputs/outputs are not retained by default, with limited temporary retention possible for reliability/abuse investigations.
+
+### Dedicated configuration — no reuse of general/paid credentials
+
+- `Gemini:SalesInvoiceFreeTierEnabled=true` plus secret `Gemini:SalesInvoiceFreeTierApiKey` enables targeted Hydrogen verification.
+- `Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled=true` is a separate opt-in for sending the whole bill to Hydrogen during a Haiku outage. It is false by default.
+- `Groq:SalesInvoiceFreeTierEnabled=true` plus secret `Groq:SalesInvoiceFreeTierApiKey` enables the fixed `qwen/qwen3.8-27b` last-resort reader.
+- The handwritten sales route deliberately ignores general `Gemini:ApiKey`, `Groq:ApiKey`, `Groq:Model` and legacy invoice fallback toggles. Other RBOS features retain their existing configuration.
+- A free-tier 429/quota-exhaustion or billing/permission error does not trigger a paid key/model. Preserve the draft and allow manual review or entry.
+- The application cannot inspect a provider account's billing plan via these generation requests. Dedicated secrets must be sourced from provider consoles verified as Free Tier. No production secrets or settings are changed by this PR.
+
+### Code guardrails now implemented
+
+- Dedicated Free Tier key + explicit enable switch are required for both sales fallbacks.
+- Hydrogen is pinned to `gemini-4-hydrogen`; an arbitrary paid Gemini model cannot be injected through sales-invoice settings.
+- Full-document Hydrogen fallback needs the additional privacy opt-in.
+- Groq is pinned to `qwen/qwen3.8-27b` and takes an explicit key/model override; the generic Groq client paths retain their existing behaviour.
+- Unit tests verify general keys alone do not enable the fallbacks, dedicated credentials and switches are both required, and the full-document Gemini path is separately gated.
+
+### Effective provider order
+
+1. Haiku reads the original image/PDF (once the secure live integration check passes; otherwise retain the current safe Hydrogen/manual contingency).
+2. Cloud Vision reads independently in parallel.
+3. Hydrogen verifies critical conflicting source crops only, using the dedicated Free Tier credential and blind to earlier answers/OCR.
+4. If Haiku is unavailable, Hydrogen may read the full original bill only when the separate data-use opt-in is enabled; otherwise do not send the whole document to Google's Free Tier.
+5. Groq Qwen 3.8 Vision Free Tier is the final AI fallback, always NeedsReview.
+6. Tesseract is only the degraded OCR fallback when Cloud Vision is unavailable.
+
+No paid Gemini/Groq fallback is permitted. Haiku is the only intended paid AI model usage. Cloud Vision can become billable after its free monthly allowance; track that separately.
