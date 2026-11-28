@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using SkiaSharp;
 
 namespace Rbos.Api.Application;
@@ -470,16 +471,19 @@ public sealed class SalesInvoiceCaptureService(
         {
             var row = FindLabelledRow(rows, labels);
             var value = ReadString(extraction[field]);
-            var agrees = value is null || row is null ||
-                ComparableText(row.Text).Contains(ComparableText(value), StringComparison.Ordinal);
+            var ocrCandidate = row is null ? null : ExtractOcrHeaderValue(field, row.Text);
+            var agreement = row is null ? (bool?)null : CompareOcrHeaderValue(field, value, ocrCandidate);
+            var agrees = agreement ?? true;
             var state = ReadString(extraction["fieldStates"]?[field]) ?? (value is null ? "unreadable" : "source_read");
+            var unresolved = row is not null && (!agrees || ocrCandidate is null || state is "ambiguous" or "unreadable");
             var region = row is null ? null : GetNormalizedRegion(row);
             fields[field] = new JsonObject
             {
-                ["status"] = agrees ? state : "ambiguous",
+                ["status"] = unresolved ? "ambiguous" : state,
                 ["haikuOrPrimaryReading"] = value,
-                ["ocrCandidate"] = row is null ? null : Clip(row.Text, 180),
-                ["ocrAgrees"] = row is null ? (bool?)null : agrees,
+                ["ocrCandidate"] = ocrCandidate,
+                ["ocrLine"] = row is null ? null : Clip(row.Text, 240),
+                ["ocrAgrees"] = agreement,
                 ["pageNumber"] = row?.PageNumber,
                 ["region"] = region is null ? null : new JsonObject
                 {
@@ -487,17 +491,16 @@ public sealed class SalesInvoiceCaptureService(
                     ["width"] = region.Width, ["height"] = region.Height
                 }
             };
-            if (row is not null && row.Words is { Length: > 0 } &&
-                (!agrees || state is "ambiguous" or "unreadable"))
+            if (row is not null && row.Words is { Length: > 0 } && unresolved)
                 verificationTargets.Add(new SalesInvoiceVerificationTarget(field, row));
-            if (!agrees)
+            if (unresolved)
             {
                 extraction["fieldStates"]![field] = "ambiguous";
                 warnings.Add(field switch
                 {
-                    "invoiceNumber" => "The invoice-number reading does not agree with the text near the labelled bill-number field. Check it against the original.",
-                    "date" => "The date reading needs checking against the labelled Date field.",
-                    _ => "The printed TOTAL field has a competing OCR reading. Check the boxed total, not nearby annotations."
+                    "invoiceNumber" => "The invoice-number reading needs confirmation against the labelled bill-number field.",
+                    "date" => "The date reading needs confirmation against the labelled Date field.",
+                    _ => "The printed TOTAL field has a competing or unreadable OCR value. Check the boxed total, not nearby annotations."
                 });
             }
         }
@@ -770,11 +773,75 @@ public sealed class SalesInvoiceCaptureService(
     }
 
     static OcrEvidenceRow? FindLabelledRow(IEnumerable<OcrEvidenceRow> rows, IEnumerable<string> labels) =>
-        rows.FirstOrDefault(row =>
+        rows.FirstOrDefault(row => labels.Any(label => IsOcrHeaderLabelRow(label, row.Text)));
+
+    public static bool IsOcrHeaderLabelRow(string fieldOrLabel, string rowText)
+    {
+        var pattern = fieldOrLabel switch
         {
-            var normalized = ComparableText(row.Text);
-            return labels.Any(label => normalized.Contains(ComparableText(label), StringComparison.Ordinal));
-        });
+            "invoiceNumber" or "invoice no" or "invoice number" or "bill no" or "bill number" =>
+                @"\b(?:invoice|bill)\s*(?:no\.?|number)\b",
+            "date" => @"\b(?:date|dated)\b",
+            "total" or "grand total" => @"\b(?:grand\s+)?total\b",
+            _ => @"(?!)"
+        };
+        return Regex.IsMatch(rowText, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    public static string? ExtractOcrHeaderValue(string field, string rowText)
+    {
+        var pattern = field switch
+        {
+            "invoiceNumber" => @"\b(?:invoice|bill)\s*(?:no\.?|number)\s*[:#\-]?\s*(?<value>[A-Z0-9][A-Z0-9/\-]*)",
+            "date" => @"\b(?:date|dated)\s*[:#\-]?\s*(?<value>(?:\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}))",
+            "total" => @"\b(?:grand\s+)?total\b\s*[:#\-]?\s*(?:₹|rs\.?\s*)?(?<value>\d[\d,]*(?:\.\d{1,2})?)",
+            _ => null
+        };
+        if (pattern is null) return null;
+        var match = Regex.Match(rowText, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success ? match.Groups["value"].Value.Trim() : null;
+    }
+
+    public static bool? CompareOcrHeaderValue(string field, string? primary, string? ocrCandidate)
+    {
+        if (ocrCandidate is null) return null;
+        if (string.IsNullOrWhiteSpace(primary)) return false;
+
+        if (field == "date")
+        {
+            static DateOnly? ParseDate(string value)
+            {
+                var formats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "yyyy/MM/dd" };
+                return DateOnly.TryParseExact(value.Trim(), formats, CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var date) ? date : null;
+            }
+            var first = ParseDate(primary);
+            var second = ParseDate(ocrCandidate);
+            return first.HasValue && second.HasValue
+                ? first.Value == second.Value
+                : string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
+        }
+
+        if (field == "total")
+        {
+            static decimal? ParseAmount(string value)
+            {
+                var normalized = value.Replace(",", "", StringComparison.Ordinal)
+                    .Replace("₹", "", StringComparison.Ordinal)
+                    .Replace("Rs.", "", StringComparison.OrdinalIgnoreCase)
+                    .Trim();
+                return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount)
+                    ? amount : null;
+            }
+            var first = ParseAmount(primary);
+            var second = ParseAmount(ocrCandidate);
+            return first.HasValue && second.HasValue
+                ? first.Value == second.Value
+                : string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
+        }
+
+        return string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
+    }
 
     static string ComparableText(string value) =>
         new(value.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
