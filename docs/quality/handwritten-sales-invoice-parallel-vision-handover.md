@@ -85,7 +85,8 @@ Out of scope:
 - Updated SalesInvoiceCaptureContractTests for existing-key reuse behind explicit flags.
 - Added tests for ignoring obsolete dedicated keys and configurable paid model overrides.
 - Added tests for provider selection priority (Haiku → Gemini → Groq), comparison output privacy, unavailable comparisons, prompt version, peer-consensus diagnostics and bounded low-reasoning provider request settings.
-- Added a service-level concurrency test using a barrier HTTP handler; it asserts Gemini and Groq both start before either provider response is released.
+- Added a service-level concurrency test using a barrier HTTP handler; it asserts Gemini and Groq both start before either provider response is released and receive byte-for-byte identical prompt text.
+- Multi-page context is part of the shared prompt; the sales Groq path no longer appends a provider-specific instruction.
 - Added explicit handling for provider refusal responses so one reader's refusal cannot fail the complete parallel extraction.
 - Removed obsolete OCR-reconciliation-specific tests.
 - appsettings.json now has Gemini:SalesInvoiceShadowEnabled=false, Groq:SalesInvoiceShadowEnabled=false and AiPerformance:SalesInvoiceShadowAttemptTimeoutSeconds=10. No secrets are committed.
@@ -142,7 +143,7 @@ Before creating the PR, review these points carefully:
 
 1. Fetch the exact current branch head and compare it to base main.
 2. Review the full diff, especially SalesInvoiceCaptureService, GroqVisionClient call contract, tests and appsettings.
-3. Draft PR #125 is open. Latest PR head is cde2d7ed233884cea022024f3ede1ded56fa32fa (documentation-only after code commit f72563e250b4cbb042f3a4c185bbb8b07afee667). CI run #1552 is queued on that exact code commit; run #1532 passed backend, frontend and PostgreSQL integration on an earlier code commit. Latest grouped visual audit run #485 is in progress. The visual audit has a known baseline failure: run #463 on the PR #124 base commit 5e7c451 failed the same invoice-import visual test because the current UI did not render the expected accessible image named “Original handwritten customer sales bill, page 1”. The same assertion failed in our branch's run #465; its screenshot was inspected. This predates this branch and is not caused by the extraction backend change. Do not change UI scope to fix it here. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173764389 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173764317; baseline visual run: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46158997046.
+3. Draft PR #125 is open. Latest PR head is 738f51e20fe08d5e1da4e0cb695618ce0bc04b1b. CI run #1552 is currently validating code commit f72563e250b4cbb042f3a4c185bbb8b07afee667; later code commits add the shared-prompt equality assertion and remove the Groq-only prompt suffix, so those latest changes still need exact-head validation. Run #1532 passed backend, frontend and PostgreSQL integration on an earlier code commit. Latest grouped visual audit run #485 is in progress. The visual audit has a known baseline failure: run #463 on the PR #124 base commit 5e7c451 failed the same invoice-import visual test because the current UI did not render the expected accessible image named “Original handwritten customer sales bill, page 1”. The same assertion failed in our branch's run #465; its screenshot was inspected. This predates this branch and is not caused by the extraction backend change. Do not change UI scope to fix it here. Run URLs: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173764389 and https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46173764317; baseline visual run: https://github.com/Vaibhav1507/retail-business-erp/actions/runs/46158997046.
 4. Fix every exact-head CI failure; do not merge on a stale green run.
 5. Review the concurrency test and cancellation paths after CI; add targeted coverage if a specific gap remains.
 6. Run Gemini and Groq synthetic/redacted smoke tests only after verifying their existing accounts and Free-tier model availability. Keep real Gemini customer data disabled until explicit data-use approval.
@@ -172,6 +173,10 @@ Before creating the PR, review these points carefully:
 - a55ccefeb64b1b1cad3e2c14d4e0a44ce5d5fb81 — isolate unexpected provider exceptions while preserving external cancellation.
 - cd090f4a9455f558e5e480da8ee6dd0f5f3a206a — include prompt version in comparison response and logs.
 - f72563e250b4cbb042f3a4c185bbb8b07afee667 — remove the now-unused Cloud Vision sales reader DI registration.
+- 266e67ab96e1fc1d508c0ce706b8702c71d7f624 — assert the exact shared prompt is sent to Gemini and Groq.
+- 626f991c9ac0c6246f2c76ff9db75e434830d2a3 — include multi-page bill context in the shared prompt.
+- 5757b3df68a0edc45f584972e178f33f1e7df8c6 — remove Groq's sales-only prompt suffix so the semantic prompt is identical.
+- 738f51e20fe08d5e1da4e0cb695618ce0bc04b1b — make the shared-prompt assertion null-safe.
 - Documentation commits after code implementation: a293caa, 792ed03, 0089a65, c13cc8e, de11f0d, 827510b and 1f63a06 (full SHAs are available in Git history).
 
-Current PR head at the latest handover update: cde2d7ed233884cea022024f3ede1ded56fa32fa (documentation-only update after code commit f72563e250b4cbb042f3a4c185bbb8b07afee667).
+Current PR head at the latest handover update: 738f51e20fe08d5e1da4e0cb695618ce0bc04b1b (code commit includes the shared-prompt test).
