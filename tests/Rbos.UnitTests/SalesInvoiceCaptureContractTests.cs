@@ -45,6 +45,25 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void SalesInvoiceHydrogenFullDocumentFallback_RequiresExplicitFreeTierDataUseSwitch()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Gemini:ApiKey"] = "general-paid-key",
+            ["Gemini:SalesInvoiceFreeTierApiKey"] = "dedicated-free-key",
+            ["Gemini:SalesInvoiceFreeTierEnabled"] = "true"
+        }).Build();
+
+        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+
+        configuration["Gemini:SalesInvoiceFreeTierFullDocumentFallbackEnabled"] = "true";
+        Assert.True(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+
+        configuration["Gemini:SalesInvoiceFreeTierEnabled"] = "false";
+        Assert.False(SalesInvoiceCaptureService.IsSalesInvoiceGeminiFullDocumentFallbackEnabled(configuration));
+    }
+
+    [Fact]
     public void NormalizeForReview_PreservesVerbatimDescriptionAndKeepsLegacySerialUnconfirmed()
     {
         var source = JsonNode.Parse("""
