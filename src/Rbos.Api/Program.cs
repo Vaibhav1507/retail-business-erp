@@ -98,6 +98,8 @@ builder.Services.AddScoped<Rbos.Api.Application.ProductLookupCoordinator>();
 builder.Services.AddScoped<Rbos.Api.Application.ProcurementService>();
 builder.Services.AddScoped<Rbos.Api.Application.DocumentIntakeService>();
 builder.Services.AddSingleton<Rbos.Api.Application.LocalOcr>();
+builder.Services.AddHttpClient<Rbos.Api.Application.AnthropicHaikuClient>(h => h.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton<Rbos.Api.Application.ISalesInvoiceOcrReader, Rbos.Api.Application.CloudVisionSalesInvoiceOcrReader>();
 builder.Services.AddHttpClient("AiGateway.Gemini", h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddHttpClient("AiGateway.Groq", h => h.Timeout = TimeSpan.FromSeconds(90));
 builder.Services.AddSingleton<Rbos.Api.Application.AiGatewayCredentialPool>();
