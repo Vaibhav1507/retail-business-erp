@@ -97,6 +97,7 @@ builder.Services.AddScoped<Rbos.Api.Application.ExternalBarcodeLookupCache>();
 builder.Services.AddScoped<Rbos.Api.Application.ProductLookupCoordinator>();
 builder.Services.AddScoped<Rbos.Api.Application.ProcurementService>();
 builder.Services.AddScoped<Rbos.Api.Application.DocumentIntakeService>();
+builder.Services.AddScoped<Rbos.Api.Application.SalesInvoiceEvidenceService>();
 builder.Services.AddSingleton<Rbos.Api.Application.LocalOcr>();
 builder.Services.AddHttpClient<Rbos.Api.Application.AnthropicHaikuClient>(h => h.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<Rbos.Api.Application.ISalesInvoiceOcrReader, Rbos.Api.Application.CloudVisionSalesInvoiceOcrReader>();
