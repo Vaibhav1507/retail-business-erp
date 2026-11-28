@@ -312,7 +312,7 @@ public static class DocumentEndpoints
     static async Task<IResult> GetPage(
         Guid id,
         int pageNumber,
-        bool preview,
+        bool preview = false,
         ClaimsPrincipal principal,
         TenantDb db,
         CancellationToken ct)
@@ -338,6 +338,8 @@ public static class DocumentEndpoints
         var content = (byte[])reader[0];
         var contentType = reader.GetString(1);
         var sourceKind = reader.GetString(3);
+        await reader.CloseAsync();
+        await session.CommitAsync(ct);
 
         // Sales review can request a visual preview of a retained PDF page. Render it
         // with the same PdfPageReader used by OCR so the Cloud Vision word geometry
@@ -348,10 +350,10 @@ public static class DocumentEndpoints
             CryptographicOperations.ZeroMemory(content);
             return rendered is null
                 ? Results.UnprocessableEntity()
-                : Results.File(rendered, "image/png");
+                : Results.Bytes(rendered, "image/png");
         }
 
-        return Results.File(content, contentType);
+        return Results.Bytes(content, contentType);
     }
 
     static bool CanReadDirection(string? role, string direction)
