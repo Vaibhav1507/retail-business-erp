@@ -205,7 +205,7 @@ Approved combined specification: [handwritten sales invoice extraction V2](./han
 - Cloud Vision product-description alignment is implemented in source order, allowing up to three adjacent OCR rows for wrapped handwriting. It records match status, OCR candidate text and source geometry; low/no-match descriptions become ambiguous and can be sent for targeted blind Hydrogen verification. It does not yet prove detection of rows omitted entirely by the primary model.
 - Provenance statuses and identifier candidates are normalized. AI-proposed serials do not populate the sale serial collection; operator confirmation is required. IMEI Luhn validation runs only for candidates classified as IMEI.
 - Original bills are retained by `SalesInvoiceEvidenceService` through migration-058 document/page tables without invoking `DocumentIntakeService.UploadAsync` or the generic worker.
-- Migration 060 creates the sales-document link. `SalesPosting` validates tenant/RLS-visible document ownership, Sale direction, HandwrittenBill source kind and NeedsReview status, then links and marks it Posted inside the normal sale transaction.
+- Migration 061 creates the sales-document link. `SalesPosting` validates tenant/RLS-visible document ownership, Sale direction, HandwrittenBill source kind and NeedsReview status, then links and marks it Posted inside the normal sale transaction.
 - Generate Invoice now presents the retained original, source-region markers, competing readings and editable review. The normal sale confirmation remains the only posting path.
 
 ### Fixes completed during continuation
@@ -217,7 +217,7 @@ Approved combined specification: [handwritten sales invoice extraction V2](./han
 - Upload MIME/signature is validated before source evidence is persisted, avoiding orphan evidence for unsupported/corrupt files.
 - Updated field correction provenance and UI presentation of the independent verification candidate.
 - Kept the handwritten source Rate separate from RBOS selling price. Only a `source_read` rate may prefill selling price; blank, unreadable or ambiguous source rates remain null and require a separate operator-entered sale price. The sale-line price now uses only `sellingPrice`, never a fallback to source `unitPrice`.
-- Added migration 061 and raised the bounded sale-line description limit from 240 to 10,000 characters. Without this, the existing domain/database rule rejected long wrapped handwriting even though extraction preserved it. Unit and Playwright coverage now verifies the complete long description survives into the posted sale line; no price, stock or accounting rules changed.
+- Added migration 062 and raised the bounded sale-line description limit from 240 to 10,000 characters. Without this, the existing domain/database rule rejected long wrapped handwriting even though extraction preserved it. Unit and Playwright coverage now verifies the complete long description survives into the posted sale line; no price, stock or accounting rules changed.
 - Expanded the in-scope Playwright journey to phone/tablet/landscape/desktop viewport and full-page captures, keyboard focus, scrolled state, Axe WCAG 2 A/AA, horizontal overflow, touch-target counts and console/server error reporting. It exercises source-bill correction and posts through the normal sale confirmation with the retained source document ID.
 - Added focused tests for OCR header extraction/comparison and null-rate provenance. Updated frontend mocks to reflect source-document IDs and operator-confirmed identifiers.
 
@@ -265,7 +265,7 @@ The Haiku activation gate remains `Anthropic:SalesInvoiceIntegrationValidated=fa
 ### Concrete issues to close in PR #120
 
 1. **Anthropic integration:** the historical HTTP 400 with empty body remains unresolved. The client and mocked request-contract tests exist, but no live non-production API check has passed. Keep the activation flag false until that single secure validation succeeds.
-2. **Migration numbering:** PR #120 currently adds `060_sales_handwritten_invoice_evidence_link.sql` and `061_verbatim_sale_line_description_length.sql`; `main` already has a different migration numbered 060. Rename the V2 files to the next free sequential numbers (061 and 062), update references, then rerun PostgreSQL integration.
+2. **Migration numbering — corrected on the feature branch:** `061_sales_handwritten_invoice_evidence_link.sql` and `062_verbatim_sale_line_description_length.sql` now follow `main`'s existing `060_password_reset_email_otp.sql`. PostgreSQL integration must pass again on the resulting exact head.
 3. **Visual acceptance:** identify the exact low-contrast node from the Axe results, correct the relevant token/state, and rerun the in-scope Playwright/Axe journey. Inspect actual screenshots/contact sheets, not just CI status.
 4. **Branch freshness:** synchronize the feature branch with current main and re-run relevant checks on the new exact head.
 5. **Extraction completeness:** ordered description-to-OCR alignment and possible-omitted-row warnings exist, but row recall and quantity/rate/amount/identifier-column geometry still need verification against independently labelled bills. Never auto-create a line from an OCR-only candidate.
