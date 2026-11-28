@@ -119,6 +119,47 @@ public sealed class SalesInvoiceCaptureContractTests
     }
 
     [Fact]
+    public void ProviderCandidateDifferences_ShowMismatchedBusinessFieldsButExcludeCustomerFields()
+    {
+        var haiku = JsonNode.Parse("""
+            {
+              "customerName": "Private Customer",
+              "customerPhone": "9999999999",
+              "invoiceNumber": "00454",
+              "total": 17500,
+              "lines": [{
+                "description": "Voltas Beko WM",
+                "quantity": 1,
+                "amount": 17500
+              }]
+            }
+            """)!;
+        var gemini = JsonNode.Parse("""
+            {
+              "customerName": "Another Private Customer",
+              "customerPhone": "8888888888",
+              "invoiceNumber": "00454",
+              "total": 17000,
+              "lines": [{
+                "description": "Voltas Beko WPM",
+                "quantity": 1,
+                "amount": 17500
+              }]
+            }
+            """)!;
+
+        var differences = SalesInvoiceCaptureService.BuildProviderCandidateDifferences(haiku, gemini, null);
+        var json = differences.ToJsonString();
+
+        Assert.Contains("total", json, StringComparison.Ordinal);
+        Assert.Contains("lines[0].description", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("customerName", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("customerPhone", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private Customer", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("9999999999", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void HaikuPeerAssessment_DetectsWhenBothShadowReadersAgreeAgainstHaiku()
     {
         static JsonObject Comparison(params string[] fields) => new()
