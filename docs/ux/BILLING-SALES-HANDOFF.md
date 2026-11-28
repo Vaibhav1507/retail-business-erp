@@ -239,3 +239,57 @@ The earlier PR #119 Visual Audit failure was a five-minute timeout in the existi
 ### Explicit status
 
 Prototype: not applicable. Repository design specification: approved. Implementation: in progress in Draft PR #120. Automated tests: pending exact-head CI. Visual acceptance: pending. Real-device acceptance: pending. User acceptance: pending. Merge: not authorised. Production deployment: not authorised. No production GCP/IAM changes have been made.
+
+
+## 2026-11-28 continuation — provider ordering, OCR and mobile-photo intake
+
+### Provider-order correction
+
+The product direction is now **free-tier VLM pool first → Haiku as first paid fallback → optional second paid model only after Haiku fails**. This replaces the earlier Haiku-first idea. The current implementation still needs this refactor; it currently tries Haiku first when validated, then only Gemini Hydrogen, then optional Groq.
+
+Existing `VisionProviderFallback.SalesInvoiceGeminiModels` and tests define the Gemini free-tier sequence: `gemini-4-hydrogen`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`. Implement a sales-specific free-first sequence and do not add a paid call until all eligible free attempts fail their structured-output/quality gate. Use independent calls on the same source image; do not prime one model with another model's answer. Keep Groq outside the free tier unless its current account quota/credit status is verified.
+
+**Privacy gate:** Google's current Gemini Developer API pricing page says Free Tier content may be used to improve Google's products, while Paid Tier content is not used for that purpose. Shop invoices can contain customer names and mobile numbers. Do not send unredacted production invoices to a free-tier model until the business owner explicitly accepts the data-use terms or an approved redaction/privacy design is implemented. Free does not mean private or unlimited.
+
+Haiku remains gated by `Anthropic:SalesInvoiceIntegrationValidated=false` until a secure non-production integration test is completed. A second paid model is not selected or enabled. Keep explicit provider budgets, usage/cost telemetry and no-payload/no-PII logging.
+
+### OCR decision
+
+Google Cloud Vision `DOCUMENT_TEXT_DETECTION` is the stronger primary handwriting OCR choice over Tesseract. Google's documentation explicitly supports handwriting and returns page/block/paragraph/word structure and geometry. Tesseract's own FAQ says handwriting does not work well because it is designed for printed text.
+
+A third-party 2026 benchmark reported 84.5% word F1 for Google Cloud Vision on 172 handwritten notes versus 13.1% for Tesseract 5.5.1. The benchmark publisher also tested its own commercial AI system, and the sample is not RBOS electronics invoices; treat this as directional only. RBOS must evaluate exact characters, row recall and column values on its 11 source bills before claiming accuracy.
+
+Cloud Vision has the first 1,000 Document Text Detection units free each month and then $1.50 per 1,000 units at the next tier; every PDF page counts as an image unit. It remains a distinct OCR cost line, not a free multimodal model. Tesseract stays a degraded fallback only.
+
+### Mobile image handling audit
+
+The V2 sales-upload route does **not** currently normalize large camera photos:
+- Browser and API both cap the file at 8 MB; the database page constraint is also 8 MB.
+- SalesInvoiceCapture uploads the selected JPEG/PNG/WebP/PDF as-is; no resize/compression, HEIC conversion, pixel cap or EXIF-orientation normalization is present.
+- A mobile photo over 8 MB is rejected; it is not automatically compressed.
+- A compressed file below 8 MB can still have large pixel dimensions.
+- The existing supplier-invoice `InvoiceUpload.tsx` routine accepts an image up to 24 MB, scales its longest side to 1,800 px and encodes JPEG at quality 0.85 (maximum prepared file 8 MB). That is a reference implementation, not yet validated for handwritten sales bills, and its retained image is the processed JPEG rather than a bit-exact original.
+
+Recommended next step: reuse/extract the supplier image-preparation utility, compare 1,800 px with a higher resolution on the handwritten corpus, normalize orientation, enforce a pixel/decode budget and a bounded sales-upload concurrency gate. If the raw oversized original must be retained unchanged, add access-controlled object storage rather than raising PostgreSQL bytea and Cloud Run memory limits blindly. Label normalized evidence honestly; do not call a lossy derivative an unchanged original.
+
+### Done / in progress / pending
+
+**Done**
+- Conservative possible-omitted-row detection and source-region review cues added; candidates are warnings, never automatically posted.
+- Authorization classification and test added for the sales handwritten-bill discard route.
+- Optional PDF preview parameter order fixed after CI exposed CS1737.
+- Documentation now records provider order, privacy caveat, OCR comparison and mobile image intake findings.
+
+**In progress**
+- Latest code CI passed at `1470631e`: frontend, backend and PostgreSQL integration jobs all succeeded.
+- Visual audit at `1470631e` failed because the test used `toContainText` for an input value. The trace confirms `SN12345678` is present in the textbox; assertion now uses `toHaveValue`. Fresh visual verification at the new exact head is pending.
+
+**Pending**
+1. Refactor handwritten sales extraction to use the free Gemini model pool before Haiku; decide and configure any second paid model only after the free/Haiku tiers.
+2. Apply the privacy gate for Gemini Free Tier use with real customer-bearing invoices.
+3. Reuse/extend image normalization for sales capture and validate handwriting fidelity, orientation, dimensions, concurrency and memory.
+4. Complete quantity/rate/amount/identifier column geometry alignment and score row recall against verified labels; possible omitted-row warnings are implemented, but recall is not proven.
+5. Complete provenance and field-correction coverage, then exact-head Playwright/Axe and visual screenshot inspection.
+6. Native Android camera/gallery, keyboard and TalkBack remain real-device acceptance checks.
+
+**Release state:** design addendum recorded; implementation remains in Draft PR #120. No merge or production deployment authorised.
