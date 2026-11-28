@@ -112,7 +112,7 @@ The known example of a blank source Rate cell becoming a populated unit price de
 - Use strict structured output via the provider's supported schema/tool mechanism and validate the response again server-side. Do not assume prompt-only JSON is a schema guarantee.
 - Keep prompt and schema versioned. Record the exact model ID, usage token counts, latency and result state.
 - Keep the Anthropic key in Secret Manager-backed runtime configuration only. Never expose it to the browser, repo, logs or screenshots.
-- A previous direct API smoke attempt returned HTTP 400 with an empty response body even for a minimal text request. The cause remains unresolved. The Haiku adapter must pass one secure integration smoke check in CI/non-production before rollout; do not burn the credit on blind repeated attempts. This is an integration gate, not a model-comparison exercise.
+- The manually gated single-call Anthropic integration smoke test passed on 2026-11-28 using one synthetic invoice image (GitHub Actions run 46143498825). This validates the direct Messages API request/response contract and configured `claude-haiku-5-5` model for that synthetic case. Production runtime secret injection and Cloud Run configuration remain separate release steps; keep `Anthropic:SalesInvoiceIntegrationValidated=false` until the production secret binding is verified and the deployed revision is intentionally configured.
 
 Current published Haiku 5.5 Claude Platform price for prompts up to 100K tokens is $0.10 per million input tokens and $0.50 per million output tokens. Actual per-bill cost must use provider-reported token usage, including image tokens. Do not hard-code the rates as an immutable truth.
 
