@@ -112,7 +112,7 @@ The known example of a blank source Rate cell becoming a populated unit price de
 - Use strict structured output via the provider's supported schema/tool mechanism and validate the response again server-side. Do not assume prompt-only JSON is a schema guarantee.
 - Keep prompt and schema versioned. Record the exact model ID, usage token counts, latency and result state.
 - Keep the Anthropic key in Secret Manager-backed runtime configuration only. Never expose it to the browser, repo, logs or screenshots.
-- The manually gated single-call Anthropic integration smoke test passed on 2026-11-28 using one synthetic invoice image (GitHub Actions run 46143498825). This validates the direct Messages API request/response contract and configured `claude-haiku-5-5` model for that synthetic case. Production runtime secret injection and Cloud Run configuration remain separate release steps; keep `Anthropic:SalesInvoiceIntegrationValidated=false` until the production secret binding is verified and the deployed revision is intentionally configured.
+- The manually gated single-call Anthropic integration smoke test passed on 2026-11-28 using one synthetic invoice image (GitHub Actions run 46143498825). This validates the direct Messages API request/response contract and configured `claude-haiku-5-5` model for that synthetic case. Production runtime secret injection and Cloud Run configuration remain separate release steps; configure the Anthropic API key through Secret Manager before enabling the Haiku-first production revision.
 
 Current published Haiku 5.5 Claude Platform price for prompts up to 100K tokens is $0.10 per million input tokens and $0.50 per million output tokens. Actual per-bill cost must use provider-reported token usage, including image tokens. Do not hard-code the rates as an immutable truth.
 
@@ -480,7 +480,7 @@ Implementation is in PR #120, branch `feat/handwritten-sales-invoice-extraction-
 
 ### Anthropic smoke result and production activation gate
 
-The one explicitly authorised synthetic-image Haiku smoke call succeeded on 2026-11-28 (GitHub Actions run `46143498825`) using model `claude-haiku-5-5`. This verifies that single synthetic Messages API request; it does not verify production Cloud Run secret injection or runtime configuration. Keep `Anthropic:SalesInvoiceIntegrationValidated=false` in production until the Anthropic key is provisioned through Secret Manager to the Cloud Run runtime identity and the production configuration is verified. Never place credentials in chat or Git.
+The one explicitly authorised synthetic-image Haiku smoke call succeeded on 2026-11-28 (GitHub Actions run `46143498825`) using model `claude-haiku-5-5`. This verifies that single synthetic Messages API request; it does not verify production Cloud Run secret injection or runtime configuration. Provision the Anthropic key through Secret Manager to the Cloud Run runtime identity before deploying the Haiku-first configuration. Never place credentials in chat or Git.
 
 ### Remaining engineering gaps
 
@@ -512,7 +512,7 @@ The approved product decision is **Claude Haiku 5.5 as the routine primary AI re
 
 Do not fan out across several multimodal models for each invoice. Do not call a free model before Haiku. Do not use an unapproved free-tier cloud model on real customer invoices. Google's Gemini Developer API pricing currently says Free Tier content may be used to improve Google products, whereas Paid Tier content is not used for that purpose. Real RBOS invoices can contain customer names, phone numbers and commercial information. For real documents, use provider terms approved for this data; a free API tier is only eligible for synthetic/de-identified development data after the data-use decision is accepted. A locally hosted model may be assessed separately in a future scope, not inserted into this V2 chain.
 
-The code keeps `Anthropic:SalesInvoiceIntegrationValidated=false` by default until one secure non-production live integration check succeeds. After that validation, Haiku becomes the routine primary. Until then, Gemini 4 Hydrogen remains the temporary runtime primary; this safety gate does not change the final architecture.
+The code uses Haiku whenever `Anthropic:ApiKey` is available; there is no manual validation flag. After that validation, Haiku becomes the routine primary. Until then, Gemini 4 Hydrogen remains the temporary runtime primary; this safety gate does not change the final architecture.
 
 ### Current engineering status at the verified PR #120 head
 
@@ -545,11 +545,11 @@ The current V2 remains limited to the synchronous handwritten customer sales-bil
 
 ### Model and billing hierarchy
 
-Claude Haiku 5.5 remains the routine primary AI reader for every bill, using the already purchased Anthropic credit after its secure integration gate passes. **No paid model may be used as a verifier or provider fallback.** Cloud Vision remains independent OCR and has its own free monthly allowance, with potential charges if that allowance is exceeded.
+Claude Haiku 5.5 remains the routine primary AI reader for every bill, using the configured Anthropic API credential. **No paid model may be used as a verifier or provider fallback.** Cloud Vision remains independent OCR and has its own free monthly allowance, with potential charges if that allowance is exceeded.
 
 | Role | Provider/model | Billing policy | Required guard |
 |---|---|---|---|
-| Primary reader | Claude Haiku 5.5 | Existing Anthropic credit / paid API | Haiku live-integration gate; one transient retry |
+| Primary reader | Claude Haiku 5.5 | Existing Anthropic credit / paid API | Anthropic Secret Manager credential; one transient retry |
 | Independent OCR | Google Cloud Vision DOCUMENT_TEXT_DETECTION | First 1,000 document-text units/month free; then billable | Bounded pages, timeout and usage telemetry |
 | Conditional verifier | Gemini 4 Hydrogen | Gemini Developer API Free Tier project only | Dedicated key and enable switch; targeted source crops by default |
 | Haiku outage fallback | Gemini 4 Hydrogen | Same Free Tier project only | Whole-document use requires a separate privacy opt-in, disabled by default |
