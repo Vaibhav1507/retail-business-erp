@@ -425,3 +425,13 @@ Visual/UI acceptance: not in scope; Generate Invoice UI is unchanged.
 Merge: not authorised. Production deployment/configuration: not authorised.
 
 The step-by-step code/test/CI continuation ledger is maintained in [handwritten sales invoice parallel vision handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md). New chats should read that handover before making further changes.
+
+
+### Inference-token and latency controls
+
+The shared prompt is the only natural-language instruction sent per provider. Avoid separate reasoning or explanation prompts. Provider-specific inference settings are deliberately bounded for structured extraction:
+
+- Haiku uses the existing 8,192-token output cap.
+- Gemini 4 Hydrogen uses LOW thinking and an 8,192-token output cap; Hydrogen defaults to HIGH thinking, so LOW is selected for structured metadata extraction and lower latency/token use.
+- Groq Qwen 3.8 27B uses instruct mode with reasoning_effort none and an 8,192-token completion cap.
+- These settings are experimental controls, not assumed accuracy improvements. Keep them fixed during the first benchmark run, then change only with a versioned experiment and verified gold-label comparison.
