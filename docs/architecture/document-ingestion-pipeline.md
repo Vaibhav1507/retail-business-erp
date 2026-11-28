@@ -288,3 +288,10 @@ Defer exhaustive parser permutations, every arithmetic branch, all provider fail
 ## 6. Non-goals for this architecture stage
 
 No schema migration, new provider, credential/configuration change, AI Gateway change, live provider request, production data operation, production migration or deployment is part of WP0. The current docs are a proposed design contract, not proof of implementation.
+
+
+## 7. Current sales-bill extraction implementation update — 2026-11-28
+
+The historical sales extraction baseline in Section 1.1 predates the merged handwritten invoice V2 implementation and the subsequent parallel-vision experiment. For the current sales route, use [the V2 design](../ux/handwritten-sales-invoice-extraction-v2-design.md) and [parallel vision handover](../quality/handwritten-sales-invoice-parallel-vision-handover.md) as the current source of truth.
+
+The approved temporary experiment runs Haiku 5.5, Gemini 4 Hydrogen and Groq Qwen 3.8 27B in parallel on the same original source. Haiku remains primary; Gemini and Groq are independent shadow readers and review-required fallbacks. One concise versioned prompt is used per provider. Cloud Vision/Tesseract are not part of the active sales-invoice extraction path during this experiment. The existing Generate Invoice review and normal sale-posting boundary remain unchanged.
