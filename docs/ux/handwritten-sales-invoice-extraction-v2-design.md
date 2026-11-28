@@ -474,6 +474,8 @@ Implementation is isolated in Draft PR #120, branch `feat/handwritten-sales-invo
 - Fixed compile errors in JSON exception handling, review-issue list mutation and the Cloud Vision client lifecycle API.
 - Corrected provenance fallback: a null Rate with no explicit source state is now `unreadable`, not guessed as `not_present`. Only an explicit source `not_present` remains a blank source cell.
 - Replaced substring OCR matching with exact labelled-row parsing for invoice number, date and printed TOTAL. This avoids treating SUBTOTAL as TOTAL and reads the first printed total after the label (e.g. keeps 10,020 distinct from a later 10,000 annotation).
+- Kept source `unitPrice` (the handwritten Rate column) separate from RBOS `sellingPrice`. Only an explicitly `source_read` Rate may prefill the sale price; `not_present`, `unreadable` or `ambiguous` source rates leave selling price empty and require operator entry. Sale posting uses only the confirmed RBOS selling price, never a fallback to a blank/uncertain source Rate.
+- Expanded the Generate Invoice Playwright journey to capture viewport and full-page screenshots at phone, tablet, landscape and desktop sizes, with keyboard-focus/scrolled states, Axe WCAG 2 A/AA, overflow, touch-target, console and server-error reporting. The synthetic bill covers the ₹10,020 printed TOTAL versus separate ₹10,000 reading and explicit header correction before sale posting.
 - Added tests for labelled OCR extraction/comparison and the null-rate provenance distinction.
 - Updated UI correction provenance for header/line edits and exposed the targeted verifier reading separately from OCR evidence.
 
