@@ -132,6 +132,14 @@ public sealed class SalesInvoiceCaptureService(
             var haikuVsGemini = CompareProviderExtractions(haikuAttempt.Extraction, geminiAttempt.Extraction);
             var haikuVsGroq = CompareProviderExtractions(haikuAttempt.Extraction, groqAttempt.Extraction);
             var geminiVsGroq = CompareProviderExtractions(geminiAttempt.Extraction, groqAttempt.Extraction);
+            var haikuShadowConsensusDifferences =
+                FindShadowConsensusDifferences(haikuVsGemini, haikuVsGroq, geminiVsGroq);
+            var haikuPeerAssessment = GetHaikuPeerAssessment(
+                haikuAttempt.Extraction is not null,
+                geminiAttempt.Extraction is not null,
+                groqAttempt.Extraction is not null,
+                haikuVsGemini, haikuVsGroq, geminiVsGroq,
+                haikuShadowConsensusDifferences);
             var hasPeerDisagreement =
                 ComparisonMismatchCount(haikuVsGemini) > 0 ||
                 ComparisonMismatchCount(haikuVsGroq) > 0 ||
@@ -196,11 +204,11 @@ public sealed class SalesInvoiceCaptureService(
             var latencySloMs = Math.Clamp(cfg.GetValue("AiPerformance:SalesInvoiceLatencySloMs", 15_000), 1_000, 60_000);
             var haikuFallbackRequired = haikuAttempt.Extraction is null;
             log.LogInformation(
-                "Sales invoice parallel vision comparison. Haiku {HaikuStatus} {HaikuMs}ms; Gemini {GeminiStatus} {GeminiMs}ms; Groq {GroqStatus} {GroqMs}ms; selected {SelectedProvider}; Haiku fallback required {HaikuFallbackRequired}; peer disagreement {PeerDisagreement}; Haiku/Gemini mismatches {HaikuGeminiMismatchCount} [{HaikuGeminiMismatchFields}]; Haiku/Groq mismatches {HaikuGroqMismatchCount} [{HaikuGroqMismatchFields}]; Gemini/Groq mismatches {GeminiGroqMismatchCount} [{GeminiGroqMismatchFields}]; total {TotalMs}ms; trace {TraceId}",
+                "Sales invoice parallel vision comparison. Haiku {HaikuStatus} {HaikuMs}ms; Gemini {GeminiStatus} {GeminiMs}ms; Groq {GroqStatus} {GroqMs}ms; selected {SelectedProvider}; Haiku fallback required {HaikuFallbackRequired}; peer assessment {HaikuPeerAssessment}; shadow-consensus differences [{HaikuConsensusDifferences}]; peer disagreement {PeerDisagreement}; Haiku/Gemini mismatches {HaikuGeminiMismatchCount} [{HaikuGeminiMismatchFields}]; Haiku/Groq mismatches {HaikuGroqMismatchCount} [{HaikuGroqMismatchFields}]; Gemini/Groq mismatches {GeminiGroqMismatchCount} [{GeminiGroqMismatchFields}]; total {TotalMs}ms; trace {TraceId}",
                 haikuAttempt.Status, haikuAttempt.LatencyMs,
                 geminiAttempt.Status, geminiAttempt.LatencyMs,
                 groqAttempt.Status, groqAttempt.LatencyMs,
-                providerName, haikuFallbackRequired, hasPeerDisagreement,
+                providerName, haikuFallbackRequired, haikuPeerAssessment, string.Join(",", haikuShadowConsensusDifferences), hasPeerDisagreement,
                 ComparisonMismatchCount(haikuVsGemini), ComparisonMismatchSummary(haikuVsGemini),
                 ComparisonMismatchCount(haikuVsGroq), ComparisonMismatchSummary(haikuVsGroq),
                 ComparisonMismatchCount(geminiVsGroq), ComparisonMismatchSummary(geminiVsGroq),
@@ -573,6 +581,51 @@ public sealed class SalesInvoiceCaptureService(
             ["mismatchFieldCount"] = mismatches.Count,
             ["mismatchedFields"] = mismatches
         };
+    }
+
+    public static string[] FindShadowConsensusDifferences(
+        JsonObject haikuVsGemini, JsonObject haikuVsGroq, JsonObject geminiVsGroq)
+    {
+        static HashSet<string> Fields(JsonObject comparison) =>
+            (comparison["mismatchedFields"] as JsonArray ?? [])
+                .Select(ReadString)
+                .Where(value => value is not null)
+                .Select(value => value!)
+                .ToHashSet(StringComparer.Ordinal);
+
+        var haikuGemini = Fields(haikuVsGemini);
+        var haikuGroq = Fields(haikuVsGroq);
+        var geminiGroq = Fields(geminiVsGroq);
+        return haikuGemini.Intersect(haikuGroq, StringComparer.Ordinal)
+            .Except(geminiGroq, StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static string GetHaikuPeerAssessment(
+        bool haikuAvailable, bool geminiAvailable, bool groqAvailable,
+        JsonObject haikuVsGemini, JsonObject haikuVsGroq, JsonObject geminiVsGroq,
+        IReadOnlyCollection<string> shadowConsensusDifferences)
+    {
+        if (!haikuAvailable) return "haiku_unavailable";
+        if (geminiAvailable && groqAvailable)
+        {
+            if (ComparisonMismatchCount(haikuVsGemini) == 0 &&
+                ComparisonMismatchCount(haikuVsGroq) == 0 &&
+                ComparisonMismatchCount(geminiVsGroq) == 0)
+                return "three_way_agreement";
+            if (shadowConsensusDifferences.Count > 0)
+                return "haiku_differs_from_both_shadow_readers";
+            return "providers_disagree";
+        }
+        if (geminiAvailable || groqAvailable)
+        {
+            var comparison = geminiAvailable ? haikuVsGemini : haikuVsGroq;
+            return ComparisonMismatchCount(comparison) == 0
+                ? "haiku_agrees_with_available_shadow"
+                : "haiku_disagrees_with_available_shadow";
+        }
+        return "haiku_only_no_shadow_comparison";
     }
 
     static int ComparisonMismatchCount(JsonObject comparison) =>
