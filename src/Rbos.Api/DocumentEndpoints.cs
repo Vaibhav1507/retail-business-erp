@@ -312,6 +312,7 @@ public static class DocumentEndpoints
     static async Task<IResult> GetPage(
         Guid id,
         int pageNumber,
+        bool preview,
         ClaimsPrincipal principal,
         TenantDb db,
         CancellationToken ct)
@@ -324,7 +325,7 @@ public static class DocumentEndpoints
 
         await using var session = await db.BeginAsync(userId, tenantId, ct);
         await using var command = session.Command(@"
-            select p.content, p.content_type, d.direction
+            select p.content, p.content_type, d.direction, d.source_kind
               from documents.document_page p
               join documents.business_document d
                 on d.tenant_id = p.tenant_id and d.id = p.document_id
@@ -336,6 +337,20 @@ public static class DocumentEndpoints
         if (!CanReadDirection(role, reader.GetString(2))) return Results.NotFound();
         var content = (byte[])reader[0];
         var contentType = reader.GetString(1);
+        var sourceKind = reader.GetString(3);
+
+        // Sales review can request a visual preview of a retained PDF page. Render it
+        // with the same PdfPageReader used by OCR so the Cloud Vision word geometry
+        // maps to the displayed page; the authenticated original download stays intact.
+        if (preview && sourceKind == "HandwrittenBill" && contentType == "application/pdf")
+        {
+            var rendered = PdfPageReader.RenderPng(content, pageNumber);
+            CryptographicOperations.ZeroMemory(content);
+            return rendered is null
+                ? Results.UnprocessableEntity()
+                : Results.File(rendered, "image/png");
+        }
+
         return Results.File(content, contentType);
     }
 
