@@ -84,7 +84,7 @@ describe('GenerateInvoice WhatsApp independence', () => {
         extraction: {
           invoiceNumber: '468', date: '2026-11-20', customerName: 'Test Customer', customerPhone: '9876543210',
           subtotal: 10000, taxAmount: 0, total: 10000,
-          lines: [{ description: 'Samsung LED Television\nModel UA43\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'serial', confirmed: false }], hsn: '8528', quantity: 1, unitPrice: 10000, sellingPrice: 10000, sellingPriceProvenance: 'source_read', discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
+          lines: [{ description: 'Samsung LED Television\nModel UA43\nS/N SN12345678', brand: 'Samsung', model: 'UA43', serialNumbers: [], identifierCandidates: [{ value: 'SN12345678', classification: 'unknown', confirmed: false }], hsn: '8528', quantity: 1, unitPrice: null, fieldStates: { unitPrice: 'not_present' }, sellingPrice: null, sellingPriceProvenance: 'not_present', discount: 0, amount: 10000, gstRate: 0, gstAmount: 0, confidence: 0.9 }]
         }, warnings: [], reviewIssues: [{ field: 'unitPrice', lineIndex: 0, severity: 'warning', message: 'Check the unit price against the original bill.' }]
       }), { status: 200 })
       if (url === '/api/sales/invoice-image-extract/00000000-0000-0000-0000-000000000001/discard' && method === 'POST') return new Response(JSON.stringify({ documentId: '00000000-0000-0000-0000-000000000001', status: 'Cancelled' }), { status: 200 })
@@ -110,17 +110,17 @@ describe('GenerateInvoice WhatsApp independence', () => {
     expect(extractedDescription).toHaveValue('Samsung LED Television\nModel UA43\nS/N SN12345678')
     expect(extractedDescription).toHaveStyle({ resize: 'none', overflowY: 'hidden' })
     expect(screen.getByLabelText('Extracted line 1 serial numbers')).toHaveValue('')
-    expect(screen.getByLabelText('Item 1 identifier candidate 1')).toHaveValue('SN12345678')
-    expect(screen.getByLabelText('Confirm this reading')).not.toBeChecked()
+    expect(screen.queryByLabelText(/identifier candidate/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Confirm this reading')).not.toBeInTheDocument()
+    expect(screen.getByText('View original bill')).toBeInTheDocument()
+    expect(screen.getByText('No rate is written on the source bill. Enter your selling price.')).toBeInTheDocument()
     Object.defineProperty(extractedDescription, 'scrollHeight', { configurable: true, value: 120 })
     fireEvent.change(extractedDescription, { target: { value: 'Long handwritten product\nmodel and serial details' } })
     await waitFor(() => expect(extractedDescription.style.height).toBe('120px'))
     expect(screen.getByLabelText('Extracted line 1 quantity')).toHaveValue('1')
-    expect(screen.getByLabelText('Extracted line 1 unit price')).toHaveValue('10000')
-    expect(screen.getByText('Check the unit price against the original bill.')).toBeInTheDocument()
-    const unitPriceInput = screen.getByLabelText('Extracted line 1 unit price')
-    await userEvent.clear(unitPriceInput)
-    await userEvent.type(unitPriceInput, '10000')
+    expect(screen.getByLabelText('Extracted line 1 selling price')).toHaveValue('')
+    const sellingPriceInput = screen.getByLabelText('Extracted line 1 selling price')
+    await userEvent.type(sellingPriceInput, '10000')
     await waitFor(() => expect(screen.getByText('Check the unit price against the original bill.')).toBeInTheDocument())
     expect(container.querySelector('.invoice-product-editor')).not.toHaveAttribute('hidden')
     expect(container.querySelector('#billing-prod')?.closest('.billing-field')).toHaveAttribute('hidden')
