@@ -134,6 +134,8 @@ public sealed class SalesInvoiceCaptureService(
             var haikuVsGemini = CompareProviderExtractions(haikuAttempt.Extraction, geminiAttempt.Extraction);
             var haikuVsGroq = CompareProviderExtractions(haikuAttempt.Extraction, groqAttempt.Extraction);
             var geminiVsGroq = CompareProviderExtractions(geminiAttempt.Extraction, groqAttempt.Extraction);
+            var candidateDifferences = BuildProviderCandidateDifferences(
+                haikuAttempt.Extraction, geminiAttempt.Extraction, groqAttempt.Extraction);
             var haikuShadowConsensusDifferences =
                 FindShadowConsensusDifferences(haikuVsGemini, haikuVsGroq, geminiVsGroq);
             var haikuPeerAssessment = GetHaikuPeerAssessment(
@@ -474,6 +476,131 @@ public sealed class SalesInvoiceCaptureService(
 
     sealed record SalesInvoiceProviderAttempt(
         string Provider, string Model, string Status, JsonNode? Extraction, long LatencyMs);
+
+    public static JsonArray BuildProviderCandidateDifferences(
+        JsonNode? haiku, JsonNode? gemini, JsonNode? groq)
+    {
+        var differences = new JsonArray();
+        var hasHaiku = HasUsableLines(haiku);
+        var hasGemini = HasUsableLines(gemini);
+        var hasGroq = HasUsableLines(groq);
+        var availableCount = (hasHaiku ? 1 : 0) + (hasGemini ? 1 : 0) + (hasGroq ? 1 : 0);
+        if (availableCount < 2) return differences;
+
+        static string? NormalizeForComparison(JsonNode? value, bool numeric, bool date)
+        {
+            var text = ReadFieldValueText(value);
+            if (text is null) return null;
+            if (numeric && ReadDecimal(value) is { } number)
+                return number.ToString(CultureInfo.InvariantCulture);
+            if (date)
+            {
+                var formats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy", "yyyy/MM/dd" };
+                if (DateOnly.TryParseExact(text.Trim(), formats, CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsed))
+                    return parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+            return ComparableText(text);
+        }
+
+        void AddDifference(
+            string field, JsonNode? h, JsonNode? g, JsonNode? q,
+            bool numeric = false, bool date = false,
+            JsonNode? hState = null, JsonNode? gState = null, JsonNode? qState = null)
+        {
+            var normalized = new List<string?>();
+            if (hasHaiku) normalized.Add(NormalizeForComparison(h, numeric, date));
+            if (hasGemini) normalized.Add(NormalizeForComparison(g, numeric, date));
+            if (hasGroq) normalized.Add(NormalizeForComparison(q, numeric, date));
+
+            var states = new List<string?>();
+            if (hasHaiku) states.Add(ReadString(hState));
+            if (hasGemini) states.Add(ReadString(gState));
+            if (hasGroq) states.Add(ReadString(qState));
+
+            if (normalized.Distinct(StringComparer.Ordinal).Count() <= 1 &&
+                states.Distinct(StringComparer.Ordinal).Count() <= 1)
+                return;
+
+            var values = new JsonObject();
+            if (hasHaiku) values["haiku"] = h?.DeepClone();
+            if (hasGemini) values["gemini"] = g?.DeepClone();
+            if (hasGroq) values["groq"] = q?.DeepClone();
+
+            var provenance = new JsonObject();
+            if (hasHaiku && hState is not null) provenance["haiku"] = hState.DeepClone();
+            if (hasGemini && gState is not null) provenance["gemini"] = gState.DeepClone();
+            if (hasGroq && qState is not null) provenance["groq"] = qState.DeepClone();
+
+            differences.Add(new JsonObject
+            {
+                ["field"] = field,
+                ["values"] = values,
+                ["states"] = provenance
+            });
+        }
+
+        AddDifference("invoiceNumber", haiku?["invoiceNumber"], gemini?["invoiceNumber"], groq?["invoiceNumber"],
+            hState: haiku?["fieldStates"]?["invoiceNumber"],
+            gState: gemini?["fieldStates"]?["invoiceNumber"],
+            qState: groq?["fieldStates"]?["invoiceNumber"]);
+        AddDifference("date", haiku?["date"], gemini?["date"], groq?["date"], date: true,
+            hState: haiku?["fieldStates"]?["date"],
+            gState: gemini?["fieldStates"]?["date"],
+            qState: groq?["fieldStates"]?["date"]);
+        AddDifference("subtotal", haiku?["subtotal"], gemini?["subtotal"], groq?["subtotal"], numeric: true);
+        AddDifference("taxAmount", haiku?["taxAmount"], gemini?["taxAmount"], groq?["taxAmount"], numeric: true);
+        AddDifference("total", haiku?["total"], gemini?["total"], groq?["total"], numeric: true,
+            hState: haiku?["fieldStates"]?["total"],
+            gState: gemini?["fieldStates"]?["total"],
+            qState: groq?["fieldStates"]?["total"]);
+
+        var hLines = hasHaiku ? haiku!["lines"] as JsonArray ?? [] : [];
+        var gLines = hasGemini ? gemini!["lines"] as JsonArray ?? [] : [];
+        var qLines = hasGroq ? groq!["lines"] as JsonArray ?? [] : [];
+        if ((hasHaiku && hasGemini && hLines.Count != gLines.Count) ||
+            (hasHaiku && hasGroq && hLines.Count != qLines.Count) ||
+            (hasGemini && hasGroq && gLines.Count != qLines.Count))
+        {
+            var counts = new JsonObject();
+            if (hasHaiku) counts["haiku"] = hLines.Count;
+            if (hasGemini) counts["gemini"] = gLines.Count;
+            if (hasGroq) counts["groq"] = qLines.Count;
+            differences.Add(new JsonObject { ["field"] = "lines.count", ["values"] = counts });
+        }
+
+        var maxLines = Math.Max(hLines.Count, Math.Max(gLines.Count, qLines.Count));
+        var lineFields = new[]
+        {
+            ("description", false), ("brand", false), ("model", false), ("hsn", false),
+            ("quantity", true), ("unitPrice", true), ("discount", true), ("amount", true),
+            ("gstRate", true), ("gstAmount", true)
+        };
+        for (var index = 0; index < maxLines; index++)
+        {
+            var hLine = hasHaiku && index < hLines.Count ? hLines[index] as JsonObject : null;
+            var gLine = hasGemini && index < gLines.Count ? gLines[index] as JsonObject : null;
+            var qLine = hasGroq && index < qLines.Count ? qLines[index] as JsonObject : null;
+            foreach (var (field, numeric) in lineFields)
+                AddDifference(
+                    $"lines[{index}].{field}",
+                    hLine?[field], gLine?[field], qLine?[field], numeric,
+                    hState: hLine?["fieldStates"]?[field],
+                    gState: gLine?["fieldStates"]?[field],
+                    qState: qLine?["fieldStates"]?[field]);
+
+            static JsonNode? IdentifierValues(JsonObject? line)
+            {
+                var identifiers = line?["identifierCandidates"] as JsonArray;
+                return identifiers?.DeepClone();
+            }
+            AddDifference(
+                $"lines[{index}].identifierCandidates",
+                IdentifierValues(hLine), IdentifierValues(gLine), IdentifierValues(qLine));
+        }
+
+        return differences;
+    }
 
     public static string SelectSalesInvoiceProvider(bool haikuUsable, bool geminiUsable, bool groqUsable) =>
         haikuUsable ? "Anthropic" : geminiUsable ? "Gemini" : groqUsable ? "Groq" : "None";
