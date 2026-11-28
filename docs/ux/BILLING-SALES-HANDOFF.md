@@ -228,12 +228,12 @@ The earlier PR #119 Visual Audit failure was a five-minute timeout in the existi
 
 ### Remaining work
 
-1. Complete physical product-row OCR alignment, row omission/merge/extra-row detection and line-level conflict handling. The current OCR comparison is limited to labelled header fields.
-2. Extend targeted Hydrogen verification to line-level critical conflicts only where original OCR geometry supplies a grounded crop; never send proposed values or OCR text to the verifier.
-3. Add PostgreSQL integration tests for tenant-isolated evidence retrieval, atomic document-to-sale linking, discard and idempotent replay.
-4. Verify all field/candidate provenance, including user-entered versus user-corrected values.
-5. Run exact-head CI to completion, then full Generate Invoice Playwright journeys, responsive phone/tablet/landscape/desktop screenshots, visual inspection and Axe WCAG 2 A/AA.
-6. Keep native Android camera/gallery, keyboard and TalkBack checks as real-device acceptance.
+1. Add conservative detection for likely Cloud Vision product rows that the primary extraction omitted entirely. Current alignment flags extracted rows that fail to match OCR but cannot prove recall for completely omitted rows. Quantity/rate/amount/identifier-column geometry alignment also remains.
+2. Add PostgreSQL integration tests for tenant-isolated evidence retrieval, atomic document-to-sale linking, discard and idempotent replay. The initial source retention and posting path is implemented.
+3. Verify all field/candidate provenance, including user-entered versus user-corrected values, through the complete UI journey.
+4. Run exact-head CI to completion, then inspect full Generate Invoice Playwright journeys, responsive phone/tablet/landscape/desktop screenshots, scrolled/focus states and Axe WCAG 2 A/AA results.
+5. Keep native Android camera/gallery, keyboard and TalkBack checks as real-device acceptance.
+
 
 ### Explicit status
 
