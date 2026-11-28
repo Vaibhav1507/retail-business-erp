@@ -266,7 +266,7 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
     setItems(current => current.filter((_, i) => i !== index))
   }
 
-  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[] = [], documentId: string, sourceMime: string) {
+  function applySalesInvoiceDraft(draft: ExtractedSalesInvoice, warnings: string[], reviewIssues: SalesInvoiceReviewIssue[], documentId: string, sourceMime: string) {
     setSourceDocumentId(documentId)
     setSourceDocumentMime(sourceMime)
     setSalesInvoiceDraft(draft)
@@ -309,9 +309,16 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
         identifierCandidates: (line.identifierCandidates ?? []).map((candidate, indexOfCandidate) =>
           indexOfCandidate !== candidateIndex ? candidate : ({
             ...candidate,
-            [field]: field === 'confirmed' ? value : value,
+            [field]: field === 'confirmed'
+              ? Boolean(value)
+              : field === 'classification'
+                ? value as SalesInvoiceIdentifierCandidate['classification']
+                : String(value),
             ...(field === 'value' && typeof value === 'string'
               ? { luhnValid: candidate.classification === 'imei' ? validImei(value.trim()) : null }
+              : {}),
+            ...(field === 'classification' && value === 'imei'
+              ? { luhnValid: validImei(candidate.value.trim()) }
               : {})
           }))
       }))
@@ -764,8 +771,8 @@ export function GenerateInvoice({ products, locations, reload, offlineMode = fal
             <span className="invoice-extraction-count">{salesInvoiceDraft.lines.length} {salesInvoiceDraft.lines.length === 1 ? 'item' : 'items'}</span>
           </header>
           <div className="invoice-extraction-header-fields">
-            <label>Source bill number<input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
-            <label>Bill date<input aria-label="Source bill date" type="date" value={sourceInvoiceDate} onChange={e => { setSourceInvoiceDate(e.target.value); setDate(e.target.value); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'date')) }} />{salesInvoiceFieldIssue('date') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('date')}</small>}</label>
+            <label>Source bill number<input aria-label="Source bill number" value={sourceInvoiceRef} onChange={e => { setSourceInvoiceRef(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), invoiceNumber: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'invoiceNumber')) }} />{salesInvoiceFieldIssue('invoiceNumber') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('invoiceNumber')}</small>}</label>
+            <label>Bill date<input aria-label="Source bill date" type="date" value={sourceInvoiceDate} onChange={e => { setSourceInvoiceDate(e.target.value); setDate(e.target.value); setSalesInvoiceDraft(current => current ? { ...current, fieldStates: { ...(current.fieldStates ?? {}), date: 'user_corrected' } } : current); setSalesInvoiceReviewIssues(current => current.filter(issue => issue.field !== 'date')) }} />{salesInvoiceFieldIssue('date') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('date')}</small>}</label>
           </div>
           <p className="invoice-extraction-total">Handwritten total <strong>{salesInvoiceDraft.total != null ? `₹${money(salesInvoiceDraft.total)}` : 'Not read'}</strong><small>Compare this with the extracted line values before continuing.</small>{salesInvoiceFieldIssue('total') && <small className="invoice-extraction-field-warning">{salesInvoiceFieldIssue('total')}</small>}</p>
           {salesInvoiceWarnings.length > 0 && <ul className="invoice-extraction-warnings">{salesInvoiceWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
