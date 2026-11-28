@@ -495,7 +495,7 @@ public sealed class SalesInvoiceCaptureService(
                 }
             };
             if (row is not null && row.Words is { Length: > 0 } && unresolved)
-                verificationTargets.Add(new SalesInvoiceVerificationTarget(field, row));
+                verificationTargets.Add(new SalesInvoiceVerificationTarget(field, field, null, row));
             if (unresolved)
             {
                 extraction["fieldStates"]![field] = "ambiguous";
@@ -507,10 +507,125 @@ public sealed class SalesInvoiceCaptureService(
                 });
             }
         }
+        if (cloud is not null)
+            ApplyLineOcrEvidence(extraction["lines"] as JsonArray, rows, warnings, verificationTargets);
+        else if (extraction["lines"] is JsonArray degradedLines)
+        {
+            foreach (var item in degradedLines.OfType<JsonObject>())
+                item["ocrEvidence"] = new JsonObject { ["status"] = "unavailable" };
+        }
+
         extraction["ocrEvidence"] = fields;
         extraction["ocrSource"] = cloud is not null ? "CloudVision" :
             degradedOcrText is not null ? "TesseractDegraded" : "Unavailable";
     }
+
+    static void ApplyLineOcrEvidence(
+        JsonArray? lines,
+        OcrEvidenceRow[] rows,
+        List<string> warnings,
+        List<SalesInvoiceVerificationTarget> verificationTargets)
+    {
+        if (lines is null || rows.Length == 0) return;
+        var cursor = 0;
+        for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+        {
+            if (lines[lineIndex] is not JsonObject line) continue;
+            var description = ReadVerbatimString(line["description"]);
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                line["ocrEvidence"] = new JsonObject { ["status"] = "unreadable" };
+                continue;
+            }
+
+            var match = FindBestOcrDescriptionMatch(description, rows, cursor);
+            var candidate = match.Row;
+            var corroborated = candidate is not null && match.Score >= 0.55;
+            var conflict = candidate is not null && !corroborated;
+            var region = candidate is null ? null : GetNormalizedRegion(candidate);
+            line["ocrEvidence"] = new JsonObject
+            {
+                ["status"] = corroborated ? "corroborated" : conflict ? "ambiguous" : "not_correlated",
+                ["haikuOrPrimaryReading"] = ClipVerbatim(description, 800),
+                ["ocrCandidate"] = candidate is null ? null : Clip(candidate.Text, 600),
+                ["ocrAgrees"] = candidate is null ? (bool?)null : corroborated,
+                ["matchScore"] = match.Score,
+                ["pageNumber"] = candidate?.PageNumber,
+                ["region"] = region is null ? null : new JsonObject
+                {
+                    ["left"] = region.Left, ["top"] = region.Top,
+                    ["width"] = region.Width, ["height"] = region.Height
+                }
+            };
+
+            if (candidate is not null)
+            {
+                cursor = Math.Max(cursor, match.LastIndex + 1);
+                if (conflict && candidate.Words is { Length: > 0 })
+                    verificationTargets.Add(new SalesInvoiceVerificationTarget(
+                        "lineDescription" + lineIndex,
+                        $"Product row {lineIndex + 1} description",
+                        lineIndex,
+                        candidate));
+            }
+
+            if (conflict || candidate is null)
+            {
+                var states = line["fieldStates"] as JsonObject;
+                if (states is not null) states["description"] = "ambiguous";
+                warnings.Add(candidate is null
+                    ? $"Independent OCR could not confidently align product row {lineIndex + 1}. Check the complete handwritten description against the original bill."
+                    : $"Product row {lineIndex + 1} has a competing OCR reading. Confirm the complete description and its wrapped lines.");
+            }
+        }
+    }
+
+    static (OcrEvidenceRow? Row, int LastIndex, double Score) FindBestOcrDescriptionMatch(
+        string description,
+        OcrEvidenceRow[] rows,
+        int startIndex)
+    {
+        var expected = OcrTokens(description);
+        if (expected.Count == 0) return (null, startIndex, 0);
+        OcrEvidenceRow? bestRow = null;
+        var bestEnd = startIndex;
+        var bestScore = 0d;
+        var searchEnd = Math.Min(rows.Length, startIndex + 40);
+
+        for (var rowIndex = Math.Max(0, startIndex); rowIndex < searchEnd; rowIndex++)
+        {
+            var page = rows[rowIndex].PageNumber;
+            var combined = new List<OcrEvidenceRow>();
+            for (var length = 1; length <= 3 && rowIndex + length <= searchEnd; length++)
+            {
+                var row = rows[rowIndex + length - 1];
+                if (row.PageNumber != page) break;
+                combined.Add(row);
+                var candidateText = string.Join(' ', combined.Select(item => item.Text));
+                var candidateTokens = OcrTokens(candidateText);
+                var matches = expected.Count(token => candidateTokens.Contains(token));
+                var score = (double)matches / expected.Count;
+                if (score > bestScore)
+                {
+                    var words = combined.SelectMany(item => item.Words ?? []).ToArray();
+                    bestRow = new OcrEvidenceRow(page, candidateText, words,
+                        rows[rowIndex].PageWidth, rows[rowIndex].PageHeight);
+                    bestEnd = rowIndex + length - 1;
+                    bestScore = score;
+                }
+                if (bestScore >= 0.98) return (bestRow, bestEnd, bestScore);
+            }
+        }
+
+        return (bestScore >= 0.20 ? bestRow : null, bestEnd, bestScore);
+    }
+
+    static HashSet<string> OcrTokens(string value) =>
+        Regex.Matches(value.ToUpperInvariant(), @"[A-Z0-9]{2,}")
+            .Select(match => match.Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+
 
     async Task<JsonObject?> VerifyCriticalFieldsAsync(
         string mime,
@@ -522,9 +637,9 @@ public sealed class SalesInvoiceCaptureService(
         var apiKey = cfg["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(apiKey)) return null;
         var selected = targets
-            .Where(target => target.Field is "invoiceNumber" or "date" or "total")
+            .Where(target => target.Field is "invoiceNumber" or "date" or "total" || target.LineIndex.HasValue)
             .DistinctBy(target => target.Field)
-            .Take(3)
+            .Take(5)
             .ToArray();
         if (selected.Length == 0) return null;
 
@@ -733,7 +848,21 @@ public sealed class SalesInvoiceCaptureService(
             existing["verificationStatus"] = status;
             // Preserve the primary value and the disagreement. Verification supplies
             // another human-review candidate, never an automatic overwrite.
-            if (status != "source_read" || reading is null)
+            if (field.StartsWith("lineDescription", StringComparison.Ordinal) &&
+                int.TryParse(field["lineDescription".Length..], out var lineIndex) &&
+                extraction["lines"] is JsonArray lines &&
+                lineIndex >= 0 && lineIndex < lines.Count &&
+                lines[lineIndex] is JsonObject line)
+            {
+                var lineState = line["fieldStates"] as JsonObject;
+                var primaryDescription = ReadVerbatimString(line["description"]);
+                if (status != "source_read" || reading is null ||
+                    !HasDescriptionAgreement(primaryDescription, reading))
+                {
+                    if (lineState is not null) lineState["description"] = "ambiguous";
+                }
+            }
+            else if (status != "source_read" || reading is null)
                 extraction["fieldStates"]![field] = "ambiguous";
             else if (ReadString(extraction[field]) is not { } primary ||
                      !string.Equals(ComparableText(primary), ComparableText(reading), StringComparison.Ordinal))
@@ -748,7 +877,7 @@ public sealed class SalesInvoiceCaptureService(
     }
 
     sealed record OcrEvidenceRow(int PageNumber, string Text, SalesInvoiceOcrWord[]? Words, int PageWidth, int PageHeight);
-    sealed record SalesInvoiceVerificationTarget(string Field, OcrEvidenceRow Row);
+    sealed record SalesInvoiceVerificationTarget(string Field, string Label, int? LineIndex, OcrEvidenceRow Row);
     sealed record NormalizedRegion(double Left, double Top, double Width, double Height);
 
     static OcrEvidenceRow[] BuildOcrRows(SalesInvoiceOcrResult result) =>
@@ -844,6 +973,15 @@ public sealed class SalesInvoiceCaptureService(
         }
 
         return string.Equals(ComparableText(primary), ComparableText(ocrCandidate), StringComparison.Ordinal);
+    }
+
+    static bool HasDescriptionAgreement(string? primary, string verification)
+    {
+        if (string.IsNullOrWhiteSpace(primary)) return false;
+        var expected = OcrTokens(primary);
+        var actual = OcrTokens(verification);
+        if (expected.Count == 0 || actual.Count == 0) return false;
+        return (double)expected.Count(token => actual.Contains(token)) / expected.Count >= 0.55;
     }
 
     static string ComparableText(string value) =>
