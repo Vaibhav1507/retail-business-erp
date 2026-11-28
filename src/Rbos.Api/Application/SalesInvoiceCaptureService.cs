@@ -1456,9 +1456,14 @@ public sealed class SalesInvoiceCaptureService(
                         {
                             ["type"] = "string",
                             ["enum"] = new JsonArray("model", "serial", "imei", "barcode", "part_number", "unknown")
+                        },
+                        ["fieldState"] = new JsonObject
+                        {
+                            ["type"] = "string",
+                            ["enum"] = new JsonArray("source_read", "not_present", "unreadable", "ambiguous", "calculated", "user_entered", "user_corrected")
                         }
                     },
-                    ["required"] = Required("value", "classification"),
+                    ["required"] = Required("value", "classification", "fieldState"),
                     ["additionalProperties"] = false
                 }
             },
