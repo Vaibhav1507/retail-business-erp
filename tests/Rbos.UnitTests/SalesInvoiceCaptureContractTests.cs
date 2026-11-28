@@ -35,6 +35,7 @@ public sealed class SalesInvoiceCaptureContractTests
         var candidate = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(line["identifierCandidates"])));
         Assert.Equal("SN12345678", candidate["value"]!.GetValue<string>());
         Assert.Equal("unknown", candidate["classification"]!.GetValue<string>());
+        Assert.Equal("ambiguous", candidate["fieldState"]!.GetValue<string>());
         Assert.False(candidate["confirmed"]!.GetValue<bool>());
         Assert.Equal(17500m, line["amount"]!.GetValue<decimal>());
     }
@@ -65,6 +66,7 @@ public sealed class SalesInvoiceCaptureContractTests
         Assert.All(candidates, candidate =>
         {
             Assert.Equal("unknown", candidate!["classification"]!.GetValue<string>());
+            Assert.Equal("ambiguous", candidate["fieldState"]!.GetValue<string>());
             Assert.False(candidate["confirmed"]!.GetValue<bool>());
         });
     }
@@ -79,6 +81,26 @@ public sealed class SalesInvoiceCaptureContractTests
 
         Assert.Empty(Assert.IsType<JsonArray>(line["serialNumbers"]));
     }
+    [Fact]
+    public void NormalizeForReview_DoesNotClaimSourceReadWhenProviderOmitsProvenance()
+    {
+        var source = JsonNode.Parse("""
+            {
+              "invoiceNumber": "00454",
+              "lines": [{ "description": "Voltas washer", "quantity": 1 }]
+            }
+            """)!;
+
+        var result = SalesInvoiceCaptureService.NormalizeForReview(source);
+        var line = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(result["lines"])));
+        var candidate = Assert.IsType<JsonObject>(Assert.Single(Assert.IsType<JsonArray>(line["identifierCandidates"])));
+
+        Assert.Equal("ambiguous", result["fieldStates"]!["invoiceNumber"]!.GetValue<string>());
+        Assert.Equal("ambiguous", line["fieldStates"]!["description"]!.GetValue<string>());
+        Assert.Equal("ambiguous", candidate["fieldState"]!.GetValue<string>());
+        Assert.Equal("unreadable", result["fieldStates"]!["total"]!.GetValue<string>());
+    }
+
     [Fact]
     public void NormalizeForReview_PreservesOnlyBoundedFieldConfidenceScores()
     {
