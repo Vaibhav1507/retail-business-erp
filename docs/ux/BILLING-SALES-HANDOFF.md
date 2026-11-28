@@ -216,6 +216,7 @@ Approved combined specification: [handwritten sales invoice extraction V2](./han
 - Upload MIME/signature is validated before source evidence is persisted, avoiding orphan evidence for unsupported/corrupt files.
 - Updated field correction provenance and UI presentation of the independent verification candidate.
 - Kept the handwritten source Rate separate from RBOS selling price. Only a `source_read` rate may prefill selling price; blank, unreadable or ambiguous source rates remain null and require a separate operator-entered sale price. The sale-line price now uses only `sellingPrice`, never a fallback to source `unitPrice`.
+- Added migration 061 and raised the bounded sale-line description limit from 240 to 10,000 characters. Without this, the existing domain/database rule rejected long wrapped handwriting even though extraction preserved it. Unit and Playwright coverage now verifies the complete long description survives into the posted sale line; no price, stock or accounting rules changed.
 - Expanded the in-scope Playwright journey to phone/tablet/landscape/desktop viewport and full-page captures, keyboard focus, scrolled state, Axe WCAG 2 A/AA, horizontal overflow, touch-target counts and console/server error reporting. It exercises source-bill correction and posts through the normal sale confirmation with the retained source document ID.
 - Added focused tests for OCR header extraction/comparison and null-rate provenance. Updated frontend mocks to reflect source-document IDs and operator-confirmed identifiers.
 
