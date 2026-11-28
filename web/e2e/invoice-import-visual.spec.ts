@@ -97,7 +97,7 @@ test('Create Invoice: handwritten evidence review, sale posting and responsive t
         fieldStates: { invoiceNumber: 'ambiguous', date: 'source_read', customerName: 'source_read', customerPhone: 'source_read', subtotal: 'source_read', taxAmount: 'source_read', total: 'ambiguous' },
         ocrEvidence: {
           invoiceNumber: { status: 'ambiguous', haikuOrPrimaryReading: 'HAND-468', ocrCandidate: '4006', ocrAgrees: false, pageNumber: 1, region: { left: 0.12, top: 0.1, width: 0.22, height: 0.04 }, verificationCandidate: 'HAND-468', verificationStatus: 'source_read' },
-          total: { status: 'ambiguous', haikuOrPrimaryReading: '11800', ocrCandidate: '10000', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '10020', verificationStatus: 'source_read' },
+          total: { status: 'ambiguous', haikuOrPrimaryReading: '10020', ocrCandidate: '10000', ocrAgrees: false, pageNumber: 1, region: { left: 0.75, top: 0.82, width: 0.16, height: 0.05 }, verificationCandidate: '10020', verificationStatus: 'source_read' },
         },
         lines: [{
           description: 'Samsung LED Television model UA43\\nSerial: SN12345678\\nFull handwritten model and package text preserved on this line',
