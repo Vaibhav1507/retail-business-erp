@@ -1042,6 +1042,11 @@ public sealed class SalesInvoiceCaptureService(
             var present = field is "subtotal" or "taxAmount" or "total"
                 ? HasNumber(extraction[field]) : HasText(extraction[field]);
             CheckConfidence(headerConfidence, field, label, null, present);
+            var state = ReadString(extraction["fieldStates"]?[field]);
+            if (state == "ambiguous")
+                Add(field, null, $"The {label} has competing readings. Check the original bill and choose the correct value.");
+            else if (state == "unreadable" && present)
+                Add(field, null, $"The {label} is marked unreadable. Check the original bill before continuing.");
         }
 
         if (!HasText(extraction["invoiceNumber"]))
@@ -1057,6 +1062,7 @@ public sealed class SalesInvoiceCaptureService(
             Add("total", null, "Bill total was not read. Check the printed TOTAL box.");
 
         var serialLocations = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+        var identifierLocations = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
         if (extraction["lines"] is JsonArray lines)
         {
             for (var index = 0; index < lines.Count; index++)
@@ -1113,10 +1119,24 @@ public sealed class SalesInvoiceCaptureService(
                 {
                     foreach (var candidate in candidates.OfType<JsonObject>())
                     {
-                        if (ReadString(candidate["classification"]) == "imei" &&
-                            ReadString(candidate["value"]) is { } imei && !IsValidImei(imei))
+                        var candidateValue = ReadString(candidate["value"]);
+                        var classification = ReadString(candidate["classification"]);
+                        if (candidateValue is null) continue;
+                        if (classification == "imei" && !IsValidImei(candidateValue))
                             Add("identifierCandidates", index, $"Item {index + 1}: a possible IMEI failed its check digit. Confirm the characters or change its classification; it has not been added as a serial.");
+                        if (!identifierLocations.TryGetValue(candidateValue, out var occurrences))
+                            identifierLocations[candidateValue] = occurrences = [];
+                        occurrences.Add(index);
                     }
+                }
+                foreach (var field in new[] { "description", "brand", "model", "hsn", "quantity", "unitPrice", "discount", "amount", "gstRate", "gstAmount" })
+                {
+                    var state = ReadString(line["fieldStates"]?[field]);
+                    var hasValue = line[field] is not null;
+                    if (state == "ambiguous")
+                        Add(field, index, $"Item {index + 1}: {field} has competing readings. Check the original bill.");
+                    else if (state == "unreadable" && hasValue)
+                        Add(field, index, $"Item {index + 1}: {field} is marked unreadable. Check the original bill.");
                 }
 
                 // Check only simple rows. Discounts and taxes can legitimately explain differences.
@@ -1130,6 +1150,9 @@ public sealed class SalesInvoiceCaptureService(
         foreach (var (serial, lineIndices) in serialLocations.Where(item => item.Value.Count > 1))
             foreach (var lineIndex in lineIndices)
                 Add("serialNumbers", lineIndex, $"Serial {serial} appears on more than one item. Check which item it belongs to.");
+        foreach (var (identifier, lineIndices) in identifierLocations.Where(item => item.Value.Count > 1))
+            foreach (var lineIndex in lineIndices)
+                Add("identifierCandidates", lineIndex, $"Identifier {identifier} appears on more than one item. Check which row it belongs to.");
 
         var subtotal = ReadDecimal(extraction["subtotal"]);
         var tax = ReadDecimal(extraction["taxAmount"]);
